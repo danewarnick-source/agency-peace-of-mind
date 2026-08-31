@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { coerceScheduledShiftStatus } from "@/lib/scheduling/shift-status";
+import { denverWeekUtcBounds } from "@/lib/scheduler/recurrence";
 
 const ShiftInput = z.object({
   id: z.string().uuid().optional(),
@@ -208,16 +209,15 @@ export const publishWeek = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     if (!supabase || !userId) return { shifts: 0, staff: 0 };
-    const start = new Date(data.week_start_iso);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
+    const { startIso, endExclusiveIso } = denverWeekUtcBounds(data.week_start_iso);
+    const start = new Date(startIso);
     const { data: rows, error } = await supabase
       .from("scheduled_shifts")
       .update({ published: true, status: "published" })
       .eq("organization_id", data.organization_id)
       .eq("published", false)
-      .gte("starts_at", start.toISOString())
-      .lt("starts_at", end.toISOString())
+      .gte("starts_at", startIso)
+      .lt("starts_at", endExclusiveIso)
       .not("staff_id", "is", null)
       .select("id, staff_id");
     if (error) throw error;

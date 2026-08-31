@@ -52,23 +52,44 @@ export function addCalendarMonths(year: number, month1to12: number, delta: numbe
   return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
 }
 
-/**
- * UTC ISO for a wall-clock time on a Denver calendar date.
- * Used when writing eMAR scheduled_for from a daily-note date.
- */
-export function denverWallToIso(ymd: string, hh: number, mm: number): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const utcGuess = Date.parse(`${ymd}T${pad(hh)}:${pad(mm)}:00Z`);
+function denverYmdHm(date: Date): { ymd: string; h: number; m: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: DENVER_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).formatToParts(new Date(utcGuess));
-  const gotH = Number(parts.find((p) => p.type === "hour")?.value ?? hh);
-  const gotM = Number(parts.find((p) => p.type === "minute")?.value ?? mm);
-  const deltaMin = gotH * 60 + gotM - (hh * 60 + mm);
-  return new Date(utcGuess - deltaMin * 60_000).toISOString();
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const num = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  let h = num("hour");
+  if (h === 24) h = 0;
+  const ymd = `${String(num("year")).padStart(4, "0")}-${String(num("month")).padStart(2, "0")}-${String(num("day")).padStart(2, "0")}`;
+  return { ymd, h, m: num("minute") };
+}
+
+/**
+ * UTC ISO for a wall-clock time on a Denver calendar date.
+ * Used when writing eMAR scheduled_for from a daily-note date, and for
+ * scheduler week bounds (midnight must stay on that Denver calendar day).
+ */
+export function denverWallToIso(ymd: string, hh: number, mm: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wantAsUtc = Date.parse(`${ymd}T${pad(hh)}:${pad(mm)}:00.000Z`);
+  let utcMs = wantAsUtc;
+  // Iterate so midnight (and DST) don't land on the previous Denver day.
+  // Comparing YMD+HM as fake-UTC timestamps gives the wall-clock error.
+  for (let i = 0; i < 4; i++) {
+    const got = denverYmdHm(new Date(utcMs));
+    const gotAsUtc = Date.parse(`${got.ymd}T${pad(got.h)}:${pad(got.m)}:00.000Z`);
+    const delta = gotAsUtc - wantAsUtc;
+    if (delta === 0) break;
+    utcMs -= delta;
+  }
+  return new Date(utcMs).toISOString();
 }
 
 /** Inclusive month window as Denver midnights, expressed as UTC ISO for queries. */

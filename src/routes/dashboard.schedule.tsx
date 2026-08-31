@@ -174,7 +174,9 @@ function useMyScheduledShifts(view: ViewMode, anchor: Date) {
         .eq("organization_id", org!.organization_id)
         .gte("starts_at", from.toISOString())
         .lte("starts_at", to.toISOString())
-        .or("published.eq.true,status.eq.accepted")
+        // Assigned to this staff — drafts included. Publish still drives
+        // accept/decline + notifications; cancelled stays hidden.
+        .neq("status", "cancelled")
         .order("starts_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({
@@ -349,8 +351,8 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
   );
 
   // Treat both legacy "pending" and the widened "published" status as
-  // awaiting-acceptance. "draft" and "cancelled" never reach this view
-  // (filtered by the fetch query), and "open" shifts have no staff_id.
+  // awaiting-acceptance. Cancelled never reaches this view. Drafts show
+  // so a saved series is visible before Publish; they skip accept/decline.
   if ((s.status === "pending" || s.status === "published") && s.published) {
     return (
       <div className="space-y-2">

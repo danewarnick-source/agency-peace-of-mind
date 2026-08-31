@@ -43,6 +43,8 @@ import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
+import { denverYmd } from "@/lib/denver-date";
+import { layoutShiftBars } from "@/lib/scheduler/recurrence";
 import { HiveMark } from "@/components/brand/hive-mark";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
@@ -108,7 +110,7 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 function dayStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return denverYmd(d);
 }
 
 function SchedulerPage() {
@@ -685,8 +687,8 @@ function DayView({
                     />
                   ))}
                 </div>
-                {/* Shifts */}
-                {rowShifts.map((s) => {
+                {/* Shifts — one bar per staff+slot; overlapping staff stack in lanes */}
+                {layoutShiftBars(rowShifts).map((s) => {
                   const start = new Date(s.starts_at);
                   const end = new Date(s.ends_at);
                   const startH = start.getHours() + start.getMinutes() / 60;
@@ -695,25 +697,44 @@ function DayView({
                   const leftPct = Math.max(0, (startH - min) / (max - min)) * 100;
                   const widthPct = Math.max(2, (Math.min(endH, max) - Math.max(startH, min)) / (max - min)) * 100;
                   const st = s.staff_id ? staffById.get(s.staff_id) : null;
-                  const label = st?.first_name ?? "Open";
+                  const name = st?.first_name ?? "Open";
+                  const label = `${name} · ${fmtTime(start)} – ${fmtTime(end)}`;
+                  const laneH = 100 / s.lanes;
                   return (
                     <button
                       key={s.id}
+                      type="button"
                       data-block="1"
                       onClick={() => onOpenShift(s.id)}
+                      title={label}
                       style={{
                         position: "absolute",
-                        top: 6, bottom: 6,
-                        left: `${leftPct}%`, width: `${widthPct}%`,
+                        top: `calc(${s.lane * laneH}% + 4px)`,
+                        height: `calc(${laneH}% - 8px)`,
+                        left: `${leftPct}%`,
+                        width: `${widthPct}%`,
+                        zIndex: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                         background: s.staff_id ? "rgba(245,147,36,0.15)" : "rgba(180,180,180,0.15)",
                         border: `1px solid ${s.staff_id ? GOLD : "#bbb"}`,
-                        borderRadius: 6, padding: "2px 6px",
-                        fontSize: 11, fontWeight: 600,
-                        color: NAVY, textAlign: "left", overflow: "hidden", whiteSpace: "nowrap",
+                        borderRadius: 6,
+                        padding: "0 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        lineHeight: 1.15,
+                        color: NAVY,
+                        textAlign: "left",
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 999, background: GOLD, marginRight: 4 }} />
-                      <strong>{label}</strong> <span className="opacity-70">{fmtTime(start)}–{fmtTime(end)}</span>
+                      <span
+                        aria-hidden
+                        style={{ width: 6, height: 6, borderRadius: 999, background: GOLD, flex: "0 0 6px" }}
+                      />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
                     </button>
                   );
                 })}
@@ -1759,7 +1780,9 @@ function StaffViewPreview({
     return set;
   }, [sched.timeOff, days, staffId]);
 
-  const myShifts = sched.shifts.filter((s) => s.staff_id === staffId && s.published);
+  const myShifts = sched.shifts.filter(
+    (s) => s.staff_id === staffId && s.status !== "cancelled",
+  );
 
   const setOff = useMutation({
     mutationFn: (args: { date: string; on: boolean }) =>
@@ -1811,7 +1834,7 @@ function StaffViewPreview({
               <div className="flex-1 text-sm">
                 {isOff ? (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                    ✈ Time off
+                    Time off
                   </span>
                 ) : dayShifts.length === 0 ? (
                   <span className="text-muted-foreground">No shifts</span>
@@ -1819,7 +1842,8 @@ function StaffViewPreview({
                   <div className="space-y-1">
                     {dayShifts.map((s) => {
                       const c = sched.clients.find((x) => x.id === s.client_id);
-                      return <div key={s.id}>{c?.first_name} {c?.last_name} · {s.service_code ?? s.job_code} · {fmtTime(new Date(s.starts_at))}–{fmtTime(new Date(s.ends_at))}</div>;
+                      const draft = !s.published ? " · Draft" : "";
+                      return <div key={s.id}>{c?.first_name} {c?.last_name} · {s.service_code ?? s.job_code} · {fmtTime(new Date(s.starts_at))}–{fmtTime(new Date(s.ends_at))}{draft}</div>;
                     })}
                   </div>
                 )}
@@ -1837,7 +1861,7 @@ function StaffViewPreview({
         })}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground text-center">
-        Only published shifts appear here. Marking off blocks scheduling that day everywhere.
+        Assigned shifts appear here, including unpublished drafts. Marking off blocks scheduling that day everywhere.
       </p>
     </div>
   );

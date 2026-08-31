@@ -14,7 +14,7 @@ export type TodayShiftRow = {
 
 /**
  * Returns ALL of the current staff's scheduled shifts for today
- * (published OR accepted), sorted by start time.
+ * (assigned, including unpublished drafts), sorted by start time.
  */
 export function useTodayShifts() {
   const { user } = useAuth();
@@ -35,7 +35,7 @@ export function useTodayShifts() {
         .eq("organization_id", org!.organization_id)
         .gte("starts_at", start.toISOString())
         .lte("starts_at", end.toISOString())
-        .or("published.eq.true,status.eq.accepted")
+        .neq("status", "cancelled")
         .order("starts_at", { ascending: true });
       if (error) throw error;
 

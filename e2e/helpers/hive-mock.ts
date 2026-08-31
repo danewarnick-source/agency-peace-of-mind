@@ -30,6 +30,7 @@ export const SHIFT = {
   hhsPublished: "dddddddd-dddd-dddd-dddd-ddddddddddd3",
   slhPublished: "dddddddd-dddd-dddd-dddd-ddddddddddd4",
   seiEvening: "dddddddd-dddd-dddd-dddd-ddddddddddd5",
+  slhDraftAssigned: "dddddddd-dddd-dddd-dddd-ddddddddddd6",
 } as const;
 
 const PROJECT_REF = "mmknqtdrefbzwfdtykza";
@@ -205,6 +206,20 @@ function shifts() {
       ends_at: mt("2026-09-01", "22:00"),
       status: "published",
       published: true,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+    {
+      // Unpublished assigned SLH — staff schedule / Staff view must still show it.
+      id: SHIFT.slhDraftAssigned,
+      staff_id: STAFF.stephen,
+      client_id: CLIENT.tom,
+      job_code: "SLH",
+      service_code: "SLH",
+      starts_at: mt("2026-09-01", "16:00"),
+      ends_at: mt("2026-09-01", "18:00"),
+      status: "draft",
+      published: false,
       parent_shift_id: null,
       organization_id: ORG_ID,
     },

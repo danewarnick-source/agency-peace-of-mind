@@ -1,32 +1,39 @@
 /**
- * Hive locked dark black-and-gold theme.
+ * Hive locked room — steel chrome, pale canvas, sparse gold jewelry.
  *
- * Tokens were locked by Julie with Dane. Do not invent, approximate, or
- * drift these hex values. Import this file from src/styles.css so Apex and
- * later surfaces read the same variables.
+ * Tokens locked from Dane's Employees / Scheduler / Documentation mocks.
+ * Import this file from src/styles.css so every surface inherits the same room.
  *
  * Product name on screen: Hive (never Hive Certify, never Keel)
  * AI agent name: Nectar (never Ask Hive, never Compass)
  * Domain hivecertify.com: marketing footer / login footer only
- * Hex mark: simple gold outline — not a filled bee
+ * Hex mark: gold outline — not a filled honeycomb, not a letter H
  */
 
 :root {
-  --hive-bg: #12141A;
-  --hive-sidebar: #0E1014;
-  --hive-canvas: #1C1F26;
-  --hive-surface: #252830;
-  --hive-border: #2A2E36;
-  --hive-gold: #D4A017;
-  --hive-gold-hover: #E8B423;
-  --hive-on-gold: #12141A;
-  --hive-text: #F4F1EA;
-  --hive-text-muted: #A39E93;
-  --hive-danger: #C45C4A;
-  --hive-ok: #6B8F71;
+  --hive-sidebar: #3e5368;
+  --hive-chrome-text: #f3efe6;
+  --hive-canvas: #f4f6f8;
+  --hive-bg: #f4f6f8;
+  --hive-surface: #ffffff;
+  --hive-border: #d5dbe1;
+  --hive-steel: #8a96a3;
+  --hive-gold: #c9a227;
+  --hive-gold-hover: #d4af37;
+  --hive-gold-soft: #f3ebd4;
+  --hive-on-gold: #243040;
+  --hive-text: #243040;
+  --hive-text-muted: #5a6570;
+  --hive-ink: #243040;
+  --hive-danger: #c45c4a;
+  --hive-danger-fg: #6b2e24;
+  --hive-danger-soft: #f3e4df;
+  --hive-ok: #6b8f71;
+  --hive-ok-fg: #2f4a35;
+  --hive-ok-soft: #e4ede5;
 
-  /* Semantic tokens — chrome stays darker than canvas. */
-  --background: var(--hive-bg);
+  /* Semantic tokens — chrome is steel; canvas is pale stone-white. */
+  --background: var(--hive-canvas);
   --foreground: var(--hive-text);
   --surface-warm: var(--hive-canvas);
   --card: var(--hive-surface);
@@ -34,22 +41,23 @@
   --popover: var(--hive-surface);
   --popover-foreground: var(--hive-text);
 
-  --primary: var(--hive-gold);
-  --primary-foreground: var(--hive-on-gold);
+  /* Primary = navy-steel for structural fills (toggles, selected chips). */
+  --primary: var(--hive-ink);
+  --primary-foreground: #ffffff;
   --accent: var(--hive-gold);
   --accent-foreground: var(--hive-on-gold);
   --accent-2: var(--hive-gold);
-  --accent-3: var(--hive-gold);
+  --accent-3: var(--hive-ok);
 
-  --secondary: var(--hive-canvas);
+  --secondary: #eef1f4;
   --secondary-foreground: var(--hive-text);
-  --muted: var(--hive-canvas);
+  --muted: #eef1f4;
   --muted-foreground: var(--hive-text-muted);
 
   --destructive: var(--hive-danger);
-  --destructive-foreground: var(--hive-text);
+  --destructive-foreground: #ffffff;
   --success: var(--hive-ok);
-  --success-foreground: var(--hive-text);
+  --success-foreground: #ffffff;
   --warning: var(--hive-gold);
   --warning-foreground: var(--hive-on-gold);
 
@@ -58,36 +66,36 @@
   --ring: var(--hive-gold);
 
   --sidebar: var(--hive-sidebar);
-  --sidebar-foreground: var(--hive-text);
+  --sidebar-foreground: var(--hive-chrome-text);
   --sidebar-primary: var(--hive-gold);
   --sidebar-primary-foreground: var(--hive-on-gold);
-  --sidebar-accent: color-mix(in srgb, var(--hive-gold) 10%, var(--hive-sidebar));
-  --sidebar-accent-foreground: var(--hive-gold);
-  --sidebar-border: var(--hive-border);
+  --sidebar-accent: color-mix(in srgb, white 10%, var(--hive-sidebar));
+  --sidebar-accent-foreground: var(--hive-chrome-text);
+  --sidebar-border: color-mix(in srgb, white 14%, var(--hive-sidebar));
   --sidebar-ring: var(--hive-gold);
 
-  --gradient-hero: var(--hive-bg);
+  --gradient-hero: var(--hive-canvas);
   --gradient-brand: var(--hive-gold);
   --gradient-life: var(--hive-gold);
-  --gradient-soft: color-mix(in srgb, var(--hive-gold) 8%, var(--hive-bg));
+  --gradient-soft: color-mix(in srgb, var(--hive-gold) 6%, var(--hive-canvas));
   --gradient-amber: var(--hive-gold);
-  --gradient-navy: var(--hive-bg);
+  --gradient-navy: var(--hive-sidebar);
 
-  --shadow-elegant: 0 18px 40px -24px rgba(0, 0, 0, 0.55);
+  --shadow-elegant: 0 18px 40px -24px rgba(36, 48, 64, 0.18);
   --shadow-card: 0 1px 0 color-mix(in srgb, var(--hive-border) 80%, transparent);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--hive-gold) 28%, transparent),
-    0 12px 32px -16px color-mix(in srgb, var(--hive-gold) 45%, transparent);
+  --shadow-soft: 0 1px 2px rgba(36, 48, 64, 0.06);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--hive-gold) 22%, transparent),
+    0 12px 32px -16px color-mix(in srgb, var(--hive-gold) 28%, transparent);
 
   --ink: var(--hive-text);
   --surface: var(--hive-surface);
   --surface-2: var(--hive-canvas);
-  --surface-3: var(--hive-bg);
+  --surface-3: #eef1f4;
   --border-light: var(--hive-border);
   --border-dark: var(--hive-border);
-  --navy-900: var(--hive-bg);
+  --navy-900: var(--hive-ink);
   --navy-800: var(--hive-sidebar);
-  --navy-700: var(--hive-canvas);
+  --navy-700: #35475a;
   --amber-500: var(--hive-gold);
   --amber-600: var(--hive-gold-hover);
   --text-strong: var(--hive-text);
@@ -101,23 +109,23 @@
 }
 
 .dark {
-  --background: var(--hive-bg);
+  --background: var(--hive-canvas);
   --foreground: var(--hive-text);
   --surface-warm: var(--hive-canvas);
   --card: var(--hive-surface);
   --card-foreground: var(--hive-text);
   --popover: var(--hive-surface);
   --popover-foreground: var(--hive-text);
-  --primary: var(--hive-gold);
-  --primary-foreground: var(--hive-on-gold);
-  --secondary: var(--hive-canvas);
+  --primary: var(--hive-ink);
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f4;
   --secondary-foreground: var(--hive-text);
-  --muted: var(--hive-canvas);
+  --muted: #eef1f4;
   --muted-foreground: var(--hive-text-muted);
   --accent: var(--hive-gold);
   --accent-foreground: var(--hive-on-gold);
   --accent-2: var(--hive-gold);
-  --accent-3: var(--hive-gold);
+  --accent-3: var(--hive-ok);
   --border: var(--hive-border);
   --input: var(--hive-border);
   --ring: var(--hive-gold);
@@ -125,8 +133,8 @@
 
 @layer utilities {
   .bg-hive-hex {
-    background-color: var(--hive-bg);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='92'%3E%3Cpolygon points='40,2 78,24 78,68 40,90 2,68 2,24' fill='none' stroke='%23D4A017' stroke-opacity='0.11' stroke-width='1'/%3E%3C/svg%3E");
+    background-color: var(--hive-canvas);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='92'%3E%3Cpolygon points='40,2 78,24 78,68 40,90 2,68 2,24' fill='none' stroke='%23C9A227' stroke-opacity='0.10' stroke-width='1'/%3E%3C/svg%3E");
     background-size: 80px 92px;
   }
 
@@ -140,10 +148,40 @@
 
   .hive-ghost-btn {
     background-color: transparent;
-    color: var(--hive-gold);
-    border: 1px solid var(--hive-gold);
+    color: var(--hive-text);
+    border: 1px solid var(--hive-border);
   }
   .hive-ghost-btn:hover {
-    background-color: color-mix(in srgb, var(--hive-gold) 10%, transparent);
+    background-color: #eef1f4;
+  }
+
+  /* Thin gold left bar — active nav. Never a gold fill box. */
+  .hive-nav-active {
+    position: relative;
+    color: var(--hive-chrome-text);
+    background: color-mix(in srgb, white 8%, var(--hive-sidebar));
+  }
+  .hive-nav-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--hive-gold);
+  }
+
+  .hive-status-active {
+    background: var(--hive-ok-soft);
+    color: var(--hive-ok-fg);
+  }
+  .hive-status-danger {
+    background: var(--hive-danger-soft);
+    color: var(--hive-danger-fg);
+  }
+  .hive-role-pill {
+    background: var(--hive-gold-soft);
+    color: var(--hive-on-gold);
   }
 }

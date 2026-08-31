@@ -32,7 +32,7 @@ function FunctionalityPage() {
     <div className="space-y-4">
       <header className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">IT / Functionality Channel</h1>
+          <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">IT / Functionality Channel</h1>
           <p className="text-sm text-muted-foreground">
             Functionality reports from provider organizations. Technical context only — payloads strip client data.
           </p>

@@ -3,24 +3,24 @@ import type { ShiftRow } from "@/hooks/use-schedule-preview";
 
 // ── Design tokens ported from HIVE-Schedule-Demo-v6.html ──────────────
 export const SCHED = {
-  navy: "#0B1126",
-  gold: "#f5a623",
-  teal: "#137182",
-  ink: "#0d112b",
-  paper: "#f6f7fb",
-  card: "#fff",
-  line: "#e6e8f0",
-  muted: "#6b7280",
-  gap: "#e0463e",
-  gapBg: "#fdeceb",
-  ok: "#1f9d6b",
-  okBg: "#e8f6f0",
-  warn: "#b8791a",
-  warnBg: "#fdf3e3",
-  tealBg: "#e6f1f3",
-  purple: "#5b4b9e",
-  purpleBg: "#eeeafb",
-  shadow: "0 1px 2px rgba(11,17,38,.06),0 8px 24px rgba(11,17,38,.06)",
+  navy: "var(--hive-sidebar)",
+  gold: "var(--hive-gold)",
+  teal: "var(--hive-ok)",
+  ink: "var(--hive-ink)",
+  paper: "var(--hive-canvas)",
+  card: "var(--hive-surface)",
+  line: "var(--hive-border)",
+  muted: "var(--hive-text-muted)",
+  gap: "var(--hive-danger)",
+  gapBg: "var(--hive-danger-soft)",
+  ok: "var(--hive-ok)",
+  okBg: "var(--hive-ok-soft)",
+  warn: "var(--hive-gold)",
+  warnBg: "var(--hive-gold-soft)",
+  tealBg: "var(--hive-ok-soft)",
+  purple: "var(--hive-sidebar)",
+  purpleBg: "#eef1f4",
+  shadow: "0 1px 2px rgba(36,48,64,.06),0 8px 24px rgba(36,48,64,.06)",
 } as const;
 
 export const font: React.CSSProperties = {
@@ -50,7 +50,7 @@ export type ShiftType = {
 };
 
 export const DEFAULT_SHIFT_TYPES: ShiftType[] = [
-  { key: "morning",   label: "Morning",     start: "06:00", end: "14:00", color: "#137182" },
+  { key: "morning",   label: "Morning",     start: "06:00", end: "14:00", color: "#3E5368" },
   { key: "swing",     label: "Swing",       start: "14:00", end: "22:00", color: "#5b4b9e" },
   { key: "overnight", label: "Overnight",   start: "22:00", end: "06:00", color: "#3a3f78" },
   { key: "day",       label: "Day",         start: "09:00", end: "15:00", color: "#b8791a" },

@@ -16,12 +16,12 @@ const buttonVariants = cva(
         secondary:
           "bg-[var(--hive-surface)] text-[var(--hive-text)] border border-[var(--hive-border)] hover:bg-[var(--hive-canvas)]",
         ghostOnDark:
-          "bg-transparent text-[var(--hive-gold)] border border-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]",
+          "bg-transparent text-[var(--hive-chrome-text)] border border-[color-mix(in_srgb,white_22%,transparent)] hover:bg-[color-mix(in_srgb,white_10%,transparent)]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]",
-        ghost: "text-[var(--hive-text)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]",
-        link: "text-[var(--hive-gold)] underline-offset-4 hover:underline",
+          "border border-[var(--hive-border)] bg-[var(--hive-surface)] text-[var(--hive-text)] hover:bg-[var(--hive-canvas)]",
+        ghost: "text-[var(--hive-text)] hover:bg-[#eef1f4] hover:text-[var(--hive-text)]",
+        link: "text-[var(--hive-text)] underline-offset-4 hover:underline",
         life: "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)]",
       },
       size: {

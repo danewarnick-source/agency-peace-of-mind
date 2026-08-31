@@ -57,7 +57,7 @@ function NectarPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
+      <section className="rounded-xl border border-[var(--hive-gold)]/30 bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <NectarBadge size="sm" />
@@ -292,7 +292,7 @@ function ReportBuilder() {
   }
 
   return (
-    <section className="rounded-xl border border-[#f4a93a]/30 bg-card p-4 shadow-sm">
+    <section className="rounded-xl border border-[var(--hive-gold)]/30 bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-3">
         <NectarMark size="sm" />
         <div className="flex flex-1 items-center gap-2">
@@ -342,7 +342,7 @@ function ReportBuilder() {
             type="button"
             onClick={() => saveName.trim() && saveM.mutate(saveName.trim())}
             disabled={saveM.isPending || saveName.trim().length === 0}
-            className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
           >
             {saveM.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save &amp; pin
@@ -480,7 +480,7 @@ function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <Pin className="h-4 w-4 text-[#d97a1c]" />
+        <Pin className="h-4 w-4 text-[var(--hive-gold)]" />
         <h2 className="font-display text-lg font-semibold">Saved reports</h2>
         <span className="text-xs text-muted-foreground">
           Pin one-tap re-runs and schedule recurring delivery
@@ -499,8 +499,8 @@ function SavedReportsSection({ onRunPrompt }: { onRunPrompt: (p: string) => void
             <li key={r.id} className="rounded-lg border border-border bg-background p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1 text-sm font-semibold text-[#0f1b3d]">
-                    {r.pinned && <Pin className="h-3 w-3 text-[#d97a1c]" />}
+                  <div className="flex items-center gap-1 text-sm font-semibold text-[var(--hive-text)]">
+                    {r.pinned && <Pin className="h-3 w-3 text-[var(--hive-gold)]" />}
                     <span className="truncate">{r.name}</span>
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{r.prompt}</p>
@@ -612,12 +612,12 @@ function ScheduleDialog({
             <button
               type="button"
               onClick={() => setCadence("weekly")}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${cadence === "weekly" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${cadence === "weekly" ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white" : "border-border"}`}
             >Weekly</button>
             <button
               type="button"
               onClick={() => setCadence("monthly")}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${cadence === "monthly" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${cadence === "monthly" ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white" : "border-border"}`}
             >Monthly</button>
           </div>
 
@@ -696,7 +696,7 @@ function ScheduleDialog({
                 });
               } finally { setPending(false); }
             }}
-            className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Save schedule

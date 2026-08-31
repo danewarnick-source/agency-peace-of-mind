@@ -86,7 +86,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span data-testid="geofence-badge" data-geofence="corrected" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+            <span data-testid="geofence-badge" data-geofence="corrected" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[var(--hive-ink)]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[var(--hive-ink)]">
               <CheckCircle2 className="h-3.5 w-3.5" /> CORRECTED
             </span>
           </TooltipTrigger>
@@ -138,7 +138,7 @@ function GpsBypassBadge({ row }: { row: Pick<Row, "gps_in_bypassed" | "gps_in_by
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span data-testid="gps-bypass-badge" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+          <span data-testid="gps-bypass-badge" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[var(--hive-ink)]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[var(--hive-ink)]">
             <Zap className="h-3.5 w-3.5" /> GPS BYPASSED — ADDRESS USED
           </span>
         </TooltipTrigger>
@@ -2608,8 +2608,8 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
             </div>
 
             {(row.gps_in_bypassed || row.gps_out_bypassed) && (
-              <div className="rounded-lg border border-[#137182]/40 bg-[#137182]/10 p-3 text-xs">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#137182]">
+              <div className="rounded-lg border border-[var(--hive-ink)]/40 bg-[var(--hive-ink)]/10 p-3 text-xs">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--hive-ink)]">
                   <Zap className="h-3.5 w-3.5" /> GPS bypassed — address used
                 </div>
                 {row.gps_in_bypassed && (

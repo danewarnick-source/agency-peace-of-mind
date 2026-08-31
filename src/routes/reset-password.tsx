@@ -141,7 +141,7 @@ function ResetPassword() {
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2"><Label htmlFor="password">New password</Label><PasswordInput id="password" name="password" minLength={8} required /></div>
         <div className="grid gap-2"><Label htmlFor="confirm">Confirm password</Label><PasswordInput id="confirm" name="confirm" minLength={8} required /></div>
-        <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+        <Button type="submit" disabled={busy} className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
           {busy ? "Saving…" : "Update password"}
         </Button>
       </form>

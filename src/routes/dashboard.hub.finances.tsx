@@ -114,7 +114,7 @@ function FinancesHub() {
         {/* ─── Billing card ─────────────────────────────────────────── */}
         <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between">
-            <Receipt className="h-6 w-6 text-[#137182]" />
+            <Receipt className="h-6 w-6 text-[var(--hive-ink)]" />
           </div>
           <div className="mt-3 text-base font-semibold">Billing</div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -166,7 +166,7 @@ function FinancesHub() {
           {canSeeBilling && (
             <Link
               to="/dashboard/billing"
-              className="mt-5 inline-flex w-fit items-center gap-1.5 rounded-lg bg-[#137182] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f5d6b]"
+              className="mt-5 inline-flex w-fit items-center gap-1.5 rounded-lg bg-[var(--hive-ink)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f5d6b]"
             >
               Open Billing <ArrowRight className="h-4 w-4" />
             </Link>
@@ -176,7 +176,7 @@ function FinancesHub() {
         {/* ─── Financial card ────────────────────────────────────────── */}
         <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between">
-            <TrendingUp className="h-6 w-6 text-[#137182]" />
+            <TrendingUp className="h-6 w-6 text-[var(--hive-ink)]" />
           </div>
           <div className="mt-3 text-base font-semibold">Financial</div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -227,7 +227,7 @@ function FinancesHub() {
 
           <Link
             to="/dashboard/financial"
-            className="mt-5 inline-flex w-fit items-center gap-1.5 rounded-lg bg-[#137182] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f5d6b]"
+            className="mt-5 inline-flex w-fit items-center gap-1.5 rounded-lg bg-[var(--hive-ink)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f5d6b]"
           >
             Open Financial <ArrowRight className="h-4 w-4" />
           </Link>

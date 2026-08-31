@@ -59,7 +59,7 @@ function CertificatePage() {
         <div className="text-sm text-muted-foreground">
           Verification code: <span className="font-mono">{code}</span>
         </div>
-        <Button onClick={() => window.print()} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+        <Button onClick={() => window.print()} className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
           <Download className="mr-2 h-4 w-4" /> Download / Print PDF
         </Button>
       </div>
@@ -67,7 +67,7 @@ function CertificatePage() {
       {/* Certificate sheet */}
       <div className="mx-auto max-w-4xl rounded-3xl border-8 border-double border-primary/30 bg-card p-10 shadow-[var(--shadow-card)] print:rounded-none print:border-primary/40 print:shadow-none">
         <div className="text-center">
-          <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-[image:var(--gradient-brand)] text-primary-foreground">
+          <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
             <Award className="h-7 w-7" />
           </div>
           <p className="mt-4 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">

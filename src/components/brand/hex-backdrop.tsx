@@ -1,10 +1,10 @@
 /**
- * Faint gold hexagon-outline pattern. Use on dark marketing / login bands.
+ * Faint gold hexagon-outline pattern. Use on pale canvas marketing / login bands.
  * Stroke uses the locked --hive-gold token.
  */
 export function HexBackdrop({
   glow = true,
-  opacity = 0.14,
+  opacity = 0.08,
 }: { glow?: boolean; opacity?: number }) {
   return (
     <>
@@ -32,7 +32,7 @@ export function HexBackdrop({
           className="pointer-events-none absolute inset-x-0 bottom-[-20%] h-[60%]"
           style={{
             background:
-              "radial-gradient(900px 420px at 20% 40%, color-mix(in srgb, var(--hive-gold) 14%, transparent), transparent 60%)",
+              "radial-gradient(900px 420px at 20% 40%, color-mix(in srgb, var(--hive-gold) 8%, transparent), transparent 60%)",
           }}
         />
       )}

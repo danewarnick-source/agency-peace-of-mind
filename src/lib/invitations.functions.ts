@@ -64,13 +64,13 @@ async function sendInvitationEmail(args: {
 
     const subject = `You're invited to join ${orgName} on HIVE`;
     const html = `
-      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f1b3d">
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#243040">
         <p>Hello,</p>
         <p><strong>${escapeHtml(orgName)}</strong> has invited you to join their team on HIVE as a
           <strong>${escapeHtml(roleLabel)}</strong>.</p>
         <p style="margin:28px 0">
           <a href="${link}"
-             style="display:inline-block;background:#0f1b3d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
+             style="display:inline-block;background:#c9a227;color:#243040;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
             Accept invitation
           </a>
         </p>

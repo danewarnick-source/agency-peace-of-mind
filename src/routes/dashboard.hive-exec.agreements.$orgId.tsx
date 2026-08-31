@@ -33,7 +33,7 @@ function OrgAgreementsPage() {
       <Link to="/dashboard/hive-exec/agreements" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" /> Back to matrix
       </Link>
-      <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">Organization Agreements</h1>
+      <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">Organization Agreements</h1>
 
       {q.isLoading && <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading…</div>}
 

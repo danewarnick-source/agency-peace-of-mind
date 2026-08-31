@@ -116,7 +116,7 @@ function ProgramsPage() {
                   )}
                   <div className="flex gap-2">
                     {a ? (
-                      <Button asChild className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground">
+                      <Button asChild className="flex-1 bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
                         <Link to="/dashboard/programs/$programId" params={{ programId: p.id }}>
                           {isComplete ? "Review" : a.progress > 0 ? "Resume" : "Start"}
                         </Link>
@@ -127,7 +127,7 @@ function ProgramsPage() {
                           <Link to="/dashboard/programs/$programId" params={{ programId: p.id }}>View</Link>
                         </Button>
                         <Button
-                          className="flex-1 bg-[image:var(--gradient-brand)] text-primary-foreground"
+                          className="flex-1 bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
                           disabled={!org || enroll.isPending}
                           onClick={() => enroll.mutate(p.id)}
                         >

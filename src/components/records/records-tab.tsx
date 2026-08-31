@@ -722,7 +722,7 @@ export function RecordsTab() {
     <div className="space-y-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h3 className="text-base font-semibold text-[#0B1126]">Records</h3>
+          <h3 className="text-base font-semibold text-[var(--hive-text)]">Records</h3>
           <p className="text-xs text-muted-foreground">
             Every work record in one place. Click any row to view and edit every field. Switch to Needs attention to work the exception queue.
           </p>
@@ -735,7 +735,7 @@ export function RecordsTab() {
           type="button"
           onClick={() => setMode("all")}
           className={`flex min-h-[36px] items-center gap-2 px-3 py-1.5 text-xs font-medium transition ${
-            mode === "all" ? "bg-[#137182] text-white" : "bg-card text-muted-foreground hover:bg-accent"
+            mode === "all" ? "bg-[var(--hive-ink)] text-white" : "bg-card text-muted-foreground hover:bg-accent"
           }`}
         >
           <ListChecks className="h-3.5 w-3.5" /> All records
@@ -744,7 +744,7 @@ export function RecordsTab() {
           type="button"
           onClick={() => setMode("attention")}
           className={`flex min-h-[36px] items-center gap-2 border-l border-border px-3 py-1.5 text-xs font-medium transition ${
-            mode === "attention" ? "bg-[#137182] text-white" : "bg-card text-muted-foreground hover:bg-accent"
+            mode === "attention" ? "bg-[var(--hive-ink)] text-white" : "bg-card text-muted-foreground hover:bg-accent"
           }`}
         >
           <AlertCircle className="h-3.5 w-3.5" /> Needs attention
@@ -768,7 +768,7 @@ export function RecordsTab() {
             type="button"
             onClick={() => setType(k)}
             className={`min-h-[36px] rounded px-3 py-1 text-xs font-medium transition ${
-              type === k ? "bg-[#0B1126] text-white" : "text-muted-foreground hover:bg-accent"
+              type === k ? "bg-[var(--hive-ink)] text-white" : "text-muted-foreground hover:bg-accent"
             }`}
           >
             {label}
@@ -810,7 +810,7 @@ export function RecordsTab() {
           {/* Hours summary bar */}
           <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
               <span className="font-medium text-foreground">
-                Billable <span className="tabular-nums text-[#137182]">{(billableMin / 60).toFixed(1)}h</span>
+                Billable <span className="tabular-nums font-semibold text-[var(--hive-text)]">{(billableMin / 60).toFixed(1)}h</span>
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="font-medium text-foreground">
@@ -818,7 +818,7 @@ export function RecordsTab() {
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="font-medium text-foreground">
-                Total <span className="tabular-nums">{(totalHoursMin / 60).toFixed(1)}h</span>
+                Total <span className="tabular-nums font-semibold text-[var(--hive-text)]">{(totalHoursMin / 60).toFixed(1)}h</span>
               </span>
             </div>
 
@@ -865,7 +865,7 @@ export function RecordsTab() {
           {type === "evv" && (
             <section className="rounded-xl border border-border bg-card p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#0B1126]">EVV Export Batches</h3>
+                <h3 className="text-base font-semibold text-[var(--hive-text)]">EVV Export Batches</h3>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
                   Show archived
@@ -979,7 +979,7 @@ export function RecordsTab() {
                         className="cursor-pointer border-t border-border hover:bg-accent/40"
                       >
                         <td className="px-3 py-2">{r.staff_name}</td>
-                        <td className="px-3 py-2 text-black">
+                        <td className="px-3 py-2 text-[var(--hive-text)]">
                           {r.client_name}
                           {r.team_name && (
                             <span className="ml-1 text-xs text-muted-foreground">· {r.team_name}</span>
@@ -991,7 +991,7 @@ export function RecordsTab() {
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
                         <td className="px-3 py-2">{formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp)}</td>
                         <InlineTimeCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
-                        <td className={`px-3 py-2 tabular-nums ${isLongOpenPunch(r.duration_min) ? "font-semibold text-amber-800 dark:text-amber-300" : ""}`}>
+                        <td className={`px-3 py-2 tabular-nums font-semibold text-[var(--hive-text)] ${isLongOpenPunch(r.duration_min) ? "text-[var(--hive-danger-fg)]" : ""}`}>
                           {fmtDur(r.duration_min)}
                           {isLongOpenPunch(r.duration_min) && (
                             <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">open punch</span>
@@ -1011,7 +1011,7 @@ export function RecordsTab() {
                             )}
                             {(r.gps_in_bypassed || r.gps_out_bypassed) && (
                               <span
-                                className="inline-flex items-center gap-1 rounded-full bg-[#137182]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#137182]"
+                                className="inline-flex items-center gap-1 rounded-full bg-[var(--hive-ok-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--hive-ok-fg)]"
                                 title="GPS could not be captured — staff proceeded with a confirmed reason and the record uses the client's on-file address instead."
                               >
                                 <Zap className="h-3 w-3" /> GPS bypassed — address used
@@ -1205,13 +1205,13 @@ function InlineTimeCell({
     >
       {formatPunchRange(inTs, outTs)}
       {isEvv && (
-        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400">evv</span>
+        <span className="ml-1 inline-flex items-center rounded-full bg-[var(--hive-ok-soft)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--hive-ok-fg)]">evv</span>
       )}
       {row.is_edited_by_admin && (
         <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
       )}
       {row.shift_entry_type === "Manual_Entry" && (
-        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-[#137182]">manual</span>
+        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-[var(--hive-text-muted)]">manual</span>
       )}
     </td>
   );

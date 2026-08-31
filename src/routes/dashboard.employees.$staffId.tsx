@@ -739,7 +739,7 @@ function DocumentVaultCard({
       <CardContent className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold">Document Vault</p>
-          <a href={obligationsHref} className="text-sm font-medium text-[#137182] hover:underline">
+          <a href={obligationsHref} className="text-sm font-medium text-[var(--hive-ink)] hover:underline">
             View compliance obligations →
           </a>
         </div>
@@ -1583,8 +1583,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "border-[#137182] bg-[#137182] text-white"
-          : "border-border bg-card text-muted-foreground hover:border-[#137182]/40 hover:text-foreground"
+          ? "border-[var(--hive-ink)] bg-[var(--hive-ink)] text-white"
+          : "border-border bg-card text-muted-foreground hover:border-[var(--hive-ink)]/40 hover:text-foreground"
       }`}
     >
       {children}
@@ -1814,8 +1814,8 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
 
 function KindBadge({ kind }: { kind: ActivityItem["kind"] }) {
   const map: Record<ActivityItem["kind"], { Icon: typeof FileText; cls: string }> = {
-    Shift: { Icon: Clock, cls: "bg-[#137182]/10 text-[#137182]" },
-    Timesheet: { Icon: ClipboardList, cls: "bg-[#0B1126]/10 text-[#0B1126]" },
+    Shift: { Icon: Clock, cls: "bg-[var(--hive-ink)]/10 text-[var(--hive-ink)]" },
+    Timesheet: { Icon: ClipboardList, cls: "bg-[var(--hive-text)]/10 text-[var(--hive-text)]" },
     Form: { Icon: FileText, cls: "bg-muted text-foreground/80" },
     Incident: { Icon: AlertTriangle, cls: "bg-rose-100 text-rose-700" },
   };

@@ -36,7 +36,7 @@ export function RecentActivityCard({ items }: { items: ActivityItem[] }) {
             const Icon = ICONS[it.kind];
             return (
               <li key={it.id} className="flex items-start gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">

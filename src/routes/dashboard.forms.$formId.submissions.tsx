@@ -135,7 +135,7 @@ function renderCell(v: unknown) {
   if (Array.isArray(v)) return v.join(", ");
   if (typeof v === "object") {
     const o = v as Record<string, unknown>;
-    if (typeof o.dataUrl === "string") return <a href={o.dataUrl} target="_blank" rel="noreferrer" className="text-[#137182] underline">{(o.name as string) ?? "file"}</a>;
+    if (typeof o.dataUrl === "string") return <a href={o.dataUrl} target="_blank" rel="noreferrer" className="text-[var(--hive-ink)] underline">{(o.name as string) ?? "file"}</a>;
     if (typeof o.lat === "number" && typeof o.lng === "number") return `${(o.lat as number).toFixed(5)}, ${(o.lng as number).toFixed(5)}`;
     return <code className="text-xs">{JSON.stringify(v)}</code>;
   }

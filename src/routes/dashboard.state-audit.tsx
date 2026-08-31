@@ -49,12 +49,12 @@ function StateAuditPage() {
       <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
               <div className="text-xs uppercase tracking-wider text-[#9a3412]">State Audit</div>
-              <h1 className="font-display text-xl font-bold text-[#0f1b3d]">Audit Packages</h1>
+              <h1 className="font-display text-xl font-bold text-[var(--hive-text)]">Audit Packages</h1>
               <p className="text-xs text-[#9a3412]">
                 Assemble packets of subject-level records, provision auditors, and preview
                 exactly what they see at{" "}
@@ -120,7 +120,7 @@ function SubTabButton({ active, onClick, icon, children }: {
     <button
       onClick={onClick}
       className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
-        active ? "bg-[#0f1b3d] text-white" : "text-slate-600 hover:bg-slate-100"
+        active ? "bg-[var(--hive-text)] text-white" : "text-slate-600 hover:bg-slate-100"
       }`}
     >
       {icon} {children}
@@ -164,7 +164,7 @@ function PackageList({ orgId, selectedId, onSelect }: {
     <div className="space-y-3">
       <button
         onClick={() => setShowForm((s) => !s)}
-        className="inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-[#0f1b3d] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a]"
+        className="inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-[var(--hive-text)] px-3 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a]"
       >
         <Plus className="h-4 w-4" /> New audit package
       </button>
@@ -185,13 +185,13 @@ function PackageList({ orgId, selectedId, onSelect }: {
                 onClick={() => onSelect(p.id)}
                 className={`w-full rounded-lg border p-3 text-left transition-colors ${
                   selectedId === p.id
-                    ? "border-[#0f1b3d] bg-[#0f1b3d]/5"
+                    ? "border-[var(--hive-text)] bg-[var(--hive-text)]/5"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <StatusPill status={p.status} />
-                  <span className="truncate text-sm font-medium text-[#0f1b3d]">
+                  <span className="truncate text-sm font-medium text-[var(--hive-text)]">
                     {p.title ?? p.state_agency}
                   </span>
                 </div>
@@ -340,7 +340,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
           <div>
             <div className="flex items-center gap-2">
               <StatusPill status={pkg.status} />
-              <h3 className="font-display text-lg font-semibold text-[#0f1b3d]">
+              <h3 className="font-display text-lg font-semibold text-[var(--hive-text)]">
                 {pkg.title ?? pkg.state_agency}
               </h3>
             </div>
@@ -365,7 +365,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
 
       {/* Subjects */}
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h4 className="mb-3 font-display text-sm font-semibold text-[#0f1b3d]">Subjects in scope</h4>
+        <h4 className="mb-3 font-display text-sm font-semibold text-[var(--hive-text)]">Subjects in scope</h4>
         {subjects.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-300 p-3 text-center text-xs text-muted-foreground">
             No subjects added yet.
@@ -410,7 +410,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
 
       {/* Auditors */}
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h4 className="mb-3 font-display text-sm font-semibold text-[#0f1b3d]">Auditors with access</h4>
+        <h4 className="mb-3 font-display text-sm font-semibold text-[var(--hive-text)]">Auditors with access</h4>
         {access.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-300 p-3 text-center text-xs text-muted-foreground">
             No auditors granted access yet.
@@ -420,7 +420,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
             {access.map((a) => (
               <li key={a.id} className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50 px-2 py-1.5 text-sm">
                 <div>
-                  <div className="font-medium text-[#0f1b3d]">{a.auditor_name}</div>
+                  <div className="font-medium text-[var(--hive-text)]">{a.auditor_name}</div>
                   <div className="text-xs text-muted-foreground">{a.auditor_email} · {a.auditor_agency}</div>
                 </div>
                 {a.revoked_at ? (
@@ -446,7 +446,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
 
       <div className="text-center">
         <Link to="/audit-portal" target="_blank" rel="noopener"
-          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[#0f1b3d]">
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[var(--hive-text)]">
           Preview auditor portal <ExternalLink className="h-3 w-3" />
         </Link>
       </div>
@@ -501,7 +501,7 @@ function AuditorGrantPicker({ available, onGrant }: {
       <button
         onClick={() => { if (selected) { onGrant(selected); setSelected(""); } }}
         disabled={!selected}
-        className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
+        className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
       >
         <Plus className="h-4 w-4" /> Grant
       </button>
@@ -555,8 +555,8 @@ function ProvisionedAuditorsSection({ orgId, auditPackageId }: { orgId: string; 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <UserPlus className="h-4 w-4 text-[#0f1b3d]" />
-        <h4 className="font-display text-sm font-semibold text-[#0f1b3d]">Invite a new auditor to this package</h4>
+        <UserPlus className="h-4 w-4 text-[var(--hive-text)]" />
+        <h4 className="font-display text-sm font-semibold text-[var(--hive-text)]">Invite a new auditor to this package</h4>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">
         Creates a separate auditor account (not an org member). The invite email
@@ -616,7 +616,7 @@ function AuditorRow({ auditor, onRevoke }: { auditor: OrgAuditorRow; onRevoke: (
   return (
     <li className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
       <div>
-        <div className="font-medium text-[#0f1b3d]">
+        <div className="font-medium text-[var(--hive-text)]">
           {auditor.full_name}{" "}
           <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${
             auditor.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"

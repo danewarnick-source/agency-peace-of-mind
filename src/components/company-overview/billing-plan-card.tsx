@@ -14,15 +14,15 @@ export function BillingPlanCard({
   const utilization = hasPlan && seatsPurchased! > 0 ? Math.round((seatsUsed / seatsPurchased!) * 100) : null;
 
   return (
-    <section className="rounded-2xl border border-[#f4a93a]/40 bg-gradient-to-br from-[#fff8ec] to-[#fef0d6] p-5 shadow-card">
+    <section className="rounded-2xl border border-[var(--hive-gold)]/40 bg-gradient-to-br from-[#fff8ec] to-[#fef0d6] p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
             <CreditCard className="h-4 w-4" />
           </span>
-          <h2 className="font-display text-base font-semibold tracking-tight text-[#0d112b]">Plan & billing</h2>
+          <h2 className="font-display text-base font-semibold tracking-tight text-[var(--hive-text)]">Plan & billing</h2>
         </div>
-        <span className="rounded-full border border-[#0d112b]/15 bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0d112b]">
+        <span className="rounded-full border border-[var(--hive-text)]/15 bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--hive-text)]">
           Company Executive
         </span>
       </div>
@@ -30,7 +30,7 @@ export function BillingPlanCard({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-white bg-white/70 p-3">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Seats used</p>
-          <p className="mt-1 font-display text-2xl font-bold tabular-nums text-[#0d112b]">
+          <p className="mt-1 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">
             {seatsUsed}{hasPlan ? ` / ${seatsPurchased}` : ""}
           </p>
           {utilization != null && (
@@ -39,7 +39,7 @@ export function BillingPlanCard({
         </div>
         <div className="rounded-xl border border-white bg-white/70 p-3">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Next invoice</p>
-          <p className="mt-1 font-display text-2xl font-bold tabular-nums text-[#0d112b]">
+          <p className="mt-1 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">
             {nextInvoiceAt
               ? new Date(nextInvoiceAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
               : "—"}

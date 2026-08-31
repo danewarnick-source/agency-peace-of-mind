@@ -108,14 +108,18 @@
   /* Locked Hive theme — single source in src/styles/hive-theme.css */
   --color-hive-bg: var(--hive-bg);
   --color-hive-sidebar: var(--hive-sidebar);
+  --color-hive-chrome-text: var(--hive-chrome-text);
   --color-hive-canvas: var(--hive-canvas);
   --color-hive-surface: var(--hive-surface);
   --color-hive-border: var(--hive-border);
+  --color-hive-steel: var(--hive-steel);
   --color-hive-gold: var(--hive-gold);
   --color-hive-gold-hover: var(--hive-gold-hover);
+  --color-hive-gold-soft: var(--hive-gold-soft);
   --color-hive-on-gold: var(--hive-on-gold);
   --color-hive-text: var(--hive-text);
   --color-hive-text-muted: var(--hive-text-muted);
+  --color-hive-ink: var(--hive-ink);
   --color-hive-danger: var(--hive-danger);
   --color-hive-ok: var(--hive-ok);
   --color-canvas: var(--hive-canvas);
@@ -124,28 +128,28 @@
 :root {
   --radius: 0.5rem;
 
-  /* === HIVE — powered by NECTAR : Brand ramps (hex sources) === */
-  --hive-navy-50:  #EDEEF2;
-  --hive-navy-100: #D2D4DF;
-  --hive-navy-200: #A9AEC2;
-  --hive-navy-300: #7B83A2;
-  --hive-navy-400: #49557E;
-  --hive-navy-500: #1C2A5E;
-  --hive-navy-600: #192553;
-  --hive-navy-700: #141E44;
-  --hive-navy-800: #101835;
-  --hive-navy-900: #0B1126;
+  /* === HIVE brand ramps — remapped to the locked steel room === */
+  --hive-navy-50:  #F4F6F8;
+  --hive-navy-100: #E4E8ED;
+  --hive-navy-200: #C5CDD5;
+  --hive-navy-300: #9AA6B2;
+  --hive-navy-400: #6B7A89;
+  --hive-navy-500: #3E5368;
+  --hive-navy-600: #35475A;
+  --hive-navy-700: #2C3C4D;
+  --hive-navy-800: #243040;
+  --hive-navy-900: #243040;
 
-  --nectar-gold-50:  #FEF8ED;
-  --nectar-gold-100: #FDEDD3;
-  --nectar-gold-200: #FBDDAB;
-  --nectar-gold-300: #F9CB7F;
-  --nectar-gold-400: #F7B84F;
-  --nectar-gold-500: #F5A623;
-  --nectar-gold-600: #D8921F;
-  --nectar-gold-700: #B07819;
-  --nectar-gold-800: #895D14;
-  --nectar-gold-900: #62420E;
+  --nectar-gold-50:  #F8F3E4;
+  --nectar-gold-100: #F3EBD4;
+  --nectar-gold-200: #E8D7A8;
+  --nectar-gold-300: #DCC46F;
+  --nectar-gold-400: #D4AF37;
+  --nectar-gold-500: #C9A227;
+  --nectar-gold-600: #B08E1F;
+  --nectar-gold-700: #8E7219;
+  --nectar-gold-800: #6B5613;
+  --nectar-gold-900: #4A3B0D;
 
   --nectar-violet-50:  #F3EEF9;
   --nectar-violet-100: #E2D5F0;
@@ -158,50 +162,51 @@
   --nectar-violet-800: #3C1864;
   --nectar-violet-900: #2B1148;
 
-  --hive-teal-50:  #EDF7F9;
-  --hive-teal-100: #D1EBF0;
-  --hive-teal-200: #A8DAE3;
-  --hive-teal-300: #7BC6D4;
-  --hive-teal-400: #49B1C4;
-  --hive-teal-500: #1B9DB5;
-  --hive-teal-600: #188A9F;
-  --hive-teal-700: #137182;
-  --hive-teal-800: #0F5865;
-  --hive-teal-900: #0B3F48;
+  --hive-teal-50:  #E4EDE5;
+  --hive-teal-100: #D4E2D6;
+  --hive-teal-200: #B5CDB9;
+  --hive-teal-300: #96B89C;
+  --hive-teal-400: #7AA382;
+  --hive-teal-500: #6B8F71;
+  --hive-teal-600: #58785D;
+  --hive-teal-700: #2F4A35;
+  --hive-teal-800: #243040;
+  --hive-teal-900: #243040;
 
-  --ink: #0B1220;
+  --ink: var(--hive-text);
 
   /* === HIVE rebrand surfaces (raw hex) === */
-  --surface:        #ffffff;
-  --surface-2:      #f7f8fb;
-  --surface-3:      #eef0f5;
-  --border-light:   #e4e7ef;
-  --border-dark:    rgba(255,255,255,0.11);
+  --surface:        var(--hive-surface);
+  --surface-2:      var(--hive-canvas);
+  --surface-3:      #eef1f4;
+  --border-light:   var(--hive-border);
+  --border-dark:    var(--hive-border);
 
-  --navy-900:       #0d112b;
-  --navy-800:       #141a3d;
-  --navy-700:       #1c2350;
+  --navy-900:       var(--hive-ink);
+  --navy-800:       var(--hive-sidebar);
+  --navy-700:       #35475a;
 
-  --amber-500:      #f4a93a;
-  --amber-600:      #f59324;
+  --amber-500:      var(--hive-gold);
+  --amber-600:      var(--hive-gold-hover);
 
-  --text-strong:    #0d112b;
-  --text-soft:      #4a5168;
+  --text-strong:    var(--hive-text);
+  --text-soft:      var(--hive-text-muted);
 
-  --gradient-amber:  linear-gradient(135deg, #f4a93a 0%, #f59324 100%);
-  --gradient-navy:   linear-gradient(140deg, #141a3d 0%, #0d112b 100%);
+  --gradient-amber:  var(--hive-gold);
+  --gradient-navy:   var(--hive-sidebar);
 
-  /* HIVE Training storefront tokens (spec: navy #1A2B47, honey-gold #C8881E). */
-  --training-navy:      #1A2B47;
-  --training-gold:      #C8881E;
-  --training-gold-soft: #E9C27A;
-  --training-bg:        #FAFAF7;
-  --training-glow:      0 0 0 1px rgba(200,136,30,0.35), 0 20px 60px -20px rgba(200,136,30,0.35);
+  /* HIVE Training storefront — same room as the rest of the product. */
+  --training-navy:      var(--hive-sidebar);
+  --training-gold:      var(--hive-gold);
+  --training-gold-soft: var(--hive-gold-soft);
+  --training-bg:        var(--hive-canvas);
+  --training-glow:      0 0 0 1px color-mix(in srgb, var(--hive-gold) 28%, transparent),
+    0 20px 60px -20px color-mix(in srgb, var(--hive-gold) 22%, transparent);
 
-  --btn-primary:        #1C2A5E;  --btn-primary-hover: #333F6E;  --btn-primary-active: #18234F;
-  --btn-gold:           #F5A623;  --btn-gold-hover:    #DC9520;  --btn-gold-active:    #C4851C;
-  --btn-violet:         #6C2BB3;  --btn-violet-hover:  #6127A1;  --btn-violet-active:  #56228F;
-  --btn-teal:           #137182;  --btn-teal-hover:    #0F5865;  --btn-teal-active:    #0B3F48;
+  --btn-primary:        var(--hive-gold);  --btn-primary-hover: var(--hive-gold-hover);  --btn-primary-active: var(--hive-gold);
+  --btn-gold:           var(--hive-gold);  --btn-gold-hover:    var(--hive-gold-hover);  --btn-gold-active:    var(--hive-gold);
+  --btn-violet:         var(--hive-sidebar);  --btn-violet-hover:  #35475a;  --btn-violet-active:  #2c3c4d;
+  --btn-teal:           var(--hive-ink);  --btn-teal-hover:    #35475a;  --btn-teal-active:    #2c3c4d;
 
   /* Legacy raw aliases */
   --hive-navy: var(--hive-navy-500);
@@ -211,7 +216,7 @@
 
   /* Semantic tokens — remapped in hive-theme.css; values here keep
      Tailwind @theme in sync if that file is not yet applied. */
-  --background: var(--hive-bg);
+  --background: var(--hive-canvas);
   --foreground: var(--hive-text);
   --surface-warm: var(--hive-canvas);
 
@@ -220,26 +225,26 @@
   --popover: var(--hive-surface);
   --popover-foreground: var(--hive-text);
 
-  --primary: var(--hive-gold);
-  --primary-foreground: var(--hive-on-gold);
+  --primary: var(--hive-ink);
+  --primary-foreground: #ffffff;
 
   --accent: var(--hive-gold);
   --accent-foreground: var(--hive-on-gold);
 
   --accent-2: var(--hive-gold);
-  --accent-3: var(--hive-gold);
+  --accent-3: var(--hive-ok);
 
-  --secondary: var(--hive-canvas);
+  --secondary: #eef1f4;
   --secondary-foreground: var(--hive-text);
 
-  --muted: var(--hive-canvas);
+  --muted: #eef1f4;
   --muted-foreground: var(--hive-text-muted);
 
   --destructive: var(--hive-danger);
-  --destructive-foreground: var(--hive-text);
+  --destructive-foreground: #ffffff;
 
   --success: var(--hive-ok);
-  --success-foreground: var(--hive-text);
+  --success-foreground: #ffffff;
   --warning: var(--hive-gold);
   --warning-foreground: var(--hive-on-gold);
 
@@ -247,24 +252,24 @@
   --input: var(--hive-border);
   --ring: var(--hive-gold);
 
-  --gradient-hero: var(--hive-bg);
+  --gradient-hero: var(--hive-canvas);
   --gradient-brand: var(--hive-gold);
   --gradient-life: var(--hive-gold);
-  --gradient-soft: color-mix(in srgb, var(--hive-gold) 8%, var(--hive-bg));
+  --gradient-soft: color-mix(in srgb, var(--hive-gold) 6%, var(--hive-canvas));
 
-  --shadow-elegant: 0 18px 40px -24px rgba(0, 0, 0, 0.55);
+  --shadow-elegant: 0 18px 40px -24px rgba(36, 48, 64, 0.18);
   --shadow-card: 0 1px 0 color-mix(in srgb, var(--hive-border) 80%, transparent);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--hive-gold) 28%, transparent),
-    0 12px 32px -16px color-mix(in srgb, var(--hive-gold) 45%, transparent);
+  --shadow-soft: 0 1px 2px rgba(36, 48, 64, 0.06);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--hive-gold) 22%, transparent),
+    0 12px 32px -16px color-mix(in srgb, var(--hive-gold) 28%, transparent);
 
   --sidebar: var(--hive-sidebar);
-  --sidebar-foreground: var(--hive-text);
+  --sidebar-foreground: var(--hive-chrome-text);
   --sidebar-primary: var(--hive-gold);
   --sidebar-primary-foreground: var(--hive-on-gold);
-  --sidebar-accent: color-mix(in srgb, var(--hive-gold) 10%, var(--hive-sidebar));
-  --sidebar-accent-foreground: var(--hive-gold);
-  --sidebar-border: var(--hive-border);
+  --sidebar-accent: color-mix(in srgb, white 10%, var(--hive-sidebar));
+  --sidebar-accent-foreground: var(--hive-chrome-text);
+  --sidebar-border: color-mix(in srgb, white 14%, var(--hive-sidebar));
   --sidebar-ring: var(--hive-gold);
 
   /* ===== Scheduler service-code families (Phase 1) ===== */
@@ -277,23 +282,23 @@
 }
 
 .dark {
-  --background: var(--hive-bg);
+  --background: var(--hive-canvas);
   --foreground: var(--hive-text);
   --surface-warm: var(--hive-canvas);
   --card: var(--hive-surface);
   --card-foreground: var(--hive-text);
   --popover: var(--hive-surface);
   --popover-foreground: var(--hive-text);
-  --primary: var(--hive-gold);
-  --primary-foreground: var(--hive-on-gold);
-  --secondary: var(--hive-canvas);
+  --primary: var(--hive-ink);
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f4;
   --secondary-foreground: var(--hive-text);
-  --muted: var(--hive-canvas);
+  --muted: #eef1f4;
   --muted-foreground: var(--hive-text-muted);
   --accent: var(--hive-gold);
   --accent-foreground: var(--hive-on-gold);
   --accent-2: var(--hive-gold);
-  --accent-3: var(--hive-gold);
+  --accent-3: var(--hive-ok);
   --border: var(--hive-border);
   --input: var(--hive-border);
   --ring: var(--hive-gold);

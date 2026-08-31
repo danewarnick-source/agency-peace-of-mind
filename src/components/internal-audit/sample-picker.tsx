@@ -66,7 +66,7 @@ export function SamplePicker({
     <div>
       <div className="mb-1 flex items-center justify-between">
         <label className="block text-xs font-medium text-muted-foreground">{label}</label>
-        <span className="text-[11px] font-semibold text-[#0f1b3d]">
+        <span className="text-[11px] font-semibold text-[var(--hive-text)]">
           {selected.length} selected
           {targetCount ? (
             <span
@@ -113,7 +113,7 @@ export function SamplePicker({
               <button
                 type="button"
                 onClick={selectAllVisible}
-                className="font-medium text-[#0f1b3d] hover:underline"
+                className="font-medium text-[var(--hive-text)] hover:underline"
               >
                 Select all{query ? " (matching)" : ""}
               </button>
@@ -145,7 +145,7 @@ export function SamplePicker({
                     <span
                       className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                         checked
-                          ? "border-[#0f1b3d] bg-[#0f1b3d] text-white"
+                          ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white"
                           : "border-border bg-background"
                       }`}
                     >

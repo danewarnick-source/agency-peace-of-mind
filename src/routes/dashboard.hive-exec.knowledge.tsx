@@ -35,7 +35,7 @@ function KnowledgePage() {
     <div className="space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">Knowledge Base</h1>
+          <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">Knowledge Base</h1>
           <p className="text-sm text-muted-foreground">
             HIVE's own how-to articles. Steve (Guide-me) answers exec questions by retrieving from
             these entries. No org data or PHI belongs here — platform ops only.

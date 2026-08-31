@@ -5,7 +5,7 @@ export function renderErrorPage(): string {
     <meta charset="utf-8" />
     <title>Preview is warming up — HIVE</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0d112b" />
+    <meta name="theme-color" content="#3E5368" />
     <style>
       :root { color-scheme: light; }
       * { box-sizing: border-box; }
@@ -16,7 +16,7 @@ export function renderErrorPage(): string {
           radial-gradient(1200px 600px at 10% -10%, rgba(245,165,36,0.10), transparent 60%),
           radial-gradient(900px 500px at 110% 110%, rgba(13,17,43,0.08), transparent 60%),
           #f4f5f9;
-        color: #0d112b;
+        color: #243040;
         display: grid;
         place-items: center;
         padding: 1.5rem;
@@ -30,8 +30,8 @@ export function renderErrorPage(): string {
         overflow: hidden;
       }
       .band {
-        background: linear-gradient(135deg, #0d112b 0%, #1a2050 100%);
-        color: #fff;
+        background: #3E5368;
+        color: #F3EFE6;
         padding: 1.25rem 1.75rem;
         display: flex;
         align-items: center;
@@ -44,12 +44,6 @@ export function renderErrorPage(): string {
         align-items: center;
         justify-content: center;
         width: 28px; height: 28px;
-        border-radius: 8px;
-        background: #f5a524;
-        color: #0d112b;
-        font-weight: 800;
-        font-size: 13px;
-        letter-spacing: 0.04em;
       }
       .band small {
         margin-left: auto;
@@ -71,7 +65,7 @@ export function renderErrorPage(): string {
       li { padding: 0.2rem 0 0.2rem 1.2rem; position: relative; }
       li::before {
         content: ""; position: absolute; left: 0; top: 0.7em;
-        width: 6px; height: 6px; border-radius: 999px; background: #f5a524;
+        width: 6px; height: 6px; border-radius: 999px; background: #C9A227;
       }
       .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1.5rem; align-items: center; }
       a, button {
@@ -86,11 +80,11 @@ export function renderErrorPage(): string {
         transition: transform 0.05s ease, background 0.15s ease, box-shadow 0.15s ease;
       }
       .primary {
-        background: #0d112b; color: #fff;
-        box-shadow: 0 8px 18px -10px rgba(13,17,43,0.6);
+        background: #C9A227; color: #243040;
+        box-shadow: 0 8px 18px -10px rgba(36,48,64,0.25);
       }
-      .primary:hover { background: #1a2050; }
-      .secondary { background: #fff; color: #0d112b; border-color: #d8dbe7; }
+      .primary:hover { background: #D4AF37; }
+      .secondary { background: #fff; color: #243040; border-color: #D5DBE1; }
       .secondary:hover { background: #f4f5f9; }
       button:active, a:active { transform: translateY(1px); }
       .status {
@@ -105,7 +99,7 @@ export function renderErrorPage(): string {
       .spinner {
         width: 12px; height: 12px;
         border: 2px solid #d8dbe7;
-        border-top-color: #0d112b;
+        border-top-color: #C9A227;
         border-radius: 999px;
         animation: spin 0.8s linear infinite;
         display: none;
@@ -119,7 +113,7 @@ export function renderErrorPage(): string {
         font-size: 12.5px;
         color: #7a8099;
       }
-      .foot a { color: #0d112b; padding: 0; border: 0; background: transparent; font-weight: 600; }
+      .foot a { color: #243040; padding: 0; border: 0; background: transparent; font-weight: 600; }
       .foot a:hover { text-decoration: underline; }
       @media (max-width: 480px) {
         .body { padding: 1.35rem; }
@@ -132,7 +126,7 @@ export function renderErrorPage(): string {
   <body>
     <main class="card" role="alert" aria-live="polite">
       <div class="band">
-        <span class="logo" aria-hidden="true">H</span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none"><polygon points="12,2.2 21.2,7.5 21.2,16.5 12,21.8 2.8,16.5 2.8,7.5" stroke="#C9A227" stroke-width="1.55" stroke-linejoin="round"/></svg></span>
         <span>HIVE preview</span>
         <small>Status: warming up</small>
       </div>

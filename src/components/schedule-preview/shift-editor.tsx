@@ -292,7 +292,7 @@ export function ShiftEditorDialog({
                   onClick={() => setScope("one")}
                   className={`min-h-[44px] flex-1 rounded border px-2 text-xs font-semibold ${
                     scope === "one"
-                      ? "border-[#137182] bg-[#137182] text-white"
+                      ? "border-[var(--hive-ink)] bg-[var(--hive-ink)] text-white"
                       : "border-border bg-background"
                   }`}
                 >
@@ -303,7 +303,7 @@ export function ShiftEditorDialog({
                   onClick={() => setScope("series")}
                   className={`min-h-[44px] flex-1 rounded border px-2 text-xs font-semibold ${
                     scope === "series"
-                      ? "border-[#137182] bg-[#137182] text-white"
+                      ? "border-[var(--hive-ink)] bg-[var(--hive-ink)] text-white"
                       : "border-border bg-background"
                   }`}
                 >
@@ -409,7 +409,7 @@ export function ShiftEditorDialog({
                             title={DOW_FULL[idx]}
                             className={`min-h-[44px] min-w-[44px] rounded-md border px-2 text-xs font-semibold ${
                               on
-                                ? "border-[#137182] bg-[#137182] text-white"
+                                ? "border-[var(--hive-ink)] bg-[var(--hive-ink)] text-white"
                                 : "border-border bg-background hover:bg-accent"
                             }`}
                           >

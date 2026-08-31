@@ -185,23 +185,23 @@ export function NectarOnboardingPanel({
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-[color:var(--amber-400,#f4a93a)]/40 bg-gradient-to-br from-[#0b1733] via-[#0d1a3a] to-[#0b1733] text-amber-50 shadow-xl"
+      className="relative overflow-hidden rounded-2xl border border-[color:var(--amber-400,var(--hive-gold))]/40 bg-gradient-to-br from-[#0b1733] via-[#0d1a3a] to-[#0b1733] text-amber-50 shadow-xl"
       aria-label="NECTAR onboarding"
     >
       {/* Hex backdrop accent */}
       <div className="pointer-events-none absolute -right-12 -top-12 opacity-20">
-        <Hexagon className="h-56 w-56 text-[color:var(--amber-400,#f4a93a)]" strokeWidth={1} />
+        <Hexagon className="h-56 w-56 text-[color:var(--amber-400,var(--hive-gold))]" strokeWidth={1} />
       </div>
 
       {/* Header */}
       <div className="relative flex flex-col gap-4 border-b border-amber-300/15 px-5 py-5 sm:px-7">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733]">
+            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733]">
               <Sparkles className="h-5 w-5" />
             </span>
             <div>
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
                 NECTAR · Onboarding
               </div>
               <h2 className="font-display text-xl font-semibold tracking-tight text-amber-50 sm:text-2xl">
@@ -239,14 +239,14 @@ export function NectarOnboardingPanel({
           </div>
           <Progress
             value={(completedCount / steps.length) * 100}
-            className="h-2 bg-white/10 [&>div]:bg-[color:var(--amber-400,#f4a93a)]"
+            className="h-2 bg-white/10 [&>div]:bg-[color:var(--amber-400,var(--hive-gold))]"
           />
         </div>
 
         {allComplete && (
           <Button
             onClick={dismiss}
-            className="self-start bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]"
+            className="self-start bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]"
           >
             Dismiss & go to dashboard
             <ArrowRight className="ml-1 h-4 w-4" />
@@ -278,7 +278,7 @@ export function NectarOnboardingPanel({
                 s.done
                   ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
                   : isActive
-                    ? "border-[color:var(--amber-400,#f4a93a)]/60 bg-amber-400/10 text-amber-50"
+                    ? "border-[color:var(--amber-400,var(--hive-gold))]/60 bg-amber-400/10 text-amber-50"
                     : s.locked
                       ? "cursor-not-allowed border-white/5 bg-white/[0.02] text-amber-100/40"
                       : "border-white/10 bg-white/[0.03] text-amber-100/80 hover:border-amber-300/30 hover:bg-white/[0.05]",
@@ -291,7 +291,7 @@ export function NectarOnboardingPanel({
                       ? "bg-emerald-500/20 text-emerald-200"
                       : s.locked
                         ? "bg-white/5 text-amber-100/30"
-                        : "bg-[color:var(--amber-500,#f4a93a)]/20 text-[color:var(--amber-400,#f4a93a)]",
+                        : "bg-[color:var(--amber-500,var(--hive-gold))]/20 text-[color:var(--amber-400,var(--hive-gold))]",
                   )}
                 >
                   {s.done ? (
@@ -419,7 +419,7 @@ function Step1Sources({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 1 · Required
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -441,9 +441,9 @@ function Step1Sources({
                 to="/dashboard/authoritative-sources"
                 search={{ from: "onboarding", step: 1, type: dt.kind } as never}
                 className={cn(
-                  "flex items-start gap-3 rounded-xl border px-3 py-2.5 transition hover:border-[color:var(--amber-400,#f4a93a)]/60 hover:bg-amber-400/10",
+                  "flex items-start gap-3 rounded-xl border px-3 py-2.5 transition hover:border-[color:var(--amber-400,var(--hive-gold))]/60 hover:bg-amber-400/10",
                   dt.required && !sowUploaded
-                    ? "border-[color:var(--amber-400,#f4a93a)]/50 bg-amber-400/5"
+                    ? "border-[color:var(--amber-400,var(--hive-gold))]/50 bg-amber-400/5"
                     : "border-white/10 bg-white/[0.03]",
                 )}
               >
@@ -465,7 +465,7 @@ function Step1Sources({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-amber-50">{dt.label}</span>
                     {dt.required && (
-                      <span className="rounded-full bg-[color:var(--amber-500,#f4a93a)]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+                      <span className="rounded-full bg-[color:var(--amber-500,var(--hive-gold))]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
                         Required
                       </span>
                     )}
@@ -536,7 +536,7 @@ function Step2Profile({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 2
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -561,7 +561,7 @@ function Step2Profile({
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
                     active
-                      ? "border-[color:var(--amber-400,#f4a93a)] bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733]"
+                      ? "border-[color:var(--amber-400,var(--hive-gold))] bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733]"
                       : "border-white/15 bg-white/[0.04] text-amber-100/80 hover:border-amber-300/40",
                   )}
                 >
@@ -619,7 +619,7 @@ function Step2Profile({
         <div className="flex items-center justify-end pt-1">
           <Button
             onClick={onSave}
-            className="bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]"
+            className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]"
           >
             {saved ? "Update profile" : "Save & continue"}
             <ArrowRight className="ml-1 h-4 w-4" />
@@ -651,7 +651,7 @@ function Step3Staff({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 3
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -668,7 +668,7 @@ function Step3Staff({
         <OnboardingPipelineCard counts={{ invited, inProgress, complete }} />
       </div>
 
-      <Button asChild className="bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]">
+      <Button asChild className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]">
         <Link to="/dashboard/employees">
           Go to Employees <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
@@ -686,7 +686,7 @@ function Step4Clients({ clientCount, disabled }: { clientCount: number; disabled
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 4
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -702,7 +702,7 @@ function Step4Clients({ clientCount, disabled }: { clientCount: number; disabled
         <strong className="font-semibold text-amber-50">{clientCount}</strong>{" "}
         client{clientCount === 1 ? "" : "s"} added so far.
       </div>
-      <Button asChild className="bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]">
+      <Button asChild className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]">
         <Link to="/dashboard/clients">
           Go to Clients <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
@@ -728,7 +728,7 @@ function Step5Services({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 5
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -741,7 +741,7 @@ function Step5Services({
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button asChild onClick={onVisit} className="bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]">
+        <Button asChild onClick={onVisit} className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]">
           <Link to="/dashboard/settings/service-codes">
             Open service codes <ArrowRight className="ml-1 h-4 w-4" />
           </Link>
@@ -765,7 +765,7 @@ function Step6Docs({ docsCount, disabled }: { docsCount: number; disabled: boole
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
           Step 6
         </div>
         <h3 className="mt-0.5 font-display text-lg font-semibold text-amber-50">
@@ -782,7 +782,7 @@ function Step6Docs({ docsCount, disabled }: { docsCount: number; disabled: boole
         <strong className="font-semibold text-amber-50">{docsCount}</strong>{" "}
         document{docsCount === 1 ? "" : "s"} on file (authoritative sources count too).
       </div>
-      <Button asChild className="bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733] hover:bg-[color:var(--amber-400,#f4a93a)]">
+      <Button asChild className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]">
         <Link to="/dashboard/nectar-docs">
           Open Company Documents <ArrowRight className="ml-1 h-4 w-4" />
         </Link>

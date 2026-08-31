@@ -261,11 +261,11 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
         : "bg-muted text-muted-foreground";
 
   const card = (
-    <article className="rounded-xl border border-border bg-card p-4 shadow-sm transition active:scale-[0.99] hover:border-[color:var(--amber-600,#f59324)]/60">
+    <article className="rounded-xl border border-border bg-card p-4 shadow-sm transition active:scale-[0.99] hover:border-[color:var(--amber-600,var(--hive-gold))]/60">
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--navy-900,#0d112b)] text-sm font-semibold text-white"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--navy-900,var(--hive-text))] text-sm font-semibold text-white"
         >
           {initials || <User className="h-5 w-5" />}
         </span>
@@ -304,7 +304,7 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
             <span
               className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-xs font-semibold ${
                 code
-                  ? "border-[color:var(--amber-600,#f59324)]/40 bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,#0d112b)]"
+                  ? "border-[color:var(--amber-600,var(--hive-gold))]/40 bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,var(--hive-text))]"
                   : "border-border bg-muted text-muted-foreground"
               }`}
             >
@@ -316,7 +316,7 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
           </div>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2 text-xs font-semibold text-[color:var(--amber-700,#d97a1c)]">
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs font-semibold text-[color:var(--amber-700,var(--hive-gold))]">
         <RequestSwapDialog
           shiftId={s.id}
           shiftLabel={`${s.client_name} · ${fmtTimeRange(s.starts_at, s.ends_at)}`}
@@ -460,7 +460,7 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
           <h3 className="mt-0.5 break-words text-base font-semibold leading-snug text-foreground">{names}</h3>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+          <span className="rounded-full bg-[color:var(--amber-600,var(--hive-gold))]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))]">
             {ratioLabel}
           </span>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}>
@@ -482,10 +482,10 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
                 to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
                 params={{ clientId: s.client_id }}
                 {...(daily ? {} : { search: { tab: "clock-in", ...(code ? { code } : {}) } as any })}
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-warm px-2 py-1.5 text-xs hover:border-[color:var(--amber-600,#f59324)]/60"
+                className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-warm px-2 py-1.5 text-xs hover:border-[color:var(--amber-600,var(--hive-gold))]/60"
               >
                 <span className="truncate font-medium text-foreground">{s.client_name}</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))]">
                   {daily ? "Client Hub" : "Time Clock"}
                   <ArrowRight className="h-3 w-3" />
                 </span>
@@ -701,7 +701,7 @@ function SchedulePage() {
           <button
             type="button"
             onClick={goToday}
-            className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)] hover:underline"
+            className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))] hover:underline"
           >
             Jump to today
           </button>
@@ -728,7 +728,7 @@ function SchedulePage() {
               <li key={sess.id}>
                 <Link
                   to="/dashboard/scheduler"
-                  className="block rounded-xl border border-border bg-card p-3 shadow-sm hover:border-[color:var(--amber-600,#f59324)]/60"
+                  className="block rounded-xl border border-border bg-card p-3 shadow-sm hover:border-[color:var(--amber-600,var(--hive-gold))]/60"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -743,7 +743,7 @@ function SchedulePage() {
                         <span className="tabular-nums">{fmtTimeRange(sess.start_time, sess.end_time)}</span>
                       </p>
                     </div>
-                    <span className="rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,#d97a1c)]">
+                    <span className="rounded-full bg-[color:var(--amber-600,var(--hive-gold))]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))]">
                       One clock-in · roster
                     </span>
                   </div>

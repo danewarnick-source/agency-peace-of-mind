@@ -50,7 +50,7 @@ function Header() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
           <CreditCard className="h-5 w-5" />
         </span>
         <div>
@@ -84,7 +84,7 @@ function TierCatalogSection() {
             className="flex flex-col rounded-lg border border-border bg-background p-4"
           >
             <div className="flex items-baseline justify-between">
-              <div className="font-display text-base font-semibold text-[#0f1b3d]">
+              <div className="font-display text-base font-semibold text-[var(--hive-text)]">
                 {t.name}
               </div>
               <div className="text-sm font-medium text-[#7a4a0a]">
@@ -113,9 +113,9 @@ function TierCatalogSection() {
                   {t.addons.map((a) => (
                     <li
                       key={a}
-                      className="flex items-center gap-1.5 text-xs text-[#0f1b3d]"
+                      className="flex items-center gap-1.5 text-xs text-[var(--hive-text)]"
                     >
-                      <Sparkles className="h-3 w-3 text-[#d97a1c]" />
+                      <Sparkles className="h-3 w-3 text-[var(--hive-gold)]" />
                       {ADDON_CATALOG[a].name}
                     </li>
                   ))}
@@ -223,7 +223,7 @@ function CompanyTierAssignmentSection() {
                     key={r.organization_id}
                     className="border-t border-border hover:bg-muted/30"
                   >
-                    <td className="px-3 py-2 font-medium text-[#0f1b3d]">{r.name}</td>
+                    <td className="px-3 py-2 font-medium text-[var(--hive-text)]">{r.name}</td>
                     <td className="px-3 py-2 text-xs uppercase tracking-wide">{r.plan}</td>
                     <td className="px-3 py-2 text-xs">{r.status.replace("_", " ")}</td>
                     <td className="px-3 py-2">
@@ -361,7 +361,7 @@ function StripeStatusSection() {
       </p>
       <div className="mt-3 rounded-lg border border-border bg-background p-4">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">MRR (paying companies)</div>
-        <div className="mt-1 font-display text-xl font-bold tabular-nums text-[#0f1b3d]">
+        <div className="mt-1 font-display text-xl font-bold tabular-nums text-[var(--hive-text)]">
           {fmtMoney(mrr)}
         </div>
       </div>

@@ -153,14 +153,14 @@ export function RecordsExportDialog({
             <div className="flex gap-2">
               <button
                 type="button"
-                className="text-[11px] font-medium text-[#137182] hover:underline"
+                className="text-[11px] font-medium text-[var(--hive-ink)] hover:underline"
                 onClick={() => setSelected(new Set(FIELD_DEFS.map((f) => f.key)))}
               >
                 Select all
               </button>
               <button
                 type="button"
-                className="text-[11px] font-medium text-[#137182] hover:underline"
+                className="text-[11px] font-medium text-[var(--hive-ink)] hover:underline"
                 onClick={() => setSelected(new Set())}
               >
                 Clear

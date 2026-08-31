@@ -138,7 +138,7 @@ export function OrgComplianceDocCard({
         {doc ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
-              <button type="button" className="truncate text-left hover:underline hover:text-[#137182]" onClick={openDoc}>
+              <button type="button" className="truncate text-left hover:underline hover:text-[var(--hive-ink)]" onClick={openDoc}>
                 {doc.file_name}
               </button>
               <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

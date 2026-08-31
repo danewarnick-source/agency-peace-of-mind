@@ -293,7 +293,7 @@ export function MyObligationsWidget() {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex items-center gap-2">
-        <ClipboardList className="h-4 w-4 text-[#137182]" />
+        <ClipboardList className="h-4 w-4 text-[var(--hive-ink)]" />
         <h2 className="text-sm font-semibold">My obligations</h2>
         <Badge
           className={
@@ -313,7 +313,7 @@ export function MyObligationsWidget() {
       <div className="mt-3 text-right">
         <Link
           to="/dashboard/my-obligations"
-          className="text-xs font-medium text-[#137182] hover:underline"
+          className="text-xs font-medium text-[var(--hive-ink)] hover:underline"
         >
           View all {openItems.length} <ArrowRight className="ml-0.5 inline h-3 w-3" />
         </Link>

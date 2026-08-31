@@ -168,9 +168,9 @@ function OnboardingPage() {
         </span>
       </div>
 
-      <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#0f1b3d] to-[#1a2a5a] p-4 text-white shadow-sm">
+      <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[var(--hive-text)] to-[#1a2a5a] p-4 text-white shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#d97a1c]">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-gold)]">
             <ClipboardList className="h-5 w-5" />
           </span>
           <div>
@@ -198,12 +198,12 @@ function OnboardingPage() {
               onClick={() => setStepIdx(i)}
               className={`inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors ${
                 i === stepIdx
-                  ? "bg-[#0f1b3d] text-white"
+                  ? "bg-[var(--hive-text)] text-white"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               <span className="font-mono">{i + 1}</span> {s.title}
-              {flaggedHere ? <Flag className="h-3 w-3 text-[#d97a1c]" /> : null}
+              {flaggedHere ? <Flag className="h-3 w-3 text-[var(--hive-gold)]" /> : null}
             </button>
           );
         })}
@@ -253,7 +253,7 @@ function OnboardingPage() {
               type="button"
               onClick={() => complete.mutate()}
               disabled={complete.isPending}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-md bg-[#0f1b3d] px-4 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-md bg-[var(--hive-text)] px-4 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
               Complete onboarding & build template
@@ -262,7 +262,7 @@ function OnboardingPage() {
             <button
               type="button"
               onClick={() => setStepIdx((i) => Math.min(totalSteps - 1, i + 1))}
-              className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-sm font-semibold text-white hover:bg-[#1a2a5a]"
+              className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-sm font-semibold text-white hover:bg-[#1a2a5a]"
             >
               Next <ArrowRight className="h-3.5 w-3.5" />
             </button>
@@ -273,7 +273,7 @@ function OnboardingPage() {
       {/* Build-needs summary */}
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h3 className="flex items-center gap-2 font-display text-base font-semibold">
-          <Wrench className="h-4 w-4 text-[#d97a1c]" />
+          <Wrench className="h-4 w-4 text-[var(--hive-gold)]" />
           Flagged build needs ({flags.length})
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -293,7 +293,7 @@ function OnboardingPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="font-medium text-[#0f1b3d]">
+                    <div className="font-medium text-[var(--hive-text)]">
                       {f.section} · {f.field}
                     </div>
                     <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
@@ -355,7 +355,7 @@ function FieldRow({
           onClick={onToggleFlag}
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium ${
             flagged
-              ? "border-[#d97a1c] bg-[#fff7ed] text-[#7c2d12]"
+              ? "border-[var(--hive-gold)] bg-[#fff7ed] text-[#7c2d12]"
               : "border-border bg-background text-muted-foreground hover:bg-muted"
           }`}
         >

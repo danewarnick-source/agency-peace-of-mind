@@ -41,11 +41,11 @@ export function MasterController({ organizationId }: { organizationId: string })
   const childrenOf = (key: string) => registry.filter((r) => r.parent_key === key);
 
   return (
-    <section className="rounded-xl border-2 border-[#0f1b3d]/20 bg-card p-4 shadow-sm">
+    <section className="rounded-xl border-2 border-[var(--hive-text)]/20 bg-card p-4 shadow-sm">
       <header className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-            <ShieldCheck className="h-5 w-5 text-[#0f1b3d]" />
+            <ShieldCheck className="h-5 w-5 text-[var(--hive-text)]" />
             Organization Master Controller
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">

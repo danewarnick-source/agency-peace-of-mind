@@ -92,7 +92,7 @@ function TabLink({
       replace
       className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
         active
-          ? "border-[#137182] text-[#137182]"
+          ? "border-[var(--hive-ink)] text-[var(--hive-ink)]"
           : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
       }`}
     >

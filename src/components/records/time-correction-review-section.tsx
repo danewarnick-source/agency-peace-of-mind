@@ -140,7 +140,7 @@ export function TimeCorrectionReviewSection({ organizationId }: { organizationId
     <section className="rounded-xl border-l-4 border-l-amber-500 border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-[#0B1126]">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--hive-text)]">
             <Clock className="h-4 w-4 text-amber-600" /> Time-correction requests
           </h3>
           <p className="mt-0.5 text-[11px] text-muted-foreground">

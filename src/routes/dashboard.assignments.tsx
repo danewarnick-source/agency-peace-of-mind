@@ -316,7 +316,7 @@ function AssignmentsPage() {
             </Select>
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-sm font-semibold tabular-nums text-[color:var(--navy-900,#0d112b)]">
+            <span className="font-mono text-sm font-semibold tabular-nums text-[color:var(--navy-900,var(--hive-text))]">
               {counts.clientsN} clients · {counts.servicesN} services selected
             </span>
             <Button
@@ -556,8 +556,8 @@ function ClientAssignRow({
                     className={[
                       "flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition",
                       checked
-                        ? "border-[color:var(--amber-600,#f59324)] bg-[image:var(--gradient-amber)]/40"
-                        : "border-border bg-background hover:border-[color:var(--amber-600,#f59324)]/50",
+                        ? "border-[color:var(--amber-600,var(--hive-gold))] bg-[image:var(--gradient-amber)]/40"
+                        : "border-border bg-background hover:border-[color:var(--amber-600,var(--hive-gold))]/50",
                     ].join(" ")}
                   >
                     <Checkbox
@@ -573,7 +573,7 @@ function ClientAssignRow({
                         className={[
                           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                           daily
-                            ? "bg-[color:var(--navy-900,#0d112b)] text-white"
+                            ? "bg-[color:var(--navy-900,var(--hive-text))] text-white"
                             : "bg-[image:var(--gradient-amber)] text-[#412402]",
                         ].join(" ")}
                       >

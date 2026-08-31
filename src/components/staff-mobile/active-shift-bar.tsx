@@ -146,7 +146,7 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
             {elapsed}
           </span>
           {isClient && (
-            <span className="font-mono text-[11px] font-semibold tabular-nums text-[#f4a93a]">
+            <span className="font-mono text-[11px] font-semibold tabular-nums text-[var(--hive-gold)]">
               {fmtUSD(live.liveEarnings)}
             </span>
           )}

@@ -185,7 +185,7 @@ function FieldBlock({
       className={`rounded-lg border border-border/60 bg-card p-3 ${isLong ? "p-4" : ""}`}
     >
       <div className="flex items-center gap-1.5 mb-2">
-        <Label className="text-xs font-semibold text-[#0B1126]">{field.field_label}</Label>
+        <Label className="text-xs font-semibold text-[var(--hive-text)]">{field.field_label}</Label>
         {field.source === "pcsp" && <FromPcspBadge />}
       </div>
 

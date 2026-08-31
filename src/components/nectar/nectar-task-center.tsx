@@ -232,10 +232,10 @@ function ExplainModal({ task, onClose }: { task: GuideTask; onClose: () => void 
         </div>
         {task.why && <p className="mb-3 text-sm text-muted-foreground">{task.why}</p>}
         {task.steps.length > 0 ? (
-          <ol className="space-y-2 text-sm text-[#0f1b3d]">
+          <ol className="space-y-2 text-sm text-[var(--hive-text)]">
             {task.steps.map((s, i) => (
               <li key={i} className="rounded-md border border-border bg-[#fbfaf7] px-3 py-2">
-                <span className="mr-2 text-[10px] font-semibold uppercase tracking-wider text-[#d97a1c]">Step {i + 1}</span>
+                <span className="mr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--hive-gold)]">Step {i + 1}</span>
                 {s.instruction}
               </li>
             ))}

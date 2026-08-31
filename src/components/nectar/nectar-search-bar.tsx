@@ -214,7 +214,7 @@ export function NectarSearchBar({
               : "h-11 w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] pl-8 pr-9 text-sm text-[var(--hive-text)] placeholder:text-[var(--hive-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--hive-gold)]/40"
           }
         />
-        <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-white/55" : "text-white/60"}`} />
+        <Search className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--hive-text-muted)]" />
       </div>
 
       {open && (query.trim().length >= 1 || results.length > 0) && (

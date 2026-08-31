@@ -43,6 +43,7 @@ import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
+import { HiveMark } from "@/components/brand/hive-mark";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
@@ -87,10 +88,10 @@ function sectionLabelFor(code: string): string {
   return parts.length > 1 ? parts.slice(1).join(" — ") : full;
 }
 
-const NAVY = "#0d112b";
-const GOLD = "#f59324";
-const TEAL = "#137182";
-const LINE = "#e6e7ee";
+const NAVY = "var(--hive-ink)";
+const GOLD = "var(--hive-gold)";
+const TEAL = "var(--hive-ok)";
+const LINE = "var(--hive-border)";
 
 type ViewMode = "day" | "week" | "month";
 type Tab = "schedule" | "day-program" | "staff-view";
@@ -165,20 +166,19 @@ function SchedulerPage() {
 
   return (
     <div
-      className="min-h-0 min-w-0 max-w-full overflow-x-hidden"
-      style={{ background: "#faf9f5", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+      className="min-h-0 min-w-0 max-w-full overflow-x-hidden rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)]"
+      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
       <div className="px-4 pt-4"><NectarFocusBanner /></div>
-      {/* Brand bar with tabs */}
-      <div style={{ background: NAVY, color: "#fff", padding: "10px 16px" }} className="flex items-center gap-3 flex-wrap">
+      {/* Brand bar with tabs — light work area, gold jewelry only */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--hive-border)] bg-[var(--hive-surface)] px-4 py-3 text-[var(--hive-text)]">
         <div className="flex items-center gap-2">
-          <span style={{ width: 28, height: 28, borderRadius: 6, background: GOLD, display: "inline-grid", placeItems: "center", color: NAVY, fontWeight: 800 }}>H</span>
+          <HiveMark className="h-8 w-8" />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: 0.2 }}>HIVE</div>
-            <div style={{ fontSize: 9, letterSpacing: 0.16, opacity: 0.8 }}>SCHEDULER</div>
+            <div className="text-sm font-bold tracking-[0.14em] text-[var(--hive-text)]">HIVE SCHEDULER</div>
           </div>
         </div>
-        <div className="flex items-center gap-1 ml-2">
+        <div className="ml-2 flex items-center gap-1">
           <TabBtn label="Schedule" active={tab === "schedule"} onClick={() => setTab("schedule")} />
           <TabBtn label="Day Program" active={tab === "day-program"} onClick={() => setTab("day-program")} />
           <TabBtn label="Staff view" active={tab === "staff-view"} onClick={() => setTab("staff-view")} />
@@ -188,7 +188,7 @@ function SchedulerPage() {
           <button
             onClick={() => publishMut.mutate()}
             disabled={publishMut.isPending || !orgId}
-            style={{ background: GOLD, color: NAVY, border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--hive-gold)] bg-transparent px-3.5 py-2 text-[13px] font-semibold text-[var(--hive-text)] hover:bg-[var(--hive-gold-soft)]"
           >
             <Send className="h-4 w-4" /> {publishMut.isPending ? "Publishing…" : "Publish"}
           </button>
@@ -231,12 +231,11 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
   return (
     <button
       onClick={onClick}
-      style={{
-        background: active ? GOLD : "transparent",
-        color: active ? NAVY : "#fff",
-        border: active ? "none" : "1px solid rgba(255,255,255,0.15)",
-        borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-      }}
+      className={`cursor-pointer border-b-2 px-3 py-1.5 text-[13px] font-semibold ${
+        active
+          ? "border-[var(--hive-gold)] text-[var(--hive-text)]"
+          : "border-transparent text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
+      }`}
     >
       {label}
     </button>
@@ -246,12 +245,11 @@ function ViewBtn({ label, icon, active, onClick }: { label: string; icon?: React
   return (
     <button
       onClick={onClick}
-      className="text-sm font-medium inline-flex items-center gap-1 px-3 py-1.5 rounded-md"
-      style={{
-        background: active ? GOLD : "#fff",
-        color: active ? NAVY : "#444",
-        border: `1px solid ${active ? GOLD : LINE}`,
-      }}
+      className={`inline-flex items-center gap-1 border-b-2 px-3 py-1.5 text-sm font-medium ${
+        active
+          ? "border-[var(--hive-gold)] text-[var(--hive-gold)]"
+          : "border-transparent text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
+      }`}
     >
       {icon}{label}
     </button>
@@ -533,14 +531,14 @@ function HomePill({ label, active, onClick }: { label: string; active: boolean; 
   );
 }
 
-const FALLBACK_PALETTE = ["#3b6aa8", "#7d4cdb", "#137182", "#d6438a", "#f59324", "#3a8acc", "#dc3a3a", "#7eb45b", "#4a5b8c", "#a36cd6", "#2e8b75", "#c0593f"];
+const FALLBACK_PALETTE = ["#3b6aa8", "#7d4cdb", "var(--hive-ink)", "#d6438a", "var(--hive-gold)", "#3a8acc", "#dc3a3a", "#7eb45b", "#4a5b8c", "#a36cd6", "#2e8b75", "#c0593f"];
 function codeColor(code: string): string {
   switch (code) {
     case "SLH": return "#3b6aa8";
     case "COM": return "#7d4cdb";
-    case "PAC": return "#137182";
+    case "PAC": return "var(--hive-ink)";
     case "RP2": return "#d6438a";
-    case "HHS": return "#f59324";
+    case "HHS": return "var(--hive-gold)";
     case "RHS": return "#3a8acc";
     case "PM1": return "#dc3a3a";
     case "DSI": return "#7eb45b";
@@ -573,7 +571,7 @@ function ClientCell({
       metaLine = (
         <button
           onClick={() => onSetAdminHours(client)}
-          className="text-[11px] underline text-[color:var(--amber-700,#d97a1c)]"
+          className="text-[11px] underline text-[color:var(--amber-700,var(--hive-gold))]"
         >
           Set administrative hours
         </button>
@@ -589,7 +587,7 @@ function ClientCell({
           to="/dashboard/clients/$clientId"
           params={{ clientId: client.id }}
           search={{ tab: "codes" }}
-          className="text-[11px] underline text-[color:var(--amber-700,#d97a1c)]"
+          className="text-[11px] underline text-[color:var(--amber-700,var(--hive-gold))]"
         >
           Set units
         </Link>
@@ -1788,16 +1786,16 @@ function StaffViewPreview({
         </Select>
         <span className="text-xs text-muted-foreground">this is what they do on their phone</span>
       </div>
-      <div style={{ background: NAVY, color: "#fff", padding: "12px 14px", borderRadius: "12px 12px 0 0" }} className="flex items-center justify-between">
+      <div className="flex items-center justify-between rounded-t-xl bg-[var(--hive-sidebar)] px-3.5 py-3 text-[var(--hive-chrome-text)]">
         <div className="flex items-center gap-2">
-          <span style={{ width: 36, height: 36, borderRadius: 999, background: GOLD, color: NAVY, display: "inline-grid", placeItems: "center", fontWeight: 800 }}>
+          <span className="inline-grid h-9 w-9 place-items-center rounded-full bg-[color-mix(in_srgb,white_16%,transparent)] text-sm font-bold">
             {staff?.first_name?.[0] ?? "S"}
           </span>
           <div>
             <div className="font-bold">{staff?.name ?? "Staff"}</div>
           </div>
         </div>
-        <Badge style={{ background: GOLD, color: NAVY }}>{myShifts.length} shifts</Badge>
+        <Badge className="hive-role-pill border-0">{myShifts.length} shifts</Badge>
       </div>
       <div style={{ background: "#fff", border: `1px solid ${LINE}`, borderTop: "none", borderRadius: "0 0 12px 12px" }} className="divide-y">
         {days.map((d) => {

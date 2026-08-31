@@ -65,7 +65,7 @@ function MessageCenterPage() {
               onClick={() => setTab(t.id)}
               className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 active
-                  ? "bg-[#0f1b3d] text-white"
+                  ? "bg-[var(--hive-text)] text-white"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
@@ -274,7 +274,7 @@ function MessageCenter() {
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />
             <div className="text-sm">
-              <div className="font-semibold text-[#0f1b3d]">
+              <div className="font-semibold text-[var(--hive-text)]">
                 Message delivered
               </div>
               <div className="text-muted-foreground">
@@ -298,7 +298,7 @@ function MessageCenter() {
       <NectarCard className="p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-[#7a4a0a]" />
-          <h3 className="font-display text-base font-semibold text-[#0f1b3d]">
+          <h3 className="font-display text-base font-semibold text-[var(--hive-text)]">
             Compose
           </h3>
         </div>
@@ -332,7 +332,7 @@ function MessageCenter() {
 
       <NectarCard className="p-5">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="font-display text-base font-semibold text-[#0f1b3d]">
+          <h3 className="font-display text-base font-semibold text-[var(--hive-text)]">
             Recipients
           </h3>
           <div className="text-xs font-medium text-muted-foreground">
@@ -349,7 +349,7 @@ function MessageCenter() {
             disabled={sending}
             className={`min-h-[44px] flex-1 rounded-md border px-3 py-2 text-left text-sm transition ${
               scope === "selected"
-                ? "border-[#0f1b3d] bg-[#0f1b3d] text-white"
+                ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white"
                 : "border-border bg-card hover:bg-muted"
             }`}
           >
@@ -368,7 +368,7 @@ function MessageCenter() {
             disabled={sending}
             className={`min-h-[44px] flex-1 rounded-md border px-3 py-2 text-left text-sm transition ${
               scope === "all"
-                ? "border-[#0f1b3d] bg-[#0f1b3d] text-white"
+                ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white"
                 : "border-border bg-card hover:bg-muted"
             }`}
           >
@@ -422,7 +422,7 @@ function MessageCenter() {
                       <li key={o.id}>
                         <label
                           className={`flex min-h-[44px] cursor-pointer items-center gap-3 px-3 py-2 text-sm transition hover:bg-muted ${
-                            checked ? "bg-[#0f1b3d]/5" : ""
+                            checked ? "bg-[var(--hive-text)]/5" : ""
                           }`}
                         >
                           <input
@@ -432,7 +432,7 @@ function MessageCenter() {
                             disabled={sending}
                             className="h-4 w-4"
                           />
-                          <span className="flex-1 truncate font-medium text-[#0f1b3d]">
+                          <span className="flex-1 truncate font-medium text-[var(--hive-text)]">
                             {o.name}
                           </span>
                           {o.is_demo && (
@@ -454,7 +454,7 @@ function MessageCenter() {
       <NectarCard className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <Paperclip className="h-4 w-4 text-[#7a4a0a]" />
-          <h3 className="font-display text-base font-semibold text-[#0f1b3d]">
+          <h3 className="font-display text-base font-semibold text-[var(--hive-text)]">
             Attachments
           </h3>
         </div>
@@ -465,7 +465,7 @@ function MessageCenter() {
             multiple
             onChange={onPickFiles}
             disabled={sending}
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#0f1b3d] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#1a2a5a]"
+            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[var(--hive-text)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#1a2a5a]"
           />
           <div className="text-xs text-muted-foreground">
             Up to 25 MB per file. Most file types accepted.
@@ -478,7 +478,7 @@ function MessageCenter() {
                   className="flex min-h-[44px] items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-[#0f1b3d]">
+                    <div className="truncate font-medium text-[var(--hive-text)]">
                       {f.name}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -579,7 +579,7 @@ function SentMessagesView() {
           ← Back to Sent
         </button>
         <NectarCard className="p-6">
-          <h2 className="font-display text-xl font-bold text-[#0f1b3d]">{open.subject}</h2>
+          <h2 className="font-display text-xl font-bold text-[var(--hive-text)]">{open.subject}</h2>
           <div className="mt-1 text-xs text-muted-foreground">
             Sent {formatSentDate(open.created_at)}
             <span className="mx-1.5">·</span>
@@ -609,7 +609,7 @@ function SentMessagesView() {
                   {open.recipients.map((r) => (
                     <tr key={r.organization_id} className="border-t border-border">
                       <td className="px-3 py-2">
-                        <span className="font-medium text-[#0f1b3d]">{r.organization_name}</span>
+                        <span className="font-medium text-[var(--hive-text)]">{r.organization_name}</span>
                         {r.is_demo && (
                           <span className="ml-2 inline-flex items-center rounded-full border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
                             Demo
@@ -662,7 +662,7 @@ function SentMessagesView() {
                 onClick={() => setOpenId(m.message_id)}
                 className="cursor-pointer border-t border-border hover:bg-muted/40"
               >
-                <td className="px-4 py-3 font-medium text-[#0f1b3d]">{m.subject}</td>
+                <td className="px-4 py-3 font-medium text-[var(--hive-text)]">{m.subject}</td>
                 <td className="px-4 py-3 text-muted-foreground">{formatSentDate(m.created_at)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{m.recipient_count}</td>
                 <td className="px-4 py-3 text-muted-foreground">

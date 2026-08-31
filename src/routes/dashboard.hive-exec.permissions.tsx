@@ -56,7 +56,7 @@ function HiveExecsSection() {
   return (
     <section className="rounded-xl border border-[#fed7aa] bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-[#d97a1c]" />
+        <ShieldCheck className="h-4 w-4 text-[var(--hive-gold)]" />
         <h2 className="font-display text-lg font-semibold">HIVE Executive Role</h2>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">
@@ -95,7 +95,7 @@ function HiveExecsSection() {
         <button
           type="submit"
           disabled={grant.isPending || !email.trim()}
-          className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-md bg-[#d97a1c] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-md bg-[var(--hive-gold)] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
         >
           <Plus className="h-4 w-4" /> Grant
         </button>
@@ -120,7 +120,7 @@ function HiveExecsSection() {
             ) : (q.data ?? []).map((r) => (
               <tr key={r.user_id} className="border-t border-border">
                 <td className="px-3 py-2">
-                  <div className="font-medium text-[#0f1b3d]">{r.full_name ?? "—"}</div>
+                  <div className="font-medium text-[var(--hive-text)]">{r.full_name ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">{r.email ?? r.user_id}</div>
                 </td>
                 <td className="px-3 py-2">
@@ -204,7 +204,7 @@ function MembersSection() {
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
-          <UserCog className="h-4 w-4 text-[#0f1b3d]" />
+          <UserCog className="h-4 w-4 text-[var(--hive-text)]" />
           <h2 className="font-display text-lg font-semibold">Cross-Company Memberships</h2>
         </div>
         <div className="flex flex-col gap-2 md:flex-row">
@@ -250,7 +250,7 @@ function MembersSection() {
             ) : rows.map((m) => (
               <tr key={m.membership_id} className="border-t border-border">
                 <td className="px-3 py-2">
-                  <div className="font-medium text-[#0f1b3d]">{m.full_name ?? "—"}</div>
+                  <div className="font-medium text-[var(--hive-text)]">{m.full_name ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">{m.email ?? m.user_id}</div>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{m.organization_name}</td>
@@ -307,7 +307,7 @@ function AuditSection() {
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <ScrollText className="h-4 w-4 text-[#0f1b3d]" />
+        <ScrollText className="h-4 w-4 text-[var(--hive-text)]" />
         <h2 className="font-display text-lg font-semibold">HIVE Executive Audit Trail</h2>
         <Shield className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
       </div>

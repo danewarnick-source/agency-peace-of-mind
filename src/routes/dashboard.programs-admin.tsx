@@ -208,7 +208,7 @@ function ProgramsAdminPage() {
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+            <Button className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
               <Plus className="h-4 w-4" /> New program
             </Button>
           </DialogTrigger>
@@ -415,7 +415,7 @@ function CreateProgramDialog({
         <Button
           disabled={!name || pending}
           onClick={() => onSubmit({ name, description, category, validity_months: validity, annual_renewal: annual })}
-          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+          className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
         >
           Create program
         </Button>

@@ -110,7 +110,7 @@ export function AssignModal({
 function Pill({ checked, label, onClick }: { checked: boolean; label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className={`min-h-[36px] rounded-full px-3 py-1 text-xs font-medium border transition ${checked ? "bg-[#0B1126] text-white border-[#0B1126]" : "bg-background text-foreground border-border hover:bg-muted"}`}>
+      className={`min-h-[36px] rounded-full px-3 py-1 text-xs font-medium border transition ${checked ? "bg-[var(--hive-text)] text-white border-[var(--hive-text)]" : "bg-background text-foreground border-border hover:bg-muted"}`}>
       {label}
     </button>
   );

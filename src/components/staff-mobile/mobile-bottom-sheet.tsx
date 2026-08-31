@@ -59,7 +59,7 @@ export function MobileBottomSheet({
 
       {/* Sheet — width 100% of shell, internal scroll */}
       <div
-        className={`relative z-10 w-full ${maxHeightClass} overflow-y-auto overscroll-contain rounded-t-2xl border-t-4 border-[color:var(--amber-500,#f4a93a)] bg-background shadow-2xl animate-in slide-in-from-bottom`}
+        className={`relative z-10 w-full ${maxHeightClass} overflow-y-auto overscroll-contain rounded-t-2xl border-t-4 border-[color:var(--amber-500,var(--hive-gold))] bg-background shadow-2xl animate-in slide-in-from-bottom`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <button

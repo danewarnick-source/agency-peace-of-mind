@@ -186,7 +186,7 @@ function DocSlot({
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <div className="flex min-w-0 items-center gap-2">
-        <FileText className="h-4 w-4 shrink-0 text-[color:var(--teal-700,#137182)]" />
+        <FileText className="h-4 w-4 shrink-0 text-[color:var(--teal-700,var(--hive-ink))]" />
         <div className="min-w-0">
           <p className="text-sm font-semibold">{label}</p>
           {doc ? (

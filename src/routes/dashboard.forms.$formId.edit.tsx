@@ -200,7 +200,7 @@ function EditForm() {
             <Trash2 className="mr-1.5 h-4 w-4" /> Delete
           </Button>
           <Button onClick={persist} disabled={busy}><Save className="mr-1.5 h-4 w-4" /> Save</Button>
-          <Button variant="default" className="bg-[#137182] hover:bg-[#0e5a68]"
+          <Button variant="default" className="bg-[var(--hive-ink)] hover:bg-[#0e5a68]"
             onClick={async () => { const ok = await persist(); if (ok) setShowPublish(true); }}>
             <Send className="mr-1.5 h-4 w-4" /> Publish
           </Button>
@@ -323,7 +323,7 @@ function EditForm() {
 
         {/* Live preview + admin map */}
         <aside className="space-y-3">
-          <Card className="p-3 bg-[#0B1126] text-white">
+          <Card className="p-3 bg-[var(--hive-text)] text-white">
             <p className="text-[10px] uppercase tracking-wider text-white/60">Live staff preview</p>
             <p className="font-semibold text-sm mt-0.5 truncate">{name || "Untitled form"}</p>
           </Card>

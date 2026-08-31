@@ -690,7 +690,7 @@ function SourceRow({
             </span>
             {stats!.scopePending > 0 && (
               <span
-                className="text-[#d97a1c]"
+                className="text-[var(--hive-gold)]"
                 title="Requirement confirmed but applicability scope not yet confirmed"
               >
                 · {stats!.scopePending} scope pending
@@ -762,7 +762,7 @@ function SourceRow({
             }
             className={
               isDrafting
-                ? "border-[color:var(--amber-500,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
+                ? "border-[color:var(--amber-500,var(--hive-gold))]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
                 : undefined
             }
           >
@@ -2332,7 +2332,7 @@ function DocumentRequirementGroup({
           </Badge>
           {counts.scopePending > 0 && (
             <Badge
-              className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+              className="bg-[var(--hive-gold)]/15 text-[10px] text-[var(--hive-gold)]"
               title="Requirement confirmed, but NECTAR applicability scope still needs review"
             >
               {counts.scopePending} scope pending
@@ -2791,7 +2791,7 @@ function RequirementRow({
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Requirement confirmed
                 </Badge>
                 <Badge
-                  className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+                  className="bg-[var(--hive-gold)]/15 text-[10px] text-[var(--hive-gold)]"
                   title="Applicability scope still needs to be confirmed below"
                 >
                   <Sparkle className="mr-1 h-3 w-3" />
@@ -2810,7 +2810,7 @@ function RequirementRow({
           )}
           {status === "needs_attention" && hasPrefilledProposals && (
             <Badge
-              className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]"
+              className="bg-[var(--hive-gold)]/15 text-[10px] text-[var(--hive-gold)]"
               title="NECTAR has pre-filled its proposed applicability for this requirement — review and approve."
             >
               <Sparkle className="mr-1 h-3 w-3" />
@@ -3695,7 +3695,7 @@ function ApplicabilityPanel({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full min-h-[36px] items-center justify-between gap-2 px-3 py-2 text-left text-[11px]"
       >
-        <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-[#d97a1c]">
+        <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wide text-[var(--hive-gold)]">
           <Sparkle className="h-3 w-3" /> NECTAR Applicability
         </span>
         <span className="flex items-center gap-2 text-muted-foreground">
@@ -3723,7 +3723,7 @@ function ApplicabilityPanel({
       {open && (
         <div className="space-y-3 border-t border-amber-500/20 px-3 py-3 text-xs">
           <p className="text-[11px] text-muted-foreground">
-            <span className="font-semibold text-[#d97a1c]">Step 2 of 2.</span>{" "}
+            <span className="font-semibold text-[var(--hive-gold)]">Step 2 of 2.</span>{" "}
             Confirming applicability tells NECTAR <em>who or what</em> this
             requirement governs — it's what drives the audit checklist, billing
             readiness, and staff capture. A requirement isn't fully reviewed
@@ -3739,7 +3739,7 @@ function ApplicabilityPanel({
               .map((r) => r.id);
             if (pendingIds.length === 0) return null;
             return (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#d97a1c]/40 bg-[#d97a1c]/10 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-3 py-2">
                 <span className="text-[11px] text-[#7a4310] dark:text-amber-200">
                   NECTAR proposed{" "}
                   <span className="font-semibold">
@@ -3749,7 +3749,7 @@ function ApplicabilityPanel({
                 </span>
                 <Button
                   size="sm"
-                  className="h-8 bg-[#d97a1c] text-white hover:bg-[#b86413]"
+                  className="h-8 bg-[var(--hive-gold)] text-white hover:bg-[#b86413]"
                   disabled={confirmAll.isPending}
                   onClick={() => confirmAll.mutate(pendingIds)}
                 >
@@ -3803,7 +3803,7 @@ function ApplicabilityPanel({
                     </Badge>
                   )}
                   {m.proposed_by === "nectar" && !m.confirmed && (
-                    <Badge className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]">
+                    <Badge className="bg-[var(--hive-gold)]/15 text-[10px] text-[var(--hive-gold)]">
                       proposed
                     </Badge>
                   )}
@@ -4046,7 +4046,7 @@ function RequirementDetailDialog({
           {/* NECTAR plain-language explanation — clearly secondary */}
           <section className="rounded-xl border border-amber-500/30 bg-amber-50/40 p-3 dark:bg-amber-500/5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#d97a1c]">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--hive-gold)]">
                 <Sparkle className="h-3 w-3" /> NECTAR — Explain this (plain language)
               </p>
               <Button
@@ -4397,7 +4397,7 @@ function ReviewQueueDialog({
 
             <div className="rounded-xl border border-amber-500/30 bg-amber-50/40 p-3 dark:bg-amber-500/5">
               <div className="mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#d97a1c]">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--hive-gold)]">
                   <Sparkle className="h-3 w-3" /> NECTAR's proposed applicability
                 </span>
                 {rows.length === 0 && !mapsQ.isLoading && (
@@ -4453,7 +4453,7 @@ function ReviewQueueDialog({
                         </Badge>
                       )}
                       {!m.confirmed && m.scope_kind !== "unknown" && (
-                        <Badge className="bg-[#d97a1c]/15 text-[10px] text-[#d97a1c]">
+                        <Badge className="bg-[var(--hive-gold)]/15 text-[10px] text-[var(--hive-gold)]">
                           proposed
                         </Badge>
                       )}

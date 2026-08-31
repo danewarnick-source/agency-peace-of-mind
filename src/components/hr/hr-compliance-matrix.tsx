@@ -169,7 +169,7 @@ function BandRows({ band }: { band: { key: string; label: string; staff: HrMatri
           <td className="border-b border-border px-3 py-1.5">
             <a
               href={`/dashboard/my-obligations?staff=${s.staff_id}`}
-              className="text-sm font-medium text-[#137182] hover:underline"
+              className="text-sm font-medium text-[var(--hive-ink)] hover:underline"
             >
               View obligations →
             </a>

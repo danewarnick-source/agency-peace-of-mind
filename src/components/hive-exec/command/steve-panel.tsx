@@ -57,7 +57,7 @@ export function SteveDockPanel({ routeContext = null, featureKeyContext = null, 
   return (
     <aside className={`rounded-xl border border-border bg-card p-4 shadow-sm ${expanded ? "" : ""}`}>
       <header className="mb-3 flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f1b3d] text-[#fed7aa]">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[#fed7aa]">
           <Sparkles className="h-4 w-4" />
         </span>
         <div className="flex-1">
@@ -93,7 +93,7 @@ export function SteveDockPanel({ routeContext = null, featureKeyContext = null, 
         <div className={`space-y-3 ${expanded ? "max-h-[50vh]" : "max-h-64"} overflow-y-auto pr-1`}>
           {history.map((turn, i) => (
             <div key={i} className="space-y-1.5">
-              <div className="rounded-md bg-[#0f1b3d] px-2 py-1 text-xs text-white">{turn.q}</div>
+              <div className="rounded-md bg-[var(--hive-text)] px-2 py-1 text-xs text-white">{turn.q}</div>
               <div className="rounded-md border border-border bg-muted/20 p-2 text-xs text-foreground whitespace-pre-wrap">
                 {turn.a.answer}
               </div>
@@ -105,7 +105,7 @@ export function SteveDockPanel({ routeContext = null, featureKeyContext = null, 
                       {s.related_route && (
                         <a
                           href={s.related_route}
-                          className="inline-flex items-center text-[#d97a1c] hover:underline"
+                          className="inline-flex items-center text-[var(--hive-gold)] hover:underline"
                           title={`Open ${s.related_route}`}
                         >
                           <ExternalLink className="ml-0.5 h-2.5 w-2.5" />

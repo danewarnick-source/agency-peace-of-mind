@@ -189,7 +189,7 @@ function RevenuePage() {
                   onClick={() => setGranularity(g)}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors ${
                     granularity === g
-                      ? "bg-[image:var(--gradient-brand)] text-primary-foreground"
+                      ? "bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >

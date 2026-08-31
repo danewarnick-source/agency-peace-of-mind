@@ -82,7 +82,7 @@ function FormRow({
         <ChevronRight
           className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
         />
-        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />
+        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[var(--hive-ink)]" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-medium text-foreground truncate">{form.name}</p>

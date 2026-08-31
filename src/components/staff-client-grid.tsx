@@ -147,17 +147,17 @@ function ClientDetail({
                 className={[
                   "min-h-[44px] rounded-lg border px-3 py-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
-                    ? "border-[color:var(--amber-600,#f59324)] bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,#0d112b)] shadow-sm"
+                    ? "border-[color:var(--amber-600,var(--hive-gold))] bg-[image:var(--gradient-amber)] text-[color:var(--navy-900,var(--hive-text))] shadow-sm"
                     : locked
                       ? "border-border bg-muted/40 text-muted-foreground opacity-60"
-                      : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,#f59324)]/60",
+                      : "border-border bg-background text-foreground hover:border-[color:var(--amber-600,var(--hive-gold))]/60",
                 ].join(" ")}
               >
                 <span className="block font-mono text-sm font-semibold leading-tight">{code}</span>
                 <span
                   className={[
                     "block text-[10px] font-medium uppercase tracking-wide leading-tight",
-                    active ? "text-[color:var(--navy-900,#0d112b)]/70" : "text-muted-foreground",
+                    active ? "text-[color:var(--navy-900,var(--hive-text))]/70" : "text-muted-foreground",
                   ].join(" ")}
                 >
                   {billingLabel(code)}
@@ -332,7 +332,7 @@ function ClientRow({
         isOnTheClock
           ? "border-[#15a06a] ring-1 ring-[#15a06a]/40"
           : todayShift
-            ? "border-[color:var(--amber-600,#f59324)]/70 ring-1 ring-[color:var(--amber-600,#f59324)]/30"
+            ? "border-[color:var(--amber-600,var(--hive-gold))]/70 ring-1 ring-[color:var(--amber-600,var(--hive-gold))]/30"
             : "border-border",
       ].join(" ")}
     >
@@ -350,7 +350,7 @@ function ClientRow({
       >
         <span
           aria-hidden
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--navy-900,#0d112b)] text-sm font-semibold text-white"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--navy-900,var(--hive-text))] text-sm font-semibold text-white"
         >
           {initials || <User className="h-5 w-5" />}
         </span>
@@ -366,7 +366,7 @@ function ClientRow({
                 On clock · {elapsed}
               </span>
             ) : todayShift ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--amber-600,#f59324)]/15 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--amber-700,#d97a1c)]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--amber-600,var(--hive-gold))]/15 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--amber-700,var(--hive-gold))]">
                 <CalendarCheck2 className="h-3 w-3" />
                 Scheduled · {fmtTime(todayShift.starts_at)}–{fmtTime(todayShift.ends_at)}
                 {todayShift.job_code ? ` · ${todayShift.job_code}` : ""}
@@ -386,7 +386,7 @@ function ClientRow({
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{address}</p>
         </div>
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
-          <span className="rounded-full bg-[color:var(--navy-900,#0d112b)]/5 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-[color:var(--navy-900,#0d112b)]">
+          <span className="rounded-full bg-[color:var(--navy-900,var(--hive-text))]/5 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-[color:var(--navy-900,var(--hive-text))]">
             {periodHours.toFixed(1)}h
           </span>
         </div>
@@ -397,7 +397,7 @@ function ClientRow({
               role="button"
               aria-label={`Quick info for ${fullName}`}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:border-[color:var(--amber-600,#f59324)]/60 hover:text-[color:var(--amber-700,#d97a1c)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:border-[color:var(--amber-600,var(--hive-gold))]/60 hover:text-[color:var(--amber-700,var(--hive-gold))]"
             >
               <Info className="h-4 w-4" />
             </span>

@@ -418,7 +418,7 @@ function ProgramPlayer() {
                 <div className="h-full bg-[image:var(--gradient-brand)]" style={{ width: `${activeStatus?.progress ?? 0}%` }} />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button asChild className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+                <Button asChild className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
                   <Link to="/dashboard/courses/$courseId" params={{ courseId: activeCourse.id }}>
                     <PlayCircle className="mr-2 h-4 w-4" /> Open module
                   </Link>

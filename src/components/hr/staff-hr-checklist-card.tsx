@@ -69,7 +69,7 @@ function Annual12hInlineProgress({
     return (
       <a
         href="/dashboard/records-desk?tab=training-records"
-        className="text-xs text-[#137182] hover:underline"
+        className="text-xs text-[var(--hive-ink)] hover:underline"
       >
         Log training hours →
       </a>
@@ -107,7 +107,7 @@ function Annual12hInlineProgress({
         </div>
         <a
           href="/dashboard/records-desk?tab=training-records"
-          className="text-xs text-[#137182] hover:underline"
+          className="text-xs text-[var(--hive-ink)] hover:underline"
         >
           Log training hours →
         </a>
@@ -136,7 +136,7 @@ function Annual12hInlineProgress({
       </div>
       <a
         href="/dashboard/records-desk?tab=training-records"
-        className="text-xs text-[#137182] hover:underline"
+        className="text-xs text-[var(--hive-ink)] hover:underline"
       >
         Log training hours →
       </a>
@@ -403,7 +403,7 @@ export function StaffHrChecklistCard({
       <>
       <p className="text-sm text-muted-foreground">
         Requirement tracking now lives in{" "}
-        <a href="/dashboard/company-obligations" className="font-medium text-[#137182] hover:underline">
+        <a href="/dashboard/company-obligations" className="font-medium text-[var(--hive-ink)] hover:underline">
           Company Obligations
         </a>.
       </p>

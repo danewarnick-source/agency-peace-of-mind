@@ -296,14 +296,11 @@ export function NotificationBell({
         className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={`Notifications${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`}
       >
-        <Bell className={`h-5 w-5 ${critical.length > 0 ? "text-rose-500" : ""}`} />
+        <Bell className="h-5 w-5 text-[var(--hive-gold)]" />
         {unreadCount > 0 && (
-          <span className={`absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${critical.length > 0 ? "bg-rose-500 text-white" : "bg-primary text-primary-foreground"}`}>
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--hive-gold)] text-[10px] font-bold text-[var(--hive-on-gold)]">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
-        )}
-        {critical.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 h-4 w-4 animate-ping rounded-full bg-rose-400 opacity-60" />
         )}
       </button>
 

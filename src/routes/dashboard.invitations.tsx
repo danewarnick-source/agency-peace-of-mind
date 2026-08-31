@@ -140,7 +140,7 @@ function InvitationsPage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+            <Button className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
               <UserPlus className="mr-2 h-4 w-4" /> Invite by email
             </Button>
           </DialogTrigger>

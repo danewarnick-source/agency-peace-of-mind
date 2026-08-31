@@ -125,14 +125,14 @@ function CompletedCard({
             <Link
               to="/dashboard/my-obligations/course/$instanceId"
               params={{ instanceId: instance.id }}
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--hive-ink)] hover:underline"
             >
               Open course / exam export <ExternalLink className="h-3 w-3" />
             </Link>
           ) : evidenceUsed === "form" && isFormUuid(ob.linked_form_id) ? (
             <a
               href={`/dashboard/forms/${ob.linked_form_id}/submissions`}
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--hive-ink)] hover:underline"
             >
               View submission <ExternalLink className="h-3 w-3" />
             </a>
@@ -141,7 +141,7 @@ function CompletedCard({
               href={downloadUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--hive-ink)] hover:underline"
             >
               View submission <ExternalLink className="h-3 w-3" />
             </a>

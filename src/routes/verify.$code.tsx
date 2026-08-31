@@ -34,7 +34,7 @@ function VerifyPage() {
     <div className="min-h-screen bg-secondary/40 px-6 py-16">
       <div className="mx-auto max-w-xl">
         <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm font-medium">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
             <GraduationCap className="h-4 w-4" />
           </span>
           HIVE

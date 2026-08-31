@@ -2,7 +2,7 @@ import { Hexagon, Crosshair } from "lucide-react";
 
 export function FounderStory() {
   return (
-    <section className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-text)]">
+    <section className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute -right-20 -top-20 h-72 w-72 opacity-[0.04] clip-hex bg-nectar-gold-500" />
         <div className="absolute -left-16 bottom-10 h-56 w-56 opacity-[0.03] clip-hex bg-nectar-gold-500" />
@@ -20,7 +20,7 @@ export function FounderStory() {
             We set out to survive an audit.
           </h2>
 
-          <div className="mt-6 space-y-4 text-base leading-relaxed text-white/75">
+          <div className="mt-6 space-y-4 text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
             <p>
               We run a disability support agency. We lived the 11 p.m. paperwork, the month-end
               scramble to reconcile EVV against authorizations, the cold dread of a DSPD audit

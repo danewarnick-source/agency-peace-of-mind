@@ -60,12 +60,12 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Building2; label: str
   return (
     <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-card">
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
           <Icon className="h-4 w-4" />
         </span>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       </div>
-      <p className="mt-2 font-display text-2xl font-bold tabular-nums text-[#0d112b]">{value}</p>
+      <p className="mt-2 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">{value}</p>
     </div>
   );
 }

@@ -46,10 +46,10 @@ export function TrainingDiagram({ id }: { id: DiagramId }) {
           </figcaption>
           <svg viewBox="0 0 360 120" className="h-auto w-full" role="img" aria-label="Person on their side">
             <ellipse cx="180" cy="98" rx="140" ry="10" fill="#e4e7ef" />
-            <path d="M70 78 C90 70 130 62 170 64 C210 66 250 72 290 78" fill="none" stroke="#137182" strokeWidth="10" strokeLinecap="round" />
-            <circle cx="78" cy="62" r="14" fill="#c5d4e0" stroke="#137182" strokeWidth="2" />
-            <path d="M170 64 L155 88" stroke="#137182" strokeWidth="8" strokeLinecap="round" />
-            <path d="M210 66 L230 90" stroke="#137182" strokeWidth="8" strokeLinecap="round" />
+            <path d="M70 78 C90 70 130 62 170 64 C210 66 250 72 290 78" fill="none" stroke="var(--hive-ink)" strokeWidth="10" strokeLinecap="round" />
+            <circle cx="78" cy="62" r="14" fill="#c5d4e0" stroke="var(--hive-ink)" strokeWidth="2" />
+            <path d="M170 64 L155 88" stroke="var(--hive-ink)" strokeWidth="8" strokeLinecap="round" />
+            <path d="M210 66 L230 90" stroke="var(--hive-ink)" strokeWidth="8" strokeLinecap="round" />
             <text x="180" y="28" textAnchor="middle" fontSize="12" fill="#0f6e56">On the side so the airway can drain</text>
           </svg>
         </figure>
@@ -114,17 +114,17 @@ export function TrainingDiagram({ id }: { id: DiagramId }) {
     case "hospital-to-community":
       return (
         <figure className={frame}>
-          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#137182]">
+          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--hive-ink)]">
             Picture: hospital to community
           </figcaption>
           <svg viewBox="0 0 360 90" className="h-auto w-full" role="img" aria-label="Hospital to community steps">
             <rect x="10" y="20" width="90" height="50" rx="8" fill="#eaf3fc" stroke="#8eb8e0" />
             <text x="55" y="50" textAnchor="middle" fontSize="11" fill="#1c4e80">Hospital</text>
-            <path d="M104 45 H128" stroke="#137182" strokeWidth="2" />
+            <path d="M104 45 H128" stroke="var(--hive-ink)" strokeWidth="2" />
             <rect x="132" y="20" width="96" height="50" rx="8" fill="#fff8e6" stroke="#f5d889" />
             <text x="180" y="42" textAnchor="middle" fontSize="11" fill="#7a5208">Discharge</text>
             <text x="180" y="58" textAnchor="middle" fontSize="10" fill="#7a5208">plan + who to call</text>
-            <path d="M232 45 H256" stroke="#137182" strokeWidth="2" />
+            <path d="M232 45 H256" stroke="var(--hive-ink)" strokeWidth="2" />
             <rect x="260" y="20" width="90" height="50" rx="8" fill="#e1f5ee" stroke="#9fe1cb" />
             <text x="305" y="42" textAnchor="middle" fontSize="11" fill="#0f6e56">Community</text>
             <text x="305" y="58" textAnchor="middle" fontSize="10" fill="#0f6e56">staff + family</text>
@@ -134,7 +134,7 @@ export function TrainingDiagram({ id }: { id: DiagramId }) {
     case "eight-know":
       return (
         <figure className={frame}>
-          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#137182]">
+          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--hive-ink)]">
             Picture: eight things before working alone
           </figcaption>
           <ul className="grid grid-cols-2 gap-1.5 text-[11px] text-[#2a3040] sm:grid-cols-4">
@@ -149,7 +149,7 @@ export function TrainingDiagram({ id }: { id: DiagramId }) {
     case "policy-stack":
       return (
         <figure className={frame}>
-          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#1C2A5E]">
+          <figcaption className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--hive-ink)]">
             Picture: this agency’s documents
           </figcaption>
           <svg viewBox="0 0 360 110" className="h-auto w-full" role="img" aria-label="Stack of agency policy documents">

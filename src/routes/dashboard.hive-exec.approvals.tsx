@@ -78,7 +78,7 @@ function ApprovalsPage() {
       {/* Liability banner — critical to keep visible */}
       <section className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#d97a1c] text-white">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-white">
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>

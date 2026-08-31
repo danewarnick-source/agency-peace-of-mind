@@ -27,7 +27,6 @@ import {
   LayoutDashboard,
   GraduationCap,
   Settings,
-  Hexagon,
   LogOut,
   Users,
   Contact2,
@@ -91,7 +90,7 @@ import {
   writeSessionHint,
 } from "@/lib/auth-session-boot";
 import { PortalViewSwitcher } from "@/components/portal-view-switcher";
-import { HiveWordmark } from "@/components/brand/hive-mark";
+import { HiveMark, HiveWordmark } from "@/components/brand/hive-mark";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -833,10 +832,10 @@ function DashboardLayout() {
                     type="button"
                     onClick={() => setTaskCenterOpen(true)}
                     data-tour="nav.help"
-                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[var(--hive-gold)] bg-transparent px-2.5 py-1 text-xs font-medium text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[var(--hive-ink)] bg-[var(--hive-ink)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#35475a]"
                     title="Open Nectar"
                   >
-                    <ListChecks className="h-3.5 w-3.5 text-[var(--hive-gold)]" />{" "}
+                    <ListChecks className="h-3.5 w-3.5" />{" "}
                     <span className="hidden md:inline">Nectar</span>
                   </button>
                   {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
@@ -868,7 +867,7 @@ function DashboardLayout() {
               {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
 
               {isStatePreview && (
-                <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--hive-gold)]/30 bg-[var(--hive-gold)]/[0.08] px-4 py-2 text-xs md:px-6">
                   <div className="flex items-center gap-2 text-[#9a3412]">
                     <MapPin className="h-3.5 w-3.5" />
                     <span className="font-semibold uppercase tracking-wider">
@@ -884,7 +883,7 @@ function DashboardLayout() {
                     <Link
                       to="/dashboard/hive-exec/states/$stateCode"
                       params={{ stateCode: currentPreviewState.code }}
-                      className="hidden md:inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
+                      className="hidden md:inline-flex items-center gap-1 rounded-md border border-[var(--hive-gold)]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
                     >
                       Edit template
                     </Link>
@@ -908,8 +907,8 @@ function DashboardLayout() {
                     Select a state from the sidebar to load the platform configured as that state.
                   </div>
                 ) : isComingSoonPreview ? (
-                  <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[#f4a93a]/40 bg-[#f4a93a]/[0.06] p-10 text-center">
-                    <MapPin className="mx-auto h-8 w-8 text-[#f4a93a]" />
+                  <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/[0.06] p-10 text-center">
+                    <MapPin className="mx-auto h-8 w-8 text-[var(--hive-gold)]" />
                     <h2 className="mt-3 text-lg font-semibold tracking-tight">
                       Coming soon for {currentPreviewState?.name}
                     </h2>
@@ -921,7 +920,7 @@ function DashboardLayout() {
                       <Link
                         to="/dashboard/hive-exec/states/$stateCode"
                         params={{ stateCode: currentPreviewState.code }}
-                        className="mt-4 inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#f4a93a]/10"
+                        className="mt-4 inline-flex items-center gap-1 rounded-md border border-[var(--hive-gold)]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[var(--hive-gold)]/10"
                       >
                         Build {currentPreviewState.name} template
                       </Link>
@@ -962,7 +961,7 @@ function CompanyClientsBridge({
   return (
     <button
       type="button"
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-3 py-2 text-xs font-semibold text-[#f4a93a] hover:bg-[#f4a93a]/20"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-3 py-2 text-xs font-semibold text-[var(--hive-gold)] hover:bg-[var(--hive-gold)]/20"
       onClick={() => {
         // Switch to company Admin portal and open Clients — hive-exec
         // nav intentionally excludes PHI; this is the explicit bridge.
@@ -1055,7 +1054,7 @@ function SidebarBody({
   return (
     <>
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <HiveWordmark markClassName="h-6 w-6" wordClassName="text-lg" />
+        <HiveWordmark markClassName="h-8 w-8" wordClassName="text-[1.35rem]" tone="chrome" />
       </div>
 
       {(isAdminCapable || isExecutive) && (
@@ -1088,7 +1087,7 @@ function SidebarBody({
           )}
 
           {isStatePreview && (
-            <div className="mt-3 space-y-2 rounded-md border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-2">
+            <div className="mt-3 space-y-2 rounded-md border border-[var(--hive-gold)]/30 bg-[var(--hive-gold)]/[0.06] p-2">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                 State
               </label>
@@ -1128,7 +1127,7 @@ function SidebarBody({
                   onClick={() => setSubView("admin")}
                   className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                     subView === "admin"
-                      ? "bg-[#d97a1c] text-white"
+                      ? "bg-[var(--hive-gold)] text-white"
                       : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
                   }`}
                 >
@@ -1139,7 +1138,7 @@ function SidebarBody({
                   onClick={() => setSubView("staff")}
                   className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                     subView === "staff"
-                      ? "bg-[#d97a1c] text-white"
+                      ? "bg-[var(--hive-gold)] text-white"
                       : "bg-sidebar text-sidebar-foreground/70 hover:bg-sidebar-accent"
                   }`}
                 >
@@ -1150,7 +1149,7 @@ function SidebarBody({
                 <Link
                   to="/dashboard/hive-exec/states/$stateCode"
                   params={{ stateCode: currentPreviewState.code }}
-                  className="block rounded-md border border-[#f4a93a]/30 bg-sidebar px-2 py-1 text-center text-[11px] font-medium text-[#f4a93a] hover:bg-[#f4a93a]/10"
+                  className="block rounded-md border border-[var(--hive-gold)]/30 bg-sidebar px-2 py-1 text-center text-[11px] font-medium text-[var(--hive-gold)] hover:bg-[var(--hive-gold)]/10"
                 >
                   Edit {currentPreviewState.name} template
                 </Link>
@@ -1168,8 +1167,8 @@ function SidebarBody({
               onClick={onNavigate}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 pathname === COMMAND_CENTER_ITEM.to
-                  ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
-                  : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
+                  ? "hive-nav-active"
+                  : "text-[var(--hive-chrome-text)]/75 hover:bg-[color-mix(in_srgb,white_10%,transparent)] hover:text-[var(--hive-chrome-text)]"
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
@@ -1203,8 +1202,8 @@ function SidebarBody({
                             onClick={onNavigate}
                             className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                               active
-                                ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
-                                : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
+                                ? "hive-nav-active"
+                                : "text-[var(--hive-chrome-text)]/75 hover:bg-[color-mix(in_srgb,white_10%,transparent)] hover:text-[var(--hive-chrome-text)]"
                             }`}
                           >
                             <span className="inline-flex items-center gap-2">
@@ -1212,7 +1211,7 @@ function SidebarBody({
                             </span>
                             {badgeCount > 0 && (
                               <span
-                                className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}
+                                className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[var(--hive-text)]" : "bg-[var(--hive-gold)] text-white"}`}
                               >
                                 {badgeCount}
                               </span>
@@ -1259,14 +1258,14 @@ function SidebarBody({
                 data-tour={`nav.${slug}`}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
+                    ? "hive-nav-active"
                     : isNectar
-                      ? "text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]"
-                      : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
+                      ? "text-[var(--hive-chrome-text)] hover:bg-[color-mix(in_srgb,white_10%,transparent)]"
+                      : "text-[var(--hive-chrome-text)]/75 hover:bg-[color-mix(in_srgb,white_10%,transparent)] hover:text-[var(--hive-chrome-text)]"
                 }`}
               >
                 <Icon
-                  className={`h-4 w-4 ${active || isNectar ? "text-[var(--hive-gold)]" : ""}`}
+                  className="h-4 w-4"
                 />
                 <span className="flex-1">{item.label}</span>
                 {item.to === "/dashboard/company-obligations" &&
@@ -1295,18 +1294,18 @@ function SidebarBody({
         {showNectarCluster && (
           <div className="mt-5 border-t border-sidebar-border pt-5">
             <div className="mb-2.5 flex items-start gap-2.5 px-3">
-              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/20">
-                <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2} />
+              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center">
+                <HiveMark className="h-6 w-6" />
               </span>
               <div className="min-w-0">
-                <span className="text-sm font-bold tracking-wide text-[var(--hive-gold)]">Nectar</span>
-                <p className="text-[11px] leading-relaxed text-sidebar-foreground/50">
+                <span className="text-sm font-bold tracking-wide text-[var(--hive-chrome-text)]">Nectar</span>
+                <p className="text-[11px] leading-relaxed text-[var(--hive-chrome-text)]/55">
                   The brain. Tabs below feed it the data the rest of Hive reads from.
                 </p>
               </div>
             </div>
 
-            <div className="mx-1 space-y-0.5 rounded-xl border border-[#f4a93a]/10 bg-[#f4a93a]/[0.04] p-1.5">
+            <div className="mx-1 space-y-0.5 rounded-xl border border-[color-mix(in_srgb,white_14%,transparent)] p-1.5">
               {nectarNav.map((item) => {
                 const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
                 const Icon = item.icon;
@@ -1320,9 +1319,9 @@ function SidebarBody({
                       onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
                       data-tour={`nav.${slug}`}
                       aria-label={`${item.label} — locked. Click to request upgrade.`}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 transition-colors hover:bg-[#f4a93a]/10 hover:text-sidebar-foreground/60"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--hive-chrome-text)]/40 transition-colors hover:bg-[color-mix(in_srgb,white_10%,transparent)] hover:text-[var(--hive-chrome-text)]/60"
                     >
-                      <Icon className="h-4 w-4 text-[#f4a93a]/50" />
+                      <Icon className="h-4 w-4" />
                       <span className="flex-1 text-left">{item.label}</span>
                       <Lock className="h-3 w-3 opacity-70" />
                     </button>
@@ -1336,11 +1335,11 @@ function SidebarBody({
                     data-tour={`nav.${slug}`}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                       active
-                        ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
-                        : "text-[var(--hive-text-muted)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)] hover:text-[var(--hive-gold)]"
+                        ? "hive-nav-active"
+                        : "text-[var(--hive-chrome-text)]/75 hover:bg-[color-mix(in_srgb,white_10%,transparent)] hover:text-[var(--hive-chrome-text)]"
                     }`}
                   >
-                    <Icon className="h-4 w-4 text-[var(--hive-gold)]" />
+                    <Icon className="h-4 w-4" />
                     {item.label}
                   </Link>
                 );

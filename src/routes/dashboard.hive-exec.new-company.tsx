@@ -144,7 +144,7 @@ function NewCompanyPage() {
           <button
             type="submit"
             disabled={disabled}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-[#d97a1c] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-[var(--hive-gold)] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" />
             {m.isPending ? "Creating…" : "Create company & invite admin"}

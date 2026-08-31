@@ -234,7 +234,7 @@ function BillingOverviewPage() {
                   <Link
                     to="/dashboard/billing/$clientId"
                     params={{ clientId: s.client.id }}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[#d97a1c] hover:bg-[#fde9c8]"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-[var(--hive-gold)] hover:bg-[#fde9c8]"
                   >
                     Open <ChevronRight className="h-4 w-4" />
                   </Link>

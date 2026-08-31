@@ -56,7 +56,7 @@ export function AuditorPackagePreview({ packageId, mode }: { packageId: string; 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{pkg.state_agency}</div>
-            <h2 className="font-display text-xl font-bold text-[#0f1b3d]">
+            <h2 className="font-display text-xl font-bold text-[var(--hive-text)]">
               {pkg.title ?? `${pkg.state_agency} audit`}
             </h2>
             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -83,8 +83,8 @@ export function AuditorPackagePreview({ packageId, mode }: { packageId: string; 
 
       {/* NECTAR + subject records */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0f1b3d]">
-          <Sparkles className="h-4 w-4 text-[#d97a1c]" /> NECTAR summary
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--hive-text)]">
+          <Sparkles className="h-4 w-4 text-[var(--hive-gold)]" /> NECTAR summary
         </div>
         <p className="text-sm text-slate-700">{payload.nectar_summary.overall}</p>
         {payload.nectar_summary.flags.length > 0 && (
@@ -121,7 +121,7 @@ function SubjectCard({ subject, nectarNote }: { subject: AuditPackageSubjectSumm
         </span>
         <div>
           <div className="text-xs uppercase tracking-wider text-muted-foreground">{subject.subject_type}</div>
-          <div className="font-semibold text-[#0f1b3d]">{subject.subject_label}</div>
+          <div className="font-semibold text-[var(--hive-text)]">{subject.subject_label}</div>
         </div>
       </header>
 
@@ -307,7 +307,7 @@ function PackageFilesSection({ packageId, mode }: { packageId: string; mode: "or
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="text-sm font-semibold text-[#0f1b3d]">Provider-uploaded files</div>
+        <div className="text-sm font-semibold text-[var(--hive-text)]">Provider-uploaded files</div>
         {canEdit && (
           <div className="flex items-center gap-2">
             <input
@@ -319,7 +319,7 @@ function PackageFilesSection({ packageId, mode }: { packageId: string; mode: "or
             <button
               onClick={() => { if (newFolder.trim()) { createFolderMut.mutate(newFolder.trim()); setNewFolder(""); } }}
               disabled={createFolderMut.isPending}
-              className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
+              className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
             >
               <FolderPlus className="h-3 w-3" /> New folder
             </button>
@@ -401,11 +401,11 @@ function FolderBlock({
       onClick={onActivate}
       className={`mt-2 rounded-lg border p-3 transition-colors ${
         dragOver ? "border-emerald-400 bg-emerald-50" :
-        active ? "border-[#0f1b3d]/40 bg-slate-50" : "border-slate-200 bg-white"
+        active ? "border-[var(--hive-text)]/40 bg-slate-50" : "border-slate-200 bg-white"
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-[#0f1b3d]">
+        <div className="flex items-center gap-2 text-sm font-medium text-[var(--hive-text)]">
           <Folder className="h-4 w-4 text-amber-500" /> {label}
           <span className="text-xs text-muted-foreground">({files.length})</span>
         </div>
@@ -455,7 +455,7 @@ function FolderBlock({
               <span className="flex items-center gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownload(f.id); }}
-                  className="inline-flex items-center gap-1 text-[#0f1b3d] hover:underline"
+                  className="inline-flex items-center gap-1 text-[var(--hive-text)] hover:underline"
                 >
                   <Download className="h-3 w-3" /> Download
                 </button>

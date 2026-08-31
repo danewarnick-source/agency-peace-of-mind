@@ -13,6 +13,8 @@ import {
   trainingClassLabel,
   type TrainingClassType,
 } from "@/lib/training-class";
+import { ensureOpenStaffObligationInternal } from "@/lib/ensure-staff-obligation";
+import { hireDueDaysForTitle } from "@/lib/obligation-auto-assign";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -24,13 +26,6 @@ export type FulfillTrainingClassInput = {
   stripePaymentIntentId?: string | null;
   amountCents?: number;
   waived?: boolean;
-};
-
-const DUE_DAYS: Record<string, number> = {
-  [THIRTY_DAY_OBLIGATION_TITLE]: 30,
-  "CPR & First Aid Certification": 90,
-  "CPR/First Aid Certification — Initial": 90,
-  "Behavior Intervention Certification (SOAR/MANDT/PART/CPI/Safety Care)": 180,
 };
 
 function titlesForType(type: TrainingClassType): string[] {
@@ -101,81 +96,16 @@ async function matchStaffByEmail(
   return { id: hit.id, full_name: hit.full_name, role };
 }
 
-async function findObligationByTitles(
-  sb: AnySupabase,
-  organizationId: string,
-  titles: string[],
-): Promise<{ id: string; title: string } | null> {
-  const { data, error } = await sb
-    .from("company_obligations")
-    .select("id, title")
-    .eq("organization_id", organizationId)
-    .eq("active", true)
-    .in("title", titles);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{ id: string; title: string }>;
-  for (const title of titles) {
-    const hit = rows.find((r) => r.title === title);
-    if (hit) return hit;
-  }
-  return rows[0] ?? null;
-}
-
 async function ensureOpenObligationForStaff(
   sb: AnySupabase,
   organizationId: string,
   titles: string[],
   staff: { id: string; full_name: string | null; role: string },
 ): Promise<void> {
-  const ob = await findObligationByTitles(sb, organizationId, titles);
-  if (!ob) return;
-
-  const { data: existing, error: openErr } = await sb
-    .from("company_obligation_instances")
-    .select("id")
-    .eq("obligation_id", ob.id)
-    .eq("assignee_staff_id", staff.id)
-    .in("status", ["pending", "overdue"])
-    .maybeSingle();
-  if (openErr) throw new Error(openErr.message);
-  if (existing) return;
-
-  const days = DUE_DAYS[ob.title] ?? 30;
-  const due = new Date();
-  due.setUTCDate(due.getUTCDate() + days);
-  due.setUTCHours(23, 59, 59, 0);
-  const periodKey = `Class roster ${due.toISOString().slice(0, 10)}`;
-
-  const { data: inserted, error: insErr } = await sb
-    .from("company_obligation_instances")
-    .insert({
-      obligation_id: ob.id,
-      organization_id: organizationId,
-      period_key: periodKey,
-      due_at: due.toISOString(),
-      status: "pending",
-      assignee_staff_id: staff.id,
-    })
-    .select("id")
-    .maybeSingle();
-  if (insErr) {
-    if ((insErr as { code?: string }).code === "23505") return;
-    throw new Error(insErr.message);
-  }
-  if (!inserted) return;
-
-  await sb.from("company_obligation_instance_assignees").upsert(
-    [
-      {
-        instance_id: inserted.id,
-        organization_id: organizationId,
-        staff_id: staff.id,
-        staff_name: staff.full_name ?? "Staff",
-        staff_role: staff.role,
-      },
-    ],
-    { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
-  );
+  await ensureOpenStaffObligationInternal(sb, organizationId, titles, staff, {
+    dueDays: hireDueDaysForTitle(titles[0] ?? ""),
+    periodPrefix: "Class roster",
+  });
 }
 
 export async function fulfillTrainingClass(input: FulfillTrainingClassInput): Promise<{ ok: true }> {

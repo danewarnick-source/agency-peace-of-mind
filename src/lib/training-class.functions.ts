@@ -14,15 +14,20 @@ import {
   validateRosterRows,
   type TrainingClassType,
 } from "@/lib/training-class";
+import { classCardSummary, rosterCardStatus, type RosterCardStatus } from "@/lib/training-class-cards";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
 export type TrainingClassRosterView = {
+  rosterId: string;
   name: string;
   email: string;
   phone: string;
   staffUserId: string | null;
+  cardStatus: RosterCardStatus;
+  cardFilename: string | null;
+  cardUploadedAt: string | null;
 };
 
 export type TrainingClassRow = {
@@ -38,6 +43,9 @@ export type TrainingClassRow = {
   amountCents: number;
   submittedAt: string;
   completedAt: string | null;
+  cardInCount: number;
+  cardMissingCount: number;
+  cardsAllIn: boolean;
   roster: TrainingClassRosterView[];
 };
 
@@ -56,6 +64,7 @@ function mapClass(
   row: Record<string, unknown>,
   roster: TrainingClassRosterView[],
 ): TrainingClassRow {
+  const cards = classCardSummary(roster);
   return {
     id: String(row.id),
     organizationId: String(row.organization_id),
@@ -69,8 +78,73 @@ function mapClass(
     amountCents: Number(row.amount_cents ?? 0),
     submittedAt: String(row.submitted_at ?? row.created_at ?? ""),
     completedAt: (row.completed_at as string | null) ?? null,
+    cardInCount: cards.inCount,
+    cardMissingCount: cards.missingCount,
+    cardsAllIn: cards.allIn,
     roster,
   };
+}
+
+const ROSTER_SELECT_WITH_CARDS =
+  "id, class_id, staff_name, staff_email, staff_phone, staff_user_id, sort_order, card_path, card_filename, card_uploaded_at";
+const ROSTER_SELECT_BASIC =
+  "id, class_id, staff_name, staff_email, staff_phone, staff_user_id, sort_order";
+
+async function loadRosterByClass(
+  sb: AnySupabase,
+  classIds: string[],
+): Promise<Map<string, TrainingClassRosterView[]>> {
+  let roster: unknown[] | null = null;
+  const withCards = await sb
+    .from("training_class_roster")
+    .select(ROSTER_SELECT_WITH_CARDS)
+    .in("class_id", classIds)
+    .order("sort_order", { ascending: true });
+  if (withCards.error) {
+    if (!/card_path|schema cache|does not exist/i.test(withCards.error.message ?? "")) {
+      throw new Error(withCards.error.message);
+    }
+    const basic = await sb
+      .from("training_class_roster")
+      .select(ROSTER_SELECT_BASIC)
+      .in("class_id", classIds)
+      .order("sort_order", { ascending: true });
+    if (basic.error) throw new Error(basic.error.message);
+    roster = basic.data;
+  } else {
+    roster = withCards.data;
+  }
+
+  const byClass = new Map<string, TrainingClassRosterView[]>();
+  for (const r of (roster ?? []) as Array<{
+    id: string;
+    class_id: string;
+    staff_name: string;
+    staff_email: string;
+    staff_phone: string | null;
+    staff_user_id: string | null;
+    card_path?: string | null;
+    card_filename?: string | null;
+    card_uploaded_at?: string | null;
+  }>) {
+    const list = byClass.get(r.class_id) ?? [];
+    list.push({
+      rosterId: r.id,
+      name: r.staff_name,
+      email: r.staff_email,
+      phone: r.staff_phone ?? "",
+      staffUserId: r.staff_user_id,
+      cardStatus: rosterCardStatus({
+        cardPath: r.card_path,
+        cardFilename: r.card_filename,
+        cardUploadedAt: r.card_uploaded_at,
+      }),
+      cardFilename: r.card_filename ?? null,
+      cardUploadedAt: r.card_uploaded_at ?? null,
+    });
+    byClass.set(r.class_id, list);
+  }
+  return byClass;
 }
 
 async function loadPaidExternalClasses(): Promise<TrainingClassRow[]> {
@@ -91,31 +165,7 @@ async function loadPaidExternalClasses(): Promise<TrainingClassRow[]> {
   if (!classRows.length) return [];
 
   const ids = classRows.map((c) => String(c.id));
-  const { data: roster, error: rosErr } = await admin
-    .from("training_class_roster")
-    .select("class_id, staff_name, staff_email, staff_phone, staff_user_id, sort_order")
-    .in("class_id", ids)
-    .order("sort_order", { ascending: true });
-  if (rosErr) throw new Error(rosErr.message);
-
-  const byClass = new Map<string, TrainingClassRosterView[]>();
-  for (const r of (roster ?? []) as Array<{
-    class_id: string;
-    staff_name: string;
-    staff_email: string;
-    staff_phone: string | null;
-    staff_user_id: string | null;
-  }>) {
-    const list = byClass.get(r.class_id) ?? [];
-    list.push({
-      name: r.staff_name,
-      email: r.staff_email,
-      phone: r.staff_phone ?? "",
-      staffUserId: r.staff_user_id,
-    });
-    byClass.set(r.class_id, list);
-  }
-
+  const byClass = await loadRosterByClass(admin, ids);
   return classRows.map((c) => mapClass(c, byClass.get(String(c.id)) ?? []));
 }
 
@@ -193,30 +243,7 @@ export const getOrgTrainingClasses = createServerFn({ method: "POST" })
     if (!classRows.length) return [];
 
     const ids = classRows.map((c) => String(c.id));
-    const { data: roster, error: rosErr } = await sb
-      .from("training_class_roster")
-      .select("class_id, staff_name, staff_email, staff_phone, staff_user_id, sort_order")
-      .in("class_id", ids)
-      .order("sort_order", { ascending: true });
-    if (rosErr) throw new Error(rosErr.message);
-
-    const byClass = new Map<string, TrainingClassRosterView[]>();
-    for (const r of (roster ?? []) as Array<{
-      class_id: string;
-      staff_name: string;
-      staff_email: string;
-      staff_phone: string | null;
-      staff_user_id: string | null;
-    }>) {
-      const list = byClass.get(r.class_id) ?? [];
-      list.push({
-        name: r.staff_name,
-        email: r.staff_email,
-        phone: r.staff_phone ?? "",
-        staffUserId: r.staff_user_id,
-      });
-      byClass.set(r.class_id, list);
-    }
+    const byClass = await loadRosterByClass(sb, ids);
     return classRows.map((c) => mapClass(c, byClass.get(String(c.id)) ?? []));
   });
 

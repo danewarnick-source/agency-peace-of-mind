@@ -70,6 +70,7 @@ import {
   getStaffTrainingRiskFlags,
 } from "@/lib/hr-staff.functions";
 import { setMemberGrants } from "@/lib/team-access.functions";
+import { onStaffHired } from "@/lib/staff-assignment-hooks.functions";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { usePermissions } from "@/hooks/use-permissions";
 import { StaffPermissionsTab } from "@/components/employees/staff-permissions-tab";
@@ -875,6 +876,7 @@ function ContactCard({
 }) {
   const [editing, setEditing] = useState(false);
   const setGrantsFn = useServerFn(setMemberGrants);
+  const hireHookFn = useServerFn(onStaffHired);
   const [draft, setDraft] = useState({
     full_name: "",
     email: "",
@@ -942,6 +944,13 @@ function ContactCard({
         } as any)
         .eq("id", staffId);
       if (error) throw new Error(error.message);
+      if (draft.start_date) {
+        try {
+          await hireHookFn({ data: { organizationId: orgId, staffId } });
+        } catch (e) {
+          console.warn("[obligations] hire auto-assign failed:", e);
+        }
+      }
 
       const { error: mErr } = await supabase
         .from("organization_members")

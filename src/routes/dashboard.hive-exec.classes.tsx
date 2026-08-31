@@ -13,6 +13,7 @@ import {
 } from "@/lib/training-class.functions";
 import { trainingClassLabel, type TrainingClassType } from "@/lib/training-class";
 import { formatUsdFromCents } from "@/lib/hive-pricing";
+import { ClassCardStatus } from "@/components/training/class-card-upload";
 
 export const Route = createFileRoute("/dashboard/hive-exec/classes")({
   head: () => ({ meta: [{ title: "Classes — Hive Executive" }] }),
@@ -126,6 +127,8 @@ function ClassCard({ row, onComplete }: { row: TrainingClassRow; onComplete: () 
           <div className="text-xs text-muted-foreground">
             {row.seatCount} staff · {row.amountCents === 0 ? "$0" : formatUsdFromCents(row.amountCents)} · submitted{" "}
             {row.submittedAt ? new Date(row.submittedAt).toLocaleDateString() : "—"}
+            {" · "}
+            <ClassCardStatus row={row} />
           </div>
         </div>
         {row.status === "upcoming" && (
@@ -138,6 +141,9 @@ function ClassCard({ row, onComplete }: { row: TrainingClassRow; onComplete: () 
         {row.roster.map((r) => (
           <li key={`${r.email}-${r.name}`} className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium">{r.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {r.cardStatus === "in" ? "Card in" : "Card not in"}
+            </span>
             <a href={`mailto:${r.email}`} className="inline-flex items-center gap-1 text-[var(--hive-gold)] hover:underline">
               <Mail className="h-3 w-3" /> {r.email}
             </a>

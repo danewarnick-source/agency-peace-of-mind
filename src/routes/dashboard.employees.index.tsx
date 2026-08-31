@@ -9,6 +9,7 @@ import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employ
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
+import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 
 import { Button } from "@/components/ui/button";
@@ -1067,6 +1068,7 @@ function CaseloadDrawer({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const assignmentHookFn = useServerFn(onStaffAssignmentCreated);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [original, setOriginal] = useState<Set<string>>(new Set());
@@ -1145,6 +1147,20 @@ function CaseloadDrawer({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error } = await supabase.from("staff_assignments" as any).insert(rows as any);
         if (error) throw error;
+        for (const clientId of toAdd) {
+          try {
+            await assignmentHookFn({
+              data: {
+                organizationId,
+                staffId: member.id,
+                clientId,
+                serviceCodes: [],
+              },
+            });
+          } catch (e) {
+            console.warn("[obligations] assignment auto-assign failed:", e);
+          }
+        }
       }
     },
     onSuccess: () => {

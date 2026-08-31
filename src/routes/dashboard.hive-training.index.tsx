@@ -28,6 +28,7 @@ import { isBillingExempt } from "@/lib/billing-access";
 import { getBillingStatusFn } from "@/lib/stripe-checkout.functions";
 import { getOrgTrainingClasses } from "@/lib/training-class.functions";
 import { trainingClassLabel, type TrainingClassType } from "@/lib/training-class";
+import { ClassCardUploadButtons } from "@/components/training/class-card-upload";
 import { FeatureLocked } from "@/components/feature-locked";
 import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
 import { FeatureLockedRoute } from "@/components/upgrade-gate";
@@ -1015,9 +1016,12 @@ function SubmittedClasses({ orgId }: { orgId: string }) {
               </div>
               <ul className="mt-2 space-y-0.5 text-xs">
                 {c.roster.map((r) => (
-                  <li key={`${r.email}-${r.name}`}>{r.name} · {r.email} · {r.phone}</li>
+                  <li key={r.rosterId || `${r.email}-${r.name}`}>{r.name} · {r.email} · {r.phone}</li>
                 ))}
               </ul>
+              {(c.trainingType === "cpr_first_aid" || c.trainingType === "mandt" || c.trainingType === "package") && (
+                <ClassCardUploadButtons orgId={orgId} row={c} />
+              )}
             </CardContent>
           </Card>
         ))}

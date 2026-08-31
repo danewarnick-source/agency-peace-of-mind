@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { onStaffHiredInternal } from "@/lib/staff-assignment-hooks.functions";
 
 const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
 
@@ -162,6 +163,12 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         if (trackErr) console.warn("track assignment failed", trackErr.message);
       }
 
+      try {
+        await onStaffHiredInternal(supabaseAdmin, data.organizationId, newUserId);
+      } catch (hireErr) {
+        console.warn("[obligations] hire auto-assign failed:", hireErr);
+      }
+
       return { userId: newUserId, email: effectiveEmail };
     } catch (e) {
       // Rollback auth user on downstream failure
@@ -298,6 +305,11 @@ export const bulkSetStaffHireDates = createServerFn({ method: "POST" })
         .update({ hire_date: u.hireDate, start_date: u.hireDate } as any)
         .eq("id", u.userId);
       if (upErr) throw new Error(upErr.message);
+      try {
+        await onStaffHiredInternal(supabaseAdmin, data.organizationId, u.userId);
+      } catch (hireErr) {
+        console.warn("[obligations] hire-date auto-assign failed:", hireErr);
+      }
       updated += 1;
     }
     return { updated };

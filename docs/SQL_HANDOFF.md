@@ -6,6 +6,64 @@ it worked before moving on.
 
 ---
 
+## ACTION — Agency policies binder + class cards (2026-08-31)
+
+**Do not run this until Dane approves the PR.** This is an add-only migration.
+It does **not** drop or truncate anything. It does **not** change True North
+client/PHI tables.
+
+**What this is for:**
+
+1. **Policies Home** — admin adds a company policy (title, who it applies to,
+   and a file or pasted text). Hive turns it into a staff obligation. Staff
+   finish it on My Obligations by reading or watching and checking a box.
+2. **Class cards** — after a CPR or Mandt class, admin uploads the completion
+   card. That closes the staff obligation. Hive Executive Classes shows
+   whether the card is in.
+
+**New table:** `agency_policies` (one binder per agency). Org members can
+read; only admin/manager (or Hive Executive) can add or edit.
+
+**New columns (add only):**
+
+- `company_obligations.agency_policy_id`
+- `training_class_roster` card path / filename / uploaded-at
+- `training_classes` class-level card path / filename / uploaded-at
+
+**New storage bucket:** `agency-policies` (100 MB, PDF / slides / video /
+images). Staff can read files for their agency; only admin can upload.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260831080000_agency_policies_and_class_cards.sql`
+into Lovable’s SQL editor (clear the editor first) and run it.
+
+**What you'll see:** `Success. No rows returned` (or a small UPDATE count).
+
+**Confirm (paste this next, after clearing the editor):**
+
+```sql
+SELECT string_agg(table_name, ' | ' ORDER BY table_name) AS tables_ok
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('agency_policies', 'training_class_roster');
+
+SELECT string_agg(column_name, ' | ' ORDER BY column_name) AS card_cols
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'training_class_roster'
+  AND column_name IN ('card_path', 'card_filename', 'card_uploaded_at');
+
+SELECT id, file_size_limit
+FROM storage.buckets
+WHERE id = 'agency-policies';
+```
+
+You want `agency_policies | training_class_roster`,
+`card_filename | card_path | card_uploaded_at`, and
+`agency-policies` with `file_size_limit = 104857600`.
+
+---
+
 ## ACTION — Training class rosters + locked prices (2026-08-31)
 
 **Do not run this until Dane approves the PR.** This is a new-table migration.

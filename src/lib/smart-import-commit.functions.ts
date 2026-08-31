@@ -18,6 +18,10 @@ import {
 import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
 import { BASELINE_STAFF_TRAININGS, isBaselineApplicable } from "@/lib/staff-training-requirements";
 import { onPcspActivatedInternal } from "@/lib/company-obligations.functions";
+import {
+  onStaffAssignmentCreatedInternal,
+  onStaffHiredInternal,
+} from "@/lib/staff-assignment-hooks.functions";
 import { enrichNamesFromFull } from "@/lib/person-name";
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -432,6 +436,13 @@ export async function runJobCommit(
         );
       } else {
         recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
+        if (recordId) {
+          try {
+            await onStaffHiredInternal(sb, orgId, recordId);
+          } catch (e) {
+            console.warn("[obligations] import hire auto-assign failed:", e);
+          }
+        }
       }
 
       if (!recordId) throw new Error("Failed to produce target record id");
@@ -1470,6 +1481,11 @@ async function applyAssignmentMap(
       writeError = error;
     }
     if (!writeError) {
+      try {
+        await onStaffAssignmentCreatedInternal(sb, orgId, staffId, clientId, codes ?? []);
+      } catch (e) {
+        console.warn("[obligations] import assignment auto-assign failed:", e);
+      }
       await sb
         .from("assignment_map")
         .update({ staff_record_id: staffId, client_record_id: clientId })

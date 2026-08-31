@@ -19,6 +19,7 @@ import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle, ShieldA
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.functions";
+import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
@@ -47,6 +48,7 @@ function AssignmentsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [staffId, setStaffId] = useState("");
+  const assignmentHookFn = useServerFn(onStaffAssignmentCreated);
 
   const { data: staff } = useQuery({
     enabled: !!org,
@@ -178,6 +180,18 @@ function AssignmentsPage() {
               service_codes: row.codes,
             } as any);
           if (error) throw error;
+        }
+        try {
+          await assignmentHookFn({
+            data: {
+              organizationId: org.organization_id,
+              staffId,
+              clientId: row.client_id,
+              serviceCodes: row.codes,
+            },
+          });
+        } catch (e) {
+          console.warn("[obligations] assignment auto-assign failed:", e);
         }
       }
     },

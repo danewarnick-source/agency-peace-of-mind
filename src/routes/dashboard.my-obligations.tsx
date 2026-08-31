@@ -30,6 +30,8 @@ import {
   type ClientFormKind,
 } from "@/lib/client-form-obligations";
 import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
+import { getAgencyPolicyForInstance } from "@/lib/agency-policies.functions";
+import { policyMediaKind } from "@/lib/agency-policies";
 
 function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
   return courseId === "thirty-day"
@@ -216,6 +218,7 @@ function OpenCard({
   onCompleted: () => void;
 }) {
   const recordFn = useServerFn(recordCompletion);
+  const policyFn = useServerFn(getAgencyPolicyForInstance);
   const ob = instance.obligation;
   const due = dueLabel(instance.due_at);
   const [checked, setChecked] = useState(false);
@@ -232,6 +235,19 @@ function OpenCard({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const courseId = inHiveCourseIdForTitle(ob.title);
   const formKind = clientFormKindForTitle(ob.title);
+  const policyQ = useQuery({
+    queryKey: ["agency-policy-for-instance", orgId, instance.id],
+    enabled: !courseId && !formKind && ob.evidence_type === "attestation",
+    queryFn: () =>
+      policyFn({
+        data: { organizationId: orgId, instanceId: instance.id },
+      }),
+  });
+  const policy = policyQ.data?.policy ?? null;
+  const policyUrl = policyQ.data?.signedUrl ?? null;
+  const mediaKind = policy
+    ? policyMediaKind(policy.file_mime, policy.file_name)
+    : null;
   const { user } = useAuth();
   const resumeQ = useQuery({
     queryKey: ["in-hive-resume", user?.id, courseId],
@@ -448,6 +464,35 @@ function OpenCard({
                 placeholder="Notes (optional)"
                 className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
               />
+            )}
+            {policy && (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3" data-testid="policy-viewer">
+                <p className="text-sm font-medium">Read or watch this policy</p>
+                {policy.body_text ? (
+                  <div className="max-h-64 overflow-auto whitespace-pre-wrap text-sm leading-relaxed">
+                    {policy.body_text}
+                  </div>
+                ) : null}
+                {policyUrl && mediaKind === "video" ? (
+                  <video controls className="max-h-72 w-full rounded-md bg-black" src={policyUrl} />
+                ) : null}
+                {policyUrl && mediaKind === "image" ? (
+                  <img alt={policy.file_name ?? "Policy"} className="max-h-72 w-full rounded-md object-contain" src={policyUrl} />
+                ) : null}
+                {policyUrl && mediaKind === "pdf" ? (
+                  <iframe title={policy.file_name ?? "Policy"} className="h-72 w-full rounded-md border" src={policyUrl} />
+                ) : null}
+                {policyUrl && (mediaKind === "other" || !mediaKind) ? (
+                  <a
+                    href={policyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-[var(--hive-ink)] hover:underline"
+                  >
+                    Open {policy.file_name ?? "file"} <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : null}
+              </div>
             )}
             {needsAttestation && (
               <>

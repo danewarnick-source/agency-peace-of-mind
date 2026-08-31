@@ -125,6 +125,19 @@ export const setClientCaseload = createServerFn({ method: "POST" })
         .upsert(toInsert, { onConflict: "staff_id,client_id", ignoreDuplicates: false });
       if (iErr) throw iErr;
       added = toInsert.length;
+      for (const row of toInsert) {
+        try {
+          await onStaffAssignmentCreatedInternal(
+            supabase,
+            data.organization_id,
+            row.staff_id,
+            data.client_id,
+            row.service_codes ?? [],
+          );
+        } catch (e) {
+          console.warn("[obligations] assignment auto-assign failed:", e);
+        }
+      }
     }
 
     const toRemoveIds: string[] = [];

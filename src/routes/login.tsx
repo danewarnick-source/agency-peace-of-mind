@@ -7,6 +7,7 @@ import { HiveWordmark } from "@/components/brand/hive-mark";
 import { HexBackdrop } from "@/components/brand/hex-backdrop";
 
 import { supabase } from "@/integrations/supabase/client";
+import { authRedirectUrl } from "@/lib/auth-redirect";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
@@ -173,7 +174,7 @@ function LoginPage() {
 
   const google = async () => {
     const r = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/dashboard",
+      redirect_uri: authRedirectUrl("/dashboard"),
     });
     if (r.error) toast.error("Google sign-in failed");
   };

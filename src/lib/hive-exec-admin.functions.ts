@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { passwordResetRedirectUrl } from "@/lib/auth-redirect";
 
 // ───── Types ─────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,7 @@ export const createCompany = createServerFn({ method: "POST" })
       const { data: invited, error: inviteErr } =
         await supabaseAdmin.auth.admin.inviteUserByEmail(data.adminEmail, {
           data: { full_name: data.adminFullName, agency_name: data.name },
+          redirectTo: passwordResetRedirectUrl(),
         });
       if (inviteErr) throw new Error(`Invite failed: ${inviteErr.message}`);
       adminUserId = invited.user?.id ?? null;

@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { authRedirectUrl } from "@/lib/auth-redirect";
 import { useAuth } from "@/hooks/use-auth";
 import {
   listMyAuditorShares,
@@ -124,7 +125,7 @@ function AuditorSignIn() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auditor` },
+        options: { emailRedirectTo: authRedirectUrl("/auditor") },
       });
       if (error) throw error;
       setSent(true);

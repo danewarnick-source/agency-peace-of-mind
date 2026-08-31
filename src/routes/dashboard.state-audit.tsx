@@ -26,6 +26,7 @@ import {
   type AuditPackageRow,
   type OrgAuditorRow,
 } from "@/lib/audit-portal.functions";
+import { resolveAuthOrigin } from "@/lib/auth-redirect";
 
 
 export const Route = createFileRoute("/dashboard/state-audit")({
@@ -313,7 +314,7 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
       grantFn({ data: {
         auditPackageId: packageId,
         auditorAccountId,
-        siteOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
+        siteOrigin: resolveAuthOrigin(),
       } }),
     onSuccess: () => { toast.success("Auditor granted access — invite email sent"); invalidate(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
@@ -529,7 +530,7 @@ function ProvisionedAuditorsSection({ orgId, auditPackageId }: { orgId: string; 
       provisionFn({ data: {
         organizationId: orgId,
         auditPackageId,
-        siteOrigin: typeof window !== "undefined" ? window.location.origin : "",
+        siteOrigin: resolveAuthOrigin(),
         ...v,
       } }),
     onSuccess: () => {

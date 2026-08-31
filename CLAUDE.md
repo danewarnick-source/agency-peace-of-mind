@@ -23,6 +23,7 @@ HIVE is a multi-tenant compliance platform for Utah DSPD (disability services) p
 - Old hhs_daily_records table is orphaned; read hhs_daily_records_v instead (never delete the old table without instruction).
 - must_change_password must be enforced at router root. /fix-admin route is deleted; never recreate.
 - The human runs SQL in Lovable's editor and must Clear it before each paste; write handoff SQL truncation-proof (string_agg for lists).
+- Password-reset / invite / magic-link / email-confirm redirects must use `src/lib/auth-redirect.ts` (`passwordResetRedirectUrl` / `resolveAuthOrigin`). Never hardcode a Lovable URL. Origin-based so hivecertify.com and agency-peace-of-mind.vercel.app both work; Lovable hosts are rewritten to https://hivecertify.com. Supabase Dashboard Site URL must also be https://hivecertify.com (ops, not in repo) or Auth will ignore redirectTo.
 
 # Build & commit rules for this repo
 

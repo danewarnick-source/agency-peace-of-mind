@@ -4,6 +4,7 @@
 
 import Stripe from "stripe";
 import { readStripeEnv, stripeClientConfigured, isStripeLiveSecretKey } from "@/lib/stripe-config";
+import { CANONICAL_SITE_ORIGIN, isSafeAuthOrigin } from "@/lib/auth-redirect";
 
 let cached: Stripe | null = null;
 
@@ -24,10 +25,13 @@ export function getStripe(): Stripe {
 
 export function appOriginFromRequest(request: Request | null | undefined): string {
   const explicit = (process.env.APP_ORIGIN ?? process.env.PUBLIC_APP_URL ?? "").replace(/\/$/, "");
-  if (explicit) return explicit;
+  if (explicit && isSafeAuthOrigin(explicit)) return explicit;
   const origin = request?.headers.get("origin");
-  if (origin) return origin.replace(/\/$/, "");
+  if (origin && isSafeAuthOrigin(origin)) return origin.replace(/\/$/, "");
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
-  return "https://agency-peace-of-mind.vercel.app";
+  if (vercel) {
+    const vercelOrigin = `https://${vercel.replace(/^https?:\/\//, "")}`;
+    if (isSafeAuthOrigin(vercelOrigin)) return vercelOrigin;
+  }
+  return CANONICAL_SITE_ORIGIN;
 }

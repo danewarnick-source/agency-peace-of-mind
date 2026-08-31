@@ -17,6 +17,7 @@
 // infrastructure is offline.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolveAuthOrigin } from "@/lib/auth-redirect";
 
 export type BillingSmsKind =
   | "payment_declined_day0"
@@ -51,12 +52,9 @@ function buildBody(kind: BillingSmsKind, amountCents: number | null | undefined,
 }
 
 function getAppBaseUrl(): string {
-  return (
-    process.env.PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    process.env.SITE_URL ||
-    "https://hive.lovable.app"
-  ).replace(/\/$/, "");
+  return resolveAuthOrigin(
+    process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SITE_URL,
+  );
 }
 
 async function getOrgPhone(orgId: string): Promise<{ phone: string | null; name: string | null }> {

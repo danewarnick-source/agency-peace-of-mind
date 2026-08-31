@@ -3,6 +3,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
+import {
+  questionWantsClientContext,
+  questionWantsMedications,
+  slimPcspGoals,
+  staffNectarFailureMessage,
+} from "@/lib/nectar-staff-errors";
 
 /**
  * NECTAR Staff — a scoped, lower-privilege assistant for the staff app.
@@ -158,7 +164,15 @@ function clipSystem(system: string): string {
 }
 
 async function callAI(system: string, user: string): Promise<string> {
-  assertBedrockConfigured();
+  try {
+    assertBedrockConfigured();
+  } catch (e) {
+    const status = typeof (e as { status?: number }).status === "number"
+      ? (e as { status: number }).status
+      : 500;
+    const raw = e instanceof Error ? e.message : "";
+    throw new Error(staffNectarFailureMessage(status, raw));
+  }
   const slim = clipSystem(system);
   const res = await gatewayFetch({
       model: "bedrock",
@@ -168,9 +182,12 @@ async function callAI(system: string, user: string): Promise<string> {
       ],
       response_format: { type: "json_object" },
     });
-  if (res.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
-  if (res.status === 402) throw new Error("AI workspace credits exhausted.");
-  if (!res.ok && res.status === 400) {
+  if (res.ok) {
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return json.choices?.[0]?.message?.content ?? "{}";
+  }
+  const firstText = await res.text().catch(() => "");
+  if (res.status === 400) {
     const retry = await gatewayFetch({
       model: "bedrock",
       messages: [
@@ -186,10 +203,10 @@ async function callAI(system: string, user: string): Promise<string> {
       const json = (await retry.json()) as { choices?: Array<{ message?: { content?: string } }> };
       return json.choices?.[0]?.message?.content ?? "{}";
     }
+    const retryText = await retry.text().catch(() => "");
+    throw new Error(staffNectarFailureMessage(retry.status, retryText || firstText));
   }
-  if (!res.ok) throw new Error(`AI error (${res.status}).`);
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content ?? "{}";
+  throw new Error(staffNectarFailureMessage(res.status, firstText));
 }
 
 export const askNectarStaff = createServerFn({ method: "POST" })
@@ -298,50 +315,56 @@ export const askNectarStaff = createServerFn({ method: "POST" })
     // How-to questions ("How do I clock in?") do not need a PHI dump — a
     // bloated system prompt was 400ing Bedrock on CloudFront.
     const looksClientSpecific =
-      !!focusedId ||
-      /\b(client|pcsp|medication|meds|directions|caseload)\b/i.test(data.question);
+      !!focusedId || questionWantsClientContext(data.question);
+    const wantsMeds = questionWantsMedications(data.question);
+    const maxClients = focusedId ? 1 : 4;
     const clientIdsToInclude = !looksClientSpecific
       ? []
       : focusedId
         ? [focusedId]
-        : assignedRows.slice(0, 8).map((c) => c.id);
+        : assignedRows.slice(0, maxClients).map((c) => c.id);
 
     const clientFacts: ClientFact[] = [];
     if (clientIdsToInclude.length > 0) {
-      const medsQ = await supabase
-        .from("client_medications")
-        .select("id, client_id, medication_name, dosage, frequency, route, is_prn, is_controlled, instructions, choking_risk, choking_risk_details, adverse_effects, is_active")
-        .in("client_id", clientIdsToInclude)
-        .eq("is_active", true)
-        .limit(200);
       const medsByClient = new Map<string, Array<{
         id: string; client_id: string; medication_name: string; dosage: string | null;
         frequency: string | null; route: string | null; is_prn: boolean; is_controlled: boolean;
         instructions: string | null; choking_risk: boolean; choking_risk_details: string | null;
         adverse_effects: string | null;
       }>>();
-      for (const m of (medsQ.data ?? []) as Array<{
-        id: string; client_id: string; medication_name: string; dosage: string | null;
-        frequency: string | null; route: string | null; is_prn: boolean; is_controlled: boolean;
-        instructions: string | null; choking_risk: boolean; choking_risk_details: string | null;
-        adverse_effects: string | null;
-      }>) {
-        const arr = medsByClient.get(m.client_id) ?? [];
-        arr.push(m);
-        medsByClient.set(m.client_id, arr);
+      if (wantsMeds) {
+        const medsQ = await supabase
+          .from("client_medications")
+          .select("id, client_id, medication_name, dosage, frequency, route, is_prn, is_controlled, instructions, choking_risk, choking_risk_details, adverse_effects, is_active")
+          .in("client_id", clientIdsToInclude)
+          .eq("is_active", true)
+          .limit(80);
+        for (const m of (medsQ.data ?? []) as Array<{
+          id: string; client_id: string; medication_name: string; dosage: string | null;
+          frequency: string | null; route: string | null; is_prn: boolean; is_controlled: boolean;
+          instructions: string | null; choking_risk: boolean; choking_risk_details: string | null;
+          adverse_effects: string | null;
+        }>) {
+          const arr = medsByClient.get(m.client_id) ?? [];
+          arr.push(m);
+          medsByClient.set(m.client_id, arr);
+        }
       }
       for (const c of assignedRows.filter((r) => clientIdsToInclude.includes(r.id))) {
+        const directions = c.special_directions?.trim() ?? "";
         clientFacts.push({
           id: c.id,
           name: `${c.first_name} ${c.last_name}`.trim(),
-          pcsp_goals: c.pcsp_goals ?? [],
-          special_directions: c.special_directions,
-          medications: (medsByClient.get(c.id) ?? []).map((m) => ({
-            id: m.id, name: m.medication_name, dosage: m.dosage, frequency: m.frequency,
-            route: m.route, is_prn: m.is_prn, is_controlled: m.is_controlled,
-            instructions: m.instructions, choking_risk: m.choking_risk,
-            choking_risk_details: m.choking_risk_details, adverse_effects: m.adverse_effects,
-          })),
+          pcsp_goals: slimPcspGoals(c.pcsp_goals),
+          special_directions: directions ? directions.slice(0, wantsMeds ? 400 : 200) : null,
+          medications: wantsMeds
+            ? (medsByClient.get(c.id) ?? []).map((m) => ({
+                id: m.id, name: m.medication_name, dosage: m.dosage, frequency: m.frequency,
+                route: m.route, is_prn: m.is_prn, is_controlled: m.is_controlled,
+                instructions: m.instructions, choking_risk: m.choking_risk,
+                choking_risk_details: m.choking_risk_details, adverse_effects: m.adverse_effects,
+              }))
+            : [],
         });
       }
     }

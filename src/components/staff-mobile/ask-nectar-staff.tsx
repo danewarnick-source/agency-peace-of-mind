@@ -9,13 +9,18 @@ import {
 } from "@/lib/nectar-staff.functions";
 import {
   NectarMark,
-  NectarBadge,
   NectarButton,
 } from "@/components/nectar/nectar-brand";
 import { NectarAnswer } from "@/components/nectar/nectar-answer";
 import { useMobileShellContainer } from "./mobile-shell-context";
 import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { staffNectarFailureMessage } from "@/lib/nectar-staff-errors";
+import {
+  STAFF_CLOCK_BAR_PX,
+  STAFF_TAB_BAR_OFFSET_CSS,
+  STAFF_TAB_BAR_PX,
+} from "@/lib/staff-phone-chrome";
 
 interface ChatMsg {
   id: string;
@@ -47,7 +52,7 @@ export interface AskNectarStaffProps {
  * just renders the conversation. No DB persistence: each session is in
  * React state only.
  */
-export function AskNectarStaff({ clientId, compact = false, initialQuestion }: AskNectarStaffProps) {
+export function AskNectarStaff({ clientId, initialQuestion }: AskNectarStaffProps) {
   const ask = useServerFn(askNectarStaff);
   const { data: org } = useCurrentOrg();
   const organizationId = org?.organization_id;
@@ -59,11 +64,12 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
   const { container } = useMobileShellContainer();
   const barVisible = useActiveShiftBarVisible();
 
-  const bottomOffset = useMemo(() => {
-    const navHeight = 56;
-    const shiftBarHeight = barVisible ? 56 : 0;
-    const persistentBarsOffset = navHeight + shiftBarHeight;
-    return viewportInset > 0 ? viewportInset : persistentBarsOffset;
+  const bottomOffsetCss = useMemo(() => {
+    if (viewportInset > 0) return `${viewportInset}px`;
+    if (barVisible) {
+      return `calc(${STAFF_TAB_BAR_PX + STAFF_CLOCK_BAR_PX}px + env(safe-area-inset-bottom, 0px))`;
+    }
+    return STAFF_TAB_BAR_OFFSET_CSS;
   }, [barVisible, viewportInset]);
 
   const mutation = useMutation({
@@ -81,7 +87,11 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
       ]);
     },
     onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : "Something went wrong.";
+      const raw = e instanceof Error ? e.message : "Something went wrong.";
+      const statusMatch = raw.match(/AI error \((\d+)\)/);
+      const msg = statusMatch
+        ? staffNectarFailureMessage(Number(statusMatch[1]), raw)
+        : raw;
       setMessages((m) => [
         ...m,
         { id: crypto.randomUUID(), role: "nectar", text: msg },
@@ -187,8 +197,8 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
     <div
       className="absolute inset-x-0 z-30 border-t border-border bg-background/98 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/92"
       style={{
-        bottom: `${bottomOffset}px`,
-        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+        bottom: bottomOffsetCss,
+        paddingBottom: "0.5rem",
       }}
     >
       {composerForm}
@@ -199,35 +209,13 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
-        {/* Header — fixed at top */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[var(--hive-text)] px-4 py-2.5 text-white">
-          <NectarMark size={compact ? "sm" : "md"} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <NectarBadge size="xs" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]/90">
-                Staff assistant
-              </span>
-            </div>
-            <h2 className="truncate font-display text-sm font-bold leading-tight tracking-tight">
-              Ask NECTAR · Staff
-            </h2>
-          </div>
-          <span
-            title="Client information shown here is for the people on your caseload — treat it as confidential PHI."
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
-          >
-            <Shield className="h-3 w-3" /> PHI
-          </span>
-        </div>
-
-        {/* Conversation frame — internal scroll only */}
+        {/* Conversation frame — chrome title lives on StaffTopBar only */}
         <div
           ref={scrollRef}
           className="flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 py-3"
           style={
             composerMount
-              ? { paddingBottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom) + 5.5rem)` }
+              ? { paddingBottom: `calc(${bottomOffsetCss} + 5.5rem)` }
               : undefined
           }
         >
@@ -270,7 +258,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
               </div>
             ) : (
               <div key={m.id} className="flex gap-2">
-                <NectarMark size="sm" className="mt-0.5" />
+                <NectarMark size="sm" className="mt-0.5" ornament={false} />
                 <div className="max-w-[85%] flex-1 rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2.5 shadow-sm">
                   {m.reply?.refused && (
                     <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9a3412]">
@@ -305,7 +293,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
 
           {mutation.isPending && (
             <div className="flex gap-2">
-              <NectarMark size="sm" className="mt-0.5" />
+              <NectarMark size="sm" className="mt-0.5" ornament={false} />
               <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-3.5 py-2 text-sm text-muted-foreground shadow-sm">
                 <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
                 Thinking…

@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { STAFF_CLOCK_BAR_OFFSET_CSS } from "@/lib/staff-phone-chrome";
 
 const fmtUSD = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -108,21 +109,18 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
   };
 
   const positioning = framed
-    ? "absolute inset-x-0 bottom-[56px] z-40"
-    : "fixed inset-x-0 z-40 md:hidden";
+    ? "absolute inset-x-0 z-[45]"
+    : "fixed inset-x-0 z-[45] md:hidden";
 
   return (
     <div
+      data-staff-clock-bar
       className={[
         positioning,
         "select-none text-white",
         "bg-[#117a52] border-t border-[#0d5c3d] shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.35)]",
       ].join(" ")}
-      style={
-        framed
-          ? undefined
-          : { bottom: "calc(env(safe-area-inset-bottom) + 56px)" }
-      }
+      style={{ bottom: STAFF_CLOCK_BAR_OFFSET_CSS }}
       role="status"
       aria-live="polite"
     >

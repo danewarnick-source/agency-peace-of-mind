@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Hexagon, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,6 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
-import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
 
 export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
@@ -28,10 +27,6 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
   const { view, setView } = usePortalView();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // Caseload already has an in-flow "Search by name" field. A second search in
-  // this chrome stays on screen and covers client names as the list scrolls.
-  const isCaseloadHome = pathname === "/dashboard" || pathname === "/dashboard/";
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable =
@@ -50,17 +45,19 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const headerCls = framed
-    ? "relative z-30 flex shrink-0 flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)]"
-    : "relative z-30 flex flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)] md:hidden";
+    ? "relative z-30 flex h-14 shrink-0 items-center border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)]"
+    : "relative z-30 flex h-14 items-center border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)] md:hidden";
 
   return (
     <header
+      data-staff-top-bar
       className={headerCls}
       style={{
         paddingTop: "env(safe-area-inset-top)",
+        height: "calc(3.5rem + env(safe-area-inset-top, 0px))",
       }}
     >
-      <div className="flex h-14 items-center justify-between gap-2">
+      <div className="flex h-14 w-full items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
             <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2.5} />
@@ -120,17 +117,6 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
           </SheetContent>
         </Sheet>
       </div>
-
-      {!isCaseloadHome && (
-        <div className="pb-2">
-          <NectarSearchBar
-            nav={[]}
-            isAdminCapable={isAdminCapable}
-            variant="mobile"
-            askRoute="/dashboard/ask-nectar"
-          />
-        </div>
-      )}
     </header>
   );
 }

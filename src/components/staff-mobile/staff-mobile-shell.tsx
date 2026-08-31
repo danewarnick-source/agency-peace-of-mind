@@ -63,7 +63,11 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
         className={
           isAskNectar
             ? "flex-1 overflow-hidden overscroll-none"
-            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${barVisible ? "pb-[calc(1.25rem+6.5rem)]" : ""}`
+            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${
+                barVisible
+                  ? "pb-[calc(1.25rem+7rem+env(safe-area-inset-bottom,0px))]"
+                  : "pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]"
+              }`
         }
       >
         {children}

@@ -69,6 +69,10 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
+import {
+  STAFF_PHONE_MQ,
+  shouldUnmountDuplicateStaffOutlet,
+} from "@/lib/staff-phone-chrome";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks, Clock } from "lucide-react";
@@ -310,6 +314,7 @@ function DashboardLayout() {
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [bootTimedOut, setBootTimedOut] = useState(false);
+  const [hideDuplicateStaffOutlet, setHideDuplicateStaffOutlet] = useState(false);
 
   useEffect(() => {
     const openMenu = () => setMobileOpen(true);
@@ -667,6 +672,16 @@ function DashboardLayout() {
   const isStaffPhoneChrome = isStaffView && !isMobilePreview;
   const inboxUnread = unreadQ.data?.count ?? 0;
 
+  useEffect(() => {
+    const apply = () => {
+      setHideDuplicateStaffOutlet(shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome));
+    };
+    apply();
+    const mq = window.matchMedia(STAFF_PHONE_MQ);
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [isStaffPhoneChrome]);
+
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
     user,
     role,
@@ -914,7 +929,7 @@ function DashboardLayout() {
                   <StaffMobilePreviewFrame title={pageTitle}>
                     <Outlet />
                   </StaffMobilePreviewFrame>
-                ) : (
+                ) : hideDuplicateStaffOutlet ? null : (
                   <Outlet />
                 )}
               </main>

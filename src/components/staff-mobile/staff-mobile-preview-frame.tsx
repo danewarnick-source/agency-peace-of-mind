@@ -126,7 +126,11 @@ function FrameScreen({
           className={
             isAskNectar
               ? "flex-1 overflow-hidden bg-[#f7f8fb]"
-              : `flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 py-4 ${barVisible ? "pb-[calc(5rem+56px)]" : "pb-20"}`
+              : `flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 py-4 ${
+                  barVisible
+                    ? "pb-[calc(1.25rem+7rem+env(safe-area-inset-bottom,0px))]"
+                    : "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]"
+                }`
           }
         >
           {children}

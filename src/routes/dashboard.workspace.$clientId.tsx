@@ -31,7 +31,6 @@ import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
 import { StaffMedicationsPanel } from "@/components/medications/staff-medications-panel";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
-import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement-shift-panel";
 import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spending-shift-panel";
 import { useActiveShift } from "@/hooks/use-active-shift";
@@ -430,8 +429,6 @@ function ClientWorkspace() {
         </Tabs>
       </div>
 
-      {/* 3-minute shared-device idle lock — scoped to this route */}
-      <IdlePinLock />
     </>
   );
 }

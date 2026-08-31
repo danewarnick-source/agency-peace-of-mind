@@ -386,6 +386,39 @@
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
 
+/*
+ * Public marketing hamburger (landing + SiteHeader).
+ * Own compositing layer so iOS Safari does not drop taps on an SVG child
+ * inside a backdrop-filter sticky bar. Opaque fill is on the button itself.
+ */
+.public-mobile-menu-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+  pointer-events: auto;
+}
+.public-mobile-menu-btn svg {
+  pointer-events: none;
+}
+
+/*
+ * Sonner mounts a fixed top-right box even when empty. Without
+ * pointer-events:none that box steals the landing hamburger.
+ * On phones, keep toasts off the top chrome entirely.
+ */
+[data-sonner-toaster] {
+  pointer-events: none;
+}
+[data-sonner-toast] {
+  pointer-events: auto;
+}
+@media (max-width: 767px) {
+  [data-sonner-toaster][data-y-position="top"] {
+    top: auto !important;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Finance dense mode — applied to both /dashboard/billing and
    /dashboard/financial layouts. Styling/density only; never changes data.

@@ -67,9 +67,17 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await expect(page.getByTestId("training-price-full_program")).toContainText(/True North \$0/);
   await page.getByTestId("training-buy-full_program").click();
   await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
-  await page.getByTestId("training-roster-name-0").fill("TNS Staff");
-  await page.getByTestId("training-roster-email-0").fill("tns.staff@hive.test");
-  await page.getByTestId("training-roster-phone-0").fill("801-555-0100");
+  await expect(page.getByTestId("training-roster-multiselect")).toBeVisible();
+  await page.getByTestId("training-roster-select-all").click();
+  await page.getByTestId("training-roster-add-selected").click();
+  await expect(page.getByTestId("training-roster-name-0")).toHaveValue("E2E Admin");
+  await expect(page.getByTestId("training-roster-email-0")).toHaveValue("e2e.billing@example.com");
+  const tnsPhone = page.getByTestId("training-roster-phone-0");
+  if (!(await tnsPhone.inputValue())) {
+    await tnsPhone.fill("801-555-0100");
+  }
+  await expect(page.getByTestId("training-roster-list-price")).toContainText("$300");
+  await expect(page.getByTestId("training-roster-total")).toContainText(/True North \$0/);
   await page.getByTestId("training-roster-submit").click();
   await expect(page).not.toHaveURL(/checkout\.stripe\.com/);
   await expect.poll(() => exempt.lastTrainingCharge === false || exempt.trainingGranted === true).toBeTruthy();

@@ -394,6 +394,7 @@ function restRows(world: BillingWorld, table: string): unknown[] {
         id: USER_ID,
         email: "e2e.billing@example.com",
         full_name: "E2E Admin",
+        phone: "801-555-0144",
         has_passed_launchpad: true,
         must_change_password: false,
         staff_type_keys: [],

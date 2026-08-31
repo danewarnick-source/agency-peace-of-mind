@@ -11,12 +11,12 @@ import {
   markTrainingClassComplete,
   type TrainingClassRow,
 } from "@/lib/training-class.functions";
-import { trainingClassLabel, type TrainingClassType } from "@/lib/training-class";
+import { trainingClassLabel, trainingClassUnitCents, type TrainingClassType } from "@/lib/training-class";
 import { formatUsdFromCents } from "@/lib/hive-pricing";
 import { ClassCardStatus } from "@/components/training/class-card-upload";
 
 export const Route = createFileRoute("/dashboard/hive-exec/classes")({
-  head: () => ({ meta: [{ title: "Classes — Hive Executive" }] }),
+  head: () => ({ meta: [{ title: "Training — Hive Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
       <ExecClassesPage />
@@ -63,7 +63,7 @@ function ExecClassesPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Hive Executive</div>
-          <h2 className="font-display text-xl font-semibold">Classes</h2>
+          <h2 className="font-display text-xl font-semibold">Training</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             One row per class an admin submitted. CPR and Mandt are external. The package includes those plus the in-Hive 30-day course.
           </p>
@@ -125,7 +125,8 @@ function ClassCard({ row, onComplete }: { row: TrainingClassRow; onComplete: () 
             {row.providerName}
           </Link>
           <div className="text-xs text-muted-foreground">
-            {row.seatCount} staff · {row.amountCents === 0 ? "$0" : formatUsdFromCents(row.amountCents)} · submitted{" "}
+            {row.seatCount} staff · {formatUsdFromCents(trainingClassUnitCents(row.trainingType))} / seat ·{" "}
+            {row.amountCents === 0 ? "$0 charged" : formatUsdFromCents(row.amountCents)} · submitted{" "}
             {row.submittedAt ? new Date(row.submittedAt).toLocaleDateString() : "—"}
             {" · "}
             <ClassCardStatus row={row} />

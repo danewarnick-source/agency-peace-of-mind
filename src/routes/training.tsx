@@ -2,6 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/landing/footer";
 import { Button } from "@/components/ui/button";
+import {
+  PUBLIC_TRAINING_ALA_CARTE,
+  TRAINING_PRICE_CENTS,
+  formatUsdFromCents,
+  publicTrainingBundleSavingsCents,
+} from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/training")({
   head: () => ({
@@ -35,6 +41,23 @@ function TrainingExplainer() {
             Staff never buy seats. An admin submits a class roster for CPR, Mandt, or the training
             package. Assigned work shows up on My Obligations. True North Supports is always $0.
           </p>
+          <ul className="mt-6 space-y-2 rounded-xl border bg-card p-4 text-sm">
+            {PUBLIC_TRAINING_ALA_CARTE.map((row) => (
+              <li key={row.sku} className="flex items-baseline justify-between gap-3">
+                <span>{row.name}</span>
+                <span className="font-semibold text-[#1A2B47]">{formatUsdFromCents(row.priceCents)} / seat</span>
+              </li>
+            ))}
+            <li className="flex items-baseline justify-between gap-3 border-t pt-2">
+              <span>Training package</span>
+              <span className="font-semibold text-[#1A2B47]">
+                {formatUsdFromCents(TRAINING_PRICE_CENTS.full_program)} / seat
+              </span>
+            </li>
+            <li className="text-xs text-muted-foreground">
+              Package saves {formatUsdFromCents(publicTrainingBundleSavingsCents())}. True North is never charged.
+            </li>
+          </ul>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild>
               <Link to="/login">Sign in</Link>

@@ -3,9 +3,12 @@ import { describe, it } from "node:test";
 import { TRAINING_PRICE_CENTS } from "./hive-pricing.ts";
 import {
   cleanRosterRows,
+  mergeSelectedMembersIntoRoster,
   quoteTrainingClass,
   trainingClassIsExternal,
+  trainingClassSku,
   trainingClassUnitCents,
+  trainingClassUnitCentsFromCatalog,
   validateRosterRows,
 } from "./training-class.ts";
 
@@ -45,6 +48,45 @@ describe("locked training class prices", () => {
     assert.equal(trainingClassIsExternal("cpr_first_aid"), true);
     assert.equal(trainingClassIsExternal("mandt"), true);
     assert.equal(trainingClassIsExternal("package"), true);
+  });
+
+  it("maps class types to catalog SKUs and ignores stale catalog cents", () => {
+    assert.equal(trainingClassSku("thirty_day"), "dspd_required");
+    assert.equal(trainingClassSku("package"), "full_program");
+    assert.equal(trainingClassUnitCentsFromCatalog("cpr_first_aid", 7_500), 10_000);
+    assert.equal(trainingClassUnitCentsFromCatalog("thirty_day", 10_000), 7_500);
+    assert.equal(trainingClassUnitCentsFromCatalog("mandt", 0), 20_000);
+  });
+});
+
+describe("roster multi-select merge", () => {
+  const team = [
+    { id: "a", label: "Ada", email: "ada@hive.test", phone: "801-555-0100" },
+    { id: "b", label: "Bea", email: "bea@hive.test", phone: "801-555-0101" },
+    { id: "c", label: "Cal", email: "cal@hive.test", phone: "801-555-0102" },
+  ];
+
+  it("adds every selected staff in one pass", () => {
+    const next = mergeSelectedMembersIntoRoster(
+      [{ name: "", email: "", phone: "", staffUserId: null }],
+      team,
+      ["a", "c"],
+    );
+    assert.equal(next.length, 2);
+    assert.deepEqual(
+      next.map((r) => r.email),
+      ["ada@hive.test", "cal@hive.test"],
+    );
+  });
+
+  it("skips people already on the roster", () => {
+    const next = mergeSelectedMembersIntoRoster(
+      [{ name: "Ada", email: "ada@hive.test", phone: "1", staffUserId: "a" }],
+      team,
+      ["a", "b"],
+    );
+    assert.equal(next.length, 2);
+    assert.equal(next[1]?.email, "bea@hive.test");
   });
 });
 

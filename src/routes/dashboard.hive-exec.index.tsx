@@ -63,7 +63,7 @@ function CompaniesPage() {
             </div>
           </div>
           <span className="inline-flex items-center rounded-md bg-[var(--hive-text)] px-3 py-2 text-sm font-semibold text-white">
-            Open Classes
+            Open Training
           </span>
         </Link>
       ))}

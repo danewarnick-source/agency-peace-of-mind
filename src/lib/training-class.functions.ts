@@ -1,5 +1,5 @@
 /**
- * Admin class roster submit + Hive Exec Classes tab.
+ * Admin class roster submit + Hive Exec Training tab.
  */
 
 import { createServerFn } from "@tanstack/react-start";

@@ -1,8 +1,10 @@
-import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Eye, EyeOff, Hexagon, Sparkles } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { HiveWordmark } from "@/components/brand/hive-mark";
+import { HexBackdrop } from "@/components/brand/hex-backdrop";
 
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -26,75 +28,20 @@ function isSafeNext(v: unknown): v is string {
 }
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Hive" }] }),
   validateSearch: (s: Record<string, unknown>): { next?: string } =>
     isSafeNext(s.next) ? { next: s.next as string } : {},
   component: LoginPage,
 });
 
-const JAKARTA = '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif';
-const NAVY_BG =
-  "radial-gradient(1000px 600px at 80% 110%, rgba(244,169,58,0.18), transparent 60%), linear-gradient(140deg, #141a3d 0%, #0d112b 100%)";
-
-function HexPattern() {
+function AuthFrame({ children }: { children: ReactNode }) {
   return (
-    <svg
-      aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.05]"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <pattern
-          id="hex"
-          width="80"
-          height="92"
-          patternUnits="userSpaceOnUse"
-          patternTransform="scale(1.4)"
-        >
-          <polygon
-            points="40,2 78,24 78,68 40,90 2,68 2,24"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="1"
-          />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#hex)" />
-    </svg>
-  );
-}
-
-function BrandLogo({ className = "" }: { className?: string }) {
-  return (
-    <Link
-      to="/"
-      className={`flex items-center gap-2.5 font-semibold text-white ${className}`}
-      style={{ fontFamily: JAKARTA }}
-    >
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] backdrop-blur">
-        <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
-      </span>
-      <span className="text-[15px] tracking-tight">
-        HIVE <span className="ml-1 text-xs font-normal text-white/55">— powered by NECTAR™</span>
-      </span>
-    </Link>
-  );
-}
-
-function NectarPill() {
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-      style={{
-        fontFamily: JAKARTA,
-        background: "rgba(244,169,58,0.12)",
-        borderColor: "rgba(244,169,58,0.35)",
-        color: "#f7c172",
-      }}
-    >
-      <Sparkles className="h-3 w-3" />
-      Powered by NECTAR™ — the intelligence layer for care
-    </span>
+    <div className="relative min-h-screen overflow-hidden bg-[var(--hive-bg)] text-[var(--hive-text)]">
+      <HexBackdrop opacity={0.16} />
+      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 py-12">
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -105,7 +52,6 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const search = Route.useSearch();
   const nextPath = search.next;
   const hadSessionOnArrival = useRef<boolean | null>(null);
@@ -232,197 +178,108 @@ function LoginPage() {
     if (r.error) toast.error("Google sign-in failed");
   };
 
-  const inputStyle: React.CSSProperties = {
-    fontFamily: JAKARTA,
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.11)",
-    color: "#ffffff",
-  };
+  const fieldClass =
+    "flex h-12 w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-bg)] px-3 py-2 text-base text-[var(--hive-text)] outline-none placeholder:text-[var(--hive-text-muted)] focus:ring-2 focus:ring-[var(--hive-gold)]/40";
 
   return (
-    <div
-      className="relative min-h-screen overflow-hidden text-white"
-      style={{ background: NAVY_BG, fontFamily: JAKARTA }}
-    >
-      <HexPattern />
+    <AuthFrame>
+      <div className="flex w-full max-w-md flex-col items-center">
+        <HiveWordmark to="/" />
+        <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
+          Ops, training, and compliance, visible.
+        </p>
 
-      <div className="relative grid min-h-screen md:grid-cols-2">
-        {/* Left panel */}
-        <aside className="relative hidden flex-col justify-between p-12 md:flex">
-          <BrandLogo />
-
-          <div className="max-w-md space-y-6">
-            <NectarPill />
-            <h2
-              className="text-3xl leading-tight text-white md:text-[2rem]"
-              style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.02em" }}
-            >
-              "Onboarding a new hire went from two weeks of paperwork to two clicks."
-            </h2>
-            <p className="text-white/65" style={{ fontFamily: JAKARTA }}>
-              — Marcus Liu, HR Lead at Northbay Support Services
+        <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
+          <div className="mb-7 text-center">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--hive-text)]">
+              Welcome back
+            </h1>
+            <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">
+              Sign in to your Hive account
             </p>
           </div>
 
-          <p className="text-xs text-white/45" style={{ fontFamily: JAKARTA }}>
-            Trusted by modern training teams
-          </p>
-        </aside>
-
-        {/* Right panel — form */}
-        <div className="flex items-center justify-center px-6 py-12">
-          <div className="w-full max-w-sm">
-            <div className="mb-6 flex justify-center md:hidden">
-              <BrandLogo />
+          <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
+            <div className="grid gap-2">
+              <Label htmlFor="identifier" className="text-[var(--hive-text-muted)]">
+                Email
+              </Label>
+              <input
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                inputMode="email"
+                required
+                placeholder="you@example.com"
+                className={fieldClass}
+              />
             </div>
-
-            <div
-              className="rounded-2xl p-7 shadow-2xl backdrop-blur-xl"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.11)",
-              }}
-            >
-              <div className="mb-7 text-center md:text-left">
-                <h1
-                  className="text-2xl tracking-tight text-white"
-                  style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
+            <div className="grid gap-2">
+              <Label htmlFor="password" className="text-[var(--hive-text-muted)]">
+                Password
+              </Label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  className={`${fieldClass} pr-10`}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  Welcome back
-                </h1>
-                <p className="mt-1.5 text-sm text-white/60" style={{ fontFamily: JAKARTA }}>
-                  Sign in to your HIVE dashboard.
-                </p>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-
-              <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
-                <div className="grid gap-2">
-                  <Label
-                    htmlFor="identifier"
-                    className="text-white/80"
-                    style={{ fontFamily: JAKARTA }}
-                  >
-                    Email or username
-                  </Label>
-                  <input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    inputMode="email"
-                    required
-                    className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
-                    style={inputStyle}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor="password"
-                      className="text-white/80"
-                      style={{ fontFamily: JAKARTA }}
-                    >
-                      Password
-                    </Label>
-                    <Link
-                      to="/forgot-password"
-                      className="text-xs font-medium text-[#f4a93a] hover:text-[#f7c172] hover:underline"
-                    >
-                      Forgot?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      required
-                      className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
-                      style={inputStyle}
-                    />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={busy}
-                  className="group h-11 w-full border-0 text-[#1a1208] shadow-lg shadow-amber-900/20 hover:brightness-105"
-                  style={{
-                    fontFamily: JAKARTA,
-                    fontWeight: 700,
-                    backgroundImage: "linear-gradient(135deg, #f4a93a 0%, #f59324 100%)",
-                  }}
-                >
-                  {busy ? (
-                    "Signing in…"
-                  ) : (
-                    <>
-                      Sign in
-                      <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-white/40">
-                <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" />
-                <span className="relative px-3" style={{ background: "transparent" }}>
-                  <span className="rounded bg-[#141a3d] px-2">or</span>
-                </span>
-              </div>
-
-              <Button
-                variant="ghost"
-                onClick={google}
-                className="h-11 w-full border bg-transparent text-white hover:bg-white/[0.06] hover:text-white"
-                style={{
-                  fontFamily: JAKARTA,
-                  fontWeight: 600,
-                  borderColor: "rgba(255,255,255,0.18)",
-                }}
+              <Link
+                to="/forgot-password"
+                className="text-xs font-medium text-[var(--hive-gold)] hover:text-[var(--hive-gold-hover)]"
               >
-                Continue with Google
-              </Button>
-
-              <p className="mt-6 text-center text-sm text-white/60" style={{ fontFamily: JAKARTA }}>
-                New here?{" "}
-                <Link
-                  to="/signup"
-                  className="font-semibold text-[#f4a93a] hover:text-[#f7c172] hover:underline"
-                >
-                  Start a free trial
-                </Link>
-              </p>
+                Forgot password?
+              </Link>
             </div>
 
-            <p className="mt-6 text-center text-xs text-white/40" style={{ fontFamily: JAKARTA }}>
-              <Link to="/" className="hover:text-white/70 hover:underline">
-                ← Back to site
-              </Link>{" "}
-              · {pathname}
-            </p>
+            <Button type="submit" disabled={busy} className="h-11 w-full">
+              {busy ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+
+          <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--hive-text-muted)]">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-[var(--hive-border)]" />
+            <span className="relative bg-[var(--hive-surface)] px-3">or</span>
           </div>
+
+          <Button asChild variant="outline" className="h-11 w-full">
+            <Link to="/signup">Get started</Link>
+          </Button>
+
+          <button
+            type="button"
+            onClick={google}
+            className="mt-4 w-full text-center text-xs text-[var(--hive-text-muted)] hover:text-[var(--hive-gold)]"
+          >
+            Continue with Google
+          </button>
         </div>
+
+        <p className="mt-8 text-sm font-medium text-[var(--hive-gold)]">hivecertify.com</p>
       </div>
-    </div>
+    </AuthFrame>
   );
 }
 
 /**
- * Shared dark auth shell used by forgot-password / reset-password / signup.
- * Matches the new login page visual language.
+ * Shared dark auth shell used by forgot-password / reset-password.
+ * Matches the locked Hive login visual language.
  */
 export function AuthShell({
   title,
@@ -431,63 +288,26 @@ export function AuthShell({
 }: {
   title: string;
   subtitle: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <div
-      className="relative min-h-screen overflow-hidden text-white"
-      style={{ background: NAVY_BG, fontFamily: JAKARTA }}
-    >
-      <HexPattern />
-      <div className="relative grid min-h-screen md:grid-cols-2">
-        <aside className="relative hidden flex-col justify-between p-12 md:flex">
-          <BrandLogo />
-          <div className="max-w-md space-y-6">
-            <NectarPill />
-            <h2
-              className="text-3xl leading-tight text-white md:text-[2rem]"
-              style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.02em" }}
-            >
-              "Onboarding a new hire went from two weeks of paperwork to two clicks."
-            </h2>
-            <p className="text-white/65">— Marcus Liu, HR Lead at Northbay Support Services</p>
+    <AuthFrame>
+      <div className="flex w-full max-w-md flex-col items-center">
+        <HiveWordmark to="/" />
+        <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
+          Ops, training, and compliance, visible.
+        </p>
+        <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
+          <div className="mb-7 text-center">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--hive-text)]">
+              {title}
+            </h1>
+            <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">{subtitle}</p>
           </div>
-          <p className="text-xs text-white/45">Trusted by modern training teams</p>
-        </aside>
-
-        <div className="flex items-center justify-center px-6 py-12">
-          <div className="w-full max-w-sm">
-            <div className="mb-6 flex justify-center md:hidden">
-              <BrandLogo />
-            </div>
-            <div
-              className="rounded-2xl p-7 shadow-2xl backdrop-blur-xl"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.11)",
-              }}
-            >
-              <div className="mb-7 text-center md:text-left">
-                <h1
-                  className="text-2xl tracking-tight text-white"
-                  style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
-                >
-                  {title}
-                </h1>
-                <p className="mt-1.5 text-sm text-white/60">{subtitle}</p>
-              </div>
-              {children}
-            </div>
-            <p className="mt-6 text-center text-xs text-white/40">
-              <Link to="/" className="hover:text-white/70 hover:underline">
-                ← Back to site
-              </Link>{" "}
-              · {pathname}
-            </p>
-          </div>
+          {children}
         </div>
+        <p className="mt-8 text-sm font-medium text-[var(--hive-gold)]">hivecertify.com</p>
       </div>
-    </div>
+    </AuthFrame>
   );
 }

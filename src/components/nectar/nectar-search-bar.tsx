@@ -25,7 +25,7 @@ interface Props {
   nav: SearchNavItem[];
   isAdminCapable: boolean;
   variant?: "desktop" | "mobile";
-  /** Where to send "Ask NECTAR" requests. */
+  /** Where to send Nectar requests. */
   askRoute?: "/dashboard/help" | "/dashboard/ask-nectar";
 }
 
@@ -155,8 +155,8 @@ export function NectarSearchBar({
       out.push({
         kind: "ask",
         id: "ask",
-        label: `Ask NECTAR: "${q}"`,
-        sublabel: "Get an answer from NECTAR",
+        label: `Ask Nectar: "${q}"`,
+        sublabel: "Get an answer from Nectar",
         onSelect: () => goAsk(q),
       });
     }
@@ -194,7 +194,7 @@ export function NectarSearchBar({
   return (
     <div ref={wrapRef} className={wrapCls}>
       <div className="relative">
-        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#f4a93a]" fill="currentColor" />
+        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--hive-gold)]" />
         <input
           ref={inputRef}
           type="text"
@@ -202,16 +202,16 @@ export function NectarSearchBar({
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder={isDesktop ? "Ask NECTAR or search… (⌘K)" : "Ask NECTAR or search…"}
-          aria-label="NECTAR search"
+          placeholder={isDesktop ? "Ask Nectar or search… (⌘K)" : "Ask Nectar or search…"}
+          aria-label="Nectar search"
           aria-expanded={open}
           aria-controls="nectar-search-results"
           role="combobox"
           aria-autocomplete="list"
           className={
             isDesktop
-              ? "h-9 w-full rounded-md border border-white/15 bg-[#0B1126] pl-8 pr-9 text-sm text-white placeholder:text-white/55 shadow-sm focus:bg-[#0d1430] focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
-              : "h-11 w-full rounded-md border border-white/20 bg-white/[0.08] pl-8 pr-9 text-sm text-white placeholder:text-white/60 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
+              ? "h-9 w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] pl-8 pr-9 text-sm text-[var(--hive-text)] placeholder:text-[var(--hive-text-muted)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--hive-gold)]/40"
+              : "h-11 w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] pl-8 pr-9 text-sm text-[var(--hive-text)] placeholder:text-[var(--hive-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--hive-gold)]/40"
           }
         />
         <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-white/55" : "text-white/60"}`} />
@@ -223,8 +223,8 @@ export function NectarSearchBar({
           role="listbox"
           className={
             isDesktop
-              ? "absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-lg"
-              : "absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[55vh] overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-lg"
+              ? "absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-1 shadow-lg"
+              : "absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[55vh] overflow-y-auto rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-1 shadow-lg"
           }
         >
           {results.length === 0 && (
@@ -233,7 +233,7 @@ export function NectarSearchBar({
                 ? "Keep typing… results appear after 2 characters."
                 : entitiesQ.isFetching
                   ? "Searching…"
-                  : "No matches. Press Enter to ask NECTAR."}
+                  : "No matches. Press Enter to ask Nectar."}
             </div>
           )}
           <SectionGroup results={results} active={active} setActive={setActive} />
@@ -283,7 +283,7 @@ function SectionGroup({
                     onMouseEnter={() => setActive(idx)}
                     onClick={r.onSelect}
                     className={`flex w-full min-h-[40px] items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
-                      isActive ? "bg-[#fff7ed] text-[#0f1b3d]" : "text-[#0f1b3d] hover:bg-muted/60"
+                      isActive ? "bg-[color-mix(in_srgb,var(--hive-gold)_14%,var(--hive-canvas))] text-[var(--hive-text)]" : "text-[var(--hive-text)] hover:bg-[var(--hive-canvas)]"
                     }`}
                     role="option"
                     aria-selected={isActive}
@@ -295,7 +295,7 @@ function SectionGroup({
                         {r.sublabel}
                       </span>
                     )}
-                    {r.kind === "ask" && <ArrowRight className="h-3.5 w-3.5 text-[#d97a1c]" />}
+                    {r.kind === "ask" && <ArrowRight className="h-3.5 w-3.5 text-[var(--hive-gold)]" />}
                   </button>
                 </li>
               );
@@ -310,7 +310,7 @@ function SectionGroup({
 function KindIcon({ kind }: { kind: ResultKind }) {
   const cls = "h-3.5 w-3.5 shrink-0";
   if (kind === "page") return <MapPin className={`${cls} text-muted-foreground`} />;
-  if (kind === "client") return <Contact2 className={`${cls} text-[#0f1b3d]`} />;
-  if (kind === "staff") return <Users className={`${cls} text-[#0f1b3d]`} />;
-  return <Hexagon className={`${cls} text-[#d97a1c]`} fill="currentColor" />;
+  if (kind === "client") return <Contact2 className={`${cls} text-[var(--hive-text)]`} />;
+  if (kind === "staff") return <Users className={`${cls} text-[var(--hive-text)]`} />;
+  return <Hexagon className={`${cls} text-[var(--hive-gold)]`} />;
 }

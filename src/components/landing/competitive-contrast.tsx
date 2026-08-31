@@ -20,10 +20,10 @@ const contrasts = [
 
 export function CompetitiveContrast() {
   return (
-    <section className="bg-surface-warm py-20 sm:py-24">
+    <section className="bg-[var(--hive-canvas)] py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-hive-teal-700">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
             Why not a generic workforce app?
           </span>
           <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">

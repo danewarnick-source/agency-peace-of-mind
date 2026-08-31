@@ -1,10 +1,10 @@
 /**
- * Faint hexagon-outline pattern + soft amber glow.
- * Use ONLY on dark hero / spotlight bands — never behind body content.
+ * Faint gold hexagon-outline pattern. Use on dark marketing / login bands.
+ * Stroke uses the locked --hive-gold token.
  */
 export function HexBackdrop({
   glow = true,
-  opacity = 0.05,
+  opacity = 0.14,
 }: { glow?: boolean; opacity?: number }) {
   return (
     <>
@@ -19,7 +19,7 @@ export function HexBackdrop({
             <polygon
               points="40,2 78,24 78,68 40,90 2,68 2,24"
               fill="none"
-              stroke="#ffffff"
+              stroke="var(--hive-gold)"
               strokeWidth="1"
             />
           </pattern>
@@ -32,7 +32,7 @@ export function HexBackdrop({
           className="pointer-events-none absolute inset-x-0 bottom-[-20%] h-[60%]"
           style={{
             background:
-              "radial-gradient(900px 420px at 75% 80%, rgba(244,169,58,0.22), transparent 60%)",
+              "radial-gradient(900px 420px at 20% 40%, color-mix(in srgb, var(--hive-gold) 14%, transparent), transparent 60%)",
           }}
         />
       )}

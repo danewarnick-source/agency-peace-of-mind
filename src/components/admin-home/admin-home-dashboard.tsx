@@ -32,13 +32,14 @@ import {
   adminHomeInstancesQueryKey,
 } from "@/lib/yield-to-admin-home";
 import { cn } from "@/lib/utils";
+import { NectarRail } from "@/components/nectar/nectar-rail";
 
-const HIVE_NAVY = "#1C2A5E";
-const HIVE_TEAL = "#137182";
-const NECTAR_VIOLET = "#6C2BB3";
-const DOT_GREEN = "#1baf7a";
-const DOT_AMBER = "#eda100";
-const DOT_RED = "#E24B4A";
+const HIVE_NAVY = "var(--hive-surface)";
+const HIVE_TEAL = "var(--hive-gold)";
+const NECTAR_VIOLET = "var(--hive-gold)";
+const DOT_GREEN = "var(--hive-ok)";
+const DOT_AMBER = "var(--hive-gold)";
+const DOT_RED = "var(--hive-danger)";
 const DENVER = "America/Denver";
 
 const INSTANCES_SELECT = [
@@ -574,10 +575,11 @@ function AdminHomeDashboardInner() {
   const dueSoon = derived.pending.slice(0, 4);
 
   return (
-    <div className="space-y-4">
+    <div className="flex items-start gap-4">
+    <div className="min-w-0 flex-1 space-y-4">
       <div>
         <div className="text-lg font-semibold text-foreground">
-          Good {greetingWord(now)}, {firstName}
+          Good {greetingWord(now)}, {firstName}. Here's what needs your attention.
         </div>
         <div className="text-sm text-muted-foreground">
           {org ? `${orgName} · ${dateLine}` : dateLine}
@@ -592,32 +594,32 @@ function AdminHomeDashboardInner() {
             <LoadError>Could not load overdue items.</LoadError>
           </div>
         ) : derived.overdue.length === 0 ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-            <div className="text-4xl font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">
+          <div className="rounded-2xl border border-[var(--hive-ok)]/40 bg-[color-mix(in_srgb,var(--hive-ok)_12%,var(--hive-surface))] p-5">
+            <div className="text-4xl font-extrabold tabular-nums text-[var(--hive-ok)]">
               0
             </div>
-            <div className="mt-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+            <div className="mt-2 text-sm font-semibold text-[var(--hive-ok)]">
               All current
             </div>
-            <p className="mt-1 text-sm text-emerald-800/80 dark:text-emerald-300/80">
+            <p className="mt-1 text-sm text-[var(--hive-text-muted)]">
               No overdue obligation instances.
             </p>
           </div>
         ) : (
-          <div className="rounded-2xl p-5 text-white" style={{ background: HIVE_NAVY }}>
+          <div className="rounded-2xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-5 text-[var(--hive-text)]">
             <div className="text-4xl font-extrabold tabular-nums leading-none">
               {derived.overdue.length}
             </div>
-            <div className="mt-2 text-sm font-medium text-white/75">
+            <div className="mt-2 text-sm font-medium text-[var(--hive-text-muted)]">
               Overdue obligation instance{derived.overdue.length === 1 ? "" : "s"}
             </div>
             <ul className="mt-4 space-y-2.5">
               {topOverdue.map((item) => (
-                <li key={item.id} className="border-b border-white/10 pb-2.5 last:border-0 last:pb-0">
+                <li key={item.id} className="border-b border-[var(--hive-border)] pb-2.5 last:border-0 last:pb-0">
                   <div className="truncate text-sm font-medium">{item.title}</div>
-                  <div className="mt-0.5 flex items-center justify-between gap-3 text-xs text-white/70">
+                  <div className="mt-0.5 flex items-center justify-between gap-3 text-xs text-[var(--hive-text-muted)]">
                     <span className="truncate">{item.assignee}</span>
-                    <span className="shrink-0 tabular-nums">
+                    <span className="shrink-0 tabular-nums text-[var(--hive-danger)]">
                       {item.days} day{item.days === 1 ? "" : "s"} overdue
                     </span>
                   </div>
@@ -626,7 +628,7 @@ function AdminHomeDashboardInner() {
             </ul>
             <Link
               to="/dashboard/company-obligations"
-              className="mt-4 inline-flex cursor-pointer text-sm font-medium text-white/90 hover:underline"
+              className="mt-4 inline-flex cursor-pointer text-sm font-medium text-[var(--hive-gold)] hover:underline"
             >
               View all →
             </Link>
@@ -917,6 +919,11 @@ function AdminHomeDashboardInner() {
           </div>
         </div>
       </div>
+    </div>
+      <NectarRail
+        firstName={firstName}
+        className="hidden h-[min(720px,calc(100dvh-8rem))] w-[320px] shrink-0 self-stretch rounded-xl border border-[var(--hive-border)] xl:flex"
+      />
     </div>
   );
 }

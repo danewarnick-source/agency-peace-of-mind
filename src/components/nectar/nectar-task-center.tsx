@@ -71,18 +71,18 @@ export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal, sur
   }
 
   const body = (
-    <SheetContent side="right" className="w-full max-w-md overflow-y-auto p-0">
+    <SheetContent side="right" className="w-full max-w-md overflow-y-auto border-[var(--hive-border)] bg-[var(--hive-sidebar)] p-0 text-[var(--hive-text)]">
       <div className="flex h-full flex-col">
-        <div className="border-b border-border bg-[#fbfaf7] px-5 py-4">
-          <SheetTitle className="flex items-center gap-2 font-display text-lg font-bold text-[#0f1b3d]">
-            <ListChecks className="h-5 w-5 text-[#d97a1c]" /> NECTAR Task Center
+        <div className="border-b border-[var(--hive-border)] bg-[var(--hive-sidebar)] px-5 py-4">
+          <SheetTitle className="flex items-center gap-2 font-display text-lg font-bold text-[var(--hive-gold)]">
+            <ListChecks className="h-5 w-5 text-[var(--hive-gold)]" /> Nectar
           </SheetTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Tell NECTAR a goal and it'll build a shared task list, then walk you through each step.
+          <p className="mt-1 text-xs text-[var(--hive-text-muted)]">
+            Tell Nectar a goal and it'll build a shared task list, then walk you through each step.
           </p>
         </div>
 
-        <div className="space-y-3 border-b border-border bg-white px-5 py-4">
+        <div className="space-y-3 border-b border-[var(--hive-border)] bg-[var(--hive-canvas)] px-5 py-4">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             What do you want help with?
           </label>
@@ -95,12 +95,12 @@ export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal, sur
                 ? "e.g. Help me write today's daily note"
                 : "e.g. Help me prepare for my DSPD audit"
             }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
+            className="w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] px-3 py-2 text-sm text-[var(--hive-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--hive-gold)]/40"
           />
           <button
             onClick={() => goal.trim().length >= 3 && planM.mutate(goal.trim())}
             disabled={planM.isPending || goal.trim().length < 3 || !orgId}
-            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-[#d97a1c] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#b8651a] disabled:opacity-60"
+            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-[var(--hive-gold)] px-4 py-2 text-sm font-semibold text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)] disabled:opacity-60"
           >
             {planM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Build my task list
@@ -114,7 +114,7 @@ export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal, sur
             </div>
           )}
           {guidesQ.data && guidesQ.data.length === 0 && (
-            <p className="rounded-lg border border-dashed border-border bg-[#fbfaf7] p-4 text-center text-xs text-muted-foreground">
+            <p className="rounded-lg border border-dashed border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4 text-center text-xs text-[var(--hive-text-muted)]">
               No guided plans yet — describe a goal above to start.
             </p>
           )}
@@ -156,11 +156,11 @@ function GuideCard({
 }) {
   const done = guide.tasks.filter((t) => t.status === "done").length;
   return (
-    <div className="rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
+    <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] shadow-sm">
+      <div className="flex items-start justify-between gap-2 border-b border-[var(--hive-border)] px-4 py-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#d97a1c]">Guide</div>
-          <div className="truncate font-display text-sm font-bold text-[#0f1b3d]">{guide.goal}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--hive-gold)]">Guide</div>
+          <div className="truncate font-display text-sm font-bold text-[var(--hive-text)]">{guide.goal}</div>
           {guide.summary && <p className="mt-0.5 text-xs text-muted-foreground">{guide.summary}</p>}
           <div className="mt-1 text-[11px] text-muted-foreground">{done} of {guide.tasks.length} complete</div>
         </div>
@@ -178,29 +178,29 @@ function GuideCard({
                   onClick={() => onMarkDone(t)}
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                     t.status === "done"
-                      ? "border-[#0f1b3d] bg-[#0f1b3d] text-white"
-                      : "border-border bg-white hover:border-[#d97a1c]"
+                      ? "border-[var(--hive-gold)] bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
+                      : "border-[var(--hive-border)] bg-[var(--hive-canvas)] hover:border-[var(--hive-gold)]"
                   }`}
                   aria-label="Mark done"
                 >
                   {t.status === "done" && <Check className="h-3 w-3" />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-semibold ${t.status === "done" ? "text-muted-foreground line-through" : "text-[#0f1b3d]"}`}>
+                  <div className={`text-sm font-semibold ${t.status === "done" ? "text-muted-foreground line-through" : "text-[var(--hive-text)]"}`}>
                     {t.position + 1}. {t.title}
                   </div>
                   {t.why && <p className="mt-0.5 text-[11px] text-muted-foreground">{t.why}</p>}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <button
                       onClick={() => onExplain(t)}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-border bg-white px-2 py-1 text-[11px] hover:bg-muted"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1 text-[11px] hover:bg-[var(--hive-bg)]"
                     >
                       <MessageSquare className="h-3 w-3" /> Explain
                     </button>
                     <button
                       onClick={() => onStartTour(t)}
                       disabled={!hasSteps || t.status === "done"}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[#d97a1c] px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-[#b8651a] disabled:opacity-50"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--hive-gold)] px-2 py-1 text-[11px] font-semibold text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)] disabled:opacity-50"
                       title={hasSteps ? "" : "No on-screen steps — read the explanation."}
                     >
                       <PlayCircle className="h-3 w-3" /> Show me
@@ -225,8 +225,8 @@ function ExplainModal({ task, onClose }: { task: GuideTask; onClose: () => void 
       >
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#d97a1c]">NECTAR · Explain</div>
-            <h3 className="font-display text-base font-bold text-[#0f1b3d]">{task.title}</h3>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--hive-gold)]">Nectar · Explain</div>
+            <h3 className="font-display text-base font-bold text-[var(--hive-text)]">{task.title}</h3>
           </div>
           <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>

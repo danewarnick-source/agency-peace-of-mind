@@ -91,6 +91,7 @@ import {
   writeSessionHint,
 } from "@/lib/auth-session-boot";
 import { PortalViewSwitcher } from "@/components/portal-view-switcher";
+import { HiveWordmark } from "@/components/brand/hive-mark";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -208,7 +209,7 @@ const STAFF_NAV: NavItem[] = [
     icon: Clock,
     feature: "evv_timesheets",
   },
-  { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
+  { to: "/dashboard/ask-nectar", label: "Nectar", icon: Sparkles, feature: "nectar" },
   {
     to: "/dashboard/courses",
     label: "My Trainings",
@@ -269,7 +270,7 @@ const ADMIN_NAV: NavItem[] = [
 ];
 
 const NECTAR_NAV: NavItem[] = [
-  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle, feature: "nectar" },
+  { to: "/dashboard/help", label: "Nectar", icon: HelpCircle, feature: "nectar" },
   { to: "/dashboard/hub/knowledge", label: "Knowledge base", icon: Database, feature: "nectar" },
 ];
 
@@ -751,7 +752,7 @@ function DashboardLayout() {
 
             <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <header
-                className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6 min-h-16"
+                className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hive-border)] bg-[var(--hive-canvas)] px-4 md:px-6 min-h-16"
                 style={{
                   paddingTop: "env(safe-area-inset-top)",
                   paddingLeft: "max(1rem, env(safe-area-inset-left))",
@@ -823,7 +824,7 @@ function DashboardLayout() {
                       aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
                       aria-expanded={mobileSearchOpen}
                       onClick={() => setMobileSearchOpen((v) => !v)}
-                      className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-[#0B1126] text-white hover:bg-[#0d1430] md:hidden"
+                      className="grid h-11 w-11 place-items-center rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] text-[var(--hive-text)] hover:bg-[var(--hive-bg)] md:hidden"
                     >
                       <Search className="h-4 w-4" />
                     </button>
@@ -832,11 +833,11 @@ function DashboardLayout() {
                     type="button"
                     onClick={() => setTaskCenterOpen(true)}
                     data-tour="nav.help"
-                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-white/15 bg-[#0B1126] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#0d1430]"
-                    title="Open NECTAR Task Center"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[var(--hive-gold)] bg-transparent px-2.5 py-1 text-xs font-medium text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]"
+                    title="Open Nectar"
                   >
-                    <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" />{" "}
-                    <span className="hidden md:inline">Guide me</span>
+                    <ListChecks className="h-3.5 w-3.5 text-[var(--hive-gold)]" />{" "}
+                    <span className="hidden md:inline">Nectar</span>
                   </button>
                   {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
                   {isAdminCapable && effectiveView === "admin" && (
@@ -850,7 +851,7 @@ function DashboardLayout() {
               {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
               {mobileSearchOpen && !isHiveExecView && (
-                <div className="border-b border-border bg-[#0d112b] px-4 py-2 md:hidden">
+                <div className="border-b border-[var(--hive-border)] bg-[var(--hive-sidebar)] px-4 py-2 md:hidden">
                   <NectarSearchBar
                     nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
                     isAdminCapable={isAdminCapable && effectiveView === "admin"}
@@ -898,8 +899,8 @@ function DashboardLayout() {
               <main
                 className={
                   isMobilePreview
-                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40"
-                    : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"
+                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)]"
+                    : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)] px-4 py-6 md:px-8"
                 }
               >
                 {isStatePreview && !stateCode ? (
@@ -1053,11 +1054,8 @@ function SidebarBody({
   }, [activeExecDomain]);
   return (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <Hexagon className="h-4 w-4" strokeWidth={2.5} />
-        </span>
-        HIVE
+      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+        <HiveWordmark markClassName="h-6 w-6" wordClassName="text-lg" />
       </div>
 
       {(isAdminCapable || isExecutive) && (
@@ -1170,8 +1168,8 @@ function SidebarBody({
               onClick={onNavigate}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 pathname === COMMAND_CENTER_ITEM.to
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
+                  : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
@@ -1205,8 +1203,8 @@ function SidebarBody({
                             onClick={onNavigate}
                             className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                               active
-                                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
+                                : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
                             }`}
                           >
                             <span className="inline-flex items-center gap-2">
@@ -1233,7 +1231,7 @@ function SidebarBody({
             const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
             const Icon = item.icon;
             const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
-            const isNectar = item.label === "NECTAR";
+            const isNectar = item.label === "Nectar";
             const locked = !!item.isLocked;
 
             if (locked) {
@@ -1261,16 +1259,14 @@ function SidebarBody({
                 data-tour={`nav.${slug}`}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   active
-                    ? isNectar
-                      ? "bg-[#d97a1c] text-white shadow-sm"
-                      : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                    ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
                     : isNectar
-                      ? "text-[#f4a93a] hover:bg-[#f4a93a]/10 hover:text-[#d97a1c]"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      ? "text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]"
+                      : "text-[var(--hive-text-muted)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]"
                 }`}
               >
                 <Icon
-                  className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`}
+                  className={`h-4 w-4 ${active || isNectar ? "text-[var(--hive-gold)]" : ""}`}
                 />
                 <span className="flex-1">{item.label}</span>
                 {item.to === "/dashboard/company-obligations" &&
@@ -1300,12 +1296,12 @@ function SidebarBody({
           <div className="mt-5 border-t border-sidebar-border pt-5">
             <div className="mb-2.5 flex items-start gap-2.5 px-3">
               <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/20">
-                <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2} />
+                <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2} />
               </span>
               <div className="min-w-0">
-                <span className="text-sm font-bold tracking-wide text-[#f4a93a]">NECTAR</span>
+                <span className="text-sm font-bold tracking-wide text-[var(--hive-gold)]">Nectar</span>
                 <p className="text-[11px] leading-relaxed text-sidebar-foreground/50">
-                  The brain. Tabs below feed it the data the rest of HIVE reads from.
+                  The brain. Tabs below feed it the data the rest of Hive reads from.
                 </p>
               </div>
             </div>
@@ -1340,11 +1336,11 @@ function SidebarBody({
                     data-tour={`nav.${slug}`}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                       active
-                        ? "bg-[#d97a1c] text-white shadow-sm"
-                        : "text-sidebar-foreground/80 hover:bg-[#f4a93a]/10 hover:text-[#f4a93a]"
+                        ? "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)]"
+                        : "text-[var(--hive-text-muted)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)] hover:text-[var(--hive-gold)]"
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${active ? "text-white" : "text-[#f4a93a]/80"}`} />
+                    <Icon className="h-4 w-4 text-[var(--hive-gold)]" />
                     {item.label}
                   </Link>
                 );

@@ -17,6 +17,7 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     assert.doesNotMatch(pkg.scripts.build, /BUILD_TARGET/);
     assert.match(pkg.scripts["test:unit"], /auth-session-boot\.test\.ts/);
     assert.match(pkg.scripts["test:unit"], /catastrophic-ssr\.test\.ts/);
+    assert.match(pkg.scripts["test:unit"], /verify-aws-supabase-bundle\.test\.mjs/);
   });
 
   it("vite.config only switches nitro when BUILD_TARGET is aws or lambda", () => {
@@ -78,6 +79,9 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     const yml = readFileSync(new URL("../../.github/workflows/deploy-aws.yml", import.meta.url), "utf8");
     assert.match(yml, /npm run build:lambda/);
     assert.doesNotMatch(yml, /npm run build:aws/);
+    assert.match(yml, /verify-aws-supabase-bundle/);
+    assert.match(yml, /mmknqtdrefbzwfdtykza/);
+    assert.match(yml, /dhrrukdcigiiqksibdfb/);
     assert.match(yml, /verify-lambda-output/);
     assert.match(yml, /package-lambda\.sh/);
     assert.match(yml, /update-function-code/);
@@ -86,19 +90,39 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     assert.match(yml, /\.output\/public/);
     assert.match(yml, /s3 sync/);
     assert.match(yml, /--delete/);
+    assert.match(yml, /--exclude "sw\.js"/);
+    const swUpload = yml.match(/if \[ -f \.output\/public\/sw\.js \][\s\S]*?fi/);
+    assert.ok(swUpload, "sw.js must be uploaded in its own s3 cp");
+    assert.match(swUpload[0], /max-age=0,must-revalidate/);
+    assert.match(yml, /max-age=31536000,immutable/);
+    assert.match(yml, /if: \$\{\{ secrets\.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' \}\}/);
+    assert.doesNotMatch(yml, /if: env\.DISTRIBUTION_ID != ''/);
     assert.match(yml, /create-invalidation/);
+    assert.match(yml, /--paths "\/\*"/);
     assert.match(yml, /contents:\s*read/);
     assert.doesNotMatch(yml, /amazon-ecr-login/);
     assert.doesNotMatch(yml, /docker build/);
     assert.doesNotMatch(yml, /aws ecs/);
     assert.doesNotMatch(yml, /dist-aws/);
     assert.doesNotMatch(yml, /AWS_ACCESS_KEY_ID:\s*AKIA/);
+    const buildIdx = yml.indexOf("npm run build:lambda");
+    const guardIdx = yml.indexOf("verify-aws-supabase-bundle");
     const lambdaIdx = yml.indexOf("update-function-code");
     const s3Idx = yml.indexOf("s3 sync");
     const cfIdx = yml.indexOf("create-invalidation");
-    assert.ok(lambdaIdx > 0, "missing update-function-code");
+    assert.ok(buildIdx > 0, "missing build:lambda");
+    assert.ok(guardIdx > buildIdx, "Supabase project guard must run after build:lambda");
+    assert.ok(lambdaIdx > guardIdx, "guard must run before Lambda update");
     assert.ok(s3Idx > lambdaIdx, "S3 sync must run after Lambda update");
     assert.ok(cfIdx > s3Idx, "CloudFront invalidation must run after S3 sync");
+  });
+
+  it("AWS_DEPLOY.md examples use Hive-Platform and hivecertify.com", () => {
+    const docs = readFileSync(new URL("../../docs/AWS_DEPLOY.md", import.meta.url), "utf8");
+    assert.match(docs, /https:\/\/dhrrukdcigiiqksibdfb\.supabase\.co/);
+    assert.match(docs, /https:\/\/hivecertify\.com/);
+    assert.match(docs, /Vercel production/);
+    assert.doesNotMatch(docs, /https:\/\/mmknqtdrefbzwfdtykza\.supabase\.co/);
   });
 });
 

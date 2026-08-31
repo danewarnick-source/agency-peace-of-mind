@@ -19,6 +19,13 @@ name: Deploy AWS (parallel target)
 #   4. invalidate CloudFront E1BPLMZE2XLSKD
 # See docs/AWS_LAMBDA.md. Reuses existing GitHub AWS / Vite secrets.
 # Do not create new accounts, buckets, distributions, or Lambdas.
+#
+# Live JS on hivecertify.com must contain dhrrukdcigiiqksibdfb
+# (Hive-Platform). After build:lambda, CI fails the job if
+# .output/public still contains the retired Lovable project
+# mmknqtdrefbzwfdtykza or a legacy JWT anon key. Copy Vercel
+# production VITE_SUPABASE_* into GitHub Actions secrets — never
+# the Lovable project. Lambda runtime env must match.
 
 on:
   push:
@@ -55,6 +62,15 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           PUBLIC_SITE_URL: ${{ secrets.AWS_PUBLIC_SITE_URL }}
 
+      # hivecertify.com login uses this baked client URL. Wrong project
+      # looks like "Invalid username or password". Dane/Tony must set
+      # GitHub Actions secrets + Lambda runtime env to Hive-Platform
+      # (dhrrukdcigiiqksibdfb) then re-run Deploy AWS.
+      - name: Guard client bundle uses Hive-Platform Supabase
+        run: node scripts/verify-aws-supabase-bundle.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+
       - name: Verify Lambda output
         run: node scripts/verify-lambda-output.mjs
 
@@ -85,7 +101,8 @@ jobs:
             --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "index.html" \
-            --exclude "*.webmanifest"
+            --exclude "*.webmanifest" \
+            --exclude "sw.js"
           if [ -f .output/public/index.html ]; then
             aws s3 cp .output/public/index.html "s3://${{ secrets.AWS_S3_BUCKET }}/index.html" \
               --cache-control "public,max-age=0,must-revalidate"
@@ -94,9 +111,15 @@ jobs:
             aws s3 cp .output/public/manifest.webmanifest "s3://${{ secrets.AWS_S3_BUCKET }}/manifest.webmanifest" \
               --cache-control "public,max-age=0,must-revalidate"
           fi
+          if [ -f .output/public/sw.js ]; then
+            aws s3 cp .output/public/sw.js "s3://${{ secrets.AWS_S3_BUCKET }}/sw.js" \
+              --cache-control "public,max-age=0,must-revalidate"
+          fi
 
+      # Step-level env is applied after `if:` — do not use env.DISTRIBUTION_ID
+      # here or CloudFront never invalidates. Always invalidate /*.
       - name: Invalidate CloudFront cache
-        if: env.DISTRIBUTION_ID != ''
+        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
         env:
           DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
         run: |

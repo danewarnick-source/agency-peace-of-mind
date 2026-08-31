@@ -32,9 +32,11 @@ Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 
 **Training** (one-time per staff; Mandt name stays):
 
-- Full program $300
-- CPR/First Aid $75, Mandt $200, DSPD required $100
-- TNS / exempt skip these
+- Package $300 (saves $75 vs $375)
+- CPR/First Aid $100, Mandt $200, 30-day orientation $75
+- CPR and Mandt are external classes (admin roster → one Hive Executive alert)
+- 30-day is the in-Hive course from My Obligations (not an external class)
+- TNS / exempt skip these — always $0
 
 ## Sandbox products (already created)
 
@@ -44,10 +46,10 @@ These **Price IDs** are test-mode identifiers on `acct_1Ti6CMIQWmyptLnb`. Hive u
 |---|---|---|---|---|
 | Hive seat list | $125 / month | `prod_V9XjHA2R4jLnn3` | `price_1U9EeRIQWMytpLnbNurGi0Vq` | `STRIPE_PRICE_SEAT_LIST` |
 | Hive seat founding | $79 / month | `prod_V9XmH5qQO0TjHi` | `price_1U9EgWIQWMytpLnbyBvs2f4L` | `STRIPE_PRICE_SEAT_FOUNDING` |
-| Training full program | $300 one-time | `prod_V9Xn9njjImRO15` | `price_1U9EhyIQWMytpLnbg2nkCFd8` | `STRIPE_PRICE_TRAINING_FULL` |
-| Training CPR/First Aid | $75 one-time | `prod_V9XpZpdcbeJXye` | `price_1U9EjNIQWMytpLnbPnfRb6Yz` | `STRIPE_PRICE_TRAINING_CPR` |
+| Training package | $300 one-time | `prod_V9Xn9njjImRO15` | `price_1U9EhyIQWMytpLnbg2nkCFd8` | `STRIPE_PRICE_TRAINING_FULL` |
 | Training Mandt | $200 one-time | `prod_V9XqoHqzqR8JaY` | `price_1U9EkmIQWMytpLnb2coYT0rn` | `STRIPE_PRICE_TRAINING_MANDT` |
-| Training DSPD required | $100 one-time | `prod_V9Xr6M8IBuGzQK` | `price_1U9Em5IQWMytpLnb2of9BFOj` | `STRIPE_PRICE_TRAINING_DSPD` |
+| Training CPR/First Aid | **$100 locked** | old sandbox product is still $75 — do not use as default | — | `STRIPE_PRICE_TRAINING_CPR` (optional; omit to charge $100 via `price_data`) |
+| Training 30-day | **$75 locked** | old DSPD sandbox product is still $100 — do not use as default | — | `STRIPE_PRICE_TRAINING_THIRTY_DAY` (optional; omit to charge $75 via `price_data`) |
 
 Volume rates ($109 / $99) and annual (20% off) still use Stripe `price_data` until those products exist. The app still enforces the $500 list minimum and $299 founding minimum.
 
@@ -68,9 +70,12 @@ Optional overrides (defaults are the sandbox Price IDs above):
 - `STRIPE_PRICE_SEAT_LIST`
 - `STRIPE_PRICE_SEAT_FOUNDING`
 - `STRIPE_PRICE_TRAINING_FULL`
-- `STRIPE_PRICE_TRAINING_CPR`
+- `STRIPE_PRICE_TRAINING_CPR` — only if you create a new **$100** CPR Price ID
 - `STRIPE_PRICE_TRAINING_MANDT`
-- `STRIPE_PRICE_TRAINING_DSPD`
+- `STRIPE_PRICE_TRAINING_THIRTY_DAY` — only if you create a new **$75** 30-day Price ID
+- `STRIPE_PRICE_TRAINING_DSPD` — leftover alias for the 30-day price
+
+Class roster checkout always sends Stripe `price_data` at the locked amounts, so a stale $75 CPR Price ID cannot undercharge.
 
 If the secret key is missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
 

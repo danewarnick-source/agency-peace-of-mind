@@ -11,17 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import {
-  GraduationCap, ShoppingCart, Users, Loader2, PlayCircle,
+  GraduationCap, Users, Loader2, PlayCircle,
   AlertTriangle, Sparkles, Award, ShieldCheck, TrendingUp, Clock,
   Repeat, CreditCard, CheckCircle2,
 } from "lucide-react";
 import { z } from "zod";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { createTrainingCheckoutFn, confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
+import { ClassRosterDialog, type RosterMemberOption } from "@/components/training/class-roster-form";
+import { TRAINING_PRICE_CENTS, formatUsdFromCents } from "@/lib/hive-pricing";
+import { isBillingExempt } from "@/lib/billing-access";
+import { getBillingStatusFn } from "@/lib/stripe-checkout.functions";
+import { getOrgTrainingClasses } from "@/lib/training-class.functions";
+import { trainingClassLabel, type TrainingClassType } from "@/lib/training-class";
 import { FeatureLocked } from "@/components/feature-locked";
 import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
 import { FeatureLockedRoute } from "@/components/upgrade-gate";
@@ -61,7 +67,7 @@ type AssignmentRow = {
   course: { title: string; slug: string; cert_validity_months: number | null } | null;
 };
 
-type Member = { id: string; label: string };
+type Member = { id: string; label: string; email?: string | null; phone?: string | null };
 
 function HiveTrainingHub() {
   const { data: org } = useCurrentOrg();
@@ -320,20 +326,31 @@ function AdminView({ orgId }: { orgId: string }) {
   const { data: members } = useQuery({
     queryKey: ["ht-members", orgId],
     queryFn: async () => {
-      const { data: mems } = await supabase
+      const { data: mems } = await (supabase as any)
         .from("organization_members")
         .select("user_id")
         .eq("organization_id", orgId)
         .eq("active", true);
-      const ids = (mems ?? []).map((m) => m.user_id);
+      const ids = ((mems ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
       if (!ids.length) return [] as Member[];
-      const { data: profs } = await supabase
+      const { data: profs } = await (supabase as any)
         .from("org_member_directory")
         .select("id, full_name, email, username")
         .in("id", ids);
-      return (profs ?? [])
+      return ((profs ?? []) as Array<{
+        id: string | null;
+        full_name: string | null;
+        email: string | null;
+        username: string | null;
+        phone?: string | null;
+      }>)
         .filter((p): p is typeof p & { id: string } => !!p.id)
-        .map((p) => ({ id: p.id, label: p.full_name || p.email || p.username || "—" }));
+        .map((p) => ({
+          id: p.id,
+          label: p.full_name || p.email || p.username || "—",
+          email: p.email,
+          phone: p.phone ?? null,
+        }));
     },
   });
 
@@ -401,11 +418,16 @@ function AdminView({ orgId }: { orgId: string }) {
       </div>
 
       <Storefront
+        orgId={orgId}
         catalog={catalog ?? []}
         members={members ?? []}
-        onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
+        onPurchased={() => {
+          qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] });
+          qc.invalidateQueries({ queryKey: ["ht-org-classes", orgId] });
+        }}
       />
 
+      <SubmittedClasses orgId={orgId} />
 
       <RosterSection
         orgId={orgId}
@@ -990,201 +1012,158 @@ function SetupRenewalsDialog({
 // ---- Storefront ----
 
 function Storefront({
-  catalog, members, onPurchased,
-}: { catalog: CatalogRow[]; members: Member[]; onPurchased: () => void }) {
-  const full = catalog.find((c) => c.kind === "full_program");
-  const alaCarte = catalog.filter((c) => c.kind !== "full_program");
+  orgId, catalog, members, onPurchased,
+}: { orgId: string; catalog: CatalogRow[]; members: Member[]; onPurchased: () => void }) {
+  const { data: org } = useCurrentOrg();
+  const billingFn = useServerFn(getBillingStatusFn);
+  const billingQ = useQuery({
+    queryKey: ["ht-billing-status", orgId],
+    queryFn: () => billingFn({ data: { organizationId: orgId } }),
+  });
+  const billingExempt =
+    billingQ.data?.billingExempt === true ||
+    isBillingExempt({
+      billingExempt: false,
+      orgName: org?.organization_name,
+      legalName: org?.legal_name,
+      dbaName: org?.dba_name,
+      organizationId: orgId,
+      displayAcronym: org?.display_acronym,
+    });
+
+  const rosterMembers: RosterMemberOption[] = members.map((m) => ({
+    id: m.id,
+    label: m.label,
+    email: m.email,
+    phone: m.phone,
+  }));
+
+  const cards: Array<{
+    type: TrainingClassType;
+    title: string;
+    blurb: string;
+    priceCents: number;
+    featured?: boolean;
+    sku: string;
+  }> = [
+    {
+      type: "package",
+      title: "Training package",
+      blurb: "CPR, Mandt, and the in-Hive 30-day course for the same roster. Saves $75 versus buying each seat.",
+      priceCents: TRAINING_PRICE_CENTS.full_program,
+      featured: true,
+      sku: "full_program",
+    },
+    {
+      type: "cpr_first_aid",
+      title: "CPR / First Aid",
+      blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+      priceCents: TRAINING_PRICE_CENTS.cpr_first_aid,
+      sku: "cpr_first_aid",
+    },
+    {
+      type: "mandt",
+      title: "Mandt",
+      blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+      priceCents: TRAINING_PRICE_CENTS.mandt,
+      sku: "mandt",
+    },
+    {
+      type: "thirty_day",
+      title: "30-day orientation",
+      blurb: "In-Hive course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
+      priceCents: TRAINING_PRICE_CENTS.thirty_day,
+      sku: "dspd_required",
+    },
+  ];
 
   return (
     <section id="ht-storefront" className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold text-[#1A2B47]">Programs built for DSPD compliance</h2>
+        <h2 className="text-lg font-semibold text-[#1A2B47]">Submit a class roster</h2>
         <p className="text-sm text-muted-foreground">
-          Every course names the DSPD requirement it satisfies. Staff finish with a signed competency and a certificate you can hand to the state.
+          Only an admin submits. One submit is one class. Staff never buy seats.
+          {billingExempt ? " True North Supports is always $0." : ""}
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {full && (
-          <div className="md:col-span-1">
-            <FeaturedCard row={full} members={members} onPurchased={onPurchased} />
-          </div>
-        )}
-        <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
-          {alaCarte.map((c) => (
-            <AlaCarteCard key={c.id} row={c} members={members} onPurchased={onPurchased} />
-          ))}
-        </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {cards.map((card) => (
+          <Card
+            key={card.type}
+            className={card.featured ? "relative border-2 border-[#C8881E] shadow-[0_0_0_4px_rgba(200,136,30,0.15)]" : undefined}
+          >
+            {card.featured && (
+              <div className="absolute -top-3 left-4 rounded bg-[#C8881E] px-2 py-0.5 text-xs font-semibold text-white">
+                Best value · save $75
+              </div>
+            )}
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base text-[#1A2B47]">{card.title}</CardTitle>
+              <CardDescription className="text-xs">{card.blurb}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-2xl font-bold text-[#1A2B47]">
+                {billingExempt ? "$0" : formatUsdFromCents(card.priceCents)}
+                <span className="text-sm font-normal text-muted-foreground"> / seat</span>
+              </div>
+              {orgId ? (
+                <ClassRosterDialog
+                  organizationId={orgId}
+                  trainingType={card.type}
+                  billingExempt={billingExempt}
+                  members={rosterMembers}
+                  triggerLabel={card.type === "thirty_day" ? "Assign 30-day course" : "Submit class roster"}
+                  testId={`training-buy-${card.sku}`}
+                  onSubmitted={onPurchased}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {catalog.length === 0 && (
+        <p className="text-xs text-muted-foreground">Locked prices are used even if the leftover catalog has not been updated yet.</p>
+      )}
+    </section>
+  );
+}
+
+function SubmittedClasses({ orgId }: { orgId: string }) {
+  const listFn = useServerFn(getOrgTrainingClasses);
+  const { data: classes } = useQuery({
+    queryKey: ["ht-org-classes", orgId],
+    queryFn: () => listFn({ data: { organizationId: orgId } }),
+  });
+  if (!classes?.length) return null;
+  return (
+    <section className="space-y-2">
+      <h2 className="text-lg font-semibold text-[#1A2B47]">Submitted classes</h2>
+      <div className="space-y-2">
+        {classes.map((c) => (
+          <Card key={c.id}>
+            <CardContent className="p-4 text-sm">
+              <div className="font-medium text-[#1A2B47]">
+                {trainingClassLabel(c.trainingType)} · {c.seatCount} staff · {c.paymentStatus === "waived" || c.amountCents === 0 ? "$0" : formatUsdFromCents(c.amountCents)}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {c.status} · submitted {c.submittedAt ? new Date(c.submittedAt).toLocaleDateString() : "—"}
+              </div>
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {c.roster.map((r) => (
+                  <li key={`${r.email}-${r.name}`}>{r.name} · {r.email} · {r.phone}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </section>
   );
 }
 
-const COURSE_SATISFIES: Record<string, string> = {
-  cpr: "Satisfies DSPD CPR/First Aid staff qualification.",
-  mandt: "Satisfies DSPD approved crisis intervention & de-escalation.",
-  dspd: "Satisfies DSPD provider orientation for new direct-support staff.",
-  full: "Covers CPR/First Aid, Mandt de-escalation, and DSPD orientation — everything a new DSP needs to be state-ready.",
-};
-
-function satisfiesLine(row: CatalogRow) {
-  const n = row.name.toLowerCase();
-  if (row.kind === "full_program") return COURSE_SATISFIES.full;
-  if (n.includes("cpr")) return COURSE_SATISFIES.cpr;
-  if (n.includes("mandt")) return COURSE_SATISFIES.mandt;
-  if (n.includes("dspd")) return COURSE_SATISFIES.dspd;
-  return "DSPD-aligned coursework with in-app competency sign-off.";
-}
-
-function FeaturedCard({ row, members, onPurchased }: { row: CatalogRow; members: Member[]; onPurchased: () => void }) {
-  const price = (row.price_cents / 100).toLocaleString(undefined, { style: "currency", currency: row.currency || "USD" });
-  return (
-    <Card className="relative border-2 border-[#C8881E] shadow-[0_0_0_4px_rgba(200,136,30,0.15)]">
-      <div className="absolute -top-3 left-4 bg-[#C8881E] text-white text-xs font-semibold px-2 py-0.5 rounded">
-        Best value · save $75
-      </div>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg text-[#1A2B47] flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#C8881E]" /> {row.name}
-        </CardTitle>
-        <CardDescription>{satisfiesLine(row)}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="text-2xl font-bold text-[#1A2B47]">{price}<span className="text-sm font-normal text-muted-foreground"> / staff</span></div>
-        <ul className="text-xs text-muted-foreground space-y-1">
-          <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> DSPD-certified content</li>
-          <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Typed-signature competency sign-off</li>
-          <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Verifiable certificate + expiration tracking</li>
-        </ul>
-        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Buy" />
-      </CardContent>
-    </Card>
-  );
-}
-
-function AlaCarteCard({ row, members, onPurchased }: { row: CatalogRow; members: Member[]; onPurchased: () => void }) {
-  const price = (row.price_cents / 100).toLocaleString(undefined, { style: "currency", currency: row.currency || "USD" });
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base text-[#1A2B47]">{row.name}</CardTitle>
-          <Badge variant="outline" className="border-[#C8881E] text-[#C8881E]">{price}</Badge>
-        </div>
-        <CardDescription className="text-xs">{satisfiesLine(row)}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Buy" />
-      </CardContent>
-    </Card>
-  );
-}
-
-function PurchaseDialog({
-  row, members, onPurchased, triggerLabel,
-}: { row: CatalogRow; members: Member[]; onPurchased: () => void; triggerLabel: string }) {
-  const { data: org } = useCurrentOrg();
-  const checkoutFn = useServerFn(createTrainingCheckoutFn);
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"bulk_seats" | "individual">("bulk_seats");
-  const [qty, setQty] = useState(1);
-  const [assignee, setAssignee] = useState<string>("");
-  const [busy, setBusy] = useState(false);
-
-  const total = ((row.price_cents * (mode === "bulk_seats" ? qty : 1)) / 100).toLocaleString(undefined, {
-    style: "currency",
-    currency: row.currency || "USD",
-  });
-
-  const startCheckout = async () => {
-    if (!org?.organization_id) return;
-    setBusy(true);
-    try {
-      const r = await checkoutFn({
-        data: {
-          organizationId: org.organization_id,
-          catalogId: row.id,
-          modeContext: mode,
-          quantity: mode === "bulk_seats" ? qty : 1,
-          assigneeUserId: mode === "individual" ? assignee || null : null,
-        },
-      });
-      if (r.granted) {
-        toast.success("This company is billing-exempt — seats added, no charge.");
-        onPurchased();
-        setOpen(false);
-        setBusy(false);
-        return;
-      }
-      if (r.error || !r.url) throw new Error(r.error ?? "Checkout URL missing");
-      onPurchased();
-      window.location.href = r.url;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Checkout failed";
-      if (msg.includes("payments_not_configured") || msg.includes("STRIPE_SECRET_KEY")) {
-        toast.error("Payments are not set up yet. Ask a Hive Executive to add the Stripe test keys.");
-      } else {
-        toast.error(msg);
-      }
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white w-full" data-testid={`training-buy-${row.sku}`}>
-          <ShoppingCart className="h-4 w-4 mr-1" /> {triggerLabel}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Purchase — {row.name}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Purchase type</Label>
-            <Select value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bulk_seats">Bulk seats (assign later)</SelectItem>
-                <SelectItem value="individual">Assign to one staff now</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {mode === "bulk_seats" ? (
-            <div>
-              <Label>Number of seats</Label>
-              <Input type="number" min={1} max={500} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} />
-            </div>
-          ) : (
-            <div>
-              <Label>Assign to</Label>
-              <Select value={assignee} onValueChange={setAssignee}>
-                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                <SelectContent>
-                  {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="text-sm">Total: <span className="font-semibold text-[#1A2B47]">{total}</span></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button
-            onClick={startCheckout}
-            disabled={busy || (mode === "individual" && !assignee)}
-            data-testid="training-checkout-confirm"
-            className="bg-[#C8881E] hover:bg-[#C8881E]/90 text-white"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue to payment"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+// Leftover LMS buy-seats dialogs were replaced by the class roster above.
+// The /dashboard/training/catalog page is still in the repo (chunk 3 must not delete it).
 
 // ---- Roster ----
 

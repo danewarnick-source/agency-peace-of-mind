@@ -151,6 +151,7 @@ import { Route as DashboardHiveExecFunctionalityRouteImport } from './routes/das
 import { Route as DashboardHiveExecFeaturesRouteImport } from './routes/dashboard.hive-exec.features'
 import { Route as DashboardHiveExecCompanyMigrationRouteImport } from './routes/dashboard.hive-exec.company-migration'
 import { Route as DashboardHiveExecCommandRouteImport } from './routes/dashboard.hive-exec.command'
+import { Route as DashboardHiveExecClassesRouteImport } from './routes/dashboard.hive-exec.classes'
 import { Route as DashboardHiveExecBillingApprovalsRouteImport } from './routes/dashboard.hive-exec.billing-approvals'
 import { Route as DashboardHiveExecBaseTemplateRouteImport } from './routes/dashboard.hive-exec.base-template'
 import { Route as DashboardHiveExecApprovalsRouteImport } from './routes/dashboard.hive-exec.approvals'
@@ -975,6 +976,12 @@ const DashboardHiveExecCommandRoute =
     path: '/command',
     getParentRoute: () => DashboardHiveExecRoute,
   } as any)
+const DashboardHiveExecClassesRoute =
+  DashboardHiveExecClassesRouteImport.update({
+    id: '/classes',
+    path: '/classes',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecBillingApprovalsRoute =
   DashboardHiveExecBillingApprovalsRouteImport.update({
     id: '/billing-approvals',
@@ -1491,6 +1498,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/billing-approvals': typeof DashboardHiveExecBillingApprovalsRoute
+  '/dashboard/hive-exec/classes': typeof DashboardHiveExecClassesRoute
   '/dashboard/hive-exec/command': typeof DashboardHiveExecCommandRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/features': typeof DashboardHiveExecFeaturesRoute
@@ -1695,6 +1703,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/billing-approvals': typeof DashboardHiveExecBillingApprovalsRoute
+  '/dashboard/hive-exec/classes': typeof DashboardHiveExecClassesRoute
   '/dashboard/hive-exec/command': typeof DashboardHiveExecCommandRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/features': typeof DashboardHiveExecFeaturesRoute
@@ -1907,6 +1916,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/approvals': typeof DashboardHiveExecApprovalsRoute
   '/dashboard/hive-exec/base-template': typeof DashboardHiveExecBaseTemplateRoute
   '/dashboard/hive-exec/billing-approvals': typeof DashboardHiveExecBillingApprovalsRoute
+  '/dashboard/hive-exec/classes': typeof DashboardHiveExecClassesRoute
   '/dashboard/hive-exec/command': typeof DashboardHiveExecCommandRoute
   '/dashboard/hive-exec/company-migration': typeof DashboardHiveExecCompanyMigrationRoute
   '/dashboard/hive-exec/features': typeof DashboardHiveExecFeaturesRoute
@@ -2120,6 +2130,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/billing-approvals'
+    | '/dashboard/hive-exec/classes'
     | '/dashboard/hive-exec/command'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/features'
@@ -2324,6 +2335,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/billing-approvals'
+    | '/dashboard/hive-exec/classes'
     | '/dashboard/hive-exec/command'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/features'
@@ -2535,6 +2547,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/approvals'
     | '/dashboard/hive-exec/base-template'
     | '/dashboard/hive-exec/billing-approvals'
+    | '/dashboard/hive-exec/classes'
     | '/dashboard/hive-exec/command'
     | '/dashboard/hive-exec/company-migration'
     | '/dashboard/hive-exec/features'
@@ -3656,6 +3669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHiveExecCommandRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
+    '/dashboard/hive-exec/classes': {
+      id: '/dashboard/hive-exec/classes'
+      path: '/classes'
+      fullPath: '/dashboard/hive-exec/classes'
+      preLoaderRoute: typeof DashboardHiveExecClassesRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/billing-approvals': {
       id: '/dashboard/hive-exec/billing-approvals'
       path: '/billing-approvals'
@@ -4269,6 +4289,7 @@ interface DashboardHiveExecRouteChildren {
   DashboardHiveExecApprovalsRoute: typeof DashboardHiveExecApprovalsRoute
   DashboardHiveExecBaseTemplateRoute: typeof DashboardHiveExecBaseTemplateRoute
   DashboardHiveExecBillingApprovalsRoute: typeof DashboardHiveExecBillingApprovalsRoute
+  DashboardHiveExecClassesRoute: typeof DashboardHiveExecClassesRoute
   DashboardHiveExecCommandRoute: typeof DashboardHiveExecCommandRoute
   DashboardHiveExecCompanyMigrationRoute: typeof DashboardHiveExecCompanyMigrationRoute
   DashboardHiveExecFeaturesRoute: typeof DashboardHiveExecFeaturesRoute
@@ -4295,6 +4316,7 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecBaseTemplateRoute: DashboardHiveExecBaseTemplateRoute,
   DashboardHiveExecBillingApprovalsRoute:
     DashboardHiveExecBillingApprovalsRoute,
+  DashboardHiveExecClassesRoute: DashboardHiveExecClassesRoute,
   DashboardHiveExecCommandRoute: DashboardHiveExecCommandRoute,
   DashboardHiveExecCompanyMigrationRoute:
     DashboardHiveExecCompanyMigrationRoute,

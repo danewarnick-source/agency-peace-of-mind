@@ -124,20 +124,24 @@ describe("founding slots", () => {
 });
 
 describe("training catalog amounts", () => {
-  it("keeps Mandt at $200 and does not use $49 extras", () => {
+  it("locks CPR $100, 30-day $75, Mandt $200, package $300", () => {
     assert.equal(TRAINING_PRICE_CENTS.full_program, 30_000);
-    assert.equal(TRAINING_PRICE_CENTS.cpr_first_aid, 7_500);
+    assert.equal(TRAINING_PRICE_CENTS.cpr_first_aid, 10_000);
     assert.equal(TRAINING_PRICE_CENTS.mandt, 20_000);
-    assert.equal(TRAINING_PRICE_CENTS.dspd_required, 10_000);
+    assert.equal(TRAINING_PRICE_CENTS.thirty_day, 7_500);
+    assert.equal(TRAINING_PRICE_CENTS.dspd_required, 7_500);
     assert.equal(trainingPriceCentsForSku("mandt"), 20_000);
+    assert.equal(trainingPriceCentsForSku("thirty_day"), 7_500);
+    assert.equal(trainingPriceCentsForSku("dspd_required"), 7_500);
     assert.notEqual(trainingPriceCentsForSku("cpr_first_aid"), 4_900);
+    assert.notEqual(trainingPriceCentsForSku("cpr_first_aid"), 7_500);
   });
 
-  it("public catalog matches /pricing: three à la carte rows and $75 bundle savings", () => {
+  it("public catalog matches locked prices and $75 package savings", () => {
     assert.equal(PUBLIC_TRAINING_ALA_CARTE.length, 3);
     assert.equal(
       PUBLIC_TRAINING_ALA_CARTE.map((c) => `${c.name}:${c.priceCents / 100}`).join("|"),
-      "CPR / First Aid:75|Mandt:200|DSPD required training:100",
+      "CPR / First Aid:100|Mandt:200|30-day orientation:75",
     );
     assert.equal(publicTrainingAlaCarteTotalCents(), 37_500);
     assert.equal(TRAINING_PRICE_CENTS.full_program, 30_000);

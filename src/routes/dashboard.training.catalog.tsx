@@ -35,6 +35,7 @@ import {
   type TrainingPurchaseRow,
   type StaffCandidate,
 } from "@/lib/training-enrollments.functions";
+import { trainingPriceCentsForSku } from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/dashboard/training/catalog")({
   head: () => ({ meta: [{ title: "Training Catalog — HIVE" }] }),
@@ -111,7 +112,7 @@ function CatalogAndPurchases({ organizationId }: { organizationId: string }) {
                 </Badge>
               )}
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-lg font-bold">{money(p.price_cents)}<span className="text-xs font-normal text-muted-foreground"> / seat</span></span>
+                <span className="text-lg font-bold">{money(trainingPriceCentsForSku(p.sku, p.price_cents))}<span className="text-xs font-normal text-muted-foreground"> / seat</span></span>
                 <Button size="sm" onClick={() => setPurchaseProduct(p)}>Purchase seats</Button>
               </div>
             </NectarCard>

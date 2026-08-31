@@ -25,6 +25,17 @@ import {
 import { appOriginFromRequest, getStripe } from "@/lib/stripe.server";
 import { activateSubscriptionFromCheckout } from "@/lib/stripe-webhook";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
+import { fulfillTrainingClass } from "@/lib/training-class-fulfillment.server";
+import {
+  cleanRosterRows,
+  isTrainingClassType,
+  quoteTrainingClass,
+  trainingClassIsExternal,
+  trainingClassLabel,
+  validateRosterRows,
+  type TrainingClassRosterRow,
+  type TrainingClassType,
+} from "@/lib/training-class";
 import { countPayingOrgs } from "@/lib/hive-pricing.functions";
 import {
   clampClientCount,
@@ -579,6 +590,19 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
     await requireOrgAdmin(context.supabase, context.userId, orgId);
 
     const hiveKind = session.metadata?.hive_kind ?? "subscription";
+    if (hiveKind === "training_class") {
+      if (session.metadata?.class_id) {
+        await fulfillTrainingClass({
+          classId: session.metadata.class_id,
+          organizationId: orgId,
+          stripeSessionId: session.id,
+          stripePaymentIntentId:
+            typeof session.payment_intent === "string" ? session.payment_intent : null,
+          amountCents: session.amount_total ?? 0,
+        });
+      }
+      return { ok: true, error: null as string | null };
+    }
     if (hiveKind === "training") {
       if (session.metadata?.hive_order_id && session.metadata?.catalog_id) {
         await fulfillTrainingOrder({
@@ -777,4 +801,127 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
     }
 
     return { url: session.url, granted: false, error: null as string | null };
+  });
+
+type ClassRosterCheckoutInput = {
+  organizationId: string;
+  trainingType: TrainingClassType;
+  roster: TrainingClassRosterRow[];
+};
+
+export const createTrainingClassCheckoutFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: ClassRosterCheckoutInput) => {
+    const organizationId = String(input?.organizationId ?? "");
+    if (!UUID_RE.test(organizationId)) throw new Error("Invalid organization.");
+    const trainingType = String(input?.trainingType ?? "");
+    if (!isTrainingClassType(trainingType)) throw new Error("Choose CPR, Mandt, 30-day, or the package.");
+    const roster = cleanRosterRows(Array.isArray(input?.roster) ? input.roster : []);
+    const rosterError = validateRosterRows(roster);
+    if (rosterError) throw new Error(rosterError);
+    return { organizationId, trainingType, roster };
+  })
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { url: null as string | null, granted: false, classId: null as string | null, error: "Not signed in." };
+    }
+    await requireOrgAdmin(context.supabase, context.userId, data.organizationId);
+
+    const org = await loadOrgRow(data.organizationId);
+    const exempt = orgIsComped(org);
+    const quote = quoteTrainingClass(data.trainingType, data.roster.length, exempt);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = supabaseAdmin as any;
+
+    const { data: cls, error: clsErr } = await admin
+      .from("training_classes")
+      .insert({
+        organization_id: data.organizationId,
+        training_type: data.trainingType,
+        is_external: trainingClassIsExternal(data.trainingType),
+        status: "upcoming",
+        payment_status: exempt ? "waived" : "pending",
+        seat_count: quote.seatCount,
+        unit_price_cents: quote.unitCents,
+        amount_cents: quote.totalCents,
+        submitted_by: context.userId,
+        provider_name: org.name,
+      })
+      .select("id")
+      .single();
+    if (clsErr || !cls) {
+      return {
+        url: null,
+        granted: false,
+        classId: null,
+        error: clsErr?.message ?? "Could not save the class roster.",
+      };
+    }
+
+    const rosterRows = data.roster.map((row, idx) => ({
+      class_id: cls.id,
+      organization_id: data.organizationId,
+      staff_user_id: row.staffUserId && UUID_RE.test(row.staffUserId) ? row.staffUserId : null,
+      staff_name: row.name,
+      staff_email: row.email,
+      staff_phone: row.phone,
+      sort_order: idx,
+    }));
+    const { error: rosErr } = await admin.from("training_class_roster").insert(rosterRows);
+    if (rosErr) {
+      return { url: null, granted: false, classId: cls.id, error: rosErr.message };
+    }
+
+    if (exempt || quote.totalCents <= 0) {
+      await fulfillTrainingClass({
+        classId: cls.id,
+        organizationId: data.organizationId,
+        amountCents: 0,
+        waived: true,
+      });
+      return { url: null, granted: true, classId: cls.id, error: null as string | null };
+    }
+
+    const cfg = stripePaymentsConfigured();
+    if (!cfg.ok) {
+      return { url: null, granted: false, classId: cls.id, error: cfg.message ?? PAYMENTS_NOT_CONFIGURED };
+    }
+
+    const stripe = getStripe();
+    const origin = appOriginFromRequest(getRequest());
+    const label = trainingClassLabel(data.trainingType);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          quantity: quote.seatCount,
+          price_data: {
+            currency: "usd",
+            unit_amount: quote.unitCents,
+            product_data: {
+              name: `${label} · ${quote.seatCount} seat${quote.seatCount === 1 ? "" : "s"}`,
+              metadata: { training_type: data.trainingType, class_id: cls.id },
+            },
+          },
+        },
+      ],
+      client_reference_id: cls.id,
+      success_url: `${origin}/dashboard/hive-training?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/dashboard/hive-training?checkout=cancelled`,
+      metadata: {
+        hive_kind: "training_class",
+        class_id: cls.id,
+        training_type: data.trainingType,
+        quantity: String(quote.seatCount),
+        organization_id: data.organizationId,
+        purchaser_user_id: context.userId,
+      },
+    });
+
+    await admin
+      .from("training_classes")
+      .update({ stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() })
+      .eq("id", cls.id);
+
+    return { url: session.url, granted: false, classId: cls.id, error: null as string | null };
   });

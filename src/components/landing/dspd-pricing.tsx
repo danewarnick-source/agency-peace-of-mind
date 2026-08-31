@@ -14,6 +14,7 @@ import {
   LIST_MINIMUM_CENTS,
   LIST_PER_STAFF_CENTS_1_19,
   LIST_VOLUME_TIERS,
+  PUBLIC_TRAINING_ALA_CARTE,
   quoteHiveSubscription,
 } from "@/lib/hive-pricing";
 
@@ -61,16 +62,13 @@ const FULL_PROGRAM = [
   "12 hrs custom ongoing training content / year",
 ];
 
-const ALA_CARTE = [
-  { name: "CPR / First Aid", price: 75, icon: HeartPulse },
-  { name: "Mandt", price: 200, icon: ShieldCheck },
-  {
-    name: "DSPD required training",
-    price: 100,
-    icon: GraduationCap,
-    sub: "Includes 12 hrs ongoing content / year",
-  },
-];
+const ALA_ICONS = [HeartPulse, ShieldCheck, GraduationCap] as const;
+const ALA_CARTE = PUBLIC_TRAINING_ALA_CARTE.map((row, i) => ({
+  name: row.name,
+  price: row.priceCents / 100,
+  icon: ALA_ICONS[i] ?? GraduationCap,
+  sub: row.sub,
+}));
 
 const FAQ = [
   {

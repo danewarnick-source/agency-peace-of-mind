@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign, Sparkles, ArrowRight } from "lucide-react";
 import { getExecKpis, listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
 import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
+import { listRecentTrainingClassAlerts } from "@/lib/training-class.functions";
+import { formatRosterContactLine, trainingClassLabel } from "@/lib/training-class";
 
 export const Route = createFileRoute("/dashboard/hive-exec/")({
   component: CompaniesPage,
@@ -19,9 +21,11 @@ function CompaniesPage() {
   const kpisFn = useServerFn(getExecKpis);
   const listFn = useServerFn(listCompanies);
   const pendingFn = useServerFn(getPendingUpgradeRequestCount);
+  const classAlertsFn = useServerFn(listRecentTrainingClassAlerts);
   const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn(), refetchInterval: 30_000 });
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn(), refetchInterval: 30_000 });
   const pendingQ = useQuery({ queryKey: ["hive-exec-upgrade-pending-count"], queryFn: () => pendingFn(), refetchInterval: 30_000 });
+  const classAlertsQ = useQuery({ queryKey: ["hive-exec-class-alerts"], queryFn: () => classAlertsFn(), refetchInterval: 30_000 });
 
 
   const [search, setSearch] = useState("");
@@ -44,6 +48,26 @@ function CompaniesPage() {
 
   return (
     <div className="space-y-4">
+      {(classAlertsQ.data ?? []).slice(0, 3).map((cls) => (
+        <Link
+          key={cls.id}
+          to="/dashboard/hive-exec/classes"
+          className="flex items-start justify-between gap-3 rounded-xl border-2 border-[#d97a1c] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm"
+        >
+          <div>
+            <div className="font-display text-base font-bold text-[#0f1b3d]">
+              {cls.providerName} submitted a {trainingClassLabel(cls.trainingType)} class
+            </div>
+            <div className="mt-1 text-xs text-[#9a3412]">
+              {cls.roster.map((r) => formatRosterContactLine(r)).join(" · ")}
+            </div>
+          </div>
+          <span className="inline-flex items-center rounded-md bg-[#0f1b3d] px-3 py-2 text-sm font-semibold text-white">
+            Open Classes
+          </span>
+        </Link>
+      ))}
+
       {pendingCount > 0 && (
         <Link
           to="/dashboard/hive-exec/upgrade-requests"

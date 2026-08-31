@@ -40,6 +40,10 @@ jobs:
   deploy:
     name: Build & deploy to AWS
     runs-on: ubuntu-latest
+    # Job-level env can read secrets. Step `if:` cannot use secrets.*,
+    # and step-level env is applied AFTER `if:`, so this must live here.
+    env:
+      DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -116,12 +120,10 @@ jobs:
               --cache-control "public,max-age=0,must-revalidate"
           fi
 
-      # Step-level env is applied after `if:` — do not use env.DISTRIBUTION_ID
-      # here or CloudFront never invalidates. Always invalidate /*.
+      # Job-level DISTRIBUTION_ID is set before this `if:` is evaluated.
+      # Always invalidate /* so hivecertify.com does not keep stale HTML/JS.
       - name: Invalidate CloudFront cache
-        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
-        env:
-          DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+        if: env.DISTRIBUTION_ID != ''
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "$DISTRIBUTION_ID" \

@@ -89,7 +89,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Upload the orientation certificate in HIVE. NECTAR checks that the required topics appear on the document. This is a one-time hire requirement — annual hours are a separate obligation.",
+      "Staff open this from My Obligations and complete the in-Hive 30-day course (all 23 SOW topics plus a competency exam). Completing the exam greens the obligation. One-time hire requirement — annual hours are a separate obligation.",
     due_rule: { kind: "days_after_hire", days: 30 },
     owner: "staff",
     service_codes: [],
@@ -693,7 +693,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Required before working alone with a Person with acquired brain injury. HIVE only assigns this to staff on an ABI caseload (or flagged requires_abi). Upload the training record.",
+      "Required before working alone with a person with acquired brain injury. Assigned only to staff on an ABI caseload (or flagged requires_abi). Staff open this from My Obligations and complete the in-Hive ABI course plus competency exam.",
     due_rule: { kind: "days_after_hire", days: 0 },
     owner: "staff",
     service_codes: [],

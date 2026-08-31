@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AlertTriangle, ClipboardList, CheckCircle2, Upload, ExternalLink } from "lucide-react";
@@ -21,6 +21,14 @@ import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
 import { toDisplayNameCase } from "@/lib/person-name";
 import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
+import { IN_HIVE_COURSE_EVIDENCE, inHiveCourseIdForTitle } from "@/lib/in-hive-training";
+import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
+
+function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
+  return courseId === "thirty-day"
+    ? "ABCDEFGHIJKLMNOPQRSTUVW".split("")
+    : "ABCDEF".split("");
+}
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "My obligations — HIVE" }] }),
@@ -113,7 +121,15 @@ function CompletedCard({
             Submitted {formatDateTime(completion?.completed_at ?? instance.completed_at)}
           </p>
           <p className="text-xs text-muted-foreground">Evidence: {evidenceUsed}</p>
-          {evidenceUsed === "form" && isFormUuid(ob.linked_form_id) ? (
+          {evidenceUsed === IN_HIVE_COURSE_EVIDENCE || inHiveCourseIdForTitle(ob.title) ? (
+            <Link
+              to="/dashboard/my-obligations/course/$instanceId"
+              params={{ instanceId: instance.id }}
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
+            >
+              Open course / exam export <ExternalLink className="h-3 w-3" />
+            </Link>
+          ) : evidenceUsed === "form" && isFormUuid(ob.linked_form_id) ? (
             <a
               href={`/dashboard/forms/${ob.linked_form_id}/submissions`}
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
@@ -195,6 +211,14 @@ function OpenCard({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const courseId = inHiveCourseIdForTitle(ob.title);
+  const { user } = useAuth();
+  const resumeQ = useQuery({
+    queryKey: ["in-hive-resume", user?.id, courseId],
+    enabled: !!user && !!courseId,
+    queryFn: () =>
+      hasAnyInHiveProgress(user!.id, courseId!, courseTopicCodes(courseId!)),
+  });
   const needsUpload =
     ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation =
@@ -302,7 +326,23 @@ function OpenCard({
       {ob.description && <p className="mt-2 text-sm text-muted-foreground">{ob.description}</p>}
 
       <div className="mt-3 space-y-2">
-        {ob.evidence_type === "form" ? (
+        {courseId ? (
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-sm font-medium">In-Hive course</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Open the course from here. Finish each topic, then pass the competency exam (80%,
+              three tries). Completing the exam greens this obligation.
+            </p>
+            <Link
+              to="/dashboard/my-obligations/course/$instanceId"
+              params={{ instanceId: instance.id }}
+            >
+              <Button size="sm" className="mt-2 min-h-[44px]">
+                {resumeQ.data ? "Pick up where you left off" : "Open course"}
+              </Button>
+            </Link>
+          </div>
+        ) : ob.evidence_type === "form" ? (
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-sm font-medium">Linked form required</p>
             <p className="mt-1 text-xs text-muted-foreground">

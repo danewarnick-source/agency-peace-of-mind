@@ -292,12 +292,13 @@ export function MyObligationsWidget() {
   const orgId = org?.organization_id;
   const listFn = useServerFn(listMyObligationInstances);
 
-  const { data: instances = [] } = useQuery<MyObligationInstanceRow[]>({
+  const { data: instancesRaw = [] } = useQuery<MyObligationInstanceRow[]>({
     queryKey: [MY_OBLIGATIONS_KEY, orgId, user?.id],
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
     staleTime: 30_000,
   });
+  const instances = Array.isArray(instancesRaw) ? instancesRaw : [];
 
   const openItems = instances
     .filter((i) => i.status === "pending" || i.status === "overdue")

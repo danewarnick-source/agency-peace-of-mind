@@ -68,6 +68,7 @@ test("1. Admin can open Hive Training without crash", async ({ page }) => {
   const writes: WriteAttempt[] = [];
   await openAs(page, { role: "admin", hasPassedLaunchpad: true }, writes);
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(/Loading workspace/i)).toHaveCount(0, { timeout: 40_000 });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await expect(page.getByText(/HIVE Training/i).first()).toBeVisible();
@@ -172,7 +173,7 @@ test("6. Leftover catalog and LMS shop pages redirect; public /training has no s
   await expect(page.getByText(/Hive Training|Staff training lives inside Hive/i).first()).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.locator("body")).not.toContainText(/Buy seats|à la carte|Full training program/i);
+  await expect(page.locator("body")).not.toContainText(/à la carte|Full training program|Add to cart/i);
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await shot(page, "06-public-training");
 

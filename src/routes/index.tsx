@@ -1,22 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ShieldCheck,
-  Menu,
-  X,
-  ArrowRight,
-  Check,
-  ClipboardList,
-  Users,
-  CalendarClock,
-  Pill,
-  FileCheck2,
-  BarChart3,
-  Sparkles,
-  Lock,
-  HeartHandshake,
-  ArrowRightLeft,
-} from "lucide-react";
+import { Menu, X, ArrowRight, Check, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -26,25 +10,33 @@ import {
 } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing/footer";
 import { FounderStory } from "@/components/landing/founder-story";
-import { CompetitiveContrast } from "@/components/landing/competitive-contrast";
 import { HexBackdrop as HexBg } from "@/components/brand/hex-backdrop";
 import { HiveWordmark } from "@/components/brand/hive-mark";
-import { LandingAppPreview } from "@/components/landing/app-preview";
+import {
+  FrameAskNectar,
+  FrameComplianceTraining,
+  FrameDocumentationHrc,
+  FrameHhsDailyNote,
+  FrameSchedulerSlhDsi,
+} from "@/components/landing/product-frames";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Hive — Ops, training, and compliance, visible" },
+      { title: "Hive — Software that already speaks the Utah DSPD Scope of Work" },
       {
         name: "description",
         content:
-          "Hive unifies scheduling, EVV, eMAR, billing and compliance for HCBS and home-care agencies. Powered by Nectar, the intelligence layer that turns every shift into audit-ready proof.",
+          "Hive is built for Utah DSPD agencies on the Community Supports Waiver. DHHS91172 obligations, SLH, DSI, Host Home Supports, and the Human Rights Committee — without year one spent teaching a national care app the contract.",
       },
-      { property: "og:title", content: "Hive — Ops, training, and compliance, visible" },
+      {
+        property: "og:title",
+        content: "Hive — Software that already speaks the Utah DSPD Scope of Work",
+      },
       {
         property: "og:description",
         content:
-          "One platform for care, compliance and operations. Powered by Nectar.",
+          "Built for DSPD agencies on the Community Supports Waiver. The obligations, the forms, the codes.",
       },
     ],
   }),
@@ -59,7 +51,13 @@ function Honeycomb({ className = "" }: { className?: string }) {
   );
 }
 
-const TRUST_LOGOS = ["ACME", "NORTHRIDGE", "PIVOT", "VERITAS", "SUMMIT", "LATTICE"] as const;
+const NAV_LINKS = [
+  ["#product", "Product"],
+  ["#nectar", "Nectar"],
+  ["#documentation", "Documentation"],
+  ["#compliance", "Compliance"],
+  ["#scheduler", "Scheduler"],
+] as const;
 
 function HiveLandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -70,22 +68,19 @@ function HiveLandingPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <HiveWordmark to="/" tone="canvas" />
 
-          <div className="hidden items-center gap-8 md:flex">
-            <a href="#modules" className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]">
-              Product
-            </a>
-            <a href="#nectar" className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]">
-              Nectar
-            </a>
-            <a href="#compliance" className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]">
-              Solutions
-            </a>
+          <div className="hidden items-center gap-7 md:flex">
+            {NAV_LINKS.map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]"
+              >
+                {label}
+              </a>
+            ))}
             <Link to="/pricing" className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]">
               Pricing
             </Link>
-            <a href="#faq" className="text-sm font-medium text-[var(--hive-text)] hover:text-[var(--hive-gold)]">
-              Resources
-            </a>
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
@@ -109,12 +104,7 @@ function HiveLandingPage() {
         {mobileOpen && (
           <div className="border-t border-[var(--hive-border)] bg-[var(--hive-bg)] md:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
-              {[
-                ["#modules", "Product"],
-                ["#nectar", "Nectar"],
-                ["#compliance", "Solutions"],
-                ["#faq", "Resources"],
-              ].map(([href, label]) => (
+              {NAV_LINKS.map(([href, label]) => (
                 <a
                   key={href}
                   href={href}
@@ -148,15 +138,16 @@ function HiveLandingPage() {
         <Honeycomb />
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:px-8 lg:py-24">
           <div className="lg:col-span-6">
-            <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-[var(--hive-text)] sm:text-5xl lg:text-[3.4rem]">
-              Ops, training, and compliance.
-              <br />
-              <span className="text-[var(--hive-gold)]">Visible.</span>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
+              Utah DSPD · Medicaid HCBS
+            </p>
+            <h1 className="font-display mt-3 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--hive-text)] sm:text-5xl lg:text-[3.15rem]">
+              Finally, software that already speaks the Scope of Work.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--hive-text-muted)]">
-              Hive unifies scheduling, EVV, eMAR, billing and compliance into a single
-              workflow. Nectar turns every visit, signature and note into audit-ready proof —
-              automatically.
+              Hive is built for DSPD agencies on the Community Supports Waiver. The DHHS91172
+              obligations, the forms, the codes. You do not spend year one teaching a national
+              care app what SLH, DSI, and the Human Rights Committee are.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -165,135 +156,151 @@ function HiveLandingPage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link to="/login">Sign in</Link>
+                <Link to="/demo">Book a demo</Link>
               </Button>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[var(--hive-text-muted)]">
               <span className="inline-flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> HIPAA-grade
+                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> Community Supports Waiver
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> EVV-ready (21st Century Cures)
+                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> DHHS91172 Scope of Work
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> State-specific HCBS coding
+                <Check className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> HHS = Host Home Supports
               </span>
             </div>
           </div>
 
           <div className="lg:col-span-6">
-            <LandingAppPreview />
+            <FrameComplianceTraining />
           </div>
         </div>
       </header>
 
-      <section className="border-y border-[var(--hive-border)] bg-[var(--hive-bg)]">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <section id="product" className="border-y border-[var(--hive-border)] bg-[var(--hive-surface)]">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--hive-gold)]">
-            Trusted by organizations that keep the world moving
+            Built for the waiver you actually run
           </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold tracking-[0.18em] text-[var(--hive-text)]">
-            {TRUST_LOGOS.map((name) => (
-              <span key={name}>{name}</span>
-            ))}
-          </div>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed text-[var(--hive-text-muted)]">
+            SLH Supported Living. DSI Individual Day Support. Host Home Supports — hosts do not
+            clock; the daily note is the artifact. Compliance rows cite the Utah SOW, not a
+            generic “state rules” folder.
+          </p>
         </div>
       </section>
 
-      <section id="modules" className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
+      <section id="compliance" className="bg-[var(--hive-bg)] py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
+          <div className="lg:col-span-5">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-              The platform
+              Compliance
             </span>
             <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Finally, every part of care in one hive.
+              The contract is already in the register.
             </h2>
-            <p className="mt-4 text-base text-[var(--hive-text-muted)]">
-              Six modules. One source of truth. Built for the realities of community-based care —
-              messy schedules, split shifts, MAR exceptions, and state audits.
+            <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
+              Client-Specific Training is tracked in Hive and cited to{" "}
+              <span className="font-medium text-[var(--hive-text)]">
+                SOW §1.8(4)(O) — Person-Specific Training
+              </span>
+              . Open Details &amp; SOW explanation for the due-date rule and the evidence a
+              reviewer expects. Compliance is loaded from the Utah Scope of Work — not typed in
+              from a national template.
             </p>
           </div>
-
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                icon: CalendarClock,
-                title: "Scheduling & EVV",
-                body:
-                  "Build schedules in minutes. Geo + biometric punches reconcile to authorizations automatically — no missed visits, no claw-backs.",
-              },
-              {
-                icon: Pill,
-                title: "eMAR & Health",
-                body:
-                  "Med passes, PRN reasons, vitals and seizure logs in one timeline. Exceptions are flagged the moment they happen, not at month-end.",
-              },
-              {
-                icon: ClipboardList,
-                title: "HHS & Daily Logs",
-                body:
-                  "Goal-aligned documentation that writes back to service plans. Quality assurance built in, not bolted on.",
-              },
-              {
-                icon: Users,
-                title: "Workforce & Training",
-                body:
-                  "Onboarding, certifications, expirations and competencies. Block uncovered shifts before they go live.",
-              },
-              {
-                icon: FileCheck2,
-                title: "Billing & PBA",
-                body:
-                  "Claim-ready exports for Medicaid waivers. PBA ledgers, room & board, and pass-through reconciled to the penny.",
-              },
-              {
-                icon: BarChart3,
-                title: "Agency Command Center",
-                body:
-                  "Live KPIs for coverage, MAR adherence, EVV match rate, and authorization burn — for every program, every house, every day.",
-              },
-            ].map(({ icon: Icon, title, body }) => (
-              <div
-                key={title}
-                className="group relative overflow-hidden rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-6 transition-all hover:-translate-y-0.5 hover:border-[var(--hive-gold)]"
-              >
-                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--hive-gold)] text-[var(--hive-gold)]">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="font-display text-lg font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--hive-text-muted)]">{body}</p>
-              </div>
-            ))}
+          <div className="lg:col-span-7">
+            <FrameComplianceTraining />
           </div>
         </div>
       </section>
 
-      <CompetitiveContrast />
-
-      <section id="nectar" className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-text)]">
-        <Honeycomb />
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8 lg:py-24">
-          <div className="lg:col-span-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hive-gold)]/30 bg-[color-mix(in_srgb,var(--hive-gold)_12%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
-              <Sparkles className="h-3.5 w-3.5" /> Nectar
+      <section id="documentation" className="bg-[var(--hive-canvas)] py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
+          <div className="order-2 lg:order-1 lg:col-span-7">
+            <FrameDocumentationHrc />
+          </div>
+          <div className="order-1 lg:order-2 lg:col-span-5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
+              Documentation
             </span>
-            <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-              The intelligence layer that turns
-              <br />
-              messy care data into proof.
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              Human Rights Committee is a tab, not a side quest.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-              Nectar reads every shift, signature, note and pass — and quietly produces the
-              paperwork the state actually asks for. No new screens for your staff. No
-              month-end scramble for your QA team.
+              Records, Incidents, Forms, Audit, and Human Rights Committee live on one
+              Documentation desk. HRC reviews restrictions on a person's rights — SOW §1.20 /
+              HCBS Settings Rule — and is not staff HR. Daily logs for Host Home Supports sit
+              next to EVV timesheets for the codes that actually clock.
             </p>
-            <ul className="mt-7 space-y-3 text-sm">
+          </div>
+        </div>
+      </section>
+
+      <section id="scheduler" className="bg-[var(--hive-bg)] py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
+          <div className="lg:col-span-5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
+              Scheduler
+            </span>
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              SLH and DSI are first-class services.
+            </h2>
+            <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
+              The schedule is grouped by the codes on the authorization: Supported Living, Individual
+              Day Support, and the rest of the waiver set you actually run. Host Home clients do not
+              appear as clocked shifts — manage them through the daily note.
+            </p>
+          </div>
+          <div className="lg:col-span-7">
+            <FrameSchedulerSlhDsi />
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--hive-canvas)] py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
+          <div className="order-2 lg:order-1 lg:col-span-7">
+            <FrameHhsDailyNote />
+          </div>
+          <div className="order-1 lg:order-2 lg:col-span-5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
+              Host Home Supports
+            </span>
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              HHS is Host Home. Hosts do not clock.
+            </h2>
+            <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
+              The host's artifact is the daily note: PCSP goals addressed, narrative, signature,
+              overnight confirmation. Agency staff visits into a host home are timed shifts. A
+              billable Host Home day is attendance Present plus a daily note — not a punch.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="nectar" className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]">
+        <Honeycomb />
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8 lg:py-24">
+          <div className="lg:col-span-5">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hive-gold)]/30 bg-[color-mix(in_srgb,var(--hive-gold)_12%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
+              Nectar
+            </span>
+            <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+              Ask Nectar about the work on your caseload.
+            </h2>
+            <p className="mt-5 text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
+              Nectar is the intelligence layer inside Hive. It speaks DSPD — PCSP goals, training,
+              caseload — because the product already knows those words. Compliance duties are
+              loaded from the Utah SOW. Nectar advises and flags. It does not invent documentation,
+              and it does not publish unreviewed.
+            </p>
+            <ul className="mt-7 space-y-3 text-sm text-[var(--hive-chrome-text)]/85">
               {[
-                "Auto-drafts service notes from EVV + daily-log signals",
-                "Flags MAR exceptions, missed goals and EVV mismatches in real time",
-                "Maps documentation to the right HCBS service codes per state",
-                "Surfaces audit-ready packets in one click",
+                "Starter questions that exist in the product: PCSP goals, training, caseload.",
+                "Notes and clock-out checks coach for completeness — a human still attests.",
+                "Never a substitute for opening Compliance and reading the SOW cite.",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-3">
                   <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
@@ -304,132 +311,28 @@ function HiveLandingPage() {
               ))}
             </ul>
           </div>
-
-          <div className="lg:col-span-6">
-            <div className="relative rounded-2xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-6">
-              <div className="flex items-center justify-between border-b border-[var(--hive-border)] pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[var(--hive-gold)]" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--hive-text-muted)]">
-                    Nectar · Live feed
-                  </span>
-                </div>
-                <span className="text-[10px] text-[var(--hive-text-muted)]">just now</span>
-              </div>
-              <div className="mt-4 space-y-3 text-sm">
-                {[
-                  { tag: "EVV", text: "House 14 — punch reconciled to auth #4421." },
-                  { tag: "MAR", text: "PRN reason captured for K. Rivera — Tylenol 500mg." },
-                  { tag: "HHS", text: "Goal #3 progress updated from today's daily log." },
-                  { tag: "AUDIT", text: "Weekly compliance packet ready for review (12 programs)." },
-                ].map((row, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 rounded-lg border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-3"
-                  >
-                    <span className="inline-flex h-6 shrink-0 items-center rounded bg-[var(--hive-gold)] px-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--hive-on-gold)]">
-                      {row.tag}
-                    </span>
-                    <span>{row.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="compliance" className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
-          <div className="lg:col-span-5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-              Compliance, by default
-            </span>
-            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Audit-ready isn't a project.
-              <br /> It's the platform.
-            </h2>
-            <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-              Every action in Hive is timestamped, signed, and tied to a person, an
-              authorization and a service code. When the auditor calls, you don't open a
-              spreadsheet — you open Hive.
-            </p>
-            <div className="mt-7 flex gap-3">
-              <Button asChild size="lg">
-                <Link to="/contact">Talk to compliance</Link>
-              </Button>
-            </div>
-          </div>
-
           <div className="lg:col-span-7">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { icon: ShieldCheck, title: "HIPAA-grade security", body: "Encryption in transit and at rest, granular RBAC, full audit trails." },
-                { icon: Lock, title: "Role & program isolation", body: "Tenant + program scoping prevents data leakage across houses, sites and contractors." },
-                { icon: FileCheck2, title: "21st Century Cures EVV", body: "GPS, biometric, and FOB capture modes — all match-rated against authorizations." },
-                { icon: ClipboardList, title: "State HCBS coding", body: "Service codes, modifiers and units pre-mapped per state waiver." },
-              ].map(({ icon: Icon, title, body }) => (
-                <div key={title} className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-5">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--hive-gold)] text-[var(--hive-gold)]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="mt-3 font-display text-base font-semibold">{title}</h3>
-                  <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">{body}</p>
-                </div>
-              ))}
-            </div>
+            <FrameAskNectar />
           </div>
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-text)]">
-        <Honeycomb />
-        <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 lg:px-8">
-          <HeartHandshake className="mx-auto h-8 w-8 text-[var(--hive-gold)]" />
-          <h2 className="font-display mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            Care happens at the kitchen table.
-            <br />
-            Software shouldn't get in the way.
+      <section className="bg-[var(--hive-bg)] py-20 sm:py-24">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <GraduationCap className="mx-auto h-7 w-7 text-[var(--hive-gold)]" />
+          <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            Thirty-day training, cited to the contract.
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[var(--hive-text-muted)]">
-            Hive exists so direct support professionals can spend more time with the people
-            they support — and less time fighting paperwork. Every feature is measured by one
-            question: did this give a caregiver their evening back?
+          <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
+            Scenario-based modules map to the Utah rule — not a generic onboarding playlist. The
+            auditor packet carries SOW cites (for example 1.8(4)(E) on seizures) next to the
+            completion record. Person-specific training is the Client-Specific Training row in
+            Compliance, not a slide deck you invent at month-end.
           </p>
         </div>
       </section>
 
       <FounderStory />
-
-      <section className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <ArrowRightLeft className="mx-auto h-7 w-7 text-[var(--hive-gold)]" />
-            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Switching from Therap, Sandata or a stack of spreadsheets?
-            </h2>
-            <p className="mt-4 text-base text-[var(--hive-text-muted)]">
-              We move your authorizations, clients, staff and historical EVV — in days, not
-              quarters. Your team keeps documenting while we mirror the old system in the
-              background.
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {[
-              { step: "01", title: "Mirror", body: "We stand up Hive alongside your current system and reconcile data daily." },
-              { step: "02", title: "Migrate", body: "Authorizations, clients, staff, certs and EVV history move with full lineage." },
-              { step: "03", title: "Move on", body: "Cutover on your timeline — no missed visits, no missed claims." },
-            ].map(({ step, title, body }) => (
-              <div key={step} className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-6">
-                <div className="font-display text-3xl font-bold text-[var(--hive-gold)]">{step}</div>
-                <h3 className="mt-2 font-display text-lg font-semibold">{title}</h3>
-                <p className="mt-2 text-sm text-[var(--hive-text-muted)]">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <section id="faq" className="bg-[var(--hive-canvas)] py-20 sm:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -438,35 +341,35 @@ function HiveLandingPage() {
               FAQ
             </span>
             <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Questions agencies actually ask.
+              Questions a DSPD director actually asks.
             </h2>
           </div>
 
-          <Accordion type="single" collapsible className="mt-10 divide-y divide-[var(--hive-border)] rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] px-6">
+          <Accordion
+            type="single"
+            collapsible
+            className="mt-10 divide-y divide-[var(--hive-border)] rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] px-6"
+          >
             {[
               {
-                q: "Which states and waivers does Hive support today?",
-                a: "Hive ships with HCBS service-code libraries pre-mapped for most state Medicaid waivers, including DSPD (UT), and supports IDD, ABI, aging-and-disability, and behavioral health programs. New states are typically configured in under two weeks.",
+                q: "Is this built for Utah DSPD, or is Utah a filter on a national product?",
+                a: "Hive is built for DSPD agencies on the Community Supports Waiver. The compliance register is loaded from DHHS91172. Service codes, Host Home daily notes, and the Human Rights Committee are first-class — not a later configuration.",
               },
               {
-                q: "Is Hive EVV compliant under the 21st Century Cures Act?",
-                a: "Yes. Hive captures all six federally required EVV data points and supports GPS, biometric, and FOB modes. We integrate with state aggregators and reconcile every punch to an active authorization.",
+                q: "What does HHS mean here?",
+                a: "Host Home Supports. Not home health. Hosts do not clock. The host's artifact is the daily note and overnight confirmation. Agency staff visits into a host home are timed shifts (worksheet Direct Support hours).",
               },
               {
-                q: "What is Nectar, exactly?",
-                a: "Nectar is the intelligence layer inside Hive. It reads operational signals — EVV punches, MAR entries, goal progress, signatures — and continuously assembles the documentation auditors expect. Your staff don't learn a new tool; the proof just appears.",
+                q: "What is Nectar?",
+                a: "Nectar is Hive's intelligence layer. Staff can ask about PCSP goals, training, and the people on their caseload. It coaches notes for completeness. It does not invent documentation or act unreviewed. The SOW proof lives on Compliance — for example Client-Specific Training cited to §1.8(4)(O).",
               },
               {
-                q: "How long does implementation take?",
-                a: "Most agencies are live in 4–6 weeks, including data migration from Therap, Sandata, HHAeXchange or spreadsheets. We run the old system in parallel until you're confident.",
+                q: "Do you support SLH, DSI, and the Human Rights Committee?",
+                a: "Yes. The scheduler groups clocked codes such as SLH Supported Living and DSI Individual Day Support. Documentation includes a Human Rights Committee tab for rights restrictions under SOW §1.20 / the HCBS Settings Rule.",
               },
               {
                 q: "How is pricing structured?",
-                a: "Per active client, billed monthly, with no per-module upcharges. Implementation and migration are included in annual plans. See the pricing page for details.",
-              },
-              {
-                q: "Where does our data live, and who can see it?",
-                a: "Encrypted in transit and at rest in HIPAA-aligned US infrastructure. Role-based access plus program-level scoping means staff only ever see the clients and houses they're assigned to.",
+                a: "See the pricing page. Implementation is a conversation with people who have billed the waiver.",
               },
             ].map((item, i) => (
               <AccordionItem key={i} value={`item-${i}`} className="border-0">
@@ -485,11 +388,10 @@ function HiveLandingPage() {
       <section className="relative overflow-hidden bg-[var(--hive-bg)]">
         <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6 lg:px-8">
           <h2 className="font-display text-3xl font-bold tracking-tight text-[var(--hive-text)] sm:text-5xl">
-            See your agency run from one hive.
+            Sit at a desk that already knows the waiver.
           </h2>
           <p className="max-w-2xl text-base text-[var(--hive-text-muted)]">
-            A 30-minute demo with someone who has actually billed a Medicaid waiver — not a
-            sales script. Bring your hardest workflow.
+            A demo with someone who has billed DHHS91172 — not a script about every part of care.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button asChild size="lg">

@@ -1,18 +1,14 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import {
-  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, ShieldAlert, BookOpen, CalendarX2,
+  ChevronDown, ChevronRight, FileText, CalendarX, Clock, CalendarDays, Briefcase, CalendarX2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
 import { useCountUp } from "@/hooks/use-count-up";
-import { HexWatermark } from "@/components/brand/hex-watermark";
-import { NectarBadge, NectarSurface } from "@/components/nectar/nectar-brand";
-import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
+import { NectarBadge } from "@/components/nectar/nectar-brand";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
 const fmtDays = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
@@ -24,17 +20,23 @@ const fmtUSD = (n: number) =>
  * breakdown. Hourly earnings tick live during an active hourly shift;
  * daily earnings only update when a daily log is filed.
  */
-export function NectarPayPeriodCard() {
+export function NectarPayPeriodCard({
+  open: openProp,
+  onOpenChange,
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const { data } = useNectarPayPeriod();
   const live = useLivePayPeriod();
-  const [open, setOpen] = useState(false);
-  const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
-  const { data: otherSummary } = useQuery({
-    queryKey: ["my-other-assignments-summary"],
-    queryFn: () => fetchOther(),
-  });
-  const otherOpen = otherSummary?.open_count ?? 0;
-  const otherSafety = otherSummary?.safety_critical_open_count ?? 0;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+
+  const setExpanded = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
 
   const label = data?.label ?? "Current period";
@@ -67,19 +69,22 @@ export function NectarPayPeriodCard() {
   const todo = logs + attn;
 
   return (
-    <NectarSurface aria-label="NECTAR pay-period summary">
-      <HexWatermark size={120} className="-right-6 -top-6" opacity={0.07} />
+    <div
+      aria-label="NECTAR pay-period summary"
+      className="relative isolate overflow-hidden rounded-2xl border border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] text-[var(--hive-chrome-text)] [background-image:none]"
+      style={{ backgroundColor: "var(--hive-sidebar)", opacity: 1 }}
+    >
 
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setExpanded(!open)}
         aria-expanded={open}
         aria-controls="nectar-pay-period-details"
         className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-white/[0.04]"
       >
         <NectarBadge size="sm" live={live.isLive} />
 
-        <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tabular-nums text-white">
+        <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tabular-nums text-[var(--hive-chrome-text)]">
           {fmtHours(hourlyHoursDisplay)} · {fmtUSD(payTotal)}
           {live.isLive && (
             <span className="ml-2 inline-flex items-center gap-1 align-middle text-[10px] font-semibold uppercase tracking-wider text-[#9cf2c8]">
@@ -93,13 +98,13 @@ export function NectarPayPeriodCard() {
         </span>
 
         {todo > 0 && (
-          <span className="shrink-0 rounded-full bg-[image:var(--gradient-amber)] px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-[#412402]">
+          <span className="shrink-0 rounded-full bg-[var(--hive-gold)] px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-[var(--hive-on-gold)]">
             {todo} to do
           </span>
         )}
 
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-white/80 transition-transform ${
+          className={`h-4 w-4 shrink-0 text-[var(--hive-chrome-text)]/80 transition-transform ${
             open ? "rotate-180" : ""
           }`}
           aria-hidden
@@ -111,7 +116,7 @@ export function NectarPayPeriodCard() {
           id="nectar-pay-period-details"
           className="relative border-t border-white/10 px-4 pb-4 pt-3"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--hive-chrome-text)]/80">
             Pay period · {label}
           </p>
 
@@ -120,17 +125,17 @@ export function NectarPayPeriodCard() {
             {hasHourly && (
               <>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--hive-chrome-text)]">
                     <Clock className="h-4 w-4 text-[var(--hive-gold)]" />
                     Direct Support
                   </span>
-                  <span className="font-mono text-sm tabular-nums text-white/90">
+                  <span className="font-mono text-sm tabular-nums text-[var(--hive-chrome-text)]/90">
                     {fmtHours(hourlyHoursDisplay)} × {fmtUSD(hourlyRate)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                  <span className="text-[11px] uppercase tracking-wider text-[var(--hive-chrome-text)]/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-[var(--hive-chrome-text)]">
                     {fmtUSD(hourlyPayDisplay)}
                   </span>
                 </div>
@@ -140,17 +145,17 @@ export function NectarPayPeriodCard() {
             {hasDaily && (
               <>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--hive-chrome-text)]">
                     <CalendarDays className="h-4 w-4 text-[var(--hive-gold)]" />
                     Host Home
                   </span>
-                  <span className="font-mono text-sm tabular-nums text-white/90">
+                  <span className="font-mono text-sm tabular-nums text-[var(--hive-chrome-text)]/90">
                     {fmtDays(dailyDays)} × {fmtUSD(dailyRate)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                  <span className="text-[11px] uppercase tracking-wider text-[var(--hive-chrome-text)]/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-[var(--hive-chrome-text)]">
                     {fmtUSD(dailyPay)}
                   </span>
                 </div>
@@ -159,7 +164,7 @@ export function NectarPayPeriodCard() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex cursor-default items-center gap-1.5 text-[11px] text-white/60">
+                          <span className="inline-flex cursor-default items-center gap-1.5 text-[11px] text-[var(--hive-chrome-text)]/60">
                             <CalendarX2 className="h-3.5 w-3.5" />
                             {blockedDays.length} blocked day{blockedDays.length === 1 ? "" : "s"} (not billable)
                           </span>
@@ -183,7 +188,7 @@ export function NectarPayPeriodCard() {
             {hasGeneral && (
               <>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--hive-chrome-text)]">
                     <Briefcase className="h-4 w-4 text-[var(--hive-gold)]" />
                     Non-client · General time clock
                     {live.isGeneralShift && (
@@ -196,13 +201,13 @@ export function NectarPayPeriodCard() {
                       </span>
                     )}
                   </span>
-                  <span className="font-mono text-sm tabular-nums text-white/90">
+                  <span className="font-mono text-sm tabular-nums text-[var(--hive-chrome-text)]/90">
                     {fmtHours(generalHoursDisplay)} × {fmtUSD(hourlyRate)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
-                  <span className="text-[11px] uppercase tracking-wider text-white/70">= subtotal</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                  <span className="text-[11px] uppercase tracking-wider text-[var(--hive-chrome-text)]/70">= subtotal</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-[var(--hive-chrome-text)]">
                     {fmtUSD(generalPayDisplay)}
                   </span>
                 </div>
@@ -212,7 +217,7 @@ export function NectarPayPeriodCard() {
 
             <div className="flex items-center justify-between gap-3 border-t border-white/15 bg-white/[0.04] px-3 py-3">
               <div className="flex flex-col">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--hive-chrome-text)]/80">
                   Est. gross pay
                 </span>
                 <span className="text-[10px] font-medium text-[var(--hive-gold)]">
@@ -225,81 +230,48 @@ export function NectarPayPeriodCard() {
             </div>
           </div>
 
-          <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-white/80">
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-[var(--hive-chrome-text)]/80">
             Needs your attention
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
-            {otherOpen > 0 && (
-              <li>
-                <Link
-                  to="/dashboard/my-obligations"
-                  className={`flex min-h-[44px] items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white transition active:scale-[0.99] ${
-                    otherSafety > 0
-                      ? "bg-red-500/25 hover:bg-red-500/35 ring-1 ring-red-400/60"
-                      : "bg-white/[0.06] hover:bg-white/[0.12]"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    {otherSafety > 0 ? (
-                      <ShieldAlert className="h-4 w-4 text-red-200" />
-                    ) : (
-                      <BookOpen className="h-4 w-4 text-[var(--hive-gold)]" />
-                    )}
-                    {otherSafety > 0
-                      ? "Safety-critical training due"
-                      : "Assigned trainings outstanding"}
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold tabular-nums ${
-                      otherSafety > 0
-                        ? "bg-red-400 text-red-950"
-                        : "bg-[image:var(--gradient-amber)] text-[#412402]"
-                    }`}>
-                      {otherSafety > 0 ? otherSafety : otherOpen}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-white/80" />
-                  </span>
-                </Link>
-              </li>
-            )}
             <li>
 
               <Link
                 to="/dashboard/daily-logs"
-                className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"
+                className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-[var(--hive-chrome-text)] transition hover:bg-white/[0.12] active:scale-[0.99]"
               >
                 <span className="inline-flex items-center gap-2">
                   <FileText className="h-4 w-4 text-[var(--hive-gold)]" />
                   Daily logs outstanding
                 </span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="rounded-full bg-[image:var(--gradient-amber)] px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-[#412402]">
+                  <span className="rounded-full bg-[var(--hive-gold)] px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-[var(--hive-on-gold)]">
                     {logs}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-white/80" />
+                  <ChevronRight className="h-4 w-4 text-[var(--hive-chrome-text)]/80" />
                 </span>
               </Link>
             </li>
             <li>
               <Link
                 to="/dashboard/timeclock"
-                className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"
+                className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-[var(--hive-chrome-text)] transition hover:bg-white/[0.12] active:scale-[0.99]"
               >
                 <span className="inline-flex items-center gap-2">
                   <CalendarX className="h-4 w-4 text-[var(--hive-gold)]" />
                   Monthly attendance incomplete
                 </span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="rounded-full bg-[image:var(--gradient-amber)] px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-[#412402]">
+                  <span className="rounded-full bg-[var(--hive-gold)] px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-[var(--hive-on-gold)]">
                     {attn}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-white/80" />
+                  <ChevronRight className="h-4 w-4 text-[var(--hive-chrome-text)]/80" />
                 </span>
               </Link>
             </li>
           </ul>
         </div>
       )}
-    </NectarSurface>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import { LayoutDashboard, CalendarDays, ClipboardCheck, Sparkles, Lock, type Luc
 import { useState } from "react";
 import { UpgradeGate } from "@/components/upgrade-gate";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
+import { useMyOpenObligationCount } from "@/hooks/use-my-open-obligation-count";
 
 type StaffTab = {
   to: string;
@@ -27,6 +28,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isEnabled } = useOrgFeatures();
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
+  const obligationAttention = useMyOpenObligationCount();
 
   const tabs = TABS;
 
@@ -37,9 +39,8 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   return (
     <nav
       aria-label="Primary"
-      className={`${positioning} border-t border-white/10 text-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)]`}
+      className={`${positioning} border-t border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]`}
       style={{
-        backgroundImage: "var(--gradient-navy)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
@@ -56,7 +57,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                 <button
                   type="button"
                   onClick={() => setUpgradeFeatureKey(t.feature!)}
-                  className="relative flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight text-white/35 transition-all duration-150 active:scale-[0.95]"
+                  className="relative flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight text-[var(--hive-chrome-text)]/35 transition-all duration-150 active:scale-[0.95]"
                   aria-label={`${t.label} — locked. Click to request upgrade.`}
                 >
                   <Icon className="h-5 w-5" strokeWidth={2} />
@@ -68,16 +69,25 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                   to={t.to}
                   data-tour={`nav.${t.to.replace(/^\/dashboard\/?/, "") || "home"}`}
                   className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight transition-all duration-150 active:scale-[0.95] ${
-                    active ? "text-[oklch(var(--accent-2))]" : "text-white/65 hover:text-white"
+                    active
+                      ? "text-[var(--hive-gold)]"
+                      : "text-[var(--hive-chrome-text)]/65 hover:text-[var(--hive-chrome-text)]"
                   }`}
                 >
-                  <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                  <span className="relative">
+                    <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                    {t.code === "obligations" && obligationAttention > 0 && (
+                      <span
+                        aria-label={`${obligationAttention} obligations need attention`}
+                        className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hive-danger)] px-1 text-[9px] font-bold leading-none text-white"
+                      >
+                        {obligationAttention > 99 ? "99+" : obligationAttention}
+                      </span>
+                    )}
+                  </span>
                   <span className="truncate">{t.label}</span>
                   {active && (
-                    <span
-                      className="absolute top-0 h-0.5 w-8 rounded-full"
-                      style={{ backgroundImage: "var(--gradient-amber)" }}
-                    />
+                    <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--hive-gold)]" />
                   )}
                 </Link>
               )}

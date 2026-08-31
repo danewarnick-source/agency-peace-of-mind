@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -17,8 +18,8 @@ import { StaffClientGrid } from "@/components/staff-client-grid";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
+import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
-import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
 
 export const Route = createFileRoute("/dashboard/")({
@@ -212,6 +213,49 @@ function PoliciesToAcknowledgeCard() {
   );
 }
 
+function StaffCaseloadHome() {
+  const [nectarOpen, setNectarOpen] = useState(false);
+  const headingRef = useRef<HTMLDivElement>(null);
+
+  const onNectarOpenChange = (next: boolean) => {
+    setNectarOpen(next);
+    if (next) {
+      headingRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div
+        ref={headingRef}
+        className={
+          nectarOpen
+            ? "max-md:sticky max-md:top-0 max-md:z-20 max-md:-mx-4 space-y-3 bg-[var(--hive-canvas)] max-md:px-4 max-md:pb-2 max-md:pt-1"
+            : "space-y-3"
+        }
+      >
+        <StaffPageHeader
+          eyebrow="My Day · Active Caseload"
+          eyebrowIcon={Users}
+          title="My Caseload"
+          subtitle="Your assigned clients, today's shift, and anything that needs your attention."
+        />
+        {nectarOpen ? (
+          <NectarPayPeriodCard open onOpenChange={onNectarOpenChange} />
+        ) : null}
+      </div>
+      <TodayHero />
+      {!nectarOpen ? (
+        <NectarPayPeriodCard open={false} onOpenChange={onNectarOpenChange} />
+      ) : null}
+      <AttentionStrip />
+      <PoliciesToAcknowledgeCard />
+      <ComplianceInbox />
+      <StaffClientGrid />
+    </div>
+  );
+}
+
 function Overview() {
   const { data: org } = useCurrentOrg();
   const { view, subView, hasStoredView } = usePortalView();
@@ -235,22 +279,7 @@ function Overview() {
         </>
       )}
 
-      {!showAdmin && (
-        <div className="space-y-5">
-          <StaffPageHeader
-            eyebrow="My Day · Active Caseload"
-            eyebrowIcon={Users}
-            title="My Caseload"
-            subtitle="Your assigned clients, today's shift, and anything that needs your attention."
-          />
-          <TodayHero />
-          <MyObligationsWidget />
-          <AttentionStrip />
-          <PoliciesToAcknowledgeCard />
-          <ComplianceInbox />
-          <StaffClientGrid />
-        </div>
-      )}
+      {!showAdmin && <StaffCaseloadHome />}
     </div>
   );
 }

@@ -49,6 +49,12 @@ describe("inviteJoinUrl", () => {
       "https://app.example.com/join?invite=tok%2Ben",
     );
   });
+  it("rewrites a Lovable origin to hivecertify.com", () => {
+    assert.equal(
+      inviteJoinUrl("https://agency-peace-of-mind.lovable.app", "tok"),
+      "https://hivecertify.com/join?invite=tok",
+    );
+  });
 });
 
 describe("humanizeInviteError", () => {

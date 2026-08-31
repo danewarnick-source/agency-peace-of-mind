@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       );
   }
 
-  const origin = req.headers.get("origin") ?? "https://agency-peace-of-mind.lovable.app";
+  const origin = checkoutOrigin(req);
   const session = await stripe.checkout.sessions.create({
     mode: "setup",
     customer: customerId,
@@ -89,4 +89,23 @@ function json(body: unknown, status: number) {
     status,
     headers: { ...CORS, "content-type": "application/json" },
   });
+}
+
+function checkoutOrigin(req: Request): string {
+  const raw = req.headers.get("origin") ?? "https://hivecertify.com";
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+    if (
+      host === "lovable.app" ||
+      host === "lovable.dev" ||
+      host.endsWith(".lovable.app") ||
+      host.endsWith(".lovable.dev")
+    ) {
+      return "https://hivecertify.com";
+    }
+    return url.origin;
+  } catch {
+    return "https://hivecertify.com";
+  }
 }

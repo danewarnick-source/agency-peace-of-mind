@@ -14,6 +14,7 @@ import { HiveWordmark } from "@/components/brand/hive-mark";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { authRedirectUrl } from "@/lib/auth-redirect";
 import { checkEmailExists } from "@/lib/signup-checks.functions";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
@@ -320,7 +321,7 @@ function Step1Account({
         email: form.email,
         password: form.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/signup`,
+          emailRedirectTo: authRedirectUrl("/signup"),
           data: {
             full_name: form.contactName || form.email.split("@")[0],
             agency_name: form.agencyName || `${form.email.split("@")[0]}'s workspace`,

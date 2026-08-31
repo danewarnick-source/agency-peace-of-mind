@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getAuditPackageData, type AuditPackagePayload } from "@/lib/audit-package-data";
 import { assertOrgAdmin, assertPackageAccess, assertPackageAccessViaChild } from "@/lib/audit-package-access";
+import { resolveAuthOrigin } from "@/lib/auth-redirect";
 
 // ============================================================
 // Types
@@ -951,7 +952,7 @@ async function sendAuditorPackageInvite(args: {
   const orgName: string = (org?.name as string | null) ?? "the provider";
 
   // Build redirect target: after set-password, land directly on the package.
-  const origin = siteOrigin || process.env.PUBLIC_SITE_URL || "";
+  const origin = resolveAuthOrigin(siteOrigin || process.env.PUBLIC_SITE_URL);
   const redirectTo = `${origin}/audit-portal/set-password?packageId=${auditPackageId}`;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

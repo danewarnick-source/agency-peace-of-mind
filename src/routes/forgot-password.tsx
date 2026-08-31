@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { passwordResetRedirectUrl } from "@/lib/auth-redirect";
 import { toast } from "sonner";
 import { AuthShell } from "./login";
 
@@ -21,7 +22,7 @@ function ForgotPassword() {
     const fd = new FormData(e.currentTarget);
     setBusy(true);
     const { error } = await supabase.auth.resetPasswordForEmail(String(fd.get("email")), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: passwordResetRedirectUrl(),
     });
     setBusy(false);
     if (error) return toast.error(error.message);

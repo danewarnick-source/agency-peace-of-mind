@@ -81,11 +81,52 @@ function buttonHtml(href: string, label: string): string {
   `;
 }
 
+const CANONICAL_SITE_ORIGIN = "https://hivecertify.com";
+
+function isLovableHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "lovable.app" ||
+    host === "lovable.dev" ||
+    host.endsWith(".lovable.app") ||
+    host.endsWith(".lovable.dev")
+  );
+}
+
+function defaultRedirectPath(type: EmailActionType): string {
+  switch (type) {
+    case "recovery":
+      return "/reset-password";
+    case "invite":
+      return "/reset-password";
+    case "magiclink":
+      return "/login";
+    case "email_change":
+      return "/login";
+    default:
+      return "/";
+  }
+}
+
+/** Keep hivecertify.com and Vercel; rewrite Lovable (and empty) redirects. */
+function sanitizeRedirectTo(redirectTo: string, type: EmailActionType): string {
+  const fallback = `${CANONICAL_SITE_ORIGIN}${defaultRedirectPath(type)}`;
+  try {
+    const url = new URL(redirectTo);
+    if (isLovableHost(url.hostname)) {
+      return `${CANONICAL_SITE_ORIGIN}${url.pathname}${url.search}${url.hash}`;
+    }
+    return `${url.origin}${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function verifyLink(supabaseUrl: string, data: HookPayload["email_data"]): string {
   const params = new URLSearchParams({
     token: data.token_hash,
     type: data.email_action_type,
-    redirect_to: data.redirect_to,
+    redirect_to: sanitizeRedirectTo(data.redirect_to, data.email_action_type),
   });
   return `${supabaseUrl.replace(/\/+$/, "")}/auth/v1/verify?${params.toString()}`;
 }
@@ -231,4 +272,9 @@ Deno.serve(async (req) => {
 // 4. Save. From that point on, Supabase Auth calls this function for every
 //    auth email (signup codes, password reset, invite, email change)
 //    instead of its own mailer.
+// 5. Authentication → URL Configuration: Site URL must be
+//    https://hivecertify.com (not a Lovable domain). Also add
+//    https://hivecertify.com/** and
+//    https://agency-peace-of-mind.vercel.app/** as Additional Redirect URLs.
+//    This is an ops change in the Supabase dashboard — not in this repo.
 // ────────────────────────────────────────────────────────────────────────

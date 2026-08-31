@@ -16,6 +16,7 @@ import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { createInvitation, resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
 import { inviteJoinUrl } from "@/lib/join-invite";
+import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/invitations")({
@@ -65,7 +66,7 @@ function InvitationsPage() {
           organization_id: org!.organization_id,
           email,
           role: input.role,
-          site_origin: window.location.origin,
+          site_origin: resolveAuthOrigin(),
         },
       });
     },
@@ -89,7 +90,7 @@ function InvitationsPage() {
         data: {
           organization_id: org!.organization_id,
           invitation_id: id,
-          site_origin: window.location.origin,
+          site_origin: resolveAuthOrigin(),
         },
       });
     },
@@ -213,7 +214,7 @@ function InvitationsPage() {
             {invites?.map((inv) => {
               const expired = new Date(inv.expires_at) < new Date();
               const link = typeof window !== "undefined"
-                ? inviteJoinUrl(window.location.origin, inv.token)
+                ? inviteJoinUrl(resolveAuthOrigin(), inv.token)
                 : "";
               return (
                 <TableRow key={inv.id}>

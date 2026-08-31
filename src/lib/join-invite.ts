@@ -1,3 +1,5 @@
+import { resolveAuthOrigin } from "./auth-redirect.ts";
+
 /** Shown on every failed join so testers are not dumped into new-agency signup. */
 export const ASK_ADMIN_MANUAL = "Ask your admin to add you manually.";
 
@@ -18,7 +20,7 @@ export function inviteTokenFromSearchStr(searchStr: string | null | undefined): 
 }
 
 export function inviteJoinUrl(origin: string, token: string): string {
-  const base = String(origin || "").replace(/\/+$/, "");
+  const base = resolveAuthOrigin(origin);
   return `${base}/join?invite=${encodeURIComponent(token)}`;
 }
 

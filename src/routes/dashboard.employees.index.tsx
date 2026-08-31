@@ -8,6 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
 import { inviteJoinUrl } from "@/lib/join-invite";
+import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
 import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
@@ -222,7 +223,7 @@ export function EmployeesPage() {
           organization_id: org!.organization_id,
           email: input.email,
           role: input.role,
-          site_origin: window.location.origin,
+          site_origin: resolveAuthOrigin(),
         },
       });
     },
@@ -387,7 +388,7 @@ export function EmployeesPage() {
           </p>
           <ul className="mt-3 divide-y divide-border">
             {invites.map((i) => {
-              const link = inviteJoinUrl(typeof window !== "undefined" ? window.location.origin : "", i.token);
+              const link = inviteJoinUrl(resolveAuthOrigin(), i.token);
               return (
                 <li key={i.id} className="flex items-center justify-between gap-3 py-3 text-sm">
                   <div className="flex items-center gap-2 truncate"><Mail className="h-4 w-4 shrink-0 text-muted-foreground" /> <span className="truncate">{i.email}</span> <span className="shrink-0 text-xs text-muted-foreground">· {i.role}</span></div>

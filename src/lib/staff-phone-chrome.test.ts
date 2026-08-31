@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  dashboardLayoutHasHookAfterBootstrapReturn,
+  dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn,
   resetStaffPhoneScroll,
   shouldUnmountDuplicateStaffOutlet,
 } from "./staff-phone-chrome.ts";
@@ -39,6 +41,62 @@ describe("staff phone leftover search + tab scroll (source)", () => {
 
   it("unmounts the duplicate staff Outlet only on a phone staff chrome", () => {
     assert.equal(shouldUnmountDuplicateStaffOutlet(false), false);
+  });
+
+  it("flags the React 310 pattern: duplicate-outlet effect after bootstrapping return", () => {
+    const crashing = `
+      function DashboardLayout() {
+        const [hideDuplicateStaffOutlet, setHideDuplicateStaffOutlet] = useState(false);
+        if (bootstrapping) {
+          return <div>Loading workspace…</div>;
+        }
+        useEffect(() => {
+          setHideDuplicateStaffOutlet(shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome));
+        }, [isStaffPhoneChrome]);
+        return <Outlet />;
+      }
+      function CompanyClientsBridge() {}
+    `;
+    assert.equal(dashboardLayoutHasHookAfterBootstrapReturn(crashing), true);
+    assert.equal(
+      dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn(crashing),
+      false,
+    );
+  });
+
+  it("accepts the hotfix: duplicate-outlet effect above bootstrapping return", () => {
+    const fixed = `
+      function DashboardLayout() {
+        const [hideDuplicateStaffOutlet, setHideDuplicateStaffOutlet] = useState(false);
+        useEffect(() => {
+          setHideDuplicateStaffOutlet(shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome));
+        }, [isStaffPhoneChrome]);
+        if (bootstrapping) {
+          return <div>Loading workspace…</div>;
+        }
+        return <Outlet />;
+      }
+      function CompanyClientsBridge() {}
+    `;
+    assert.equal(dashboardLayoutHasHookAfterBootstrapReturn(fixed), false);
+    assert.equal(dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn(fixed), true);
+  });
+
+  it("staff DashboardLayout has no hooks after the bootstrapping early return", () => {
+    const dash = readFileSync(
+      fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.equal(
+      dashboardLayoutHasHookAfterBootstrapReturn(dash),
+      false,
+      "A hook below if (bootstrapping) is React 310 on staff phone after login",
+    );
+    assert.equal(
+      dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn(dash),
+      true,
+      "hideDuplicateStaffOutlet effect must run on the loading-spinner render too",
+    );
   });
 
   it("staff phone chrome omits the header Ask Nectar search trigger", () => {

@@ -627,6 +627,21 @@ function DashboardLayout() {
     return () => window.clearTimeout(t);
   }, [awaitingBootstrap]);
 
+  // Staff phone chrome + duplicate-outlet unmount. Must stay above the
+  // bootstrapping early return — a hook added below it is React 310 after
+  // login (spinner render → shell render with one extra useEffect).
+  const isStaffView = effectiveView === "staff";
+  const isStaffPhoneChrome = isStaffView && !isMobilePreview;
+  useEffect(() => {
+    const apply = () => {
+      setHideDuplicateStaffOutlet(shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome));
+    };
+    apply();
+    const mq = window.matchMedia(STAFF_PHONE_MQ);
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [isStaffPhoneChrome]);
+
   if (bootstrapping) {
     const cognitoEscape = isCognitoAuth() && (orgError || bootstrapStuck);
     const showSignOut = cognitoEscape || bootTimedOut;
@@ -668,19 +683,7 @@ function DashboardLayout() {
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ??
     "Dashboard";
-  const isStaffView = effectiveView === "staff";
-  const isStaffPhoneChrome = isStaffView && !isMobilePreview;
   const inboxUnread = unreadQ.data?.count ?? 0;
-
-  useEffect(() => {
-    const apply = () => {
-      setHideDuplicateStaffOutlet(shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome));
-    };
-    apply();
-    const mq = window.matchMedia(STAFF_PHONE_MQ);
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, [isStaffPhoneChrome]);
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
     user,

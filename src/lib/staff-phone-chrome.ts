@@ -36,6 +36,37 @@ export function shouldUnmountDuplicateStaffOutlet(isStaffPhoneChrome: boolean): 
   return isStaffPhoneChrome && isStaffPhoneViewport();
 }
 
+/**
+ * The duplicate-outlet media-query effect lives in DashboardLayout. If it
+ * (or any other hook) is declared after `if (bootstrapping) return`, staff
+ * phones hit React 310 on the spinner → shell transition after login.
+ */
+export function dashboardLayoutHasHookAfterBootstrapReturn(source: string): boolean {
+  const start = source.indexOf("function DashboardLayout(");
+  const end = source.indexOf("function CompanyClientsBridge(");
+  if (start < 0 || end <= start) return true;
+  const layout = source.slice(start, end);
+  const boot = layout.indexOf("if (bootstrapping)");
+  if (boot < 0) return true;
+  return /\buse(?:Effect|LayoutEffect|State|Memo|Callback|Ref|Query|ServerFn|Navigate|RouterState)\s*\(/.test(
+    layout.slice(boot),
+  );
+}
+
+export function dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn(
+  source: string,
+): boolean {
+  const start = source.indexOf("function DashboardLayout(");
+  const end = source.indexOf("function CompanyClientsBridge(");
+  if (start < 0 || end <= start) return false;
+  const layout = source.slice(start, end);
+  const boot = layout.indexOf("if (bootstrapping)");
+  if (boot < 0) return false;
+  return /setHideDuplicateStaffOutlet\(shouldUnmountDuplicateStaffOutlet/.test(
+    layout.slice(0, boot),
+  );
+}
+
 export function resetStaffPhoneScroll(scroller: HTMLElement | null): void {
   if (scroller) {
     scroller.scrollTop = 0;

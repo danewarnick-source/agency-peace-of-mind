@@ -53,7 +53,10 @@ export function RequestTimeOffDialog({ trigger }: { trigger: React.ReactNode }) 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Request time off</DialogTitle>
           <DialogDescription>Your manager will see this in the schedule.</DialogDescription>
@@ -61,12 +64,24 @@ export function RequestTimeOffDialog({ trigger }: { trigger: React.ReactNode }) 
         <div className="grid gap-3 py-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label>Start date</Label>
-              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+              <Label htmlFor="time-off-start">Start date</Label>
+              <Input
+                id="time-off-start"
+                type="date"
+                autoFocus={false}
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+              />
             </div>
             <div className="grid gap-1.5">
-              <Label>End date</Label>
-              <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+              <Label htmlFor="time-off-end">End date</Label>
+              <Input
+                id="time-off-end"
+                type="date"
+                autoFocus={false}
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+              />
             </div>
           </div>
           <div className="grid gap-1.5">

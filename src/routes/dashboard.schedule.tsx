@@ -9,7 +9,6 @@ import {
   ChevronUp,
   Clock,
   User,
-  ArrowRight,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +17,16 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useTimePaySettings } from "@/hooks/use-time-pay-settings";
 import { respondToShift } from "@/lib/scheduling/workflow.functions";
 import { OpenShiftsPanel } from "@/components/scheduling/open-shifts-panel";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { fmtElapsed } from "@/components/staff-mobile/general-time-clock";
+import {
+  SCHEDULE_NON_CLIENT_CLOCK_IN_TITLE,
+  SCHEDULE_NON_CLIENT_HELPER,
+  SCHEDULE_NON_CLIENT_SECTION,
+  scheduleNonClientClockInAllowed,
+  scheduleStaffHidesStatusBadge,
+} from "@/lib/schedule-staff-clock";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -244,6 +251,7 @@ function useMyDayProgramSessions(view: ViewMode, anchor: Date) {
 function ShiftCard({ s }: { s: ScheduledShift }) {
   const daily = isDaily(s.job_code);
   const code = s.job_code ?? "";
+  const hideStatus = scheduleStaffHidesStatusBadge(s.status);
   const visitLabel = hhsVisitLabel(code, s.is_host_home);
   const codeLabel = visitLabel ?? (code || "Service TBD");
   const initials =
@@ -290,11 +298,13 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
                   Updated
                 </span>
               )}
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
-              >
-                {s.status}
-              </span>
+              {!hideStatus && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}
+                >
+                  {s.status}
+                </span>
+              )}
             </div>
           </div>
 
@@ -332,20 +342,17 @@ function ShiftCard({ s }: { s: ScheduledShift }) {
             </button>
           }
         />
-        <span className="inline-flex items-center">
-          {daily ? "Open Client Hub" : "Open Time Clock"}
-          <ArrowRight className="ml-1 h-3.5 w-3.5" />
-        </span>
       </div>
     </article>
   );
 
+  const hubAria = `Open Client Hub for ${s.client_name} (${codeLabel})`;
   const linkWrap = daily ? (
-    <Link to="/dashboard/hhs-hub/$clientId" params={{ clientId: s.client_id }} aria-label={`Open Client Hub for ${s.client_name} (${codeLabel})`}>
+    <Link to="/dashboard/hhs-hub/$clientId" params={{ clientId: s.client_id }} aria-label={hubAria}>
       {card}
     </Link>
   ) : (
-    <Link to="/dashboard/workspace/$clientId" params={{ clientId: s.client_id }} search={{ tab: "clock-in", ...(code ? { code } : {}) }} aria-label={`Open Time Clock for ${s.client_name} (${codeLabel})`}>
+    <Link to="/dashboard/workspace/$clientId" params={{ clientId: s.client_id }} aria-label={hubAria}>
       {card}
     </Link>
   );
@@ -446,7 +453,9 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
   const names = shifts.map((s) => s.client_name).join(", ");
   const allAccepted = shifts.every((s) => s.status === "accepted");
   const allDeclined = shifts.every((s) => s.status === "declined");
+  const allDraft = shifts.every((s) => scheduleStaffHidesStatusBadge(s.status));
   const groupStatus = allAccepted ? "accepted" : allDeclined ? "declined" : "pending";
+  const hideStatus = allDraft || scheduleStaffHidesStatusBadge(groupStatus);
   const statusTone =
     groupStatus === "accepted"
       ? "bg-[#117a52]/10 text-[#0d5c3d]"
@@ -465,9 +474,11 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
           <span className="rounded-full bg-[color:var(--amber-600,var(--hive-gold))]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))]">
             {ratioLabel}
           </span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}>
-            {groupStatus}
-          </span>
+          {!hideStatus && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusTone}`}>
+              {groupStatus}
+            </span>
+          )}
         </div>
       </div>
       <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
@@ -477,20 +488,14 @@ function GroupCard({ shifts }: { shifts: ScheduledShift[] }) {
       <ul className="mt-3 space-y-1">
         {shifts.map((s) => {
           const daily = isDaily(s.job_code);
-          const code = s.job_code ?? "";
           return (
             <li key={s.id}>
               <Link
                 to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
                 params={{ clientId: s.client_id }}
-                {...(daily ? {} : { search: { tab: "clock-in", ...(code ? { code } : {}) } as any })}
                 className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-warm px-2 py-1.5 text-xs hover:border-[color:var(--amber-600,var(--hive-gold))]/60"
               >
                 <span className="truncate font-medium text-foreground">{s.client_name}</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700,var(--hive-gold))]">
-                  {daily ? "Client Hub" : "Time Clock"}
-                  <ArrowRight className="h-3 w-3" />
-                </span>
               </Link>
             </li>
           );
@@ -776,11 +781,14 @@ function SchedulePage() {
 }
 
 function CollapsibleGeneralClock() {
+  const { data: active } = useActiveShift();
   const { shift } = useGeneralShift();
   const [open, setOpen] = useState(!!shift);
   const [now, setNow] = useState(Date.now());
 
   const running = !!shift;
+  const hasOpenPunch = !!active || running;
+  const canStart = scheduleNonClientClockInAllowed(hasOpenPunch);
 
   // Default to expanded when on the clock so staff see their running shift.
   useEffect(() => {
@@ -799,72 +807,59 @@ function CollapsibleGeneralClock() {
     : "00:00:00";
 
   return (
-    <section className="mt-6 border-t border-border pt-5" aria-label="General time clock">
+    <section className="mt-6 border-t border-border pt-5" aria-label={SCHEDULE_NON_CLIENT_SECTION}>
       <h2 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        Time Clock
+        {SCHEDULE_NON_CLIENT_SECTION}
       </h2>
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="rounded-xl border border-border bg-muted/50">
-          {/* Collapsed pill / toggle header */}
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
-              aria-label={
-                running
-                  ? "Non-client time is running. Tap to manage or clock out."
-                  : "Tap to start non-client time clock"
-              }
-            >
-              <span
-                aria-hidden
-                className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                  running ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                }`}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">
-                  {running
-                    ? `Time Clock — On non-client time · ${elapsed}`
-                    : "Time Clock — Clock In"}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {running ? (
-                    <>
-                      Tap to manage / clock out{" "}
-                      <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                        NO EVV
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      Non-client work · no EVV{" "}
-                      <span className="ml-1 inline-flex items-center rounded bg-amber-100 px-1 py-0 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                        NO EVV
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-              <ChevronUp
-                className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                  open ? "" : "rotate-180"
-                }`}
-              />
-            </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            <div className="border-t border-border px-4 pb-4 pt-1">
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                Client shifts start from a scheduled shift or My Caseload — with
-                EVV.
-              </p>
-              <GeneralTimeClock />
-            </div>
-          </CollapsibleContent>
+      {!canStart && !running ? (
+        <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
+          <p className="text-[11px] text-muted-foreground">{SCHEDULE_NON_CLIENT_HELPER}</p>
         </div>
-      </Collapsible>
+      ) : (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <div className="rounded-xl border border-border bg-muted/50">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
+                aria-label={
+                  running
+                    ? "Non-client time is running. Tap to manage."
+                    : "Clock in for work that is not at a client's home"
+                }
+              >
+                <span
+                  aria-hidden
+                  className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                    running ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {running
+                      ? `On the clock · ${elapsed}`
+                      : SCHEDULE_NON_CLIENT_CLOCK_IN_TITLE}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {SCHEDULE_NON_CLIENT_HELPER}
+                  </p>
+                </div>
+                <ChevronUp
+                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                    open ? "" : "rotate-180"
+                  }`}
+                />
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <div className="border-t border-border px-4 pb-4 pt-1">
+                <GeneralTimeClock />
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
     </section>
   );
 }

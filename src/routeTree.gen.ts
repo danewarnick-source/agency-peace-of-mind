@@ -51,6 +51,7 @@ import { Route as DashboardReimbursementsRouteImport } from './routes/dashboard.
 import { Route as DashboardRecordsDeskRouteImport } from './routes/dashboard.records-desk'
 import { Route as DashboardProgramsAdminRouteImport } from './routes/dashboard.programs-admin'
 import { Route as DashboardProgramsRouteImport } from './routes/dashboard.programs'
+import { Route as DashboardPoliciesRouteImport } from './routes/dashboard.policies'
 import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.permissions'
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
@@ -429,6 +430,11 @@ const DashboardProgramsAdminRoute = DashboardProgramsAdminRouteImport.update({
 const DashboardProgramsRoute = DashboardProgramsRouteImport.update({
   id: '/programs',
   path: '/programs',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardPoliciesRoute = DashboardPoliciesRouteImport.update({
+  id: '/policies',
+  path: '/policies',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardPermissionsRoute = DashboardPermissionsRouteImport.update({
@@ -1430,6 +1436,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/policies': typeof DashboardPoliciesRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
@@ -1636,6 +1643,7 @@ export interface FileRoutesByTo {
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/policies': typeof DashboardPoliciesRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
@@ -1848,6 +1856,7 @@ export interface FileRoutesById {
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
   '/dashboard/permissions': typeof DashboardPermissionsRoute
+  '/dashboard/policies': typeof DashboardPoliciesRoute
   '/dashboard/programs': typeof DashboardProgramsRouteWithChildren
   '/dashboard/programs-admin': typeof DashboardProgramsAdminRoute
   '/dashboard/records-desk': typeof DashboardRecordsDeskRoute
@@ -2062,6 +2071,7 @@ export interface FileRouteTypes {
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
+    | '/dashboard/policies'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
     | '/dashboard/records-desk'
@@ -2268,6 +2278,7 @@ export interface FileRouteTypes {
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
+    | '/dashboard/policies'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
     | '/dashboard/records-desk'
@@ -2479,6 +2490,7 @@ export interface FileRouteTypes {
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
     | '/dashboard/permissions'
+    | '/dashboard/policies'
     | '/dashboard/programs'
     | '/dashboard/programs-admin'
     | '/dashboard/records-desk'
@@ -2967,6 +2979,13 @@ declare module '@tanstack/react-router' {
       path: '/programs'
       fullPath: '/dashboard/programs'
       preLoaderRoute: typeof DashboardProgramsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/policies': {
+      id: '/dashboard/policies'
+      path: '/policies'
+      fullPath: '/dashboard/policies'
+      preLoaderRoute: typeof DashboardPoliciesRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/permissions': {
@@ -4492,6 +4511,7 @@ interface DashboardRouteChildren {
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
   DashboardPermissionsRoute: typeof DashboardPermissionsRoute
+  DashboardPoliciesRoute: typeof DashboardPoliciesRoute
   DashboardProgramsRoute: typeof DashboardProgramsRouteWithChildren
   DashboardProgramsAdminRoute: typeof DashboardProgramsAdminRoute
   DashboardRecordsDeskRoute: typeof DashboardRecordsDeskRoute
@@ -4589,6 +4609,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,
   DashboardPermissionsRoute: DashboardPermissionsRoute,
+  DashboardPoliciesRoute: DashboardPoliciesRoute,
   DashboardProgramsRoute: DashboardProgramsRouteWithChildren,
   DashboardProgramsAdminRoute: DashboardProgramsAdminRoute,
   DashboardRecordsDeskRoute: DashboardRecordsDeskRoute,

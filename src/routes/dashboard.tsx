@@ -58,6 +58,7 @@ import {
   Search,
   Archive,
   ClipboardList,
+  BookOpen,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
@@ -224,6 +225,7 @@ const ADMIN_NAV: NavItem[] = [
   },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
+  { to: "/dashboard/policies", label: "Policies", icon: BookOpen },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   {
     to: "/dashboard/hub/finances",

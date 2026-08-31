@@ -733,13 +733,18 @@ function PolicyLibraryTab() {
     <Card>
       <CardContent className="space-y-4 p-6">
         <p className="text-sm text-muted-foreground">
-          State PDFs live in Authoritative Sources. That shelf is Nectar's reading copy — it does
-          not drive this register. Company policies that satisfy a Part I row are uploaded on that
-          duty, not in a third library.
+          Your agency binder is Policies — add a handbook, pick who it applies to, and staff
+          finish it on My Obligations. State PDFs stay in Authoritative Sources for Nectar.
+          That shelf does not replace the binder.
         </p>
-        <Button onClick={() => navigate({ to: "/dashboard/authoritative-sources" })}>
-          <Upload className="mr-1.5 h-4 w-4" /> Authoritative Sources
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate({ to: "/dashboard/policies" })}>
+            <FolderOpen className="mr-1.5 h-4 w-4" /> Policies
+          </Button>
+          <Button variant="outline" onClick={() => navigate({ to: "/dashboard/authoritative-sources" })}>
+            <Upload className="mr-1.5 h-4 w-4" /> Authoritative Sources
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

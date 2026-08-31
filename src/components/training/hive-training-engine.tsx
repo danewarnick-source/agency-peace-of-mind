@@ -1,12 +1,9 @@
-// HiveTrainingCenter.tsx
-// Hive Launchpad — 30-Day Core Training
-// Data-driven training engine + the full 23-topic course registry.
-// Paste into Lovable as a component/route. To add a topic, fill in its entry
-// in TRAINING_TOPICS using the same shape as topic "E" (seizures) below —
-// every topic then automatically gets the same lessons / dropdowns /
-// knowledge-checks / attestation flow.
+// Data-driven staff training engine + the 23-topic 30-day registry.
+// Course shell (My Obligations) lives in in-hive-course-player.tsx.
 
 import { useEffect, useState } from "react";
+import { O_STEPS, P_STEPS } from "@/lib/in-hive-training-thirty-day-extra";
+import { TrainingDiagram, type DiagramId } from "@/components/training/in-hive-diagrams";
 import {
   useTrainingSpeech,
   getSessionAutoRead,
@@ -27,6 +24,7 @@ type LessonStep = {
   facts?: Fact[];
   dropHeading?: string;
   drops?: [string, string][];
+  diagram?: DiagramId;
 };
 type CheckStep = {
   type: "check";
@@ -78,6 +76,7 @@ const SEIZURE_STEPS: Step[] = [
       { t: "Protect the head.", b: "Cushion it; move hard or sharp objects out of the way." },
       { t: "Stay and stay calm.", b: "Keep timing and reassure others nearby." },
     ],
+    diagram: "recovery-position" as const,
     dropHeading: "Go further",
     drops: [
       ["The steps, in order", "1. Note the start time. 2. Ease them to the floor. 3. Turn them onto their side. 4. Cushion the head. 5. Move sharp objects away. 6. Loosen anything tight at the neck. 7. Stay, stay calm, keep timing."],
@@ -167,7 +166,8 @@ const A_STEPS: Step[] = [
       ["Spotting a stroke \u2014 think FAST", "<b>F</b>ace: does one side droop? Ask them to smile. <b>A</b>rms: can they raise both, or does one drift down? <b>S</b>peech: is it slurred or strange? <b>T</b>ime: if you see any of these, call 911 and note the time it started \u2014 that time is critical for treatment."],
       ["Spotting a heart attack", "Chest pain or pressure, pain spreading to the arm, jaw, or back, shortness of breath, cold sweat, nausea, or sudden dizziness. Symptoms can be subtler in some people. Don\u2019t wait \u2014 call 911."],
       ["Severe allergic reaction (anaphylaxis)", "Trouble breathing, swelling of the face, lips, or throat, widespread hives, or sudden collapse after a food, sting, or medication. Call 911. If the person has a prescribed epinephrine auto-injector and a plan for it, that\u2019s part of an individual plan \u2014 follow it."],
-    ] },
+    ],
+    diagram: "fast" as const },
   { type: "check", kicker: "Knowledge check 2 of 4",
     stem: "A person\u2019s face is drooping on one side, one arm drifts down when they try to raise both, and their speech is slurred. What do you do?",
     options: [
@@ -327,6 +327,7 @@ const G_STEPS: Step[] = [
       { t: "Mild choking: let them cough.", b: "Coughing is the most effective way to clear it. Don\u2019t interfere." },
       { t: "Severe choking: act now.", b: "Silent, panicked, can\u2019t breathe, may turn pale or blue." },
     ],
+    diagram: "choking-rescue" as const,
     dropHeading: "Go further",
     drops: [
       ["Mild vs. severe choking", "Mild (partial) blockage: the person can still cough forcefully, make sounds, or breathe. Encourage them to keep coughing \u2014 don\u2019t slap their back or interfere. Severe (complete) blockage: they can\u2019t cough, speak, or breathe, may grab their throat, look panicked, and their skin may turn pale or bluish. This is an emergency \u2014 act immediately."],
@@ -601,6 +602,7 @@ const K_STEPS: Step[] = [
       { t: "Also use your agency\u2019s process.", b: "Complete the incident report too \u2014 they work together." },
       { t: "Report directly.", b: "Telling a supervisor doesn\u2019t end your personal duty." },
     ],
+    diagram: "report-path" as const,
     dropHeading: "Go further",
     drops: [
       ["Where reports go", "For a vulnerable adult, Utah Adult Protective Services (APS) takes reports at 1-800-371-7897. For a child, it\u2019s the Division of Child and Family Services (DCFS). For a crime or immediate danger, call the police / 911. You also complete your agency\u2019s incident report. These can happen together \u2014 one doesn\u2019t replace the others."],
@@ -1733,7 +1735,11 @@ export const TRAINING_TOPICS: Topic[] = [
     intro: "Understanding who you support \u2014 people with intellectual disabilities, related conditions, or acquired brain injuries \u2014 helps you see each person as an individual, not a diagnosis. This covers what ID/RC and ABI mean, how they can affect daily life, and the person-first, strengths-based mindset at the heart of this work.",
     steps: M_STEPS,
     attest: "I attest that I have completed this training, understand the basics of intellectual disabilities, related conditions, and acquired brain injury, how they can affect daily life, and the person-first, strengths-based, competence-presuming approach to support, and that I was given the opportunity to ask questions and received adequate answers." },
-  { code: "P", title: "The agency\u2019s policies & procedures", category: "Foundations & compliance", status: "soon" },
+  { code: "P", title: "The agency\u2019s policies & procedures", category: "Foundations & compliance", status: "ready",
+    estMin: 10,
+    intro: "Every agency keeps its own written policies \u2014 personnel, operating, emergency, rights, and health support. This covers what those documents are for, how to find this agency\u2019s set, and why a previous job\u2019s habits are not the rule here.",
+    steps: P_STEPS,
+    attest: "I attest that I have completed this training, understand that I must follow this agency\u2019s written policies, and that I know to ask my supervisor where the current documents are." },
   { code: "Q", title: "Introduction to DSPD philosophy & mission", category: "Foundations & compliance", status: "ready",
     estMin: 11,
     intro: "You work inside DSPD\u2019s mission: supporting people with disabilities to lead self-determined lives. This covers what that mission means, the four principles of self-determination (freedom, authority, support, responsibility), the dignity of risk, person-centered planning, and the goal of a full life in the community.",
@@ -1749,11 +1755,27 @@ export const TRAINING_TOPICS: Topic[] = [
     intro: "The HCBS Settings Rule is the federal rule guaranteeing that people receiving home and community-based services keep their rights and have full access to community life. This covers what the rule is and why it exists, the specific rights it protects, the high bar for any restriction, and how you uphold it on every shift.",
     steps: T_STEPS,
     attest: "I attest that I have completed this training, understand the purpose of the HCBS Settings Rule, the rights it guarantees including privacy, choice, a real home, and community access, the strict limits on restricting those rights, and how I uphold the rule in daily practice, and that I was given the opportunity to ask questions and received adequate answers." },
-  { code: "O", title: "Person-specific training", category: "Assigned per person", status: "pp" },
+  { code: "O", title: "Person-specific duties before working alone", category: "Foundations & compliance", status: "ready",
+    estMin: 12,
+    intro: "Before you work alone with a client, you must know their specific disability effects, goals, medical and safety needs, plan and supports, your duties, and any DNR/POLST or hospice information. This teaches what you must know \u2014 and that a guess is not a plan.",
+    steps: O_STEPS,
+    attest: "I attest that I have completed this training, understand the person-specific facts I must know before working alone, and that I will review the current record rather than guess." },
 ];
 
+/** SOW letter order A–W for the in-Hive 30-day course. */
+export function thirtyDayTopicsInSowOrder(): Topic[] {
+  const by = new Map(TRAINING_TOPICS.map((t) => [t.code, t]));
+  return "ABCDEFGHIJKLMNOPQRSTUVW".split("").map((code) => {
+    const t = by.get(code);
+    if (!t || t.status !== "ready" || !t.steps?.length) {
+      throw new Error(`30-day topic ${code} is not ready`);
+    }
+    return t;
+  });
+}
+
 /* ───────────────────────── UI bits ───────────────────────── */
-const card: React.CSSProperties = { background: "#fff", border: "1px solid #e4e7ef", borderRadius: 14, overflow: "hidden", maxWidth: 560, margin: "0 auto", boxShadow: "0 12px 40px rgba(11,17,38,.10)" };
+const card: React.CSSProperties = { background: "#fff", border: "1px solid #e4e7ef", borderRadius: 14, overflow: "hidden", maxWidth: "100%", width: "100%", margin: "0 auto", boxShadow: "0 12px 40px rgba(11,17,38,.10)" };
 const btn = (kind: "pri" | "out" | "dis"): React.CSSProperties => ({
   font: "inherit", fontSize: 13.5, fontWeight: 600, padding: "11px 18px", borderRadius: 10, cursor: kind === "dis" ? "not-allowed" : "pointer", border: kind === "out" ? "1px solid #cdd2e0" : "none",
   background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : "#1C2A5E",
@@ -1794,7 +1816,7 @@ function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClic
         borderRadius: 999, padding: "5px 10px", cursor: "pointer",
       }}
     >
-      <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>{speaking ? "\u25A0" : "\u{1F50A}"}</span>
+      <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>{speaking ? "\u25A0" : "\u25B6"}</span>
       <span>{speaking ? "Stop" : "Read aloud"}</span>
     </button>
   );
@@ -1822,10 +1844,18 @@ function Check({ step, onPass, speaking, onSpeak, onStop }: { step: CheckStep; o
           </button>
         );
       })}
-      {chosen && !chosen.correct && <div style={{ fontSize: 12.5, color: "#854f0b", background: "#faeeda", border: "1px solid #fac775", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>{chosen.fb} Try again.</div>}
+      {chosen && !chosen.correct && (
+        <div style={{ fontSize: 12.5, color: "#854f0b", background: "#faeeda", border: "1px solid #fac775", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Try again</div>
+          {chosen.fb}
+        </div>
+      )}
       {chosen && chosen.correct && (
         <>
-          <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>{chosen.fb}</div>
+          <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>That is right</div>
+            {chosen.fb}
+          </div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue</button></div>
         </>
       )}
@@ -1853,6 +1883,11 @@ export function TrainingModule({
   readOnly = false,
   previousCompletion,
   onRetake,
+  skipAttest = false,
+  initialStep = 0,
+  onStepChange,
+  hideAllTopics = false,
+  onFinished,
 }: {
   topic: Topic;
   onExit: () => void;
@@ -1860,16 +1895,25 @@ export function TrainingModule({
   readOnly?: boolean;
   previousCompletion?: { signedName: string; completedAt: string } | null;
   onRetake?: () => void;
+  /** Course path: pass the topic by finishing the last check — no typed name. */
+  skipAttest?: boolean;
+  initialStep?: number;
+  onStepChange?: (stepIndex: number) => void;
+  hideAllTopics?: boolean;
+  /** Course path: after the complete slide, go to the next topic. */
+  onFinished?: () => void;
 }) {
   // In read-only review mode, skip the attest + complete steps. The staff
   // member can re-read lessons but their record never changes.
   const baseSteps: Step[] = topic.steps || [];
   const flow: ({ type: "intro" } | Step | { type: "attest" } | { type: "complete" })[] = readOnly
     ? [{ type: "intro" }, ...baseSteps]
-    : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
+    : skipAttest
+      ? [{ type: "intro" }, ...baseSteps, { type: "complete" }]
+      : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
   const checks = baseSteps.filter(s => s.type === "check").length;
   const lessons = baseSteps.filter(s => s.type === "lesson").length;
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(() => Math.min(Math.max(0, initialStep), Math.max(0, flow.length - 1)));
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
   const [esignConsent, setEsignConsent] = useState(false);
@@ -1898,6 +1942,19 @@ export function TrainingModule({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
 
+  useEffect(() => {
+    if (!skipAttest || readOnly || !onComplete) return;
+    if (step?.type !== "complete") return;
+    void onComplete({
+      signature: "topic-passed",
+      consentStatement: ESIGN_CONSENT_STATEMENT,
+      consentAccepted: true,
+      contentVersion: TRAINING_ENGINE_VERSION,
+    });
+  // Fire once when the complete slide is reached in course mode.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skipAttest, step?.type]);
+
   // Auto-read the current slide if the staff member opted in.
   useEffect(() => {
     if (!autoRead || !ttsSupported) return;
@@ -1920,7 +1977,12 @@ export function TrainingModule({
     if (text) speak(text);
   };
 
-  const next = () => setI(i + 1), back = () => setI(i - 1);
+  const go = (n: number) => {
+    const clamped = Math.max(0, Math.min(n, flow.length - 1));
+    setI(clamped);
+    onStepChange?.(clamped);
+  };
+  const next = () => go(i + 1), back = () => go(i - 1);
   const canSign = agree && esignConsent && name.trim().length > 1;
   const submitAttestAndContinue = async () => {
     if (submitting || !canSign) return;
@@ -1934,7 +1996,7 @@ export function TrainingModule({
           contentVersion: TRAINING_ENGINE_VERSION,
         });
       }
-      setI(i + 1);
+      go(i + 1);
     } finally {
       setSubmitting(false);
     }
@@ -1945,7 +2007,7 @@ export function TrainingModule({
       <div style={{ background: NAVY, padding: "13px 17px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ width: 26, height: 26, background: GOLD, clipPath: "polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)" }} />
-          <div><div style={{ color: GOLD, fontSize: 10, fontWeight: 600, letterSpacing: ".1em" }}>Hive Launchpad · code {topic.code}{readOnly ? " · review mode" : ""}</div><div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{topic.title}</div></div>
+          <div><div style={{ color: GOLD, fontSize: 10, fontWeight: 600, letterSpacing: ".1em" }}>Staff training · {topic.code}{readOnly ? " · review" : ""}</div><div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{topic.title}</div></div>
         </div>
       </div>
       <div style={{ height: 5, background: "#eef0f5" }}><div style={{ height: "100%", width: pct + "%", background: GOLD, transition: "width .35s" }} /></div>
@@ -1999,10 +2061,11 @@ export function TrainingModule({
           <>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>Code {topic.code}</div>
             <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{topic.title}</div>
-            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios{readOnly ? "" : ", then you sign"}</div>
+            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios{readOnly || skipAttest ? "" : ", then you sign"}</div>
             <div style={{ background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", fontSize: 13.5, lineHeight: 1.6 }}>{topic.intro}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
-              <button style={btn("out")} onClick={onExit}>All topics</button>
+              {!hideAllTopics && <button style={btn("out")} onClick={onExit}>All topics</button>}
+              {hideAllTopics && <span />}
               <button style={btn("pri")} onClick={next}>{readOnly ? "Review" : "Begin"}</button>
             </div>
           </>
@@ -2028,6 +2091,11 @@ export function TrainingModule({
                 <div><b style={{ color: INK }}>{f.t}</b> {f.b}</div>
               </div>
             ))}
+            {step.diagram && (
+              <div style={{ margin: "12px 0 16px" }}>
+                <TrainingDiagram id={step.diagram} />
+              </div>
+            )}
             {step.dropHeading && <div style={{ fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", margin: "16px 0 9px" }}>{step.dropHeading}</div>}
             {step.drops && <Accordion drops={step.drops} open={openDrop} onOpenChange={setOpenDrop} />}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
@@ -2080,17 +2148,21 @@ export function TrainingModule({
             <div style={{ textAlign: "center", paddingTop: 6 }}>
               <div style={{ width: 48, height: 48, margin: "0 auto", borderRadius: "50%", background: "#e1f5ee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#0f6e56" }}>{"\u2713"}</div>
               <div style={{ fontSize: 19, fontWeight: 700, color: INK, marginTop: 12 }}>Topic complete</div>
-              <div style={{ fontSize: 12.5, color: "#8a8f9e", marginTop: 4 }}>Signed by {name || "\u2014"} · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+              <div style={{ fontSize: 12.5, color: "#8a8f9e", marginTop: 4 }}>
+                {skipAttest
+                  ? `Passed · ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : `Signed by ${name || "\u2014"} · ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+              </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              {[[`${checks}/${checks}`, "knowledge checks", "#0f6e56"], [topic.code, "topic code", "#1C2A5E"], ["\u2713", "attestation", "#b07819"]].map(([n, l, c], k) => (
+              {[[`${checks}/${checks}`, "knowledge checks", "#0f6e56"], [topic.code, "topic", "#1C2A5E"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
                 <div key={k} style={{ flex: 1, background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 11, padding: 11, textAlign: "center" }}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: c as string }}>{n}</div><div style={{ fontSize: 11, color: "#8a8f9e" }}>{l}</div>
                 </div>
               ))}
             </div>
             <div style={{ fontSize: 11.5, color: TEAL, textAlign: "center", marginTop: 13 }}>Logged to the staff training record — timestamped, signed, and tamper-evident for audit.</div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button style={btn("pri")} onClick={onExit}>All topics</button></div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button style={btn("pri")} onClick={onFinished ?? onExit}>{hideAllTopics ? "Continue" : "All topics"}</button></div>
           </>
         )}
       </div>

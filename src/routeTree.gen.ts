@@ -198,6 +198,7 @@ import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
 import { Route as DashboardSmartImportJobIdDoneRouteImport } from './routes/dashboard.smart-import.$jobId.done'
+import { Route as DashboardMyObligationsCourseInstanceIdRouteImport } from './routes/dashboard.my-obligations_.course.$instanceId'
 import { Route as DashboardHiveTrainingCourseAssignmentIdRouteImport } from './routes/dashboard.hive-training.course.$assignmentId'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardHiveExecAgreementsRequirementsRouteImport } from './routes/dashboard.hive-exec.agreements.requirements'
@@ -1235,6 +1236,12 @@ const DashboardSmartImportJobIdDoneRoute =
     path: '/$jobId/done',
     getParentRoute: () => DashboardSmartImportRoute,
   } as any)
+const DashboardMyObligationsCourseInstanceIdRoute =
+  DashboardMyObligationsCourseInstanceIdRouteImport.update({
+    id: '/my-obligations_/course/$instanceId',
+    path: '/my-obligations/course/$instanceId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardHiveTrainingCourseAssignmentIdRoute =
   DashboardHiveTrainingCourseAssignmentIdRouteImport.update({
     id: '/hive-training/course/$assignmentId',
@@ -1554,6 +1561,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/agreements/requirements': typeof DashboardHiveExecAgreementsRequirementsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
+  '/dashboard/my-obligations/course/$instanceId': typeof DashboardMyObligationsCourseInstanceIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -1757,6 +1765,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/agreements/requirements': typeof DashboardHiveExecAgreementsRequirementsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
+  '/dashboard/my-obligations/course/$instanceId': typeof DashboardMyObligationsCourseInstanceIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -1968,6 +1977,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/agreements/requirements': typeof DashboardHiveExecAgreementsRequirementsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
   '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
+  '/dashboard/my-obligations_/course/$instanceId': typeof DashboardMyObligationsCourseInstanceIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -2180,6 +2190,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/agreements/requirements'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-training/course/$assignmentId'
+    | '/dashboard/my-obligations/course/$instanceId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -2383,6 +2394,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/agreements/requirements'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-training/course/$assignmentId'
+    | '/dashboard/my-obligations/course/$instanceId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -2593,6 +2605,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/agreements/requirements'
     | '/dashboard/hive-exec/states/$stateCode'
     | '/dashboard/hive-training/course/$assignmentId'
+    | '/dashboard/my-obligations_/course/$instanceId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -3972,6 +3985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSmartImportJobIdDoneRouteImport
       parentRoute: typeof DashboardSmartImportRoute
     }
+    '/dashboard/my-obligations_/course/$instanceId': {
+      id: '/dashboard/my-obligations_/course/$instanceId'
+      path: '/my-obligations/course/$instanceId'
+      fullPath: '/dashboard/my-obligations/course/$instanceId'
+      preLoaderRoute: typeof DashboardMyObligationsCourseInstanceIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/hive-training/course/$assignmentId': {
       id: '/dashboard/hive-training/course/$assignmentId'
       path: '/hive-training/course/$assignmentId'
@@ -4500,6 +4520,7 @@ interface DashboardRouteChildren {
   DashboardCoursesPolicyDocumentIdRoute: typeof DashboardCoursesPolicyDocumentIdRoute
   DashboardCoursesTopicTopicIdRoute: typeof DashboardCoursesTopicTopicIdRoute
   DashboardHiveTrainingCourseAssignmentIdRoute: typeof DashboardHiveTrainingCourseAssignmentIdRoute
+  DashboardMyObligationsCourseInstanceIdRoute: typeof DashboardMyObligationsCourseInstanceIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -4598,6 +4619,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesTopicTopicIdRoute: DashboardCoursesTopicTopicIdRoute,
   DashboardHiveTrainingCourseAssignmentIdRoute:
     DashboardHiveTrainingCourseAssignmentIdRoute,
+  DashboardMyObligationsCourseInstanceIdRoute:
+    DashboardMyObligationsCourseInstanceIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

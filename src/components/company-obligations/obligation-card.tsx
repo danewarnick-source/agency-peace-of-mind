@@ -62,6 +62,8 @@ import { FulfillmentBadge, RollupStatus, catalogFor, fulfillmentFor } from "./ob
 import { ObligationCatalogNote } from "./obligation-catalog-note";
 import { CATEGORY_LABEL, OWNER_LABEL } from "@/lib/sow-obligation-catalog";
 import { cn } from "@/lib/utils";
+import { isInHiveCourseTitle } from "@/lib/in-hive-training";
+import { resetInHiveExamAttempts } from "@/lib/in-hive-training.functions";
 
 export type ObligationWithInstance = CompanyObligationRow & {
   current_instance: ObligationInstanceRow | null;
@@ -254,6 +256,37 @@ function ConfirmNectarOverrideButton({
   );
 }
 
+function ResetExamAttemptsButton({
+  instanceId,
+  staffId,
+}: {
+  instanceId: string;
+  staffId: string;
+}) {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: () => resetInHiveExamAttempts({ instanceId, staffId }),
+    onSuccess: () => {
+      toast.success("Exam attempts reset. Staff can try again.");
+      void qc.invalidateQueries({ queryKey: ["in-hive-exam"] });
+      void qc.invalidateQueries({ queryKey: ["obligation-instance-context"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-6 px-1.5 text-[11px]"
+      disabled={m.isPending}
+      onClick={() => m.mutate()}
+    >
+      Reset exam
+    </Button>
+  );
+}
+
 function PerNameCompletion({
   orgId,
   obligation,
@@ -310,6 +343,11 @@ function PerNameCompletion({
         })) as AssigneeRow[],
         completions: (completions ?? []) as CompletionRow[],
         dueByStaff,
+        instanceByStaff: Object.fromEntries(
+          ((instRows ?? []) as Array<{ id: string; assignee_staff_id: string | null }>)
+            .filter((r) => r.assignee_staff_id)
+            .map((r) => [r.assignee_staff_id as string, r.id]),
+        ) as Record<string, string>,
       };
     },
   });
@@ -319,7 +357,8 @@ function PerNameCompletion({
   }
   if (!data) return null;
 
-  const { assignees, completions, dueByStaff } = data;
+  const { assignees, completions, dueByStaff, instanceByStaff } = data;
+  const showExamReset = isInHiveCourseTitle(obligation.title);
   const completedIds = new Set(completions.map((c) => c.staff_id));
   const notSubmitted = assignees.filter((a) => !completedIds.has(a.staff_id));
   const isClosed =
@@ -409,6 +448,12 @@ function PerNameCompletion({
                   <span className="truncate">
                     {a.staff_name} — {text}
                   </span>
+                  {showExamReset && instanceByStaff[a.staff_id] && (
+                    <ResetExamAttemptsButton
+                      instanceId={instanceByStaff[a.staff_id]}
+                      staffId={a.staff_id}
+                    />
+                  )}
                 </li>
               );
             })}

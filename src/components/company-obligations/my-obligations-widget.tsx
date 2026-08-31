@@ -21,6 +21,8 @@ import {
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
+import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
+import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
 
 const MY_OBLIGATIONS_KEY = "my-obligation-instances";
 
@@ -185,10 +187,24 @@ function EvidencePanel({
 
 function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligationInstanceRow }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [panelOpen, setPanelOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
   const ob = instance.obligation;
   const due = dueLabel(instance.due_at);
+  const courseId = inHiveCourseIdForTitle(ob.title);
+  const resumeQ = useQuery({
+    queryKey: ["in-hive-resume", user?.id, courseId],
+    enabled: !!user && !!courseId,
+    queryFn: () =>
+      hasAnyInHiveProgress(
+        user!.id,
+        courseId!,
+        courseId === "thirty-day"
+          ? "ABCDEFGHIJKLMNOPQRSTUVW".split("")
+          : "ABCDEF".split(""),
+      ),
+  });
 
   if (removed) return null;
 
@@ -209,7 +225,17 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
             {due.text}
           </p>
         </div>
-        {ob.evidence_type === "form" && isFormUuid(ob.linked_form_id) ? (
+        {courseId ? (
+          <Link
+            to="/dashboard/my-obligations/course/$instanceId"
+            params={{ instanceId: instance.id }}
+          >
+            <Button size="sm" variant="outline" className="shrink-0">
+              {resumeQ.data ? "Pick up where you left off" : "Open course"}{" "}
+              <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        ) : ob.evidence_type === "form" && isFormUuid(ob.linked_form_id) ? (
           <Link
             to="/dashboard/forms/$formId/fill"
             params={{ formId: ob.linked_form_id }}
@@ -234,7 +260,7 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
           </Button>
         )}
       </div>
-      {panelOpen && ob.evidence_type !== "form" && (
+      {panelOpen && !courseId && ob.evidence_type !== "form" && (
         <EvidencePanel orgId={orgId} instance={instance} onDone={onDone} />
       )}
     </li>

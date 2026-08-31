@@ -80,4 +80,60 @@ test.describe("Portal View on a phone-sized viewport", () => {
       "admin",
     );
   });
+
+  test("staff phone has no leftover search glass and tabs start at top", async ({ page }) => {
+    await openPortalViewMenu(page);
+    await page.getByTestId("portal-view-option-staff").tap();
+    await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("portal-view"))).toBe(
+      "staff",
+    );
+
+    await expect(page.getByRole("button", { name: "Open profile menu" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: /Open NECTAR search/i })).toHaveCount(0);
+    await expect(page.locator("[data-staff-top-bar]")).toHaveCount(1);
+    await expect(page.getByText(/form overdue/i)).toHaveCount(0);
+    await expect(page.getByText(/CE hrs left/i)).toHaveCount(0);
+    await expect(page.getByText(/Session Suspended/i)).toHaveCount(0);
+    await expect(page.locator("[data-caseload-search]").first()).toBeVisible();
+    await expect.poll(async () => page.locator("[data-caseload-search]").count()).toBe(1);
+
+    const searchIcons = await page.evaluate(() => {
+      return [...document.querySelectorAll("svg")].flatMap((svg) => {
+        const r = svg.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return [];
+        const cls = svg.getAttribute("class") ?? "";
+        const isSearch = cls.includes("lucide-search") || cls.includes("search");
+        if (!isSearch && r.x >= 8) return [];
+        return [
+          {
+            cls,
+            x: Math.round(r.x * 10) / 10,
+            y: Math.round(r.y * 10) / 10,
+            w: Math.round(r.width * 10) / 10,
+            inField: !!svg.closest("[data-caseload-search]"),
+          },
+        ];
+      });
+    });
+    const leftoverGlass = searchIcons.filter((i) => i.cls.includes("search") && i.x < 8);
+    expect(leftoverGlass, `search icons: ${JSON.stringify(searchIcons)}`).toEqual([]);
+    await shot(page, "staff_phone_caseload_no_leftover_glass");
+
+    const scroller = page.locator("[data-staff-phone-scroller]");
+    await expect(scroller).toBeVisible();
+    await scroller.evaluate((el) => {
+      const pad = document.createElement("div");
+      pad.style.height = "1400px";
+      pad.setAttribute("data-scroll-pad", "1");
+      el.appendChild(pad);
+      el.scrollTop = 320;
+    });
+    await expect.poll(async () => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+
+    await page.getByRole("link", { name: /^Daily Logs$/ }).tap();
+    await expect.poll(async () => scroller.evaluate((el) => el.scrollTop)).toBe(0);
+    await shot(page, "staff_phone_tab_dailylogs_from_top");
+  });
 });

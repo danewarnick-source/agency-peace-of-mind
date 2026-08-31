@@ -518,14 +518,20 @@ export function StaffClientGrid() {
         </div>
       </div>
 
-      {/* In-flow only — never sticky/fixed. A pinned search covers client names. */}
-      <div className="relative static">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/*
+        Flex, not absolute. An absolute glass in the hidden desktop Outlet
+        (staff phones still mount that tree) paints as a left-edge leftover.
+      */}
+      <div
+        data-caseload-search
+        className="flex h-11 w-full items-center gap-2 rounded-lg border border-input bg-card px-3"
+      >
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         <Input
           placeholder="Search by name…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="h-11 w-full pl-10 text-base"
+          className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0"
           inputMode="search"
           aria-label="Search caseload by name"
         />

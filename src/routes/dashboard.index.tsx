@@ -17,7 +17,6 @@ import { displayPersonName } from "@/lib/person-name";
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
-import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
@@ -234,12 +233,14 @@ function StaffCaseloadHome() {
             : "space-y-3"
         }
       >
-        <StaffPageHeader
-          eyebrow="My Day · Active Caseload"
-          eyebrowIcon={Users}
-          title="My Caseload"
-          subtitle="Your assigned clients, today's shift, and anything that needs your attention."
-        />
+        <div className="max-md:hidden">
+          <StaffPageHeader
+            eyebrow="My Day · Active Caseload"
+            eyebrowIcon={Users}
+            title="My Caseload"
+            subtitle="Your assigned clients, today's shift, and anything that needs your attention."
+          />
+        </div>
         {nectarOpen ? (
           <NectarPayPeriodCard open onOpenChange={onNectarOpenChange} />
         ) : null}
@@ -248,7 +249,6 @@ function StaffCaseloadHome() {
       {!nectarOpen ? (
         <NectarPayPeriodCard open={false} onOpenChange={onNectarOpenChange} />
       ) : null}
-      <AttentionStrip />
       <PoliciesToAcknowledgeCard />
       <ComplianceInbox />
       <StaffClientGrid />

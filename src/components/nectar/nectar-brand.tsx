@@ -24,9 +24,12 @@ const cn = (...c: Array<string | false | null | undefined>) => c.filter(Boolean)
 export function NectarMark({
   size = "md",
   className,
+  ornament = true,
 }: {
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** Gold sparkle badge. Off on staff phone so it is not read as a pin. */
+  ornament?: boolean;
 }) {
   const dims = size === "sm" ? "h-7 w-7" : size === "lg" ? "h-16 w-16" : "h-10 w-10";
   const hex = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-9 w-9" : "h-5 w-5";
@@ -42,9 +45,11 @@ export function NectarMark({
       )}
     >
       <Hexagon className={cn(hex)} fill="none" strokeWidth={1.6} />
-      <span className="absolute -right-0.5 -top-0.5 inline-flex items-center justify-center rounded-full bg-[var(--hive-gold)] p-[2px] text-[var(--hive-on-gold)] shadow-sm">
-        <Sparkles className={spark} strokeWidth={2.5} />
-      </span>
+      {ornament ? (
+        <span className="absolute -right-0.5 -top-0.5 inline-flex items-center justify-center rounded-full bg-[var(--hive-gold)] p-[2px] text-[var(--hive-on-gold)] shadow-sm">
+          <Sparkles className={spark} strokeWidth={2.5} />
+        </span>
+      ) : null}
     </span>
   );
 }

@@ -11,6 +11,25 @@ GitHub repo and main branch. Lovable's build, `wrangler.jsonc`, and
 `src/server.ts`'s Cloudflare entry are untouched — nothing here changes how
 Lovable deploys.
 
+**Backend is Hive-Platform Supabase Cloud.** Project ref
+`dhrrukdcigiiqksibdfb` (`https://dhrrukdcigiiqksibdfb.supabase.co`).
+Site URL is `https://hivecertify.com`. Do **not** self-host Supabase.
+Do **not** point CloudFront or GitHub Actions at the retired Lovable
+project `mmknqtdrefbzwfdtykza`. Do **not** turn on Cognito for the
+parallel AWS frontend.
+
+Copy **Vercel production** `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` into
+GitHub Actions secrets (and the matching `SUPABASE_*` values). Never
+copy the Lovable project. Lambda `hive-app-server` runtime env must
+use the same Hive-Platform values. After secrets are set, re-run
+**Deploy AWS (parallel target)**.
+
+CI after `build:lambda` scans `.output/public` and **fails the job** if
+the client still contains `mmknqtdrefbzwfdtykza` or a legacy JWT anon
+key (`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…`). Live JS on
+hivecertify.com must contain `dhrrukdcigiiqksibdfb`.
+
 For **Cognito + RDS + S3** (env-gated, default remains Supabase) see
 `docs/AWS_DUAL_RUN.md`. That path is off until you set those ECS variables.
 Do not delete the Supabase project.
@@ -232,7 +251,7 @@ and service.
            { "name": "NODE_ENV",                 "value": "production" },
            { "name": "PORT",                     "value": "8080" },
            { "name": "AWS_REGION",               "value": "us-east-1" },
-           { "name": "SUPABASE_URL",             "value": "https://mmknqtdrefbzwfdtykza.supabase.co" },
+           { "name": "SUPABASE_URL",             "value": "https://dhrrukdcigiiqksibdfb.supabase.co" },
            { "name": "SUPABASE_PUBLISHABLE_KEY", "value": "YOUR_SUPABASE_PUBLISHABLE_KEY" },
            { "name": "BEDROCK_MODEL_ID",         "value": "YOUR_BEDROCK_MODEL_ID" }
          ],
@@ -488,12 +507,16 @@ Add (or update) each **Repository secret**:
 | `AWS_ECS_CLUSTER` | `hive-cluster` |
 | `AWS_ECS_SERVICE` | `hive-app-server` |
 | `AWS_CLOUDFRONT_DISTRIBUTION_ID` | from Step 5.8 (leave unset until distribution exists) |
-| `AWS_PUBLIC_SITE_URL` | `https://d1234abcd.cloudfront.net` from Step 5.8 |
-| `SUPABASE_URL` | `https://mmknqtdrefbzwfdtykza.supabase.co` |
-| `VITE_SUPABASE_URL` | `https://mmknqtdrefbzwfdtykza.supabase.co` |
-| `SUPABASE_PUBLISHABLE_KEY` | your publishable/anon key |
+| `AWS_PUBLIC_SITE_URL` | `https://hivecertify.com` |
+| `SUPABASE_URL` | `https://dhrrukdcigiiqksibdfb.supabase.co` (Hive-Platform — copy from Vercel production, never Lovable) |
+| `VITE_SUPABASE_URL` | `https://dhrrukdcigiiqksibdfb.supabase.co` (same as Vercel production) |
+| `SUPABASE_PUBLISHABLE_KEY` | Hive-Platform `sb_publishable_…` from Vercel production (not a legacy JWT anon key) |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | same |
-| `VITE_SUPABASE_PROJECT_ID` | `mmknqtdrefbzwfdtykza` |
+| `VITE_SUPABASE_PROJECT_ID` | `dhrrukdcigiiqksibdfb` |
+
+Also set Lambda `hive-app-server` runtime env to the same Hive-Platform
+`SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` (and service-role from
+`hive/ecs/supabase-service-role`). Then re-run **Deploy AWS**.
 
 > **Secrets no longer needed** (safe to delete): `AWS_LAMBDA_FUNCTION_NAME`,
 > `AWS_APPRUNNER_SERVICE_ARN`.

@@ -37,9 +37,8 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   return (
     <nav
       aria-label="Primary"
-      className={`${positioning} border-t border-white/10 text-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)]`}
+      className={`${positioning} border-t border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]`}
       style={{
-        backgroundImage: "var(--gradient-navy)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
@@ -56,7 +55,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                 <button
                   type="button"
                   onClick={() => setUpgradeFeatureKey(t.feature!)}
-                  className="relative flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight text-white/35 transition-all duration-150 active:scale-[0.95]"
+                  className="relative flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight text-[var(--hive-chrome-text)]/35 transition-all duration-150 active:scale-[0.95]"
                   aria-label={`${t.label} — locked. Click to request upgrade.`}
                 >
                   <Icon className="h-5 w-5" strokeWidth={2} />
@@ -68,16 +67,15 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                   to={t.to}
                   data-tour={`nav.${t.to.replace(/^\/dashboard\/?/, "") || "home"}`}
                   className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight transition-all duration-150 active:scale-[0.95] ${
-                    active ? "text-[oklch(var(--accent-2))]" : "text-white/65 hover:text-white"
+                    active
+                      ? "text-[var(--hive-gold)]"
+                      : "text-[var(--hive-chrome-text)]/65 hover:text-[var(--hive-chrome-text)]"
                   }`}
                 >
                   <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                   <span className="truncate">{t.label}</span>
                   {active && (
-                    <span
-                      className="absolute top-0 h-0.5 w-8 rounded-full"
-                      style={{ backgroundImage: "var(--gradient-amber)" }}
-                    />
+                    <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--hive-gold)]" />
                   )}
                 </Link>
               )}

@@ -518,18 +518,16 @@ export function StaffClientGrid() {
         </div>
       </div>
 
-      <div className="sticky top-14 z-10 -mx-3 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:top-0">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="h-11 w-full pl-10 text-base"
-            inputMode="search"
-            aria-label="Search caseload by name"
-          />
-        </div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search by name…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-11 w-full pl-10 text-base"
+          inputMode="search"
+          aria-label="Search caseload by name"
+        />
       </div>
 
       {isLoading ? (

@@ -198,10 +198,12 @@ test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () =
     await caseloadHint.waitFor({ state: "visible", timeout: 20_000 }).catch(() => undefined);
     if (await caseloadHint.isVisible().catch(() => false)) {
       await expect(page.getByRole("link", { name: /Open Punch pad for (Tommy Jones|Blake Stevens)/i })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: /Open time clock/i })).toHaveCount(0);
       const hostHomeCopy = page.getByText(/Daily note — hosts do not clock in/i);
       if (await hostHomeCopy.isVisible().catch(() => false)) {
         await expect(hostHomeCopy).toBeVisible();
         await expect(page.getByRole("link", { name: /Open Punch pad/i })).toHaveCount(0);
+        await expect(page.getByRole("link", { name: /Open time clock/i })).toHaveCount(0);
         await expect(page.getByRole("link", { name: /Open daily note/i }).first()).toBeVisible();
       }
       const blakeRow = page.getByText("Blake Stevens", { exact: true }).first();
@@ -211,10 +213,11 @@ test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () =
           timeout: 10_000,
         }).catch(() => undefined);
       }
-      const hubCta = page.getByRole("link", { name: /Open daily note for Blake Stevens/i });
+      const hubCta = page.getByRole("link", { name: /Open daily note( \(HHS\))? for Blake Stevens/i });
       if (await hubCta.isVisible().catch(() => false)) {
         await expect(hubCta).toBeVisible();
         await expect(page.getByRole("link", { name: /Open Punch pad for Blake Stevens/i })).toHaveCount(0);
+        await expect(page.getByRole("link", { name: /Open time clock/i })).toHaveCount(0);
         await hubCta.click();
       }
       if (page.url().includes(`/hhs-hub/${CLIENTS.blake.id}`)) {

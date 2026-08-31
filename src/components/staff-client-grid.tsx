@@ -8,22 +8,24 @@ import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
 import {
   useMyAssignments,
   allowedCodesFor,
+  caseloadCardActions,
+  caseloadDailyNoteLabel,
   clientAuthorizedCodes,
   defaultCaseloadCode,
-  firstClockableCode,
   hasHostHomeDailyCode,
+  hostHomeDailyNoteCode,
   isHostHomeDailyNoteCard,
   stackDualCaseloadActions,
   type AssignmentMap,
 } from "@/hooks/use-my-assignments";
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
+import { useTodayDailyNoteClients } from "@/hooks/use-today-daily-notes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   User,
   Search,
-  Clock,
   Home,
   Info,
   ChevronDown,
@@ -87,12 +89,16 @@ function ClientDetail({
   assignments,
   trainings,
   stackDual,
+  cardActionsVisible,
+  dailyNoteDone,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
   assignments: AssignmentMap | undefined;
   trainings: ClientTraining[];
   stackDual: boolean;
+  cardActionsVisible: boolean;
+  dailyNoteDone: boolean;
 }) {
   const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
@@ -218,38 +224,42 @@ function ClientDetail({
         </div>
       )}
 
-      {stackDual ? (
+      {cardActionsVisible || stackDual ? (
         <p className="text-center text-xs text-muted-foreground">
-          Punch pad is for the hourly code. Daily note is for HHS — available even while clocked in.
+          {isOnTheClock && daily
+            ? "Daily note is for HHS. Open time clock returns you to the punch already in progress."
+            : isOnTheClock
+              ? "Open time clock returns you to the punch already in progress."
+              : daily
+                ? "Daily note · PCSP narrative · month-end paperwork"
+                : "Start a new punch from the Punch pad tab — not from this card."}
         </p>
-      ) : (
+      ) : daily ? (
         <div>
-          <Button
-            asChild
-            size="lg"
-            className={[
-              "h-12 w-full text-base",
-              isOnTheClock ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48]" : "",
-            ].join(" ")}
-            aria-label={`${
-              isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"
-            } for ${fullName} (${selected})`}
-          >
+          <Button asChild size="lg" className="h-12 w-full text-base">
             <Link
-              to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
+              to="/dashboard/hhs-hub/$clientId"
               params={{ clientId: c.id }}
-              search={daily ? undefined : { tab: "clock-in", code: selected }}
+              aria-label={`${caseloadDailyNoteLabel({
+                code: selected || "HHS",
+                alreadyDoneToday: dailyNoteDone,
+              })} for ${fullName}`}
             >
-              {daily && !isOnTheClock ? <Home /> : <Clock />}
-              {isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"}
+              <Home />
+              {caseloadDailyNoteLabel({
+                code: selected || "HHS",
+                alreadyDoneToday: dailyNoteDone,
+              })}
             </Link>
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground">
-            {daily
-              ? "Daily note · PCSP narrative · month-end paperwork"
-              : "EVV time punch · shift & month-end paperwork"}
+            Daily note · PCSP narrative · month-end paperwork
           </p>
         </div>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground">
+          Start a new punch from the Punch pad tab — not from this card.
+        </p>
       )}
     </div>
   );
@@ -264,6 +274,7 @@ function ClientRow({
   isOpen,
   onToggle,
   trainings,
+  dailyNoteDone,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
@@ -273,6 +284,7 @@ function ClientRow({
   isOpen: boolean;
   onToggle: () => void;
   trainings: ClientTraining[];
+  dailyNoteDone: boolean;
 }) {
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
   useTick(isOnTheClock);
@@ -287,17 +299,20 @@ function ClientRow({
     todayJobCode: todayShift?.job_code,
     isOnTheClock,
   });
+  const actions = caseloadCardActions({
+    codes: effectiveCodes,
+    isOnTheClock,
+    hasClockableShiftToday: hasClockableToday,
+  });
   const stackDual = stackDualCaseloadActions({
     codes: effectiveCodes,
     isHostHomeDailyNoteCard: hostHomeCard,
     hasClockableShiftToday: hasClockableToday,
     isOnTheClock,
   });
-  const punchCode = isOnTheClock
-    ? activeShift!.service_type_code
-    : todayShift && isClockableServiceCode(todayShift.job_code)
-      ? todayShift.job_code
-      : firstClockableCode(effectiveCodes);
+  const punchCode = isOnTheClock ? activeShift!.service_type_code : "";
+  const dailyNoteCode = actions.showDailyNote ? hostHomeDailyNoteCode(effectiveCodes) : "";
+  const cardActionsVisible = actions.showDailyNote || actions.showTimeClock;
 
   const hasTrainingDue = trainings.some(
     (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
@@ -393,13 +408,15 @@ function ClientRow({
         />
       </button>
 
-      {stackDual ? (
+      {cardActionsVisible ? (
         <div className="border-t border-border px-4 py-3">
           <DualCaseloadActions
             clientId={c.id}
             fullName={fullName}
             punchCode={punchCode}
             isOnTheClock={isOnTheClock}
+            dailyNoteCode={dailyNoteCode || null}
+            dailyNoteDone={dailyNoteDone}
           />
         </div>
       ) : null}
@@ -412,6 +429,8 @@ function ClientRow({
             assignments={assignments}
             trainings={trainings}
             stackDual={stackDual}
+            cardActionsVisible={cardActionsVisible}
+            dailyNoteDone={dailyNoteDone}
           />
         </div>
       )}
@@ -425,6 +444,7 @@ export function StaffClientGrid() {
   const { data: nectar } = useNectarPayPeriod();
   const { data: assignments } = useMyAssignments();
   const { data: todayShifts = [] } = useTodayShifts();
+  const { data: todayNotes } = useTodayDailyNoteClients();
   const fetchCT = useServerFn(getMyClientTrainingStatuses);
   const { data: ct } = useQuery({
     queryKey: ["my-client-training-statuses"],
@@ -493,9 +513,9 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily
-            note — hosts do not clock on that card. A clockable shift today (DSI, SLH, SEI, …) is a
-            separate Punch pad row. EVV is submitted by CSV.
+            Tap a person to view services. Host home (HHS) always has a daily-note action. Open time
+            clock appears only when you are already punched in. Start a new punch from the Punch pad
+            tab. EVV is submitted by CSV.
           </p>
         </div>
       </div>
@@ -535,6 +555,7 @@ export function StaffClientGrid() {
                 isOpen={openId === c.id}
                 onToggle={() => setOpenId((id) => (id === c.id ? null : c.id))}
                 trainings={trainingsByClient.get(c.id) ?? []}
+                dailyNoteDone={!!todayNotes?.has(c.id)}
               />
             </li>
           ))}

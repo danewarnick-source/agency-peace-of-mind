@@ -21,7 +21,7 @@ export type ActiveTimesheet = {
 
 /**
  * Returns the current staff's next/active scheduled shift for today
- * (published OR accepted), plus any currently-open EVV timesheet.
+ * (assigned, including unpublished drafts), plus any currently-open EVV timesheet.
  */
 export function useTodayShift() {
   const { user } = useAuth();
@@ -42,7 +42,7 @@ export function useTodayShift() {
         .eq("organization_id", org!.organization_id)
         .gte("starts_at", start.toISOString())
         .lte("starts_at", end.toISOString())
-        .or("published.eq.true,status.eq.accepted")
+        .neq("status", "cancelled")
         .order("starts_at", { ascending: true });
       if (error) throw error;
 

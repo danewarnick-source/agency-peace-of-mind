@@ -221,12 +221,31 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await expect(page.getByText(/Open \(no one assigned\)|Open/i).first()).toBeVisible({ timeout: 8_000 });
     await saveShot(page, "05b-unassigned-open");
 
-    // Staff view empty state for Riley (no published shifts).
+    // Staff view empty state for Riley (no assigned shifts).
     await openStaffPreviewPicker(page);
     await page.getByRole("option", { name: /Riley NoShifts/i }).click();
     await expect(page.getByText(/No shifts/i).first()).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText(/Only published shifts appear here/i)).toBeVisible();
+    await expect(page.getByText(/Assigned shifts appear here/i)).toBeVisible();
     await saveShot(page, "05c-staff-view-empty");
+  });
+
+  test("5b. unpublished assigned shift still appears on Staff view and as one clean bar", async ({ page }) => {
+    await openAdminScheduler(page);
+    await page.goto("/dashboard/scheduler", { waitUntil: "domcontentloaded" });
+    await waitForSchedulerChrome(page);
+    await goToSep1(page);
+    await expandCode(page, "SLH");
+
+    // Day-view bar: one readable label, not stacked name+time layers.
+    const slhBar = page.getByRole("button", { name: /Stephen · 10:00\s*AM\s*[–-]\s*2:00\s*PM/i }).first();
+    await expect(slhBar).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: /Stephen · 4:00\s*PM\s*[–-]\s*6:00\s*PM/i })).toBeVisible();
+
+    await openStaffPreviewPicker(page);
+    await page.getByRole("option", { name: /Stephen Prince/i }).click();
+    await expect(page.getByText(/Tom Jones · SLH · 10:00\s*AM\s*[–-]\s*2:00\s*PM/i)).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(/Tom Jones · SLH · 4:00\s*PM\s*[–-]\s*6:00\s*PM · Draft/i)).toBeVisible();
+    await saveShot(page, "05d-staff-view-draft-assigned");
   });
 
   test("6. staff-only users do not get the full admin scheduler", async ({ page }) => {

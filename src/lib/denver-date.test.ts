@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   addCalendarMonths,
   daysInCalendarMonth,
+  denverWallToIso,
   denverYmd,
   denverYmdFromInstant,
   parseYmd,
@@ -27,5 +28,15 @@ describe("denver-date", () => {
   it("walks calendar months", () => {
     assert.deepEqual(addCalendarMonths(2026, 12, 1), { year: 2027, month: 1 });
     assert.deepEqual(addCalendarMonths(2026, 1, -1), { year: 2025, month: 12 });
+  });
+
+  it("maps Denver wall-clock midnight and 10am to the same calendar day", () => {
+    const midnight = denverWallToIso("2026-08-31", 0, 0);
+    const ten = denverWallToIso("2026-08-31", 10, 0);
+    assert.equal(denverYmd(new Date(midnight)), "2026-08-31");
+    assert.equal(denverYmd(new Date(ten)), "2026-08-31");
+    // MDT = UTC-6
+    assert.equal(midnight, "2026-08-31T06:00:00.000Z");
+    assert.equal(ten, "2026-08-31T16:00:00.000Z");
   });
 });

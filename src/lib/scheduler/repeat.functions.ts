@@ -11,6 +11,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { newShiftStatus } from "@/lib/scheduling/shift-status";
+import { expandRecurringOccurrences, occurrenceSlotKey } from "@/lib/scheduler/recurrence";
 
 type ShiftRow = {
   id: string;
@@ -29,13 +30,6 @@ function startOfDay(iso: string): Date {
   const d = new Date(iso);
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-function shiftDateOnly(src: Date, targetDay: Date): Date {
-  // Keep src time-of-day, replace y/m/d with targetDay.
-  const out = new Date(targetDay);
-  out.setHours(src.getHours(), src.getMinutes(), src.getSeconds(), src.getMilliseconds());
-  return out;
 }
 
 async function loadSourceShifts(
@@ -265,81 +259,65 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
     if (sErr) throw sErr;
     if (!seed) throw new Error("Seed shift not found.");
 
-    const seedStart = new Date(seed.starts_at);
-    const seedEnd = new Date(seed.ends_at);
-    const durationMs = seedEnd.getTime() - seedStart.getTime();
-    // Indefinite = open-ended series: fill to the hard cap (200) / 2yr scan.
     const cap = data.indefinite ? 200 : Math.min(data.count ?? 200, 200);
-    const until = data.indefinite
+    const untilYmd = data.indefinite
       ? null
-      : (data.until_date ? startOfDay(data.until_date) : null);
+      : (data.until_date ? data.until_date.slice(0, 10) : null);
 
-    const dates: Date[] = [];
-    if (data.freq === "daily") {
-      const cur = new Date(seedStart);
-      for (let i = 0; i < cap; i++) {
-        cur.setDate(cur.getDate() + 1);
-        if (until && startOfDay(cur.toISOString()) > until) break;
-        dates.push(new Date(cur));
-      }
-    } else if (data.freq === "weekly") {
-      const days = (data.weekdays && data.weekdays.length > 0)
-        ? Array.from(new Set(data.weekdays)).sort()
-        : [seedStart.getDay()];
-      const cur = new Date(seedStart);
-      let added = 0;
-      // Walk forward day-by-day; safer than week-stepping when multi-day select.
-      while (added < cap) {
-        cur.setDate(cur.getDate() + 1);
-        if (until && startOfDay(cur.toISOString()) > until) break;
-        if (days.includes(cur.getDay())) {
-          dates.push(new Date(cur));
-          added++;
-        }
-        // Hard sanity break — at most 2 years scan
-        if ((cur.getTime() - seedStart.getTime()) > 1000 * 60 * 60 * 24 * 730) break;
-      }
-    } else {
-      // monthly
-      const targetDom = data.day_of_month ?? seedStart.getDate();
-      const cur = new Date(seedStart);
-      for (let i = 0; i < cap; i++) {
-        cur.setMonth(cur.getMonth() + 1);
-        // clamp to last day of month
-        const lastDom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
-        cur.setDate(Math.min(targetDom, lastDom));
-        if (until && startOfDay(cur.toISOString()) > until) break;
-        dates.push(new Date(cur));
-      }
-    }
-
-    if (dates.length === 0) return { inserted: 0 };
+    const occurrences = expandRecurringOccurrences({
+      seedStartIso: seed.starts_at,
+      seedEndIso: seed.ends_at,
+      freq: data.freq,
+      weekdays: data.freq === "weekly" ? data.weekdays : undefined,
+      dayOfMonth: data.freq === "monthly" ? data.day_of_month : undefined,
+      count: cap,
+      untilYmd,
+    });
+    if (occurrences.length === 0) return { inserted: 0 };
 
     const code = (seed.service_code ?? seed.job_code ?? "").toUpperCase();
-    const rows = dates.map((d) => {
-      const starts = shiftDateOnly(seedStart, d);
-      const ends = new Date(starts.getTime() + durationMs);
-      return {
-        organization_id: data.organization_id,
-        staff_id: seed.staff_id,
-        client_id: seed.client_id,
-        service_code: code,
-        job_code: code,
-        shift_type: seed.shift_type ?? "hourly",
-        starts_at: starts.toISOString(),
-        ends_at: ends.toISOString(),
-        is_awake_overnight: seed.is_awake_overnight,
-        notes: seed.notes,
-        status: newShiftStatus(seed.staff_id),
-        published: false,
-        created_by: userId,
-        // CHECK allowlist: manual|template|nectar|import|rotation (not "recurring")
-        created_from: "manual",
-      };
-    });
+    const rows = occurrences.map((occ) => ({
+      organization_id: data.organization_id,
+      staff_id: seed.staff_id,
+      client_id: seed.client_id,
+      service_code: code,
+      job_code: code,
+      shift_type: seed.shift_type ?? "hourly",
+      starts_at: occ.startsAt,
+      ends_at: occ.endsAt,
+      is_awake_overnight: seed.is_awake_overnight,
+      notes: seed.notes,
+      status: newShiftStatus(seed.staff_id),
+      published: false,
+      created_by: userId,
+      // CHECK allowlist: manual|template|nectar|import|rotation (not "recurring")
+      created_from: "manual",
+    }));
+
+    // Skip slots that already exist (seed day, or a second "Repeat" click).
+    const rangeStart = rows[0]!.starts_at;
+    const rangeEnd = rows[rows.length - 1]!.starts_at;
+    const { data: existing, error: exErr } = await supabase
+      .from("scheduled_shifts")
+      .select("staff_id, client_id, starts_at")
+      .eq("organization_id", data.organization_id)
+      .eq("client_id", seed.client_id)
+      .gte("starts_at", rangeStart)
+      .lte("starts_at", rangeEnd);
+    if (exErr) throw exErr;
+    const taken = new Set(
+      (existing ?? []).map((e: { staff_id: string | null; client_id: string; starts_at: string }) =>
+        occurrenceSlotKey(e.staff_id, e.client_id, e.starts_at),
+      ),
+    );
+    const toInsert = rows.filter(
+      (r) => !taken.has(occurrenceSlotKey(r.staff_id, r.client_id, r.starts_at)),
+    );
+    if (toInsert.length === 0) return { inserted: 0 };
+
     const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
-    await gateScheduledShiftInsert(supabase, rows as never, { mode: "bulk_auto", userId });
-    const { error } = await supabase.from("scheduled_shifts").insert(rows);
+    await gateScheduledShiftInsert(supabase, toInsert as never, { mode: "bulk_auto", userId });
+    const { error } = await supabase.from("scheduled_shifts").insert(toInsert);
     if (error) throw error;
-    return { inserted: rows.length };
+    return { inserted: toInsert.length };
   });

@@ -32,6 +32,7 @@ import {
 import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import { getAgencyPolicyForInstance } from "@/lib/agency-policies.functions";
 import { policyMediaKind } from "@/lib/agency-policies";
+import { countStaffObligationsNeedingAttention } from "@/lib/staff-obligation-attention";
 
 function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
   return courseId === "thirty-day"
@@ -694,7 +695,11 @@ function MyObligationsPage() {
   const overlayDone = overlayOpen.filter((o) => o.done);
   const dueSoon = open.filter((i) => !dueLabel(i.due_at).overdue);
   const overdue = open.filter((i) => dueLabel(i.due_at).overdue);
-  const openCount = open.length + overlayDue.length;
+  const openCount = countStaffObligationsNeedingAttention(
+    instances,
+    myCompletions,
+    clientTrainings,
+  );
   const completedCount = completed.length + overlayDone.length;
 
   const shown =

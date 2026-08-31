@@ -74,6 +74,7 @@ import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks, Clock } from "lucide-react";
 import { FeatureLockedRoute, UpgradeGate } from "@/components/upgrade-gate";
 import { useActionRequiredQueue } from "@/hooks/use-action-required-queue";
+import { useMyOpenObligationCount } from "@/hooks/use-my-open-obligation-count";
 import { useYieldToAdminHomeQueries } from "@/hooks/use-yield-to-admin-home";
 import { isAdminHomePath } from "@/lib/yield-to-admin-home";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
@@ -281,6 +282,7 @@ type SidebarBodyProps = {
   inboxUnread: number;
   complianceActionCount: number;
   complianceQueueLoading: boolean;
+  staffObligationAttention: number;
 };
 
 function DashboardLayout() {
@@ -544,6 +546,7 @@ function DashboardLayout() {
     useActionRequiredQueue(isAdminCapable ? (org?.organization_id ?? null) : null, {
       enabled: layoutReady,
     });
+  const staffObligationAttention = useMyOpenObligationCount(effectiveView === "staff");
 
   const currentPreviewState = isStatePreview
     ? (states.find((s) => s.code === stateCode) ?? null)
@@ -689,6 +692,7 @@ function DashboardLayout() {
     inboxUnread,
     complianceActionCount,
     complianceQueueLoading,
+    staffObligationAttention,
   };
 
   return (
@@ -979,6 +983,7 @@ function SidebarBody({
   inboxUnread,
   complianceActionCount,
   complianceQueueLoading,
+  staffObligationAttention,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   // Domain sections in the Executive Command Center sidebar are collapsed by
@@ -1245,6 +1250,15 @@ function SidebarBody({
                   className="h-4 w-4"
                 />
                 <span className="flex-1">{item.label}</span>
+                {item.to === "/dashboard/my-obligations" && staffObligationAttention > 0 && (
+                  <span
+                    aria-label={`${staffObligationAttention} obligations need attention`}
+                    className="inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-white"
+                    style={{ backgroundColor: "var(--hive-danger)" }}
+                  >
+                    {staffObligationAttention > 99 ? "99+" : staffObligationAttention}
+                  </span>
+                )}
                 {item.to === "/dashboard/company-obligations" &&
                   !complianceQueueLoading &&
                   complianceActionCount > 0 && (

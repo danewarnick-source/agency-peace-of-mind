@@ -79,7 +79,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                     {t.code === "obligations" && obligationAttention > 0 && (
                       <span
                         aria-label={`${obligationAttention} obligations need attention`}
-                        className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hive-danger)] px-1 text-[9px] font-bold leading-none text-white"
+                        className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hive-danger)] px-1 text-[9px] font-bold leading-none tabular-nums text-white"
                       >
                         {obligationAttention > 99 ? "99+" : obligationAttention}
                       </span>

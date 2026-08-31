@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { StaffTopBar } from "./staff-top-bar";
 import { StaffBottomTabs } from "./staff-bottom-tabs";
@@ -6,6 +6,7 @@ import { ActiveShiftBar } from "./active-shift-bar";
 import { CapThresholdModal } from "./cap-threshold-modal";
 import { MobileShellProvider, useMobileShellContainer } from "./mobile-shell-context";
 import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
+import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
 
 /**
  * Mobile-only chrome for the staff portal. The shell is a fixed-viewport
@@ -33,11 +34,16 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
   const barVisible = useActiveShiftBarVisible();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAskNectar = pathname.startsWith("/dashboard/ask-nectar");
+  const mainRef = useRef<HTMLElement>(null);
   // Stable callback ref — only updates on mount/unmount.
   const ref = useCallback(
     (el: HTMLDivElement | null) => setContainer(el),
     [setContainer],
   );
+  // Tab switches reuse this <main>. Instant top — no mid-page land, no library.
+  useLayoutEffect(() => {
+    resetStaffPhoneScroll(mainRef.current);
+  }, [pathname]);
   return (
     <div
       ref={ref}
@@ -52,6 +58,8 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
         the space is reclaimed automatically.
       */}
       <main
+        ref={mainRef}
+        data-staff-phone-scroller
         className={
           isAskNectar
             ? "flex-1 overflow-hidden overscroll-none"

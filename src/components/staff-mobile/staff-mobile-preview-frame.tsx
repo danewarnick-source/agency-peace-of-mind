@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { Smartphone } from "lucide-react";
 import { StaffTopBar } from "./staff-top-bar";
@@ -10,6 +10,7 @@ import {
   MobileShellProvider,
   useMobileShellContainer,
 } from "./mobile-shell-context";
+import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
 
 const DEVICES = [
   { id: "se", label: "iPhone SE", w: 375, h: 667 },
@@ -100,10 +101,14 @@ function FrameScreen({
   const barVisible = useActiveShiftBarVisible();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAskNectar = pathname.startsWith("/dashboard/ask-nectar");
+  const mainRef = useRef<HTMLElement>(null);
   const ref = useCallback(
     (el: HTMLDivElement | null) => setContainer(el),
     [setContainer],
   );
+  useLayoutEffect(() => {
+    resetStaffPhoneScroll(mainRef.current);
+  }, [pathname]);
   return (
     <div
       ref={ref}
@@ -116,6 +121,8 @@ function FrameScreen({
             so page content never hides behind it. Bottom tabs already
             accounted for via pb-20. */}
         <main
+          ref={mainRef}
+          data-staff-phone-scroller
           className={
             isAskNectar
               ? "flex-1 overflow-hidden bg-[#f7f8fb]"

@@ -80,4 +80,29 @@ test.describe("Portal View on a phone-sized viewport", () => {
       "admin",
     );
   });
+
+  test("staff phone has no leftover search glass and tabs start at top", async ({ page }) => {
+    await openPortalViewMenu(page);
+    await page.getByTestId("portal-view-option-staff").tap();
+    await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("portal-view"))).toBe(
+      "staff",
+    );
+
+    await expect(page.getByRole("button", { name: "Open profile menu" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: /Open NECTAR search/i })).toHaveCount(0);
+    await expect(page.locator("[data-caseload-search]")).toBeVisible();
+
+    const scroller = page.locator("[data-staff-phone-scroller]");
+    await expect(scroller).toBeVisible();
+    await scroller.evaluate((el) => {
+      el.scrollTop = 320;
+    });
+    await expect.poll(async () => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+
+    await page.getByRole("link", { name: /^Schedule$/ }).tap();
+    await expect.poll(async () => scroller.evaluate((el) => el.scrollTop)).toBe(0);
+    await shot(page, "staff_phone_tab_schedule_from_top");
+  });
 });

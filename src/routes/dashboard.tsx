@@ -664,6 +664,7 @@ function DashboardLayout() {
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ??
     "Dashboard";
   const isStaffView = effectiveView === "staff";
+  const isStaffPhoneChrome = isStaffView && !isMobilePreview;
   const inboxUnread = unreadQ.data?.count ?? 0;
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
@@ -708,7 +709,7 @@ function DashboardLayout() {
           )}
 
           {/* Mobile shell — staff view only (below md) */}
-          {isStaffView && !isMobilePreview && (
+          {isStaffPhoneChrome && (
             <StaffMobileShell title={pageTitle}>
               <Outlet />
             </StaffMobileShell>
@@ -717,7 +718,7 @@ function DashboardLayout() {
           {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
           <div
             className={
-              isStaffView && !isMobilePreview
+              isStaffPhoneChrome
                 ? "hidden min-h-0 min-w-0 w-full flex-1 md:grid md:grid-cols-[260px_minmax(0,1fr)]"
                 : "grid min-h-0 min-w-0 w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)]"
             }
@@ -738,7 +739,7 @@ function DashboardLayout() {
                 <div className="flex items-center gap-2 min-w-0">
                   {/* Staff phones use the avatar drawer. Keep this control out of
                   that tree so it is not a 0×0 ghost. Hive-exec + admin phones keep it. */}
-                  {!(isStaffView && !isMobilePreview) && (
+                  {!isStaffPhoneChrome && (
                     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                       <SheetTrigger asChild>
                         <Button
@@ -794,7 +795,11 @@ function DashboardLayout() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {!isHiveExecView && (
+                  {/* Staff phones already have Ask Nectar as a tab + in-flow
+                  caseload search. Leaving this trigger in the hidden desktop
+                  tree paints a leftover glass on iOS (same class as the
+                  hamburger 0×0 ghost). */}
+                  {!isHiveExecView && !isStaffPhoneChrome && (
                     <button
                       type="button"
                       aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
@@ -826,7 +831,7 @@ function DashboardLayout() {
               </header>
               {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
-              {mobileSearchOpen && !isHiveExecView && (
+              {mobileSearchOpen && !isHiveExecView && !isStaffPhoneChrome && (
                 <div className="border-b border-[var(--hive-border)] bg-[var(--hive-sidebar)] px-4 py-2 md:hidden">
                   <NectarSearchBar
                     nav={allNav.map((n) => ({ to: n.to, label: n.label }))}

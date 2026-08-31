@@ -518,8 +518,12 @@ export function StaffClientGrid() {
         </div>
       </div>
 
-      {/* In-flow only — never sticky/fixed. A pinned search covers client names. */}
-      <div className="relative static">
+      {/*
+        In-flow only. `relative` (not static/sticky/fixed) is the containing
+        block for the glass. `static` lets the icon attach to the fixed
+        staff shell and ride the left edge as a leftover ghost.
+      */}
+      <div className="relative" data-caseload-search>
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search by name…"

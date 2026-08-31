@@ -8,7 +8,6 @@ import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
 import { useCountUp } from "@/hooks/use-count-up";
-import { HexWatermark } from "@/components/brand/hex-watermark";
 import { NectarBadge } from "@/components/nectar/nectar-brand";
 
 const fmtHours = (n: number) => `${n.toFixed(1)} hrs`;
@@ -22,16 +21,20 @@ const fmtUSD = (n: number) =>
  * daily earnings only update when a daily log is filed.
  */
 export function NectarPayPeriodCard({
+  open: openProp,
   onOpenChange,
 }: {
+  open?: boolean;
   onOpenChange?: (open: boolean) => void;
 } = {}) {
   const { data } = useNectarPayPeriod();
   const live = useLivePayPeriod();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
 
   const setExpanded = (next: boolean) => {
-    setOpen(next);
+    if (!isControlled) setUncontrolledOpen(next);
     onOpenChange?.(next);
   };
 
@@ -68,9 +71,9 @@ export function NectarPayPeriodCard({
   return (
     <div
       aria-label="NECTAR pay-period summary"
-      className="relative overflow-hidden rounded-2xl border border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]"
+      className="relative isolate overflow-hidden rounded-2xl border border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] text-[var(--hive-chrome-text)] [background-image:none]"
+      style={{ backgroundColor: "var(--hive-sidebar)", opacity: 1 }}
     >
-      <HexWatermark size={120} className="-right-6 -top-6" opacity={0.07} />
 
       <button
         type="button"

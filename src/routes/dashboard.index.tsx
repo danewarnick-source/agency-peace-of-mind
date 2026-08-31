@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -215,12 +215,22 @@ function PoliciesToAcknowledgeCard() {
 
 function StaffCaseloadHome() {
   const [nectarOpen, setNectarOpen] = useState(false);
+  const headingRef = useRef<HTMLDivElement>(null);
+
+  const onNectarOpenChange = (next: boolean) => {
+    setNectarOpen(next);
+    if (next) {
+      headingRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div
+        ref={headingRef}
         className={
           nectarOpen
-            ? "sticky top-0 z-20 -mx-4 space-y-3 bg-[var(--hive-canvas)] px-4 pb-2 pt-1 md:mx-0 md:px-0"
+            ? "max-md:sticky max-md:top-0 max-md:z-20 max-md:-mx-4 space-y-3 bg-[var(--hive-canvas)] max-md:px-4 max-md:pb-2 max-md:pt-1"
             : "space-y-3"
         }
       >
@@ -230,9 +240,14 @@ function StaffCaseloadHome() {
           title="My Caseload"
           subtitle="Your assigned clients, today's shift, and anything that needs your attention."
         />
-        <NectarPayPeriodCard onOpenChange={setNectarOpen} />
+        {nectarOpen ? (
+          <NectarPayPeriodCard open onOpenChange={onNectarOpenChange} />
+        ) : null}
       </div>
       <TodayHero />
+      {!nectarOpen ? (
+        <NectarPayPeriodCard open={false} onOpenChange={onNectarOpenChange} />
+      ) : null}
       <AttentionStrip />
       <PoliciesToAcknowledgeCard />
       <ComplianceInbox />

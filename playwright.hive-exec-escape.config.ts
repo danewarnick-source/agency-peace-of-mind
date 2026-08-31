@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "hive-exec-phone-escape.spec.ts",
+  testMatch: /(?:hive-exec-phone-escape|landing-phone-nav)\.spec\.ts/,
   retries: 0,
   timeout: 30_000,
   use: {

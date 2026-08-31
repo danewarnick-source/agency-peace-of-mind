@@ -1,8 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
 import { HiveWordmark } from "@/components/brand/hive-mark";
+import { PublicMobileMenuButton } from "@/components/landing/public-mobile-menu-button";
+import {
+  PUBLIC_MARKETING_NAV_CLASS,
+  PUBLIC_MARKETING_NAV_SAFE_AREA_STYLE,
+} from "@/lib/public-landing-nav";
+
+const SITE_MOBILE_NAV_ID = "site-mobile-nav";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -14,8 +20,8 @@ export function SiteHeader() {
   ] as const;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[var(--hive-border)] bg-[color-mix(in_srgb,var(--hive-bg)_92%,transparent)] backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className={`${PUBLIC_MARKETING_NAV_CLASS} w-full`} style={PUBLIC_MARKETING_NAV_SAFE_AREA_STYLE}>
+      <div className="relative z-10 mx-auto flex min-h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <HiveWordmark to="/" tone="canvas" />
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -40,17 +46,18 @@ export function SiteHeader() {
           </Button>
         </div>
 
-        <button
-          onClick={() => setOpen((s) => !s)}
-          aria-label="Toggle menu"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--hive-border)] text-[var(--hive-text)] md:hidden"
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <PublicMobileMenuButton
+          open={open}
+          onToggle={() => setOpen((s) => !s)}
+          controlsId={SITE_MOBILE_NAV_ID}
+        />
       </div>
 
       {open && (
-        <div className="border-t border-[var(--hive-border)] bg-[var(--hive-bg)] md:hidden">
+        <div
+          id={SITE_MOBILE_NAV_ID}
+          className="relative z-10 border-t border-[var(--hive-border)] bg-[var(--hive-bg)] md:hidden"
+        >
           <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
             {links.map((l) => (
               <Link

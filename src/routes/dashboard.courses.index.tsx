@@ -159,7 +159,7 @@ function MyTrainings() {
           className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)]"
         >
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-brand)] text-primary-foreground shadow-sm">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--hive-gold)] text-[var(--hive-on-gold)] shadow-sm">
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">

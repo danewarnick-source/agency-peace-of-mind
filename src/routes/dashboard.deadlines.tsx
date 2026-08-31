@@ -32,10 +32,10 @@ export function DeadlinesHomeCard() {
 
   return (
     <Link to="/dashboard/company-obligations" search={{ tab: "action-required" }} className="block">
-      <Card className="transition hover:border-[#137182]/40 hover:shadow-[var(--shadow-card)]">
+      <Card className="transition hover:border-[var(--hive-ink)]/40 hover:shadow-[var(--shadow-card)]">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <AlarmClock className="h-4 w-4 text-[#137182]" />
+            <AlarmClock className="h-4 w-4 text-[var(--hive-ink)]" />
             Action required
           </CardTitle>
         </CardHeader>

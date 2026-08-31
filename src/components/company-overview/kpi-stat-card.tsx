@@ -20,18 +20,18 @@ export function StatCard({
   to?: string;
 }) {
   const inner = (
-    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card/80 p-4 shadow-card backdrop-blur transition hover:border-[#f4a93a]/50">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card/80 p-4 shadow-card backdrop-blur transition hover:border-[var(--hive-gold)]/50">
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
           <Icon className="h-4 w-4" strokeWidth={2} />
         </span>
         {to && <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
       </div>
       <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-display text-3xl font-bold tabular-nums text-[#0d112b]">{value}</span>
+        <span className="font-display text-3xl font-bold tabular-nums text-[var(--hive-text)]">{value}</span>
         {delta && (
-          <span className="rounded-full border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-2 py-0.5 text-[10px] font-semibold text-[#7a4a0a]">
+          <span className="rounded-full border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-2 py-0.5 text-[10px] font-semibold text-[#7a4a0a]">
             {delta}
           </span>
         )}
@@ -66,12 +66,12 @@ export function ProgressRingCard({
   const radius = 28;
   const c = 2 * Math.PI * radius;
   const dash = (clamped / 100) * c;
-  const ringColor = clamped >= target ? "#1f7a4d" : "#f4a93a";
+  const ringColor = clamped >= target ? "#1f7a4d" : "var(--hive-gold)";
 
   const inner = (
-    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card/80 p-4 shadow-card backdrop-blur transition hover:border-[#f4a93a]/50">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card/80 p-4 shadow-card backdrop-blur transition hover:border-[var(--hive-gold)]/50">
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
           <Icon className="h-4 w-4" strokeWidth={2} />
         </span>
         {to && <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />}
@@ -89,7 +89,7 @@ export function ProgressRingCard({
             transform="rotate(-90 36 36)"
             style={{ transition: "stroke-dasharray .6s ease, stroke .3s" }}
           />
-          <text x="36" y="40" textAnchor="middle" className="fill-[#0d112b]"
+          <text x="36" y="40" textAnchor="middle" className="fill-[var(--hive-text)]"
             style={{ font: "700 14px var(--font-display)" }}>
             {clamped}%
           </text>

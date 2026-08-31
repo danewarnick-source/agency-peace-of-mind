@@ -63,7 +63,7 @@ function RequirementsPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">Agreement Requirements (Master Checklist)</h1>
+        <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">Agreement Requirements (Master Checklist)</h1>
         <p className="text-sm text-muted-foreground">Types of paperwork every provider organization must have on file.</p>
       </header>
 

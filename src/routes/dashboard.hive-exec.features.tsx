@@ -35,7 +35,7 @@ function FeatureRegistryPage() {
     <div className="space-y-4">
       <header className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">Feature Registry</h1>
+          <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">Feature Registry</h1>
           <p className="text-sm text-muted-foreground">Add or edit features so new toggles become available without a database migration.</p>
         </div>
         <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }}>

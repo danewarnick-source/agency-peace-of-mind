@@ -143,7 +143,7 @@ export function HostCertificationPanel({
     <section className="space-y-3 rounded-md border border-border bg-card p-3">
       <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <HomeIcon className="h-4 w-4 text-[#137182]" />
+          <HomeIcon className="h-4 w-4 text-[var(--hive-ink)]" />
           Host home certification
         </div>
         <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ function CertificationFormDialog({
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden p-0 flex flex-col">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-[#137182]" />
+            <ClipboardCheck className="h-5 w-5 text-[var(--hive-ink)]" />
             Host Home Certification — {hostName}
           </DialogTitle>
           <DialogDescription>

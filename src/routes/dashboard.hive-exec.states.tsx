@@ -51,7 +51,7 @@ function StatesIndexPage() {
       <header className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
               <MapPin className="h-5 w-5" />
             </span>
             <div>
@@ -65,7 +65,7 @@ function StatesIndexPage() {
             to="/dashboard/hive-exec/base-template"
             className="inline-flex min-h-[36px] items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted"
           >
-            <Sparkles className="h-3.5 w-3.5 text-[#d97a1c]" /> Base template versions
+            <Sparkles className="h-3.5 w-3.5 text-[var(--hive-gold)]" /> Base template versions
           </Link>
         </div>
       </header>
@@ -143,14 +143,14 @@ function StatesIndexPage() {
                         <Link
                           to="/dashboard/hive-exec/states/$stateCode/onboarding"
                           params={{ stateCode: r.code }}
-                          className="inline-flex min-h-[36px] items-center rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
+                          className="inline-flex min-h-[36px] items-center rounded-md bg-[var(--hive-gold)] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
                         >
                           Resume onboarding
                         </Link>
                       ) : (
                         <button
                           onClick={() => setChooser(r)}
-                          className="inline-flex min-h-[36px] items-center rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
+                          className="inline-flex min-h-[36px] items-center rounded-md bg-[var(--hive-gold)] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
                         >
                           Build {r.code} template
                         </button>
@@ -225,7 +225,7 @@ function StartingPointChooser({
         <div className="space-y-2">
           <label
             className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
-              mode === "blank" ? "border-[#d97a1c] bg-orange-50" : "border-border bg-background hover:bg-muted/40"
+              mode === "blank" ? "border-[var(--hive-gold)] bg-orange-50" : "border-border bg-background hover:bg-muted/40"
             }`}
           >
             <input
@@ -237,7 +237,7 @@ function StartingPointChooser({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-medium">
-                <Sparkles className="h-4 w-4 text-[#d97a1c]" /> Generic HIVE state template
+                <Sparkles className="h-4 w-4 text-[var(--hive-gold)]" /> Generic HIVE state template
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Neutral, state-agnostic base. Structure is in place; state-specific fields are empty for you to fill in.
@@ -247,7 +247,7 @@ function StartingPointChooser({
 
           <label
             className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
-              mode === "copy" ? "border-[#d97a1c] bg-orange-50" : "border-border bg-background hover:bg-muted/40"
+              mode === "copy" ? "border-[var(--hive-gold)] bg-orange-50" : "border-border bg-background hover:bg-muted/40"
             } ${sources.length === 0 ? "opacity-50" : ""}`}
           >
             <input
@@ -260,7 +260,7 @@ function StartingPointChooser({
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-sm font-medium">
-                <Copy className="h-4 w-4 text-[#0f1b3d]" /> Copy from an existing state
+                <Copy className="h-4 w-4 text-[var(--hive-text)]" /> Copy from an existing state
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Start from another state's already-built template and edit the differences.
@@ -299,7 +299,7 @@ function StartingPointChooser({
           </button>
           <button
             onClick={start}
-            className="inline-flex min-h-[36px] items-center rounded-md bg-[#d97a1c] px-4 text-xs font-semibold text-white hover:bg-[#b8651a]"
+            className="inline-flex min-h-[36px] items-center rounded-md bg-[var(--hive-gold)] px-4 text-xs font-semibold text-white hover:bg-[#b8651a]"
           >
             Start building
           </button>

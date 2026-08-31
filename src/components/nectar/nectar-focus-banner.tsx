@@ -33,14 +33,14 @@ export function NectarFocusBanner() {
     <div
       role="region"
       aria-label="NECTAR guidance"
-      className="relative mb-4 overflow-hidden rounded-2xl border border-[color:var(--amber-400,#f4a93a)]/50 bg-gradient-to-br from-[#0b1733] via-[#0d1a3a] to-[#0b1733] p-4 text-amber-50 shadow-lg sm:p-5"
+      className="relative mb-4 overflow-hidden rounded-2xl border border-[color:var(--amber-400,var(--hive-gold))]/50 bg-gradient-to-br from-[#0b1733] via-[#0d1a3a] to-[#0b1733] p-4 text-amber-50 shadow-lg sm:p-5"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color:var(--amber-500,#f4a93a)] text-[#0b1733]">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733]">
           <Sparkles className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,#f4a93a)]">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-400,var(--hive-gold))]">
             {content.eyebrow}
           </div>
           <h3 className="mt-0.5 font-display text-base font-semibold text-amber-50">

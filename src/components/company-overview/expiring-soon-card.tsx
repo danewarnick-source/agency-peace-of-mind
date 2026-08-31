@@ -14,7 +14,7 @@ export function ExpiringSoonCard({ items }: { items: ExpiringCert[] }) {
     <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-card backdrop-blur">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d112b] text-[#f4a93a]">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-text)] text-[var(--hive-gold)]">
             <BadgeCheck className="h-4 w-4" />
           </span>
           <h2 className="font-display text-base font-semibold tracking-tight">Expiring soon</h2>
@@ -44,7 +44,7 @@ export function ExpiringSoonCard({ items }: { items: ExpiringCert[] }) {
                 </div>
                 <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
                   urgent
-                    ? "border-[#f4a93a]/40 bg-[#f4a93a]/10 text-[#7a4a0a]"
+                    ? "border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 text-[#7a4a0a]"
                     : "border-border bg-muted text-muted-foreground"
                 }`}>
                   {it.daysUntil}d

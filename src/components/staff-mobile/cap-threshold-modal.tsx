@@ -137,7 +137,7 @@ export function CapThresholdModal() {
       aria-labelledby="cap-modal-title"
       className="absolute inset-0 z-50 flex items-end justify-center bg-black/60 px-3 pb-3 pt-6 backdrop-blur-sm"
     >
-      <div className="w-full max-w-sm rounded-2xl border border-[#f59324]/40 bg-white shadow-xl">
+      <div className="w-full max-w-sm rounded-2xl border border-[var(--hive-gold)]/40 bg-white shadow-xl">
         <div className="flex items-start gap-3 border-b border-border px-4 py-3">
           <span
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${
@@ -150,7 +150,7 @@ export function CapThresholdModal() {
           <div className="min-w-0">
             <p
               id="cap-modal-title"
-              className="text-sm font-semibold text-[color:var(--navy-900,#0d112b)]"
+              className="text-sm font-semibold text-[color:var(--navy-900,var(--hive-text))]"
             >
               {isCap ? "Weekly cap reached" : "Approaching weekly cap"}
             </p>
@@ -160,7 +160,7 @@ export function CapThresholdModal() {
             </p>
           </div>
         </div>
-        <div className="px-4 py-3 text-sm text-[color:var(--navy-900,#0d112b)]">
+        <div className="px-4 py-3 text-sm text-[color:var(--navy-900,var(--hive-text))]">
           {isCap
             ? "This client's authorized weekly hours for this service code are exhausted. Continuing may result in unpaid time. Tap Acknowledge to keep working, or finalize your shift now."
             : "You are nearing the client's authorized weekly hours for this service code. Tap Acknowledge to continue."}

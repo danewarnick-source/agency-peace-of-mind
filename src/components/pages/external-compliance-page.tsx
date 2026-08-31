@@ -98,7 +98,7 @@ export function ExternalCompliancePage() {
       <section className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#d97a1c] text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-white">
               <ExternalLink className="h-5 w-5" />
             </span>
             <div>
@@ -168,7 +168,7 @@ export function ExternalCompliancePage() {
         <section key={system} className="rounded-xl border border-border bg-card p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
-              <ExternalLink className="h-4 w-4 text-[#d97a1c]" />
+              <ExternalLink className="h-4 w-4 text-[var(--hive-gold)]" />
               {system}
               <Badge variant="outline" className="text-[10px]">{list.length}</Badge>
             </h2>
@@ -276,7 +276,7 @@ function ExternalRow({ item, orgId }: { item: Item; orgId: string }) {
         <Button
           size="sm"
           onClick={() => setOpen(true)}
-          className="min-h-[44px] bg-[#d97a1c] text-white hover:bg-[#b8651a]"
+          className="min-h-[44px] bg-[var(--hive-gold)] text-white hover:bg-[#b8651a]"
         >
           <ShieldCheck className="mr-1 h-4 w-4" />
           {item.last_attestation ? "Re-attest" : "Attest completion"}
@@ -287,7 +287,7 @@ function ExternalRow({ item, orgId }: { item: Item; orgId: string }) {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileWarning className="h-4 w-4 text-[#d97a1c]" />
+              <FileWarning className="h-4 w-4 text-[var(--hive-gold)]" />
               Attest external completion
             </DialogTitle>
           </DialogHeader>
@@ -322,7 +322,7 @@ function ExternalRow({ item, orgId }: { item: Item; orgId: string }) {
             <Button
               disabled={attest.isPending}
               onClick={() => attest.mutate()}
-              className="bg-[#d97a1c] text-white hover:bg-[#b8651a]"
+              className="bg-[var(--hive-gold)] text-white hover:bg-[#b8651a]"
             >
               {attest.isPending ? "Logging…" : "Log attestation"}
             </Button>

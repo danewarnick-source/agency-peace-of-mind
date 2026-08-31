@@ -336,7 +336,7 @@ export function EmployeesPage() {
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV
             </Link>
           </Button>
-          <Button asChild variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">
+          <Button asChild variant="outline">
             <Link to="/dashboard/smart-import" search={{ mode: "employee" }}>
               <Sparkles className="mr-2 h-4 w-4" /> Smart Import
             </Link>
@@ -350,7 +350,7 @@ export function EmployeesPage() {
           </Button>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[image:var(--gradient-brand)] text-primary-foreground"><UserPlus className="mr-2 h-4 w-4" /> Invite by email</Button>
+              <Button><UserPlus className="mr-2 h-4 w-4" /> Invite by email</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Invite an employee</DialogTitle></DialogHeader>
@@ -526,7 +526,7 @@ export function EmployeesPage() {
                           <div className="flex items-center gap-2 truncate">
                             <span className="truncate">{name}</span>
                             {needsReset && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 whitespace-nowrap">
+                              <span className="hive-role-pill rounded-full px-2 py-0.5 text-[10px] uppercase whitespace-nowrap">
                                 Pending first login
                               </span>
                             )}
@@ -541,14 +541,14 @@ export function EmployeesPage() {
                       <div className="truncate" title={login}>{login}</div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span>
+                      <span className="hive-role-pill rounded-full px-2 py-0.5 text-xs uppercase">{m.role}</span>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span
                         className={
                           "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
                           (m.active
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            ? "hive-status-active"
                             : "bg-muted text-muted-foreground")
                         }
                       >
@@ -569,10 +569,10 @@ export function EmployeesPage() {
                             className={
                               "rounded-full px-2 py-0.5 text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 " +
                               (hasOverdue
-                                ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                                ? "hive-status-danger"
                                 : hasExpiring || hasPending
-                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300")
+                                  ? "bg-[var(--hive-gold-soft)] text-[var(--hive-on-gold)]"
+                                  : "hive-status-active")
                             }
                             onClick={(e) => {
                               e.stopPropagation();
@@ -761,7 +761,7 @@ export function EmployeesPage() {
               </div>
             )}
             <DialogFooter>
-              <Button type="submit" disabled={manualMutation.isPending} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+              <Button type="submit" disabled={manualMutation.isPending} className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
                 {manualMutation.isPending ? "Creating…" : "Create employee"}
               </Button>
             </DialogFooter>

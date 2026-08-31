@@ -45,7 +45,7 @@ type Topic = {
 };
 
 /* ───────────────────────── Brand ───────────────────────── */
-const NAVY = "#0B1126", GOLD = "#f5a623", TEAL = "#137182", INK = "#0d112b";
+const NAVY = "var(--hive-text)", GOLD = "var(--hive-gold)", TEAL = "var(--hive-ink)", INK = "var(--hive-text)";
 
 /* ───────────────────────── Content: Seizures (worked example) ───────────────────────── */
 const SEIZURE_STEPS: Step[] = [
@@ -1778,7 +1778,7 @@ export function thirtyDayTopicsInSowOrder(): Topic[] {
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #e4e7ef", borderRadius: 14, overflow: "hidden", maxWidth: "100%", width: "100%", margin: "0 auto", boxShadow: "0 12px 40px rgba(11,17,38,.10)" };
 const btn = (kind: "pri" | "out" | "dis"): React.CSSProperties => ({
   font: "inherit", fontSize: 13.5, fontWeight: 600, padding: "11px 18px", borderRadius: 10, cursor: kind === "dis" ? "not-allowed" : "pointer", border: kind === "out" ? "1px solid #cdd2e0" : "none",
-  background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : "#1C2A5E",
+  background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : "var(--hive-ink)",
 });
 
 function Accordion({ drops, open, onOpenChange }: { drops: [string, string][]; open?: number | null; onOpenChange?: (n: number | null) => void }) {
@@ -1790,7 +1790,7 @@ function Accordion({ drops, open, onOpenChange }: { drops: [string, string][]; o
     <div>
       {drops.map(([t, b], i) => (
         <div key={i}>
-          <button onClick={() => set(value === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: "#1C2A5E", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
+          <button onClick={() => set(value === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: "var(--hive-ink)", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
             <span>{t}</span><span>{value === i ? "\u25B4" : "\u25BE"}</span>
           </button>
           {value === i && <div style={{ fontSize: 12.8, color: "#42485a", lineHeight: 1.6, padding: "2px 4px 12px" }} dangerouslySetInnerHTML={{ __html: b }} />}
@@ -1810,9 +1810,9 @@ function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClic
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         font: "inherit", fontSize: 11.5, fontWeight: 600,
-        background: speaking ? "#137182" : "#fff",
-        color: speaking ? "#fff" : "#137182",
-        border: "1px solid #137182",
+        background: speaking ? "var(--hive-ink)" : "#fff",
+        color: speaking ? "#fff" : "var(--hive-ink)",
+        border: "1px solid var(--hive-ink)",
         borderRadius: 999, padding: "5px 10px", cursor: "pointer",
       }}
     >
@@ -2116,7 +2116,7 @@ export function TrainingModule({
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#4e1f81" }}>Attestation · Electronic signature</div>
             <div style={{ fontSize: 17, fontWeight: 600, color: INK, margin: "4px 0 14px" }}>Confirm and sign</div>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", cursor: "pointer" }}>
-              <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: "#1C2A5E" }} />
+              <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: "var(--hive-ink)" }} />
               <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>{topic.attest}</span>
             </label>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#fff8e6", border: "1px solid #f5d889", borderRadius: 12, padding: "13px 14px", cursor: "pointer", marginTop: 10 }}>
@@ -2155,7 +2155,7 @@ export function TrainingModule({
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              {[[`${checks}/${checks}`, "knowledge checks", "#0f6e56"], [topic.code, "topic", "#1C2A5E"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
+              {[[`${checks}/${checks}`, "knowledge checks", "#0f6e56"], [topic.code, "topic", "var(--hive-ink)"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
                 <div key={k} style={{ flex: 1, background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 11, padding: 11, textAlign: "center" }}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: c as string }}>{n}</div><div style={{ fontSize: 11, color: "#8a8f9e" }}>{l}</div>
                 </div>

@@ -135,7 +135,7 @@ export function NectarDocumentActionsDialog({
                         type="button"
                         disabled={run.isPending}
                         onClick={() => run.mutate(a.handler)}
-                        className="flex w-full flex-col items-start gap-1 rounded-xl border border-border/60 bg-card p-3 text-left text-sm transition hover:border-[color:var(--amber-400,#f4a93a)] hover:bg-[color:var(--amber-50,#fffbeb)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex w-full flex-col items-start gap-1 rounded-xl border border-border/60 bg-card p-3 text-left text-sm transition hover:border-[color:var(--amber-400,var(--hive-gold))] hover:bg-[color:var(--amber-50,#fffbeb)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <span className="flex items-center gap-2 font-medium">
                           {busyKey === a.handler && run.isPending ? (

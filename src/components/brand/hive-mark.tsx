@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
-/** Simple gold hex outline. Never fill this as a cartoon bee. */
+/** Gold hex outline. Never fill this as a honeycomb or put a letter H inside. */
 export function HiveMark({
   className,
   title,
@@ -21,7 +21,7 @@ export function HiveMark({
       <polygon
         points="12,2.2 21.2,7.5 21.2,16.5 12,21.8 2.8,16.5 2.8,7.5"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.55"
         strokeLinejoin="round"
       />
     </svg>
@@ -33,18 +33,22 @@ export function HiveWordmark({
   markClassName,
   wordClassName,
   to,
+  tone = "chrome",
 }: {
   className?: string;
   markClassName?: string;
   wordClassName?: string;
   to?: "/";
+  /** chrome = cream word on steel sidebar; canvas = navy-steel word on light pages. */
+  tone?: "chrome" | "canvas";
 }) {
   const inner = (
     <>
-      <HiveMark className={cn("h-7 w-7 shrink-0", markClassName)} />
+      <HiveMark className={cn("h-8 w-8 shrink-0", markClassName)} />
       <span
         className={cn(
-          "font-display text-[1.35rem] font-semibold tracking-tight text-[var(--hive-gold)]",
+          "font-display text-[1.45rem] font-semibold tracking-tight",
+          tone === "chrome" ? "text-[var(--hive-chrome-text)]" : "text-[var(--hive-text)]",
           wordClassName,
         )}
       >

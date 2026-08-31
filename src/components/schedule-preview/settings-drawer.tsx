@@ -119,7 +119,7 @@ function ShiftTypesSection({
   const [newName, setNewName] = useState("");
   const [newStart, setNewStart] = useState("06:00");
   const [newEnd, setNewEnd] = useState("14:00");
-  const [newColor, setNewColor] = useState("#137182");
+  const [newColor, setNewColor] = useState("var(--hive-ink)");
 
   const update = (key: string, patch: Partial<ShiftType>) =>
     onChange(shiftTypes.map((t) => (t.key === key ? { ...t, ...patch } : t)));

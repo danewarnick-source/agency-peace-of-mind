@@ -155,7 +155,7 @@ function JoinPage() {
           <p>{preview.message}</p>
           <p className="mt-3 text-white/55">
             If you already have a login, you can{" "}
-            <Link to="/login" className="font-medium text-[#f4a93a] hover:underline">
+            <Link to="/login" className="font-medium text-[var(--hive-gold)] hover:underline">
               sign in
             </Link>
             . Don't create a new agency from this link.
@@ -265,13 +265,13 @@ function JoinPage() {
         <Button
           type="submit"
           disabled={busy}
-          className="h-11 bg-[linear-gradient(135deg,#f4a93a_0%,#f59324_100%)] text-[#141a3d] hover:opacity-95"
+          className="h-11 bg-[linear-gradient(135deg,var(--hive-gold)_0%,var(--hive-gold)_100%)] text-[#141a3d] hover:opacity-95"
         >
           {busy ? "Joining…" : `Join ${preview.org_name}`}
         </Button>
         <p className="text-center text-xs text-white/40">
           Already on this team?{" "}
-          <Link to="/login" className="text-[#f4a93a] hover:underline">
+          <Link to="/login" className="text-[var(--hive-gold)] hover:underline">
             Sign in
           </Link>
         </p>

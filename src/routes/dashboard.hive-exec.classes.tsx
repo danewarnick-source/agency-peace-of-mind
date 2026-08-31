@@ -70,14 +70,14 @@ function ExecClassesPage() {
         <div className="inline-flex rounded-lg border bg-card p-1 text-sm">
           <button
             type="button"
-            className={`rounded-md px-3 py-1.5 ${bucket === "upcoming" ? "bg-[#0f1b3d] text-white" : "text-muted-foreground"}`}
+            className={`rounded-md px-3 py-1.5 ${bucket === "upcoming" ? "bg-[var(--hive-text)] text-white" : "text-muted-foreground"}`}
             onClick={() => setBucket("upcoming")}
           >
             Upcoming ({upcoming.length})
           </button>
           <button
             type="button"
-            className={`rounded-md px-3 py-1.5 ${bucket === "past" ? "bg-[#0f1b3d] text-white" : "text-muted-foreground"}`}
+            className={`rounded-md px-3 py-1.5 ${bucket === "past" ? "bg-[var(--hive-text)] text-white" : "text-muted-foreground"}`}
             onClick={() => setBucket("past")}
           >
             Past ({past.length})
@@ -90,7 +90,7 @@ function ExecClassesPage() {
         return (
           <section key={type} className="rounded-xl border bg-card p-4">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <GraduationCap className="h-4 w-4 text-[#d97a1c]" />
+              <GraduationCap className="h-4 w-4 text-[var(--hive-gold)]" />
               {trainingClassLabel(type)}
             </h3>
             {q.isLoading ? (
@@ -119,7 +119,7 @@ function ClassCard({ row, onComplete }: { row: TrainingClassRow; onComplete: () 
           <Link
             to="/dashboard/hive-exec/$orgId"
             params={{ orgId: row.organizationId }}
-            className="font-medium text-[#0f1b3d] hover:underline"
+            className="font-medium text-[var(--hive-text)] hover:underline"
           >
             {row.providerName}
           </Link>
@@ -138,11 +138,11 @@ function ClassCard({ row, onComplete }: { row: TrainingClassRow; onComplete: () 
         {row.roster.map((r) => (
           <li key={`${r.email}-${r.name}`} className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium">{r.name}</span>
-            <a href={`mailto:${r.email}`} className="inline-flex items-center gap-1 text-[#d97a1c] hover:underline">
+            <a href={`mailto:${r.email}`} className="inline-flex items-center gap-1 text-[var(--hive-gold)] hover:underline">
               <Mail className="h-3 w-3" /> {r.email}
             </a>
             {r.phone ? (
-              <a href={`tel:${r.phone}`} className="inline-flex items-center gap-1 text-[#d97a1c] hover:underline">
+              <a href={`tel:${r.phone}`} className="inline-flex items-center gap-1 text-[var(--hive-gold)] hover:underline">
                 <Phone className="h-3 w-3" /> {r.phone}
               </a>
             ) : null}

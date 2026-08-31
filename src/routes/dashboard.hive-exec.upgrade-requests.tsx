@@ -58,7 +58,7 @@ function UpgradeRequestsPage() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`min-h-[36px] rounded px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                  filter === f ? "bg-[#0f1b3d] text-white" : "text-muted-foreground hover:bg-muted"
+                  filter === f ? "bg-[var(--hive-text)] text-white" : "text-muted-foreground hover:bg-muted"
                 }`}
               >
                 {f}
@@ -110,7 +110,7 @@ function RequestRow({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium text-[#0f1b3d]">{row.organization_name}</span>
+          <span className="font-medium text-[var(--hive-text)]">{row.organization_name}</span>
           <StatusPill status={row.status} />
           {row.required_tier && (
             <span className="rounded bg-[#fff7ed] px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-[#9a3412]">

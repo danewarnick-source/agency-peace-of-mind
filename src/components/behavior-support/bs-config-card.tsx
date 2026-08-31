@@ -138,7 +138,7 @@ export function BehaviorSupportConfigCard({
     <Card className="border-2">
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4 text-[color:var(--teal-700,#137182)]" />
+          <Brain className="h-4 w-4 text-[color:var(--teal-700,var(--hive-ink))]" />
           <CardTitle className="text-base">Behavior Support</CardTitle>
           <Badge variant="outline" className="ml-auto text-[10px] font-mono">{clientName}</Badge>
         </div>
@@ -247,7 +247,7 @@ export function BehaviorSupportConfigCard({
         {/* Requirements panel */}
         <div className="grid gap-3 rounded-lg border border-border bg-background p-3">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-[color:var(--gold-600,#f5a623)]" />
+            <ShieldAlert className="h-4 w-4 text-[color:var(--gold-600,var(--hive-gold))]" />
             <h4 className="text-sm font-semibold">Requirements for {code}</h4>
           </div>
           <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">

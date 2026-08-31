@@ -99,7 +99,7 @@ function TrainingPlayer() {
             className={
               isCompleted
                 ? ""
-                : "bg-[image:var(--gradient-brand)] text-primary-foreground shrink-0"
+                : "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] shrink-0"
             }
             variant={isCompleted ? "outline" : "default"}
             disabled={completeMutation.isPending || isCompleted || !user}

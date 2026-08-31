@@ -32,10 +32,10 @@ function ExecCommandCenterLayout() {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#0f1b3d] to-[#1a2a5a] p-4 text-white shadow-sm">
+      <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[var(--hive-text)] to-[#1a2a5a] p-4 text-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#d97a1c] text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-white">
               <Shield className="h-5 w-5" />
             </span>
             <div>
@@ -50,13 +50,13 @@ function ExecCommandCenterLayout() {
               <Button
                 size="sm"
                 variant="secondary"
-                className="bg-[#d97a1c] text-white hover:bg-[#b8641a]"
+                className="bg-[var(--hive-gold)] text-white hover:bg-[#b8641a]"
                 onClick={() => setGuideOpen(true)}
               >
                 <HelpCircle className="mr-1 h-3.5 w-3.5" /> Guide me
               </Button>
             )}
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[var(--hive-text)] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
               <ShieldAlert className="h-3.5 w-3.5" />
               Account &amp; billing only — no client records or PHI
             </div>

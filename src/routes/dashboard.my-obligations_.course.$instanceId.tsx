@@ -63,7 +63,7 @@ function InHiveCoursePage() {
         <p className="text-sm text-muted-foreground">
           This obligation does not open an in-Hive course.
         </p>
-        <Link to="/dashboard/my-obligations" className="text-sm font-medium text-[#137182] hover:underline">
+        <Link to="/dashboard/my-obligations" className="text-sm font-medium text-[var(--hive-ink)] hover:underline">
           Back to My Obligations
         </Link>
       </div>

@@ -976,7 +976,7 @@ async function sendAuditorPackageInvite(args: {
 
   const subject = `You've been invited to view ${packageLabel}`;
   const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f1b3d">
+    <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#243040">
       <div style="border-bottom:2px solid #fed7aa;padding-bottom:12px;margin-bottom:20px">
         <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9a3412">HIVE — State Audit Portal</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px">${escapeHtml(packageLabel)}</div>
@@ -989,7 +989,7 @@ async function sendAuditorPackageInvite(args: {
         read-only auditor portal — it is separate from ${escapeHtml(orgName)}'s regular application.</p>
       <p style="margin:28px 0">
         <a href="${actionLink}"
-           style="display:inline-block;background:#0f1b3d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
+           style="display:inline-block;background:#c9a227;color:#243040;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
           Set password & open audit package
         </a>
       </p>

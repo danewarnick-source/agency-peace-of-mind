@@ -9,26 +9,26 @@ import remarkGfm from "remark-gfm";
  */
 export function NectarAnswer({ text }: { text: string }) {
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-[#0f1b3d] [&_strong]:font-semibold [&_em]:text-muted-foreground">
+    <div className="space-y-2 text-sm leading-relaxed text-[var(--hive-text)] [&_strong]:font-semibold [&_em]:text-muted-foreground">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
           ul: ({ children }) => (
-            <ul className="my-1.5 list-disc space-y-1 pl-5 marker:text-[#d97a1c]">{children}</ul>
+            <ul className="my-1.5 list-disc space-y-1 pl-5 marker:text-[var(--hive-gold)]">{children}</ul>
           ),
           ol: ({ children }) => (
             <ol className="my-1.5 list-decimal space-y-1 pl-5">{children}</ol>
           ),
           li: ({ children }) => <li className="leading-snug">{children}</li>,
           strong: ({ children }) => (
-            <strong className="font-semibold text-[#0f1b3d]">{children}</strong>
+            <strong className="font-semibold text-[var(--hive-text)]">{children}</strong>
           ),
           em: ({ children }) => (
             <em className="not-italic text-xs text-muted-foreground">{children}</em>
           ),
           a: ({ children, href }) => (
-            <a href={href} className="text-[#d97a1c] underline underline-offset-2 hover:text-[#b8651a]">
+            <a href={href} className="text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#b8651a]">
               {children}
             </a>
           ),

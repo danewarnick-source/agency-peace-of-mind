@@ -21,7 +21,7 @@ function AuditorPackageView() {
         <div className="space-y-3">
           <Link
             to="/audit-portal"
-            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[#0f1b3d]"
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[var(--hive-text)]"
           >
             <ArrowLeft className="h-3 w-3" /> All packages
           </Link>

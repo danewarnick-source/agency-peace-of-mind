@@ -88,7 +88,7 @@ function BehaviorBars({ name, entries }: { name: string; entries: Entry[] }) {
         {buckets.map(([day, v]) => (
           <div
             key={day}
-            className="group relative flex-1 rounded-sm bg-[color:var(--teal-700,#137182)]/70 transition hover:bg-[color:var(--teal-700,#137182)]"
+            className="group relative flex-1 rounded-sm bg-[color:var(--teal-700,var(--hive-ink))]/70 transition hover:bg-[color:var(--teal-700,var(--hive-ink))]"
             style={{ height: `${(v / max) * 100}%`, minHeight: v > 0 ? "4px" : "1px" }}
             title={`${day}: ${v}`}
           />

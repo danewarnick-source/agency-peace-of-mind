@@ -167,7 +167,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
         }}
         placeholder="Ask NECTAR anything about your training…"
         rows={1}
-        className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/40"
+        className="min-h-[44px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-2.5 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--hive-gold)]/40"
         disabled={mutation.isPending}
       />
       <NectarButton
@@ -200,7 +200,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
     <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
         {/* Header — fixed at top */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[#0d112b] px-4 py-2.5 text-white">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-[var(--hive-text)] px-4 py-2.5 text-white">
           <NectarMark size={compact ? "sm" : "md"} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
           </div>
           <span
             title="Client information shown here is for the people on your caseload — treat it as confidential PHI."
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#fed7aa]"
           >
             <Shield className="h-3 w-3" /> PHI
           </span>
@@ -233,7 +233,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
         >
           {isEmpty && (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border border-[#f4a93a]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--hive-gold)]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
                 <Shield className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>
                   Client info here is for people on your caseload — treat as confidential PHI.
@@ -252,7 +252,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
                     key={s}
                     type="button"
                     onClick={() => send(s)}
-                    className="block min-h-[40px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-[13px] leading-snug text-foreground transition hover:border-[#f4a93a]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
+                    className="block min-h-[40px] w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-[13px] leading-snug text-foreground transition hover:border-[var(--hive-gold)]/50 hover:bg-[#fff7ed] active:scale-[0.99]"
                   >
                     {s}
                   </button>
@@ -264,7 +264,7 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
           {messages.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#0d112b] px-3.5 py-2 text-sm text-white shadow-sm">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--hive-text)] px-3.5 py-2 text-sm text-white shadow-sm">
                   {m.text}
                 </div>
               </div>

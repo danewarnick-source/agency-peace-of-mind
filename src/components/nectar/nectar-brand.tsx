@@ -6,9 +6,9 @@ import { Hexagon, Sparkles, Loader2 } from "lucide-react";
  *
  * Brand tokens:
  *   navy surface  #141a3d  (--navy-800)
- *   navy deep     #0d112b  (--navy-900)
- *   amber accent  #f4a93a / #F2A23C  (--amber-500)
- *   amber-on-navy text  #f4a93a
+ *   navy deep     var(--hive-text)  (--navy-900)
+ *   amber accent  var(--hive-gold) / #F2A23C  (--amber-500)
+ *   amber-on-navy text  var(--hive-gold)
  *   amber-pill text     #412402 (dark cocoa for AA on amber)
  *
  * Use these components anywhere NECTAR generates, summarizes,
@@ -41,7 +41,7 @@ export function NectarMark({
         className,
       )}
     >
-      <Hexagon className={cn(hex)} fill="currentColor" strokeWidth={1.25} />
+      <Hexagon className={cn(hex)} fill="none" strokeWidth={1.6} />
       <span className="absolute -right-0.5 -top-0.5 inline-flex items-center justify-center rounded-full bg-[var(--hive-gold)] p-[2px] text-[var(--hive-on-gold)] shadow-sm">
         <Sparkles className={spark} strokeWidth={2.5} />
       </span>
@@ -267,7 +267,7 @@ export const NectarButton = forwardRef<HTMLButtonElement, NectarButtonProps>(
     ref,
   ) {
     const base =
-      "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f4a93a]/50 focus-visible:ring-offset-2";
+      "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--hive-gold)]/50 focus-visible:ring-offset-2";
     const styles =
       variant === "amber"
         ? "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)]"

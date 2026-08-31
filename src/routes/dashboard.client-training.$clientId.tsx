@@ -243,7 +243,7 @@ function ClientTrainingViewer() {
               )}
               <Button
                 onClick={() => navigate({ to: "/dashboard" })}
-                className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
               >
                 Back to My Caseload
               </Button>
@@ -370,7 +370,7 @@ function ClientTrainingViewer() {
               <Button
                 onClick={() => completeMut.mutate()}
                 disabled={completeMut.isPending || anyChecking || signature.trim().length < 3 || !allAnswered || !contentRead}
-                className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
               >
                 {completeMut.isPending || anyChecking
                   ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />

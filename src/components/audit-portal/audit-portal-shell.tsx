@@ -59,17 +59,17 @@ export function AuditPortalShell({ children }: Props) {
       <header className="border-b border-slate-200 bg-white shadow-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/audit-portal" className="flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">HIVE</div>
-              <div className="font-display text-lg font-semibold text-[#0f1b3d]">State Audit Portal</div>
+              <div className="font-display text-lg font-semibold text-[var(--hive-text)]">State Audit Portal</div>
             </div>
           </Link>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right">
-              <div className="font-medium text-[#0f1b3d]">{auditor.full_name}</div>
+              <div className="font-medium text-[var(--hive-text)]">{auditor.full_name}</div>
               <div className="text-xs text-muted-foreground">{auditor.agency_name}</div>
             </div>
             <button
@@ -119,15 +119,15 @@ function AuditorLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0f1b3d] via-[#1a2a5a] to-[#0f1b3d] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--hive-text)] via-[#1a2a5a] to-[var(--hive-text)] px-4">
       <div className="w-full max-w-md rounded-xl border border-[#fed7aa]/30 bg-white p-8 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
             <ShieldCheck className="h-6 w-6" />
           </span>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">HIVE</div>
-            <h1 className="font-display text-lg font-bold text-[#0f1b3d]">State Audit Portal</h1>
+            <h1 className="font-display text-lg font-bold text-[var(--hive-text)]">State Audit Portal</h1>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ function AuditorLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
-              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[#0f1b3d] focus:outline-none"
+              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[var(--hive-text)] focus:outline-none"
             />
           </label>
           <label className="block">
@@ -163,7 +163,7 @@ function AuditorLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[#0f1b3d] focus:outline-none"
+                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[var(--hive-text)] focus:outline-none"
               />
               <button
                 type="button"
@@ -184,7 +184,7 @@ function AuditorLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex w-full min-h-[44px] items-center justify-center rounded-md bg-[#0f1b3d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
+            className="inline-flex w-full min-h-[44px] items-center justify-center rounded-md bg-[var(--hive-text)] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
           >
             {submitting ? "Signing in…" : "Sign in to State Audit Portal"}
           </button>

@@ -52,17 +52,17 @@ function CompaniesPage() {
         <Link
           key={cls.id}
           to="/dashboard/hive-exec/classes"
-          className="flex items-start justify-between gap-3 rounded-xl border-2 border-[#d97a1c] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm"
+          className="flex items-start justify-between gap-3 rounded-xl border-2 border-[var(--hive-gold)] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm"
         >
           <div>
-            <div className="font-display text-base font-bold text-[#0f1b3d]">
+            <div className="font-display text-base font-bold text-[var(--hive-text)]">
               {cls.providerName} submitted a {trainingClassLabel(cls.trainingType)} class
             </div>
             <div className="mt-1 text-xs text-[#9a3412]">
               {cls.roster.map((r) => formatRosterContactLine(r)).join(" · ")}
             </div>
           </div>
-          <span className="inline-flex items-center rounded-md bg-[#0f1b3d] px-3 py-2 text-sm font-semibold text-white">
+          <span className="inline-flex items-center rounded-md bg-[var(--hive-text)] px-3 py-2 text-sm font-semibold text-white">
             Open Classes
           </span>
         </Link>
@@ -71,14 +71,14 @@ function CompaniesPage() {
       {pendingCount > 0 && (
         <Link
           to="/dashboard/hive-exec/upgrade-requests"
-          className="group flex items-center justify-between gap-3 rounded-xl border-2 border-[#d97a1c] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm transition-all hover:shadow-md"
+          className="group flex items-center justify-between gap-3 rounded-xl border-2 border-[var(--hive-gold)] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm transition-all hover:shadow-md"
         >
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-[#d97a1c] text-white shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-white shadow-sm">
               <Sparkles className="h-5 w-5" />
             </span>
             <div>
-              <div className="font-display text-base font-bold text-[#0f1b3d]">
+              <div className="font-display text-base font-bold text-[var(--hive-text)]">
                 {pendingCount} {pendingCount === 1 ? "organization is" : "organizations are"} requesting upgrades
               </div>
               <div className="text-xs text-[#9a3412]">
@@ -86,7 +86,7 @@ function CompaniesPage() {
               </div>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-2 text-sm font-semibold text-white group-hover:bg-[#1a2a5a]">
+          <span className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-2 text-sm font-semibold text-white group-hover:bg-[#1a2a5a]">
             Review queue <ArrowRight className="h-4 w-4" />
           </span>
         </Link>
@@ -154,7 +154,7 @@ function CompaniesPage() {
                     <Link
                       to="/dashboard/hive-exec/$orgId"
                       params={{ orgId: r.organization_id }}
-                      className="font-medium text-[#0f1b3d] hover:underline"
+                      className="font-medium text-[var(--hive-text)] hover:underline"
                     >
                       {r.name}
                     </Link>
@@ -185,7 +185,7 @@ function Kpi({
       <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[#0f1b3d]">{value}</div>
+      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">{value}</div>
     </div>
   );
 }
@@ -193,7 +193,7 @@ function Kpi({
 function PlanBadge({ plan }: { plan: string }) {
   const map: Record<string, string> = {
     hive_standard: "bg-[#fff7ed] text-[#9a3412]",
-    enterprise: "bg-[#0f1b3d] text-white",
+    enterprise: "bg-[var(--hive-text)] text-white",
   };
   const label = plan === "hive_standard" ? "Standard" : plan === "enterprise" ? "Enterprise" : plan;
   return <span className={`rounded px-2 py-0.5 text-xs font-medium ${map[plan] ?? "bg-muted"}`}>{label}</span>;

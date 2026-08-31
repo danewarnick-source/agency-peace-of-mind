@@ -13,7 +13,7 @@ export function QuickActionsCard({
   return (
     <section
       className={`rounded-2xl border bg-card/80 p-5 shadow-card backdrop-blur ${
-        emphasized ? "border-[#f4a93a]/50 ring-1 ring-[#f4a93a]/20" : "border-border"
+        emphasized ? "border-[var(--hive-gold)]/50 ring-1 ring-[var(--hive-gold)]/20" : "border-border"
       }`}
     >
       <div className="mb-1 flex items-center gap-2">

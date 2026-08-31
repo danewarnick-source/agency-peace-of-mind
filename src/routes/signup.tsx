@@ -7,10 +7,10 @@ import {
   Check,
   Eye,
   EyeOff,
-  Hexagon,
   Loader2,
   ShieldCheck,
 } from "lucide-react";
+import { HiveWordmark } from "@/components/brand/hive-mark";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,15 +39,14 @@ export const Route = createFileRoute("/signup")({
 /* ──────────────────────────── design tokens ──────────────────────────── */
 
 const JAKARTA = '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif';
-const NAVY_BG =
-  "radial-gradient(1000px 600px at 80% 110%, rgba(244,169,58,0.18), transparent 60%), linear-gradient(140deg, #141a3d 0%, #0d112b 100%)";
-const AMBER = "#f4a93a";
-const AMBER_GRAD = "linear-gradient(135deg, #f4a93a 0%, #f59324 100%)";
+const NAVY_BG = "var(--hive-canvas)";
+const AMBER = "var(--hive-gold)";
+const AMBER_GRAD = "var(--hive-gold)";
 
 const inputStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.14)",
-  color: "white",
+  background: "var(--hive-surface)",
+  border: "1px solid var(--hive-border)",
+  color: "var(--hive-text)",
   fontFamily: JAKARTA,
 };
 
@@ -90,10 +89,10 @@ const initialForm: FormState = {
 
 function HexPattern() {
   return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.05]">
+    <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.08]">
       <defs>
         <pattern id="hex" width="80" height="92" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
-          <polygon points="40,2 78,24 78,68 40,90 2,68 2,24" fill="none" stroke="#ffffff" strokeWidth="1" />
+          <polygon points="40,2 78,24 78,68 40,90 2,68 2,24" fill="none" stroke="var(--hive-gold)" strokeWidth="1" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#hex)" />
@@ -102,33 +101,24 @@ function HexPattern() {
 }
 
 function Brand() {
-  return (
-    <Link to="/" className="inline-flex items-center gap-2.5 font-semibold text-white" style={{ fontFamily: JAKARTA }}>
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] backdrop-blur">
-        <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
-      </span>
-      <span className="text-[15px] tracking-tight">
-        HIVE <span className="ml-1 text-xs font-normal text-white/55">— powered by NECTAR™</span>
-      </span>
-    </Link>
-  );
+  return <HiveWordmark to="/" tone="canvas" />;
 }
 
 function Stepper({ step }: { step: number }) {
   return (
     <div className="mb-8">
-      <div className="mb-3 flex items-center justify-between text-xs text-white/55" style={{ fontFamily: JAKARTA }}>
+      <div className="mb-3 flex items-center justify-between text-xs text-[var(--hive-text-muted)]" style={{ fontFamily: JAKARTA }}>
         <span>
-          Step <span className="font-semibold text-white">{step + 1}</span> of {STEPS.length}
+          Step <span className="font-semibold text-[var(--hive-text)]">{step + 1}</span> of {STEPS.length}
         </span>
-        <span className="font-medium text-white/75">{STEPS[step]}</span>
+        <span className="font-medium text-[var(--hive-text)]">{STEPS[step]}</span>
       </div>
       <div className="flex gap-1.5">
         {STEPS.map((_, i) => (
           <div
             key={i}
             className="h-1.5 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? AMBER : "rgba(255,255,255,0.1)" }}
+            style={{ background: i <= step ? AMBER : "var(--hive-border)" }}
           />
         ))}
       </div>
@@ -149,14 +139,14 @@ function Field({
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label className="text-white/80" style={{ fontFamily: JAKARTA }}>
+      <Label className="text-[var(--hive-text)]" style={{ fontFamily: JAKARTA }}>
         {label}
       </Label>
       {children}
       {error ? (
-        <p className="text-xs text-red-400">{error}</p>
+        <p className="text-xs text-[var(--hive-danger)]">{error}</p>
       ) : hint ? (
-        <p className="text-xs text-white/45">{hint}</p>
+        <p className="text-xs text-[var(--hive-text-muted)]">{hint}</p>
       ) : null}
     </div>
   );
@@ -185,7 +175,7 @@ function NavButtons({
           variant="ghost"
           onClick={onBack}
           disabled={loading}
-          className="h-11 border border-white/15 bg-transparent text-white hover:bg-white/[0.06] hover:text-white"
+          className="h-11"
           style={{ fontFamily: JAKARTA }}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -228,21 +218,20 @@ function SignupPage() {
   const goBack = () => setStep((s) => Math.max(0, s - 1));
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-white" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
+    <div className="relative min-h-screen overflow-hidden text-[var(--hive-text)]" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
       <HexPattern />
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 md:py-12">
         <header className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
-          <Link to="/login" className="text-sm text-white/60 hover:text-white">
-            Already have an account? <span className="font-medium text-[#f4a93a]">Sign in</span>
+          <Link to="/login" className="text-sm text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]">
+            Already have an account? <span className="font-medium text-[var(--hive-gold)]">Sign in</span>
           </Link>
         </header>
 
         <main className="mx-auto w-full max-w-2xl flex-1">
           <Stepper step={step} />
           <div
-            className="rounded-2xl p-6 shadow-2xl backdrop-blur-xl sm:p-8"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.11)" }}
+            className="rounded-2xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-6 shadow-[var(--shadow-card)] sm:p-8"
           >
             {step === 0 && (
               <Step1Account
@@ -366,7 +355,7 @@ function Step1Account({
             emailErr ? (
               <>
                 {emailErr}{" "}
-                <Link to="/login" className="font-medium text-[#f4a93a] hover:underline">
+                <Link to="/login" className="font-medium text-[var(--hive-gold)] hover:underline">
                   Sign in →
                 </Link>
               </>
@@ -382,11 +371,11 @@ function Step1Account({
               update("email", e.target.value);
             }}
             onBlur={verifyEmail}
-            className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+            className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
             style={inputStyle}
             placeholder="you@agency.com"
           />
-          {checking && <span className="text-xs text-white/45">Checking…</span>}
+          {checking && <span className="text-xs text-[var(--hive-text-muted)]">Checking…</span>}
         </Field>
 
         <Field label="Password">
@@ -396,14 +385,14 @@ function Step1Account({
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
-              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
               style={inputStyle}
             />
             <button
               type="button"
               tabIndex={-1}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -423,14 +412,14 @@ function Step1Account({
               autoComplete="new-password"
               value={form.confirm}
               onChange={(e) => update("confirm", e.target.value)}
-              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
               style={inputStyle}
             />
             <button
               type="button"
               tabIndex={-1}
               onClick={() => setShowConfirm((v) => !v)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
               aria-label={showConfirm ? "Hide password" : "Show password"}
             >
               {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -624,7 +613,7 @@ function TextInput({
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40 disabled:opacity-60"
+      className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40 disabled:opacity-60"
       style={inputStyle}
     />
   );
@@ -692,7 +681,7 @@ function Step4Pricing({
         </div>
       )}
       {schedule === "list" && (
-        <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
+        <div className="mb-4 rounded-lg border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-3 py-2 text-sm text-[var(--hive-text)]">
           List rate: $125 / staff (1–19 clients), $109 at 20–49, $99 at 50+. $500 / month minimum.
           Annual saves 20%.
         </div>
@@ -722,7 +711,7 @@ function Step4Pricing({
               border: `1px solid ${form.interval === "monthly" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
             }}
           >
-            <div className="text-xs uppercase tracking-wider text-white/55">Monthly</div>
+            <div className="text-xs uppercase tracking-wider text-[var(--hive-text-muted)]">Monthly</div>
             <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.monthlyCents)}</div>
           </button>
           <button
@@ -734,11 +723,11 @@ function Step4Pricing({
               border: `1px solid ${form.interval === "annual" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
             }}
           >
-            <div className="text-xs uppercase tracking-wider text-white/55">Annual · 20% off</div>
+            <div className="text-xs uppercase tracking-wider text-[var(--hive-text-muted)]">Annual · 20% off</div>
             <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.billedCents)}</div>
           </button>
         </div>
-        <p className="text-xs text-white/55">
+        <p className="text-xs text-[var(--hive-text-muted)]">
           {formatUsdFromCents(quote.perStaffCents)} per staff
           {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum applied` : ""}.
           Training is separate (full program $300 / staff; TNS skips it).
@@ -839,17 +828,17 @@ function Step6Payment({
         </span>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm" data-testid="pricing-schedule">
+      <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4 text-sm" data-testid="pricing-schedule">
         <div className="text-xs uppercase tracking-wider text-[#f7c172]">
           {quote.schedule === "founding" ? "Founding" : "List"} · {form.staffCount} staff
         </div>
         <div className="mt-1 text-2xl font-bold">
           {formatUsdFromCents(form.interval === "annual" ? quote.billedCents : quote.monthlyCents)}
-          <span className="text-base font-normal text-white/60">
+          <span className="text-base font-normal text-[var(--hive-text-muted)]">
             {form.interval === "annual" ? "/year" : "/mo"}
           </span>
         </div>
-        <p className="mt-2 text-xs text-white/55">
+        <p className="mt-2 text-xs text-[var(--hive-text-muted)]">
           {formatUsdFromCents(quote.perStaffCents)} per staff
           {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum` : ""}.
           Training is one-time and separate. Enterprise is contact us.
@@ -867,12 +856,12 @@ function Header({ title, subtitle }: { title: string; subtitle: React.ReactNode 
   return (
     <div className="mb-6">
       <h1
-        className="text-2xl tracking-tight text-white sm:text-3xl"
+        className="text-2xl tracking-tight text-[var(--hive-text)] sm:text-3xl"
         style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
       >
         {title}
       </h1>
-      <p className="mt-1.5 text-sm text-white/60">{subtitle}</p>
+      <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">{subtitle}</p>
     </div>
   );
 }

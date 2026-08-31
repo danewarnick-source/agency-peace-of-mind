@@ -38,7 +38,7 @@ function TimeClockPage() {
           to="/dashboard/courses"
           className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition hover:bg-muted/50"
         >
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[image:var(--gradient-brand)] text-primary-foreground">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
             <GraduationCap className="h-4 w-4" />
           </span>
           <span className="min-w-0">

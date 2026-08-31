@@ -9,7 +9,7 @@ export function CTA() {
       <div className="mx-auto max-w-5xl px-6">
         <div
           className="relative overflow-hidden rounded-3xl p-10 text-center text-white shadow-[var(--shadow-elegant)] md:p-16"
-          style={{ background: "linear-gradient(140deg, #141a3d 0%, #0d112b 100%)" }}
+          style={{ background: "var(--hive-sidebar)" }}
         >
           <HexBackdrop opacity={0.05} />
           <div className="relative">

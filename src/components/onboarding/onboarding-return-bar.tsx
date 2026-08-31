@@ -25,11 +25,11 @@ export function OnboardingReturnBar() {
         className="flex items-center justify-between gap-3 text-sm"
       >
         <span className="inline-flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4 text-[color:var(--amber-400,#f4a93a)]" />
+          <ArrowLeft className="h-4 w-4 text-[color:var(--amber-400,var(--hive-gold))]" />
           <span className="font-medium">Back to setup</span>
         </span>
         <span className="inline-flex items-center gap-2 text-xs text-amber-100/90">
-          <Sparkles className="h-3.5 w-3.5 text-[color:var(--amber-400,#f4a93a)]" />
+          <Sparkles className="h-3.5 w-3.5 text-[color:var(--amber-400,var(--hive-gold))]" />
           <span className="tabular-nums">
             {completedCount} of {totalSteps} steps complete
           </span>

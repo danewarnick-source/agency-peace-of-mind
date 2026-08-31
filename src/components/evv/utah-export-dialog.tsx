@@ -504,7 +504,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
                 <li className="text-amber-600">{gpsAbsentCount} row{gpsAbsentCount === 1 ? "" : "s"} with no GPS — lat/lng will be blank (state may flag)</li>
               )}
               {gpsBypassedCount > 0 && (
-                <li className="text-[#137182]">{gpsBypassedCount} row{gpsBypassedCount === 1 ? "" : "s"} · GPS bypassed by staff — exporting with the client's on-file address instead of GPS</li>
+                <li className="text-[var(--hive-ink)]">{gpsBypassedCount} row{gpsBypassedCount === 1 ? "" : "s"} · GPS bypassed by staff — exporting with the client's on-file address instead of GPS</li>
               )}
             </ul>
           )}

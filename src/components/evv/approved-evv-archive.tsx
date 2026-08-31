@@ -283,7 +283,7 @@ export function EvvArchivePage() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold text-[#0B1126]">Approved EVV Archive</h3>
+        <h3 className="text-base font-semibold text-[var(--hive-text)]">Approved EVV Archive</h3>
         <p className="text-xs text-muted-foreground">
           Searchable record of every approved EVV shift. Read-only — does not change approval, billing, or DHHS export.
         </p>
@@ -380,7 +380,7 @@ export function EvvArchivePage() {
               }}
               className={`min-h-[36px] rounded px-3 py-1 text-xs font-medium capitalize transition ${
                 billing === k
-                  ? "bg-[#137182] text-white"
+                  ? "bg-[var(--hive-ink)] text-white"
                   : "text-muted-foreground hover:bg-accent"
               }`}
             >
@@ -438,7 +438,7 @@ export function EvvArchivePage() {
                       to="/dashboard/shift/$shiftId"
                       params={{ shiftId: r.id }}
                       target="_blank"
-                      className="text-[#137182] hover:underline"
+                      className="text-[var(--hive-ink)] hover:underline"
                     >
                       {r.client_name}
                     </Link>
@@ -473,7 +473,7 @@ export function EvvArchivePage() {
                       )}
                       {(r.gps_in_bypassed || r.gps_out_bypassed) && (
                         <span
-                          className="inline-flex items-center gap-1 rounded-full bg-[#137182]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#137182]"
+                          className="inline-flex items-center gap-1 rounded-full bg-[var(--hive-ink)]/12 px-1.5 py-0.5 text-[10px] font-medium text-[var(--hive-ink)]"
                           title="GPS could not be captured — staff proceeded with a confirmed reason and the record uses the client's on-file address instead."
                         >
                           <Zap className="h-3 w-3" /> GPS bypassed
@@ -552,7 +552,7 @@ function BillingBadge({ value }: { value: "billed" | "unbilled" | "held" }) {
       </Badge>
     );
   return (
-    <Badge variant="outline" className="gap-1 border-[#137182]/40 text-[#137182]">
+    <Badge variant="outline" className="gap-1 border-[var(--hive-ink)]/40 text-[var(--hive-ink)]">
       <Circle className="h-3 w-3" /> Unbilled
     </Badge>
   );

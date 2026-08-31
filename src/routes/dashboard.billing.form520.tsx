@@ -722,7 +722,7 @@ function Billing520Page() {
       .join("");
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>520 ${rangeLabel}</title>
 <style>
-  body{font-family:ui-sans-serif,system-ui,sans-serif;color:#0f1b3d;padding:24px;}
+  body{font-family:ui-sans-serif,system-ui,sans-serif;color:var(--hive-text);padding:24px;}
   h1{font-size:18px;margin:0 0 4px;} p{margin:0 0 16px;color:#555;font-size:12px;}
   table{width:100%;border-collapse:collapse;font-size:11px;}
   th,td{border:1px solid #d4d4d8;padding:6px 8px;text-align:left;}

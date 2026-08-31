@@ -42,7 +42,7 @@ function AgreementsMatrixPage() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-semibold text-[#0f1b3d]">Agreements Matrix</h1>
+          <h1 className="font-display text-lg font-semibold text-[var(--hive-text)]">Agreements Matrix</h1>
           <p className="text-sm text-muted-foreground">Per-organization compliance paperwork. Contracts &amp; status only — no client data.</p>
         </div>
         <div className="flex gap-2">

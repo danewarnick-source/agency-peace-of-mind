@@ -16,7 +16,7 @@ export function SignaturePad({
     if (!ctx) return;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, c.width, c.height);
-    ctx.strokeStyle = "#0d112b";
+    ctx.strokeStyle = "var(--hive-text)";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     if (value) {

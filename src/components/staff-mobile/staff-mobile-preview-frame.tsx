@@ -46,7 +46,7 @@ export function StaffMobilePreviewFrame({
                   onClick={() => setDevice(d)}
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     active
-                      ? "bg-[#0d112b] text-white"
+                      ? "bg-[var(--hive-text)] text-white"
                       : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
@@ -107,7 +107,7 @@ function FrameScreen({
   return (
     <div
       ref={ref}
-      className="relative overflow-hidden rounded-[2rem] bg-[#0d112b]"
+      className="relative overflow-hidden rounded-[2rem] bg-[var(--hive-text)]"
       style={{ width, height }}
     >
       <div className="absolute inset-0 flex flex-col">

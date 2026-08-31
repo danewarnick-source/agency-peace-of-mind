@@ -173,7 +173,7 @@ function PersonModulePlayer() {
               <Button
                 onClick={() => completeMutation.mutate()}
                 disabled={completeMutation.isPending || signature.trim().length < 3}
-                className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
               >
                 <CheckCircle2 className="mr-1 h-4 w-4" />
                 {completeMutation.isPending ? "Saving…" : "Sign & Complete"}

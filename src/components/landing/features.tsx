@@ -21,7 +21,7 @@ export function Features() {
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map(({ icon: Icon, title, desc }) => (
             <div key={title} className="group relative rounded-2xl border border-border bg-card p-7 shadow-[var(--shadow-card)] transition-all hover:-translate-y-1 hover:shadow-[var(--shadow-elegant)]">
-              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[image:var(--gradient-brand)] text-primary-foreground">
+              <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="text-lg font-semibold tracking-tight">{title}</h3>

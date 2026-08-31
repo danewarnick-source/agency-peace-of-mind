@@ -236,16 +236,16 @@ export function InternalAuditPage() {
   const body = (
     <div className="space-y-6">
       {/* Header / posture */}
-      <div className="rounded-2xl border border-[#f4a93a]/30 bg-gradient-to-br from-[#fff7ed] via-white to-white p-5 shadow-[var(--shadow-card)]">
+      <div className="rounded-2xl border border-[var(--hive-gold)]/30 bg-gradient-to-br from-[#fff7ed] via-white to-white p-5 shadow-[var(--shadow-card)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/30">
-              <Hexagon className="h-5 w-5 text-[#d97a1c]" />
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hive-gold)]/15 ring-1 ring-[var(--hive-gold)]/30">
+              <Hexagon className="h-5 w-5 text-[var(--hive-gold)]" />
             </span>
             <div>
-              <h2 className="font-display text-xl font-bold tracking-tight text-[#0f1b3d]">
+              <h2 className="font-display text-xl font-bold tracking-tight text-[var(--hive-text)]">
                 Internal Audit
-                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#f4a93a]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#9a3412]">
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[var(--hive-gold)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#9a3412]">
                   <Sparkles className="h-3 w-3" /> NECTAR
                 </span>
               </h2>
@@ -281,7 +281,7 @@ export function InternalAuditPage() {
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-[#0f1b3d]">DSPD-style sample</h3>
+            <h3 className="text-sm font-semibold text-[var(--hive-text)]">DSPD-style sample</h3>
             <p className="text-xs text-muted-foreground">
               Hand-pick the specific clients and staff to audit (e.g. a DSPD sample request of
               8 clients + 5 staff). Leave both empty to use the standard scope below.
@@ -357,7 +357,7 @@ export function InternalAuditPage() {
       {/* Scope filters (whole company / single client / area / date) */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[#0f1b3d]">Other scope filters</h3>
+          <h3 className="text-sm font-semibold text-[var(--hive-text)]">Other scope filters</h3>
           {usingSample && (
             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
               Sample active — single-client filter ignored

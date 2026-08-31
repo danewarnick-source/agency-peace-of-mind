@@ -214,7 +214,7 @@ function Section({
     neutral: {
       wrap: "border-border bg-card",
       head: "text-foreground",
-      icon: "bg-[color:var(--navy-900,#0d112b)] text-white",
+      icon: "bg-[color:var(--navy-900,var(--hive-text))] text-white",
     },
   }[tone];
 

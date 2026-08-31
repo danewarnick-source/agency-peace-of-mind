@@ -36,7 +36,7 @@ function AccountHealth() {
     <div className="space-y-4">
       <header className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
             <Activity className="h-5 w-5" />
           </span>
           <div>
@@ -86,7 +86,7 @@ function HealthKpi({
       <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[#0f1b3d]">
+      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">
         {value}
       </div>
     </div>
@@ -132,7 +132,7 @@ function HealthBucket({
                   <Link
                     to="/dashboard/hive-exec/$orgId"
                     params={{ orgId: r.organization_id }}
-                    className="font-medium text-[#0f1b3d] hover:underline"
+                    className="font-medium text-[var(--hive-text)] hover:underline"
                   >
                     {r.name}
                   </Link>

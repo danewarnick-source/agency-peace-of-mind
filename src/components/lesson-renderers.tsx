@@ -251,7 +251,7 @@ export function AcknowledgementLesson({
       <Button
         disabled={!checked || (data.signature_required !== false && !signature.trim())}
         onClick={() => onAcknowledge(signature.trim() || "—")}
-        className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+        className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
       >
         Sign & continue
       </Button>
@@ -439,7 +439,7 @@ export function QuizLesson({
         <Button
           disabled={!allAnswered || remaining <= 0}
           onClick={handleSubmit}
-          className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+          className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
         >
           Submit answers
         </Button>

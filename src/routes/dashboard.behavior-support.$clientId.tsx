@@ -79,7 +79,7 @@ function BehaviorSupportClientPage() {
       </button>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Brain className="h-5 w-5 text-[color:var(--teal-700,#137182)]" />
+        <Brain className="h-5 w-5 text-[color:var(--teal-700,var(--hive-ink))]" />
         <h2 className="text-xl font-semibold">
           {data.client.first_name} {data.client.last_name}
         </h2>

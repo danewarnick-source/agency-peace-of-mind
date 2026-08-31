@@ -70,7 +70,7 @@ export function PendingTrackingFormsDialog({
               key={`${p.formId}:${p.shiftId}`}
               className="flex items-start gap-2 rounded-md border border-border bg-card p-2.5"
             >
-              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#137182]" />
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[var(--hive-ink)]" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground truncate">{p.formName}</p>
               </div>

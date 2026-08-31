@@ -184,7 +184,7 @@ function LoginPage() {
   return (
     <AuthFrame>
       <div className="flex w-full max-w-md flex-col items-center">
-        <HiveWordmark to="/" />
+        <HiveWordmark to="/" tone="canvas" />
         <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
           Ops, training, and compliance, visible.
         </p>
@@ -293,7 +293,7 @@ export function AuthShell({
   return (
     <AuthFrame>
       <div className="flex w-full max-w-md flex-col items-center">
-        <HiveWordmark to="/" />
+        <HiveWordmark to="/" tone="canvas" />
         <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
           Ops, training, and compliance, visible.
         </p>

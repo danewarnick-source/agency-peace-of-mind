@@ -426,7 +426,7 @@ function BudgetCard({ b }: { b: CodeBudget }) {
     b.status === "exhausted" || b.status === "expired" || b.used_pct >= 100
       ? "bg-[#dc2626]"
       : b.used_pct >= 90
-        ? "bg-[#f59324]"
+        ? "bg-[var(--hive-gold)]"
         : "bg-[#15a06a]";
   const toneText =
     b.status === "exhausted" || b.status === "expired" || b.used_pct >= 100
@@ -439,7 +439,7 @@ function BudgetCard({ b }: { b: CodeBudget }) {
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <header className="flex items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2">
-          <Icon className="h-4 w-4 text-[color:var(--amber-700,#d97a1c)]" />
+          <Icon className="h-4 w-4 text-[color:var(--amber-700,var(--hive-gold))]" />
           <span className="font-mono text-sm font-bold">{b.code.service_code}</span>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
             {b.is_daily ? "Daily" : "Q · 15 min"}

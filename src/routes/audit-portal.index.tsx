@@ -48,7 +48,7 @@ function AuditPortalIndex() {
                   <ShieldCheck className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 className="font-display text-lg font-semibold text-[#0f1b3d]">
+                  <h2 className="font-display text-lg font-semibold text-[var(--hive-text)]">
                     Audit packages granted to you
                   </h2>
                   <p className="text-sm text-muted-foreground">
@@ -67,7 +67,7 @@ function AuditPortalIndex() {
             ) : rows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
                 <FileText className="mx-auto h-8 w-8 text-slate-300" />
-                <div className="mt-2 text-sm font-medium text-[#0f1b3d]">No packages yet</div>
+                <div className="mt-2 text-sm font-medium text-[var(--hive-text)]">No packages yet</div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   A provider organization will notify you when a package is released.
                 </div>
@@ -79,14 +79,14 @@ function AuditPortalIndex() {
                     <Link
                       to="/audit-portal/$packageId"
                       params={{ packageId: p.id }}
-                      className="group flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-[#0f1b3d] hover:shadow-md"
+                      className="group flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-[var(--hive-text)] hover:shadow-md"
                     >
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-[#0f1b3d]/10 px-2 py-0.5 text-xs font-medium uppercase text-[#0f1b3d]">
+                          <span className="rounded bg-[var(--hive-text)]/10 px-2 py-0.5 text-xs font-medium uppercase text-[var(--hive-text)]">
                             {p.status}
                           </span>
-                          <span className="font-medium text-[#0f1b3d]">
+                          <span className="font-medium text-[var(--hive-text)]">
                             {p.title ?? `${p.state_agency} audit`}
                           </span>
                         </div>
@@ -100,7 +100,7 @@ function AuditPortalIndex() {
                           <span>{p.subject_count} subjects</span>
                         </div>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-[#0f1b3d]" />
+                      <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-[var(--hive-text)]" />
                     </Link>
                   </li>
                 ))}

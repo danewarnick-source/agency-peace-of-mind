@@ -38,7 +38,7 @@ function ForgotPassword() {
       ) : (
         <form onSubmit={onSubmit} className="grid gap-4">
           <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" required /></div>
-          <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
+          <Button type="submit" disabled={busy} className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
             {busy ? "Sending…" : "Send reset link"}
           </Button>
         </form>

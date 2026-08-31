@@ -314,7 +314,7 @@ function HiveNectarPage() {
       <section className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#d97a1c] text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-white">
               <Hexagon className="h-5 w-5" />
             </span>
             <div>
@@ -338,7 +338,7 @@ function HiveNectarPage() {
             </div>
             <button
               onClick={() => setCreateOpen(true)}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-[#0f1b3d] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-[var(--hive-text)] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
             >
               <Plus className="h-3.5 w-3.5" /> File ticket manually
             </button>
@@ -582,7 +582,7 @@ function ManualTicketDialog({
           <button
             onClick={submit}
             disabled={submitting}
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-60"
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-60"
           >
             <Check className="h-3.5 w-3.5" />
             {submitting ? "Filing…" : "File ticket"}
@@ -651,7 +651,7 @@ function TicketCard({
                 <Link
                   to="/dashboard/hive-exec/$orgId"
                   params={{ orgId: o.triggeringOrgId }}
-                  className="text-[#0f1b3d] hover:underline"
+                  className="text-[var(--hive-text)] hover:underline"
                 >
                   {o.triggeringOrgName}
                 </Link>
@@ -720,7 +720,7 @@ function TicketCard({
                     onModify(draft);
                     setEditing(false);
                   }}
-                  className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
+                  className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
                 >
                   <Check className="h-3.5 w-3.5" /> Save edits
                 </button>
@@ -801,7 +801,7 @@ function TicketCard({
               {state === "approved" && !isArch && (
                 <button
                   onClick={onApply}
-                  className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[#0f1b3d] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
+                  className="inline-flex min-h-[40px] items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 text-xs font-semibold text-white hover:bg-[#1a2a5a]"
                 >
                   <PlayCircle className="h-3.5 w-3.5" /> Apply fix &amp; re-run affected documents
                 </button>

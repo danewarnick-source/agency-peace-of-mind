@@ -24,10 +24,10 @@ export const Route = createFileRoute("/demo")({
 });
 
 const NAVY_BG =
-  "radial-gradient(1000px 600px at 80% 110%, rgba(244,169,58,0.18), transparent 60%), linear-gradient(140deg, #141a3d 0%, #0d112b 100%)";
+  "radial-gradient(1000px 600px at 80% 110%, rgba(244,169,58,0.18), transparent 60%), linear-gradient(140deg, #141a3d 0%, var(--hive-text) 100%)";
 const JAKARTA = '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif';
-const AMBER = "#f4a93a";
-const AMBER_GRAD = "linear-gradient(135deg, #f4a93a 0%, #f59324 100%)";
+const AMBER = "var(--hive-gold)";
+const AMBER_GRAD = "linear-gradient(135deg, var(--hive-gold) 0%, var(--hive-gold) 100%)";
 
 function DemoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -103,7 +103,7 @@ function DemoPage() {
               <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Link to="/signup" className="w-full sm:w-auto">
                   <Button
-                    className="w-full text-[#0d112b] hover:opacity-90 sm:w-auto"
+                    className="w-full text-[var(--hive-text)] hover:opacity-90 sm:w-auto"
                     style={{ background: AMBER_GRAD, minHeight: 44 }}
                   >
                     Get started now <ArrowRight className="ml-1 h-4 w-4" />
@@ -176,7 +176,7 @@ function DemoPage() {
                 <Button
                   type="submit"
                   disabled={!valid || busy}
-                  className="mt-2 w-full text-[#0d112b] hover:opacity-90"
+                  className="mt-2 w-full text-[var(--hive-text)] hover:opacity-90"
                   style={{ background: AMBER_GRAD, minHeight: 44 }}
                 >
                   {busy ? "Sending…" : "Request demo"}

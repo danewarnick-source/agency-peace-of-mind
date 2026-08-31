@@ -247,7 +247,7 @@ export function RecordDetailSheet({
           <SheetTitle className="flex flex-wrap items-center gap-2">
             {row.staff_name} → {row.client_name}
             {isManualEntry && (
-              <Badge variant="outline" className="gap-1 border-[#137182] text-[#137182]">
+              <Badge variant="outline" className="gap-1 border-[var(--hive-ink)] text-[var(--hive-ink)]">
                 <UserCog className="h-3 w-3" /> Manually entered
               </Badge>
             )}
@@ -388,8 +388,8 @@ export function RecordDetailSheet({
         {/* Manager/admin note — deliberately separate from shift_note_text above.
             Saved with its own mutation so it never overwrites, or gets
             overwritten by, the caregiver's own note. */}
-        <div className="mt-5 space-y-2 rounded-lg border border-[#137182]/30 bg-[#137182]/5 p-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#137182]">
+        <div className="mt-5 space-y-2 rounded-lg border border-[var(--hive-ink)]/30 bg-[var(--hive-ink)]/5 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--hive-ink)]">
             <StickyNote className="h-3.5 w-3.5" /> Manager / admin note
           </div>
           <p className="text-[11px] text-muted-foreground">

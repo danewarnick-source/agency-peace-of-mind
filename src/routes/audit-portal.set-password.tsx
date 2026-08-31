@@ -107,15 +107,15 @@ function SetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0f1b3d] via-[#1a2a5a] to-[#0f1b3d] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--hive-text)] via-[#1a2a5a] to-[var(--hive-text)] px-4">
       <div className="w-full max-w-md rounded-xl border border-[#fed7aa]/30 bg-white p-8 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f1b3d] text-white">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hive-text)] text-white">
             <ShieldCheck className="h-6 w-6" />
           </span>
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">HIVE</div>
-            <h1 className="font-display text-lg font-bold text-[#0f1b3d]">State Audit Portal</h1>
+            <h1 className="font-display text-lg font-bold text-[var(--hive-text)]">State Audit Portal</h1>
           </div>
         </div>
 
@@ -149,7 +149,7 @@ function SetPasswordPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password" required minLength={8} autoComplete="new-password"
-                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[#0f1b3d] focus:outline-none"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[var(--hive-text)] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -168,7 +168,7 @@ function SetPasswordPage() {
                 <input
                   type={showConfirm ? "text" : "password"}
                   name="confirm" required minLength={8} autoComplete="new-password"
-                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[#0f1b3d] focus:outline-none"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[var(--hive-text)] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -183,7 +183,7 @@ function SetPasswordPage() {
             </label>
             <button
               type="submit" disabled={busy}
-              className="inline-flex w-full min-h-[44px] items-center justify-center rounded-md bg-[#0f1b3d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
+              className="inline-flex w-full min-h-[44px] items-center justify-center rounded-md bg-[var(--hive-text)] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a2a5a] disabled:opacity-50"
             >
               {busy ? "Saving…" : "Set password & open audit package"}
             </button>

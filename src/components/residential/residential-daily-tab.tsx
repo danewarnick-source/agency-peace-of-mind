@@ -690,7 +690,7 @@ function HistoricalDailyNotesSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[#0B1126]">Historical daily notes</h3>
+        <h3 className="text-sm font-semibold text-[var(--hive-text)]">Historical daily notes</h3>
         <Button
           type="button" size="sm" variant="outline"
           onClick={handleExport}

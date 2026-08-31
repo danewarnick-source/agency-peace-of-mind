@@ -40,7 +40,7 @@ function TicketsPage() {
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-          <LifeBuoy className="h-4 w-4 text-[#d97a1c]" /> Support queue
+          <LifeBuoy className="h-4 w-4 text-[var(--hive-gold)]" /> Support queue
         </h2>
         <select
           value={filter}
@@ -76,7 +76,7 @@ function TicketsPage() {
                   <Link
                     to="/dashboard/hive-exec/$orgId"
                     params={{ orgId: t.organization_id }}
-                    className="text-[#0f1b3d] hover:underline"
+                    className="text-[var(--hive-text)] hover:underline"
                   >
                     {t.organization_name}
                   </Link>

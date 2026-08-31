@@ -44,15 +44,15 @@ export function LandingAppPreview() {
     >
       <div className="flex min-h-[420px]">
         <div className="hidden w-[72px] shrink-0 flex-col items-center gap-3 bg-[var(--hive-sidebar)] py-4 sm:flex">
-          <HiveMark className="h-6 w-6" />
+          <HiveMark className="h-7 w-7" />
           <div className="mt-2 flex w-full flex-col items-center gap-1 px-1.5">
             {NAV.map(({ icon: Icon, label, active }) => (
               <div
                 key={label}
-                className={`flex w-full flex-col items-center gap-1 rounded-md px-1 py-1.5 text-[8px] ${
+                className={`relative flex w-full flex-col items-center gap-1 rounded-md px-1 py-1.5 text-[8px] ${
                   active
-                    ? "border border-[var(--hive-gold)] text-[var(--hive-gold)]"
-                    : "text-[var(--hive-text-muted)]"
+                    ? "hive-nav-active"
+                    : "text-[var(--hive-chrome-text)]/70"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" strokeWidth={1.6} />

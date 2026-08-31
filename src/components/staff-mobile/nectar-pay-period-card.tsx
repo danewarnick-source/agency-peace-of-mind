@@ -121,7 +121,7 @@ export function NectarPayPeriodCard() {
               <>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                    <Clock className="h-4 w-4 text-[#f4a93a]" />
+                    <Clock className="h-4 w-4 text-[var(--hive-gold)]" />
                     Direct Support
                   </span>
                   <span className="font-mono text-sm tabular-nums text-white/90">
@@ -141,7 +141,7 @@ export function NectarPayPeriodCard() {
               <>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
                   <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                    <CalendarDays className="h-4 w-4 text-[#f4a93a]" />
+                    <CalendarDays className="h-4 w-4 text-[var(--hive-gold)]" />
                     Host Home
                   </span>
                   <span className="font-mono text-sm tabular-nums text-white/90">
@@ -184,7 +184,7 @@ export function NectarPayPeriodCard() {
               <>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2.5">
                   <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-                    <Briefcase className="h-4 w-4 text-[#f4a93a]" />
+                    <Briefcase className="h-4 w-4 text-[var(--hive-gold)]" />
                     Non-client · General time clock
                     {live.isGeneralShift && (
                       <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-[#15a06a]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#9cf2c8]">
@@ -215,11 +215,11 @@ export function NectarPayPeriodCard() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
                   Est. gross pay
                 </span>
-                <span className="text-[10px] font-medium text-[#f4a93a]">
+                <span className="text-[10px] font-medium text-[var(--hive-gold)]">
                   Estimate · before taxes
                 </span>
               </div>
-              <span className="font-mono text-xl font-bold tabular-nums text-[#f4a93a]">
+              <span className="font-mono text-xl font-bold tabular-nums text-[var(--hive-gold)]">
                 {fmtUSD(payTotal)}
               </span>
             </div>
@@ -243,7 +243,7 @@ export function NectarPayPeriodCard() {
                     {otherSafety > 0 ? (
                       <ShieldAlert className="h-4 w-4 text-red-200" />
                     ) : (
-                      <BookOpen className="h-4 w-4 text-[#f4a93a]" />
+                      <BookOpen className="h-4 w-4 text-[var(--hive-gold)]" />
                     )}
                     {otherSafety > 0
                       ? "Safety-critical training due"
@@ -269,7 +269,7 @@ export function NectarPayPeriodCard() {
                 className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"
               >
                 <span className="inline-flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-[#f4a93a]" />
+                  <FileText className="h-4 w-4 text-[var(--hive-gold)]" />
                   Daily logs outstanding
                 </span>
                 <span className="inline-flex items-center gap-2">
@@ -286,7 +286,7 @@ export function NectarPayPeriodCard() {
                 className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] active:scale-[0.99]"
               >
                 <span className="inline-flex items-center gap-2">
-                  <CalendarX className="h-4 w-4 text-[#f4a93a]" />
+                  <CalendarX className="h-4 w-4 text-[var(--hive-gold)]" />
                   Monthly attendance incomplete
                 </span>
                 <span className="inline-flex items-center gap-2">

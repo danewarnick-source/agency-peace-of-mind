@@ -17,7 +17,7 @@ export function HexWatermark({
     <Hexagon
       aria-hidden
       strokeWidth={1.25}
-      className={`pointer-events-none absolute select-none text-[#f4a93a] ${className}`}
+      className={`pointer-events-none absolute select-none text-[var(--hive-gold)] ${className}`}
       style={{ width: size, height: size, opacity }}
     />
   );

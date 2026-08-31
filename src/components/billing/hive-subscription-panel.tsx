@@ -229,7 +229,7 @@ export function HiveSubscriptionPanel() {
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">Current rate</div>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
-          <div className="font-display text-2xl font-semibold text-[#0f1b3d]" data-testid="pricing-schedule">
+          <div className="font-display text-2xl font-semibold text-[var(--hive-text)]" data-testid="pricing-schedule">
             {rateKind}
           </div>
           <div className="text-lg font-medium text-[#7a4a0a]">
@@ -324,7 +324,7 @@ export function HiveSubscriptionPanel() {
               data-testid="pay-with-stripe"
               disabled={busy || !d.paymentsConfigured}
               onClick={pay}
-              className="bg-[#0f1b3d] text-white hover:bg-[#1a2a5a]"
+              className="bg-[var(--hive-text)] text-white hover:bg-[#1a2a5a]"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
               {d.lockedAt || !d.hasStripeCustomer ? "Pay with Stripe" : "Update seats"}

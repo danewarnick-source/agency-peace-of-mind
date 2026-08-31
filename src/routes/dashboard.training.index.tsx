@@ -190,7 +190,7 @@ function CourseLibrary() {
             <Button
               onClick={() => selectedUser && assignMutation.mutate(selectedUser)}
               disabled={!selectedUser || assignMutation.isPending}
-              className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+              className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
             >
               {assignMutation.isPending ? "Assigning…" : "Assign Compliance Track"}
             </Button>

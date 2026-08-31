@@ -32,8 +32,8 @@ const EXAMPLES = [
   "Fill Oak's Wednesday overnight",
 ];
 
-const TEAL = "#137182";
-const GOLD = "#f5a623";
+const TEAL = "var(--hive-ink)";
+const GOLD = "var(--hive-gold)";
 
 function fmtWhen(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -285,8 +285,8 @@ export function NectarCommandBar({
         <button
           onClick={() => setImportOpen(true)}
           style={{
-            background: "#0B1126",
-            border: "1px solid #f5a623",
+            background: "var(--hive-text)",
+            border: "1px solid var(--hive-gold)",
             boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.25)",
             borderRadius: 9,
             padding: "6px 11px",

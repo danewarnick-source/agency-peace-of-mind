@@ -179,7 +179,7 @@ function CompanyMigrationPage() {
       {/* Engagement */}
       <Card className="border-[#fed7aa] bg-gradient-to-br from-[#fff7ed] to-card/40 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <Briefcase className="h-4 w-4 text-[#d97a1c]" /> Billable engagement
+          <Briefcase className="h-4 w-4 text-[var(--hive-gold)]" /> Billable engagement
         </div>
         <div className="grid gap-3 md:grid-cols-[2fr,1fr,1fr,1fr]">
           <div className="space-y-1">
@@ -244,7 +244,7 @@ function CompanyMigrationPage() {
               <span
                 key={s.value}
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
-                  reached ? "bg-[#d97a1c] text-white" : "bg-muted text-muted-foreground"
+                  reached ? "bg-[var(--hive-gold)] text-white" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {reached && <CheckCircle2 className="h-3 w-3" />} {s.label}
@@ -297,7 +297,7 @@ function CompanyMigrationPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <Building2 className="h-4 w-4 text-[#d97a1c]" /> Active migration · {targetCompany?.name}
+                <Building2 className="h-4 w-4 text-[var(--hive-gold)]" /> Active migration · {targetCompany?.name}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline" className="capitalize">{activeJob.status.replace(/_/g, " ")}</Badge>
@@ -345,7 +345,7 @@ function CompanyMigrationPage() {
       {targetOrgId && (jobsQ.data?.length ?? 0) > 0 && (
         <Card className="border-border/60 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Receipt className="h-4 w-4 text-[#d97a1c]" /> Migration history
+            <Receipt className="h-4 w-4 text-[var(--hive-gold)]" /> Migration history
           </div>
           <div className="space-y-2 text-xs">
             {(jobsQ.data ?? []).map((j) => (

@@ -87,7 +87,7 @@ function BehavioristCaseload() {
     <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-[color:var(--teal-700,#137182)]" />
+          <Brain className="h-5 w-5 text-[color:var(--teal-700,var(--hive-ink))]" />
           <div>
             <h1 className="text-xl font-semibold">Behaviorist Caseload</h1>
             <p className="text-xs text-muted-foreground">

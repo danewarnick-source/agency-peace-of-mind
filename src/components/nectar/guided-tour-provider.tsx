@@ -183,7 +183,7 @@ function TourOverlay({
       {/* Amber spotlight ring */}
       {rect && (
         <div
-          className="pointer-events-none absolute rounded-[10px] ring-2 ring-[#d97a1c] shadow-[0_0_0_4px_rgba(217,122,28,0.25)] transition-all duration-200"
+          className="pointer-events-none absolute rounded-[10px] ring-2 ring-[var(--hive-gold)] shadow-[0_0_0_4px_rgba(217,122,28,0.25)] transition-all duration-200"
           style={{ top: rect.top - 8, left: rect.left - 8, width: rect.width + 16, height: rect.height + 16 }}
         />
       )}
@@ -198,17 +198,17 @@ function TourOverlay({
         }
       >
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0f1b3d]/70">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--hive-text)]/70">
             NECTAR · Step {tour.stepIndex + 1} of {total}
           </div>
           <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted" aria-label="Exit tour">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="font-display text-sm font-semibold text-[#0f1b3d]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div className="font-display text-sm font-semibold text-[var(--hive-text)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           {tour.task.title}
         </div>
-        <p className="mt-1 text-sm text-[#0f1b3d]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <p className="mt-1 text-sm text-[var(--hive-text)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           {step?.instruction ?? "—"}
         </p>
         {looking && (
@@ -240,7 +240,7 @@ function TourOverlay({
           </div>
           <button
             onClick={onAdvance}
-            className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[#d97a1c] px-3 py-1 text-xs font-semibold text-white shadow hover:bg-[#b8651a]"
+            className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--hive-gold)] px-3 py-1 text-xs font-semibold text-white shadow hover:bg-[#b8651a]"
           >
             {tour.stepIndex + 1 === total ? "Finish" : "Next"} <ChevronRight className="h-3 w-3" />
           </button>

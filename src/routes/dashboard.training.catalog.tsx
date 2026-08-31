@@ -98,7 +98,7 @@ function CatalogAndPurchases({ organizationId }: { organizationId: string }) {
           {(productsQ.data ?? []).map((p) => (
             <NectarCard key={p.id} className="p-5">
               <div className="flex items-start gap-3">
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-brand)] text-primary-foreground shadow-sm">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--hive-gold)] text-[var(--hive-on-gold)] shadow-sm">
                   <GraduationCap className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -42,14 +42,14 @@ export function CompetitiveContrast() {
           {contrasts.map(({ icon: Icon, title, body }) => (
             <div
               key={title}
-              className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:border-hive-teal-300 hover:shadow-elegant"
+              className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:border-[var(--hive-border)] hover:shadow-elegant"
             >
-              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-hive-teal-700 text-white">
+              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]">
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="font-display text-lg font-semibold">{title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-              <div className="absolute -right-8 -top-8 h-24 w-24 clip-hex bg-hive-teal-100 opacity-0 transition-opacity group-hover:opacity-100" />
+              <div className="absolute -right-8 -top-8 h-24 w-24 clip-hex bg-[var(--hive-gold-soft)] opacity-0 transition-opacity group-hover:opacity-100" />
             </div>
           ))}
         </div>

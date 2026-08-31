@@ -140,7 +140,7 @@ export function ManualTimesheetDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
-        <Button type="button" size="sm" variant="outline" className="gap-2">
+        <Button type="button" size="sm" className="gap-2">
           <PlusCircle className="h-4 w-4" /> {triggerLabel ?? (mode === "admin" ? "Add timesheet manually" : "Log a missed timesheet")}
         </Button>
       </DialogTrigger>

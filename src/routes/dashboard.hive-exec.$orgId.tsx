@@ -171,7 +171,7 @@ function CompanyDetailPage() {
       </button>
 
       <header className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <h1 className="font-display text-2xl font-bold text-[#0f1b3d]">{d?.name ?? "Loading…"}</h1>
+        <h1 className="font-display text-2xl font-bold text-[var(--hive-text)]">{d?.name ?? "Loading…"}</h1>
         <p className="text-xs text-muted-foreground">
           Account &amp; billing only — no client records or PHI accessible from this view.
         </p>
@@ -271,7 +271,7 @@ function CompanyDetailPage() {
               type="button"
               onClick={() => saveContact.mutate()}
               disabled={saveContact.isPending}
-              className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
             >
               <Save className="h-3.5 w-3.5" /> Save account contact
             </button>
@@ -299,7 +299,7 @@ function CompanyDetailPage() {
             type="button"
             disabled={!nameDirty || !nameEdit.trim() || saveNames.isPending}
             onClick={() => { setAttest(false); setConfirmOpen(true); }}
-            className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" /> Save name changes…
           </button>
@@ -356,7 +356,7 @@ function CompanyDetailPage() {
                 type="button"
                 disabled={!attest || saveNames.isPending}
                 onClick={() => saveNames.mutate()}
-                className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" /> Confirm &amp; save
               </button>
@@ -498,7 +498,7 @@ function CompanyDetailPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
-                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule === "founding" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule === "founding" ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white" : "border-border"}`}
                 onClick={() => {
                   scheduleFn({ data: { organizationId: orgId, schedule: "founding" } })
                     .then(() => {
@@ -513,7 +513,7 @@ function CompanyDetailPage() {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule !== "founding" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule !== "founding" ? "border-[var(--hive-text)] bg-[var(--hive-text)] text-white" : "border-border"}`}
                 onClick={() => {
                   scheduleFn({ data: { organizationId: orgId, schedule: "list" } })
                     .then(() => {
@@ -539,7 +539,7 @@ function CompanyDetailPage() {
               type="button"
               onClick={() => save.mutate()}
               disabled={save.isPending}
-              className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md bg-[var(--hive-text)] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a2a5a] disabled:opacity-50"
             >
               <Save className="h-3.5 w-3.5" /> Save subscription
             </button>
@@ -582,7 +582,7 @@ function TabButton({ active, onClick, icon: Icon, children }: { active: boolean;
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
         active
-          ? "border-[#0f1b3d] text-[#0f1b3d]"
+          ? "border-[var(--hive-text)] text-[var(--hive-text)]"
           : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >
@@ -632,7 +632,7 @@ function UsageTile({
       <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[#0f1b3d]">{value}</div>
+      <div className="mt-1 font-display text-2xl font-bold tabular-nums text-[var(--hive-text)]">{value}</div>
     </div>
   );
 }

@@ -64,7 +64,7 @@ function StateDetailPage() {
         <Link
           to="/dashboard/hive-exec/states/$stateCode/onboarding"
           params={{ stateCode }}
-          className="inline-flex min-h-[36px] items-center gap-2 rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
+          className="inline-flex min-h-[36px] items-center gap-2 rounded-md bg-[var(--hive-gold)] px-3 text-xs font-semibold text-white hover:bg-[#b8651a]"
         >
           <Sparkles className="h-3.5 w-3.5" /> Run state onboarding
         </Link>
@@ -83,7 +83,7 @@ function StateDetailPage() {
             key={key}
             onClick={() => setTab(key)}
             className={`inline-flex min-h-[36px] items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
-              tab === key ? "bg-[#0f1b3d] text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              tab === key ? "bg-[var(--hive-text)] text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             {label}
@@ -158,7 +158,7 @@ function ProfileTab({ stateCode, onJumpToSources }: { stateCode: string; onJumpT
         <button
           onClick={() => publish.mutate()}
           disabled={publish.isPending || !hasTemplate}
-          className="inline-flex min-h-[36px] items-center gap-2 rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
+          className="inline-flex min-h-[36px] items-center gap-2 rounded-md bg-[var(--hive-gold)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[#b8631a] disabled:opacity-50"
         >
           <CheckCircle2 className="h-3.5 w-3.5" /> {publish.isPending ? "Publishing…" : "Publish template"}
         </button>
@@ -281,7 +281,7 @@ function BasicsCard({
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="inline-flex items-center gap-2 font-display text-sm font-semibold">
-          <MapPin className="h-4 w-4 text-[#d97a1c]" />
+          <MapPin className="h-4 w-4 text-[var(--hive-gold)]" />
           {row?.name ?? stateCode} {row?.is_reference ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">Reference</span> : null}
         </h3>
         <span className="text-xs text-muted-foreground">
@@ -985,7 +985,7 @@ function SourcesTab({ stateCode }: { stateCode: string }) {
           <input placeholder="Title (e.g. DSPD Provider Code)" value={title} onChange={(e) => setTitle(e.target.value)} className="min-h-[40px] rounded-md border border-border bg-background px-3 text-sm md:col-span-2" />
           <input placeholder="Jurisdiction (optional)" value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className="min-h-[40px] rounded-md border border-border bg-background px-3 text-sm" />
           <button onClick={() => add.mutate()} disabled={!title.trim() || add.isPending}
-            className="min-h-[40px] rounded-md bg-[#d97a1c] px-3 text-sm font-semibold text-white hover:bg-[#b8631a] disabled:opacity-50 md:col-span-3">
+            className="min-h-[40px] rounded-md bg-[var(--hive-gold)] px-3 text-sm font-semibold text-white hover:bg-[#b8631a] disabled:opacity-50 md:col-span-3">
             {add.isPending ? "Adding…" : "Add source"}
           </button>
         </div>
@@ -1104,9 +1104,9 @@ function InventoryTab({ stateCode }: { stateCode: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-4">
+      <div className="rounded-xl border border-[var(--hive-gold)]/30 bg-[var(--hive-gold)]/[0.06] p-4">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#f4a93a]/15 ring-1 ring-[#f4a93a]/30">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--hive-gold)]/15 ring-1 ring-[var(--hive-gold)]/30">
             <Sparkles className="h-4 w-4 text-[#9a3412]" />
           </span>
           <div className="min-w-0 flex-1">
@@ -1321,7 +1321,7 @@ function BaseVersionBanner({ stateCode }: { stateCode: string }) {
         <button
           onClick={() => upgrade.mutate(d.toVersion)}
           disabled={upgrade.isPending}
-          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-md bg-[#d97a1c] px-3 text-xs font-semibold text-white hover:bg-[#b8651a] disabled:opacity-50"
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-md bg-[var(--hive-gold)] px-3 text-xs font-semibold text-white hover:bg-[#b8651a] disabled:opacity-50"
         >
           <Sparkles className="h-3.5 w-3.5" /> {upgrade.isPending ? "Upgrading…" : `Update to v${d.toVersion}`}
         </button>

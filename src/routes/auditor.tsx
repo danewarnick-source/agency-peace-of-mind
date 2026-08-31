@@ -67,7 +67,7 @@ function AuditorPortal() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-semibold" style={{ color: navy }}>
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#141a3d] text-white">
-              <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
+              <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2.5} />
             </span>
             HIVE
             <span className="text-xs font-normal text-muted-foreground border-l border-[color:var(--border-light)] ml-2 pl-2">

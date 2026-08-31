@@ -101,8 +101,11 @@ describe("Request time off dialog", () => {
   it("shows the existing form and does not auto-open the calendar", () => {
     assert.match(src, /Start date/);
     assert.match(src, /End date/);
+    assert.match(src, /Note \(optional\)/);
     assert.match(src, /onOpenAutoFocus/);
     assert.match(src, /e\.preventDefault\(\)/);
+    assert.match(src, /type=\{armed \? "date" : "text"\}/);
+    assert.match(src, /Tap to choose/);
     assert.doesNotMatch(src, /autoFocus=\{true\}/);
     assert.doesNotMatch(src, /partial-day|urgency|manager picker|hours balance/i);
   });

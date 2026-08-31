@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -17,6 +17,65 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { createTimeOffRequest, type TimeOffRequest } from "@/lib/schedule-requests";
 
 const TYPES: TimeOffRequest["type"][] = ["pto", "sick", "personal", "unpaid", "other"];
+
+/**
+ * Native type="date" on Android/iOS opens the system calendar as soon as
+ * the field is focused (or sometimes as soon as it mounts in a dialog).
+ * Stay on type="text" until this field is tapped, then arm the picker.
+ */
+function TimeOffDateField({
+  id,
+  label,
+  value,
+  onChange,
+  dialogOpen,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  dialogOpen: boolean;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!dialogOpen) setArmed(false);
+  }, [dialogOpen]);
+
+  useEffect(() => {
+    if (!armed) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    try {
+      el.showPicker?.();
+    } catch {
+      /* showPicker is user-gesture gated on some browsers; tap still focuses */
+    }
+  }, [armed]);
+
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        ref={ref}
+        id={id}
+        type={armed ? "date" : "text"}
+        inputMode="none"
+        autoComplete="off"
+        autoFocus={false}
+        readOnly={!armed}
+        placeholder="Tap to choose"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onPointerDown={() => {
+          if (!armed) setArmed(true);
+        }}
+      />
+    </div>
+  );
+}
 
 export function RequestTimeOffDialog({ trigger }: { trigger: React.ReactNode }) {
   const qc = useQueryClient();
@@ -63,26 +122,20 @@ export function RequestTimeOffDialog({ trigger }: { trigger: React.ReactNode }) 
         </DialogHeader>
         <div className="grid gap-3 py-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="time-off-start">Start date</Label>
-              <Input
-                id="time-off-start"
-                type="date"
-                autoFocus={false}
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="time-off-end">End date</Label>
-              <Input
-                id="time-off-end"
-                type="date"
-                autoFocus={false}
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
-            </div>
+            <TimeOffDateField
+              id="time-off-start"
+              label="Start date"
+              value={start}
+              onChange={setStart}
+              dialogOpen={open}
+            />
+            <TimeOffDateField
+              id="time-off-end"
+              label="End date"
+              value={end}
+              onChange={setEnd}
+              dialogOpen={open}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>Type</Label>

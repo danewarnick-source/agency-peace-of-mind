@@ -20,6 +20,7 @@ import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
+import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
@@ -120,7 +121,7 @@ function ComplianceInbox() {
                 navigate({
                   to: "/dashboard/workspace/$clientId",
                   params: { clientId: s.client_id },
-                  search: { tab: "clock-in", code: s.service_type_code, verify: "1" },
+                  search: staffClockOutSearch(s.service_type_code),
                 })
               }
             >

@@ -19,8 +19,9 @@
  *   enforces this.
  *
  * Staff-visibility rules live in the returned `visibility` block. Screens
- * do NOT re-implement "which goal is complete enough to show" or "does
- * this goal match the shift's service code" — they read from `visibility`.
+ * do NOT re-implement "which goal is complete enough to show" — they read
+ * from `visibility`. Clock-out shows the client's on-file PCSP goals
+ * (untagged included); it does not require a matching service code.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -35,6 +36,11 @@ import {
   isFieldVisible,
   isSectionVisible,
 } from "./client-staff-visibility";
+import {
+  mergeClientGoalSources,
+  selectGoalsForStaffClockOut,
+  type StaffPcspGoal,
+} from "./pcsp-goals-for-staff";
 
 // ── Return types ────────────────────────────────────────────────────────────
 
@@ -143,9 +149,9 @@ export type CareEmergencyContact = {
 };
 
 export type ClientCareVisibility = {
-  /** Goals that a staff member should see during the given shift.
-   *  Rule: is_complete AND per-goal visible AND care_plan section on AND
-   *  (no shiftServiceCode ? all-complete : job_codes.includes(code)). */
+  /** Goals staff may check on clock-out / punch-pad.
+   *  Rule: non-empty statement AND per-goal visible. Uploaded PCSP goals
+   *  appear even when job_codes is empty or does not match the punch. */
   goalsForStaff: CareGoal[];
   medicationsVisible: boolean;
   /** The shift's active service code echoed back, uppercased. */
@@ -289,7 +295,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, has_abi, hr_applicable, dnr_applicable, diagnoses, primary_care_name, pcsp_expiration_date, special_directions",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, has_abi, hr_applicable, dnr_applicable, diagnoses, primary_care_name, pcsp_expiration_date, special_directions, pcsp_goals",
         )
         .eq("id", clientId)
         .maybeSingle(),
@@ -410,9 +416,10 @@ export const getClientCareData = createServerFn({ method: "GET" })
       self_admin_med_support_locked: !!row.self_admin_med_support_locked,
     };
 
-    // Structured goals — enrich each with is_complete.
+    // Structured CST goals, then the flat clients.pcsp_goals copy written
+    // on PCSP upload when CST is empty. Do not invent statements.
     const rawGoals = Array.isArray(cstRes.data?.goals) ? cstRes.data!.goals : [];
-    const goals: CareGoal[] = rawGoals.map((g: any) => {
+    const structured: StaffPcspGoal[] = rawGoals.map((g: any) => {
       const goalText = String(g?.goal ?? "").trim();
       const jobCodes = Array.isArray(g?.job_codes)
         ? g.job_codes.map((c: unknown) => String(c ?? "").trim()).filter(Boolean)
@@ -423,9 +430,13 @@ export const getClientCareData = createServerFn({ method: "GET" })
         supports: String(g?.supports ?? ""),
         details: String(g?.details ?? ""),
         job_codes: jobCodes,
-        is_complete: goalText.length > 0 && jobCodes.length > 0,
       };
     });
+    const merged = mergeClientGoalSources(structured, row.pcsp_goals);
+    const goals: CareGoal[] = merged.map((g) => ({
+      ...g,
+      is_complete: g.goal.trim().length > 0 && g.job_codes.length > 0,
+    }));
 
     // Filter authorized codes to currently-open only (same rule as
     // useClientBillingCodes — no end date or end date > today).
@@ -524,19 +535,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
     // Custom fields inherit their section's toggle — no per-field key.
     const customFieldsStaff = custom_fields.filter((f) => sections[f.section]);
 
-    // goalsForStaff — shift-time compliance list. Intentionally bypasses
-    // the `sections.care_plan` toggle so PCSP goals tagged for the active
-    // shift's service code always appear on the punch pad / clock-out
-    // attestation. Per-goal field visibility switches are still honored
-    // so admins can hide a specific goal.
+    // goalsForStaff — clock-out checklist. Same on-file PCSP goals the
+    // client profile shows (plus the flat pcsp_goals fallback above).
+    // Intentionally does NOT require a matching job_code / service code.
+    // Per-goal field visibility switches are still honored.
     const codeUpper = shiftServiceCode ? shiftServiceCode.toUpperCase() : null;
-    const goalsForStaff = goals
-      .filter((g) => g.is_complete)
-      .filter((g) => isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id)))
-      .filter((g) => {
-        if (!codeUpper) return true;
-        return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
-      });
+    const goalsForStaff = selectGoalsForStaffClockOut(goals, (goalId) =>
+      isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", goalId)),
+    );
 
     const target_behaviors: CareTargetBehavior[] = ((tbRes?.data ?? []) as any[]).map((b) => ({
       id: String(b.id),

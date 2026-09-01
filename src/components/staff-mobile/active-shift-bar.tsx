@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { STAFF_CLOCK_BAR_OFFSET_CSS } from "@/lib/staff-phone-chrome";
+import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 const fmtUSD = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -65,12 +66,12 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
 
   const open = () => {
     if (isClient) {
-      // Route to the Clock In/Out tab so the staff completes the punch +
-      // paperwork there. The bar itself never finalizes the shift.
+      // Open the Shift Verification form (verify=1). The bar never
+      // finalizes the punch itself.
       navigate({
         to: "/dashboard/workspace/$clientId",
         params: { clientId: active!.client_id },
-        search: { tab: "clock-in" },
+        search: staffClockOutSearch(active!.service_type_code),
       });
     } else {
       navigate({ to: "/dashboard/timeclock" });
@@ -161,8 +162,8 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
             }
           }}
           className="ml-1 inline-flex min-h-[36px] shrink-0 cursor-pointer items-center gap-1 rounded-md bg-white/15 px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          aria-label={isGeneral ? "Clock out of non-EVV shift" : "Go to clock-out flow (paperwork required to finalize)"}
-          title={isGeneral ? "End this non-EVV / training shift" : "Opens the Clock In/Out tab — paperwork required to finalize"}
+          aria-label={isGeneral ? "Clock out of non-EVV shift" : "Open shift verification form to clock out"}
+          title={isGeneral ? "End this non-EVV / training shift" : "Opens the shift verification form — paperwork required to finalize"}
         >
           Clock out
         </span>

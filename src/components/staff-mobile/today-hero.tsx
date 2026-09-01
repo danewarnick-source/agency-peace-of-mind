@@ -19,6 +19,7 @@ import { isClockableServiceCode } from "@/lib/service-billing";
 import { displayPersonName } from "@/lib/person-name";
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 import { useTodayDailyNoteClients } from "@/hooks/use-today-daily-notes";
+import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -162,7 +163,7 @@ export function TodayHero() {
               <Link
                 to="/dashboard/workspace/$clientId"
                 params={{ clientId: active.client_id }}
-                search={{ tab: "clock-in" }}
+                search={staffClockOutSearch(active.service_type_code)}
               >
                 {needsClockOut ? "Clock out now" : "Return to shift"}
               </Link>

@@ -225,9 +225,9 @@ function ClientDetail({
       {cardActionsVisible || stackDual ? (
         <p className="text-center text-xs text-muted-foreground">
           {isOnTheClock && daily
-            ? "Daily note is for HHS. Open time clock returns you to the punch already in progress."
+            ? "Daily note is for HHS. End shift opens the verification form for the punch already in progress."
             : isOnTheClock
-              ? "Open time clock returns you to the punch already in progress."
+              ? "End shift opens the verification form for the punch already in progress."
               : daily
                 ? "Daily note · PCSP narrative · month-end paperwork"
                 : "Start a new punch from the Punch pad tab — not from this card."}

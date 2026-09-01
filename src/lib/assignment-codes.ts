@@ -123,10 +123,10 @@ export function caseloadDailyNoteLabel(opts: {
     : `Open daily note (${code})`;
 }
 
-/** Caseload return-to-open-punch CTA. CODE is the job on that open punch. */
+/** Caseload end-shift CTA. CODE is the job on that open punch. */
 export function caseloadTimeClockLabel(code?: string | null): string {
   const c = String(code ?? "").trim();
-  return c ? `Open time clock (${c})` : "Open time clock";
+  return c ? `End shift (${c})` : "End shift";
 }
 
 /**

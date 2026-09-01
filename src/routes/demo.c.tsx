@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/landing/footer";
-import { HiveMark } from "@/components/brand/hive-mark";
 import { HeroPhone } from "@/components/landing/hero-phone";
 import {
+  DemoClosingCta,
+  DemoFaq,
   DemoHoneycomb,
   DemoLandingHeader,
   DemoPageShell,
-  DemoSteelCta,
+  DemoSteelFeature,
 } from "@/components/landing/demo-landing";
 
 export const Route = createFileRoute("/demo/c")({
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/demo/c")({
 const NAV = [
   { href: "#stop-chasing", label: "What you stop" },
   { href: "#nectar", label: "Nectar" },
+  { href: "#faq", label: "FAQ" },
 ] as const;
 
 const STOPS = [
@@ -106,44 +108,13 @@ function DemoCPage() {
         </div>
       </section>
 
-      <section
-        id="nectar"
-        className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]"
-      >
-        <DemoHoneycomb />
-        <div className="relative mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hive-gold)]/30 bg-[color-mix(in_srgb,var(--hive-gold)_12%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
-            <HiveMark className="h-3.5 w-3.5" />
-            Nectar
-          </span>
-          <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            The record is already there. Ask it.
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
-            Nectar watches hours, notes, and incidents in Hive. It drafts summaries from work
-            already captured. A person still attests. It does not invent documentation.
-          </p>
-        </div>
-      </section>
+      <DemoSteelFeature heading="The record is already there. Ask it.">
+        Nectar watches hours, notes, and incidents in Hive. It drafts summaries from work already
+        captured. A person still attests. It does not invent documentation.
+      </DemoSteelFeature>
 
-      <section className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-            Who this is for
-          </span>
-          <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            Newer agencies. Same day. One desk.
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-            Built for Utah teams that support people with disabilities and are tired of chasing the
-            paperwork across phones, folders, and inboxes.
-          </p>
-        </div>
-      </section>
-
-      <DemoSteelCta heading="Get a walkthrough.">
-        See how hours, notes, and incidents stay in one place.
-      </DemoSteelCta>
+      <DemoFaq />
+      <DemoClosingCta heading="Get a walkthrough." />
       <Footer />
     </DemoPageShell>
   );

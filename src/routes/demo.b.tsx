@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/landing/footer";
 import { HeroPhone } from "@/components/landing/hero-phone";
 import {
+  DemoClosingCta,
+  DemoFaq,
   DemoHoneycomb,
   DemoLandingHeader,
   DemoPageShell,
-  DemoSteelCta,
+  DemoSteelFeature,
 } from "@/components/landing/demo-landing";
 
 export const Route = createFileRoute("/demo/b")({
@@ -45,7 +47,7 @@ const BANDS = [
     body: "Daily notes get written on shift.",
   },
   {
-    id: "nectar",
+    id: "nectar-band",
     icon: Sparkles,
     label: "Nectar",
     body: "Ask in plain English. It already knows your records.",
@@ -101,40 +103,13 @@ function DemoBPage() {
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]">
-        <DemoHoneycomb />
-        <div className="relative mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 lg:px-8">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-            Nectar
-          </span>
-          <h2 className="font-display mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            Ask about the day you already have.
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
-            Nectar reads hours and notes already in Hive. It drafts summaries from that work. A
-            person still attests. It does not invent documentation.
-          </p>
-        </div>
-      </section>
+      <DemoSteelFeature heading="Ask about the day you already have.">
+        Nectar reads hours and notes already in Hive. It drafts summaries from that work. A person
+        still attests. It does not invent documentation.
+      </DemoSteelFeature>
 
-      <section className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-            Who this is for
-          </span>
-          <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            Built for newer Utah agencies.
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-            If you support people with disabilities and the day still lives in texts, paper, and
-            three other apps, Hive is the desk that holds it together.
-          </p>
-        </div>
-      </section>
-
-      <DemoSteelCta heading="Put the desk on one phone.">
-        Hours, notes, and questions in the same place your staff already open.
-      </DemoSteelCta>
+      <DemoFaq />
+      <DemoClosingCta heading="Put the desk on one phone." />
       <Footer />
     </DemoPageShell>
   );

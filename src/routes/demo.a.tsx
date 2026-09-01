@@ -1,20 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Clock, FileText, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Footer } from "@/components/landing/footer";
-import { HiveMark } from "@/components/brand/hive-mark";
 import { HeroPhone } from "@/components/landing/hero-phone";
 import {
+  DemoClosingCta,
+  DemoFaq,
   DemoHoneycomb,
   DemoLandingHeader,
   DemoPageShell,
-  DemoSteelCta,
+  DemoSteelFeature,
 } from "@/components/landing/demo-landing";
 
 export const Route = createFileRoute("/demo/a")({
@@ -53,21 +48,6 @@ const CARDS = [
     icon: ShieldAlert,
     title: "Incidents that don’t get lost",
     body: "When something happens, it is captured in the moment and routed to the people who need it.",
-  },
-];
-
-const FAQ = [
-  {
-    q: "What is Nectar?",
-    a: "Nectar is Hive’s intelligence layer. It reviews notes, drafts monthly and quarterly summaries from records already in Hive, and answers questions in plain English. A person still attests. It does not invent documentation.",
-  },
-  {
-    q: "Who is this for?",
-    a: "Utah agencies that support people with disabilities — especially newer providers who want hours, notes, and incidents in one place instead of a stack of apps and spreadsheets.",
-  },
-  {
-    q: "How does pricing work?",
-    a: "See the pricing page. Implementation is a conversation.",
   },
 ];
 
@@ -124,58 +104,13 @@ function DemoAPage() {
         </div>
       </section>
 
-      <section
-        id="nectar"
-        className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-chrome-text)]"
-      >
-        <DemoHoneycomb />
-        <div className="relative mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hive-gold)]/30 bg-[color-mix(in_srgb,var(--hive-gold)_12%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
-            <HiveMark className="h-3.5 w-3.5" />
-            Nectar
-          </span>
-          <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            Reviews the work. Drafts the summaries.
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
-            Nectar reviews notes already in Hive and drafts monthly and quarterly summaries from
-            that same record. A person still reads and attests. It does not invent documentation.
-          </p>
-        </div>
-      </section>
+      <DemoSteelFeature heading="Reviews the work. Drafts the summaries.">
+        Nectar reviews notes already in Hive and drafts monthly and quarterly summaries from that
+        same record. A person still reads and attests. It does not invent documentation.
+      </DemoSteelFeature>
 
-      <section id="faq" className="bg-[var(--hive-bg)] py-20 sm:py-24">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-              FAQ
-            </span>
-            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              A few plain questions.
-            </h2>
-          </div>
-          <Accordion
-            type="single"
-            collapsible
-            className="mt-10 divide-y divide-[var(--hive-border)] rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] px-6"
-          >
-            {FAQ.map((item, i) => (
-              <AccordionItem key={item.q} value={`item-${i}`} className="border-0">
-                <AccordionTrigger className="py-5 text-left font-display text-base font-semibold hover:no-underline">
-                  {item.q}
-                </AccordionTrigger>
-                <AccordionContent className="pb-5 text-sm leading-relaxed text-[var(--hive-text-muted)]">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </section>
-
-      <DemoSteelCta heading="See Hive with your own day.">
-        A short walkthrough. Bring the questions you actually have.
-      </DemoSteelCta>
+      <DemoFaq />
+      <DemoClosingCta heading="See Hive with your own day." />
       <Footer />
     </DemoPageShell>
   );

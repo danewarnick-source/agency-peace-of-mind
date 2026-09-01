@@ -45,23 +45,33 @@ export function HeroPhone({
 }) {
   return (
     <div
-      className={`relative mx-auto w-full ${slim ? "max-w-[280px]" : "max-w-[340px]"} ${className}`}
+      className={`relative mx-auto w-full ${slim ? "max-w-[260px]" : "max-w-[340px]"} ${className}`}
     >
       <div
         className={`relative overflow-hidden bg-[var(--hive-canvas)] shadow-[var(--shadow-elegant)] ${
           slim
-            ? "rounded-[2.65rem] border-[8px] border-[#1c232b]"
+            ? "rounded-[2.75rem] border-[7px] border-[#1c232b]"
             : "rounded-[2.4rem] border-[10px] border-[#2a333c]"
         }`}
         style={{ boxShadow: "0 28px 60px -28px rgba(36, 48, 64, 0.45), 0 0 0 1px #1c232b" }}
       >
-        <div
-          className={`absolute left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#0b0f14] ${
-            slim ? "top-[11px] h-[22px] w-[78px]" : "top-2 h-5 w-24 bg-[#1c232b]"
-          }`}
-        />
+        {slim ? (
+          <div className="relative bg-[var(--hive-canvas)] px-5 pb-1 pt-2.5">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--hive-text)]">
+              <span>9:41</span>
+              <span className="tracking-tight">●●●●</span>
+            </div>
+            <div className="absolute left-1/2 top-[8px] z-10 h-[22px] w-[74px] -translate-x-1/2 rounded-full bg-[#0b0f14]" />
+          </div>
+        ) : (
+          <div className="absolute left-1/2 top-2 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-[#1c232b]" />
+        )}
 
-        <div className="flex items-center justify-between bg-[var(--hive-sidebar)] px-3 pb-2.5 pt-8">
+        <div
+          className={`flex items-center justify-between bg-[var(--hive-sidebar)] px-3 pb-2.5 ${
+            slim ? "pt-2.5" : "pt-8"
+          }`}
+        >
           <div className="flex items-center gap-1.5">
             <HiveMark className="h-5 w-5" />
             <span className="font-display text-[15px] font-semibold tracking-tight text-[var(--hive-chrome-text)]">

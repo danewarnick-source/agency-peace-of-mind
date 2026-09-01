@@ -38,6 +38,7 @@ import {
   perHomeServiceCode,
 } from "./obligation-assignee-rules";
 import { toIsoDateDay } from "./iso-date-day";
+import { isPackSentinel, obligationIsRequired } from "./obligation-packs";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -69,6 +70,9 @@ export type CompanyObligationRow = {
   nectar_cert_type_label: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   nectar_keyword_groups: any;
+  pack_key?: string | null;
+  is_required?: boolean | null;
+  agency_policy_id?: string | null;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -1534,7 +1538,7 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
     return (instances ?? [])
       .map((i: ObligationInstanceRow) => {
         const obligation = obligationById.get(i.obligation_id);
-        if (!obligation) return null;
+        if (!obligation || isPackSentinel(obligation)) return null;
         if (obligation.evidence_type === "form") {
           return {
             ...i,
@@ -1952,7 +1956,7 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
     }> = [];
 
     for (const ob of visibleObligations) {
-      if (!ob.active) continue;
+      if (!ob.active || isPackSentinel(ob) || !obligationIsRequired(ob)) continue;
       for (const inst of instancesByObligation.get(ob.id) ?? []) {
         if (inst.status !== "pending" && inst.status !== "overdue") continue;
         if (allowedInstanceIds && !allowedInstanceIds.has(inst.id)) continue;

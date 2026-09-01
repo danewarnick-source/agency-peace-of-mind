@@ -32,6 +32,7 @@ import {
 import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import { getAgencyPolicyForInstance } from "@/lib/agency-policies.functions";
 import { policyMediaKind } from "@/lib/agency-policies";
+import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
   return courseId === "thirty-day"
@@ -118,7 +119,7 @@ function CompletedCard({
           <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
           {ob.source === "sow" ? (
             <p className="text-xs text-muted-foreground">
-              🔒 Required by state contract — DSPD SOW DHHS91172
+              Required by state contract — DSPD SOW DHHS91172
             </p>
           ) : (
             ob.source_policy_section && (
@@ -342,23 +343,29 @@ function OpenCard({
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
-      {ob.source === "sow" ? (
-        <p className="text-xs text-muted-foreground">
-          🔒 Required by state contract — DSPD SOW DHHS91172
-        </p>
-      ) : (
-        ob.source_policy_section && (
-          <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
-        )
-      )}
-      <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
-      <p
-        className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
-      >
-        {due.overdue
-          ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`
-          : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}
-      </p>
+          {ob.source === "sow" ? (
+            <p className="text-xs text-muted-foreground">
+              Required by state contract — DSPD SOW DHHS91172
+            </p>
+          ) : (
+            ob.source_policy_section && (
+              <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+            )
+          )}
+          <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
+          {obligationIsRequired(ob) ? (
+            <p
+              className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
+            >
+              {due.overdue
+                ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`
+                : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Optional — complete when you can. This does not block clock-in.
+            </p>
+          )}
       {ob.description && <p className="mt-2 text-sm text-muted-foreground">{ob.description}</p>}
 
       <div className="mt-3 space-y-2">
@@ -584,7 +591,9 @@ function MyObligationsPage() {
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
   });
-  const instances = Array.isArray(instancesRaw) ? instancesRaw : [];
+  const instances = (Array.isArray(instancesRaw) ? instancesRaw : []).filter(
+    (row) => !isPackSentinel(row.obligation),
+  );
 
   const { data: clientTrainings } = useQuery({
     queryKey: ["my-client-training-statuses", user?.id],
@@ -692,13 +701,23 @@ function MyObligationsPage() {
 
   const overlayDue = overlayOpen.filter((o) => !o.done);
   const overlayDone = overlayOpen.filter((o) => o.done);
-  const dueSoon = open.filter((i) => !dueLabel(i.due_at).overdue);
-  const overdue = open.filter((i) => dueLabel(i.due_at).overdue);
+  const dueSoon = open.filter(
+    (i) => obligationIsRequired(i.obligation) && !dueLabel(i.due_at).overdue,
+  );
+  const overdue = open.filter(
+    (i) => obligationIsRequired(i.obligation) && dueLabel(i.due_at).overdue,
+  );
   const openCount = open.length + overlayDue.length;
   const completedCount = completed.length + overlayDone.length;
 
   const shown =
-    tab === "all" ? open : tab === "due_soon" ? dueSoon : tab === "overdue" ? overdue : completed;
+    tab === "all"
+      ? open
+      : tab === "due_soon"
+        ? dueSoon
+        : tab === "overdue"
+          ? overdue
+          : completed;
   const shownOverlay = tab === "completed" ? overlayDone : tab === "overdue" ? [] : overlayDue;
 
   const onCompleted = () => {

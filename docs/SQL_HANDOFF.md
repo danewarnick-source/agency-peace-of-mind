@@ -6,6 +6,57 @@ it worked before moving on.
 
 ---
 
+## ACTION — Obligation packs (custom tabs + required flag) (2026-09-01)
+
+**Do not run this until Dane approves the PR.** This is an add-only migration.
+It does **not** drop or truncate anything. It does **not** change True North
+client/PHI tables. This agent did **not** apply it.
+
+**What this is for:** Admin Obligations is now a Connecteam-style pack grid
+(staff × items). Locked tabs — Onboarding, Credentials, Client — group
+**existing** `company_obligations` by title in app code. No seed of W-9 / I-9.
+
+This SQL is only for:
+
+1. **Custom pack tabs** admin creates (house documents, internal policies).
+2. A durable `is_required` flag so optional items stay quiet (never red,
+   never overdue count, never clock-in block).
+
+Until this runs, custom packs still persist on `company_obligations.due_day_config`
+(`hive_pack_key`, `hive_is_required`, `hive_pack_sentinel`). The grid works
+without this file.
+
+**One conceptual RLS change (described, not applied until you paste this):**
+new table `obligation_packs` is org-scoped. Members can SELECT via
+`is_org_member`; only admin/manager (or Hive Executive) can write. Same
+pattern as `agency_policies`. No existing policy is dropped except the
+idempotent `DROP POLICY IF EXISTS` for the new table's own names.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260901080000_obligation_packs.sql`
+into Lovable’s SQL editor (clear the editor first) and run it.
+
+**What you'll see:** `Success. No rows returned`.
+
+**Confirm (paste this next, after clearing the editor):**
+
+```sql
+SELECT string_agg(column_name, ' | ' ORDER BY column_name) AS ob_cols
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'company_obligations'
+  AND column_name IN ('pack_key', 'is_required');
+
+SELECT string_agg(table_name, ' | ' ORDER BY table_name) AS tables_ok
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name = 'obligation_packs';
+```
+
+You want `is_required | pack_key` and `obligation_packs`.
+
+---
+
 ## ACTION — Agency policies binder + class cards (2026-08-31)
 
 **Do not run this until Dane approves the PR.** This is an add-only migration.

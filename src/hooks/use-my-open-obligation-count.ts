@@ -7,6 +7,7 @@ import {
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import { isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
+import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 const MY_OBLIGATIONS_KEY = "my-obligation-instances";
 
@@ -28,6 +29,8 @@ export function useMyOpenObligationCount(): number {
   return instances.filter(
     (row) =>
       (row.status === "pending" || row.status === "overdue") &&
-      !isUnlinkedFormDuty(row.obligation),
+      !isUnlinkedFormDuty(row.obligation) &&
+      !isPackSentinel(row.obligation) &&
+      obligationIsRequired(row.obligation),
   ).length;
 }

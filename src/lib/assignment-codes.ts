@@ -139,10 +139,12 @@ export function caseloadCardActions(opts: {
   codes: string[];
   isOnTheClock: boolean;
   hasClockableShiftToday?: boolean;
+  /** Today's HHS daily note is already filed — drop the open-work CTA. */
+  dailyNoteDoneToday?: boolean;
 }): { showDailyNote: boolean; showTimeClock: boolean } {
   void opts.hasClockableShiftToday;
   return {
-    showDailyNote: hasHostHomeDailyCode(opts.codes),
+    showDailyNote: hasHostHomeDailyCode(opts.codes) && !opts.dailyNoteDoneToday,
     showTimeClock: !!opts.isOnTheClock,
   };
 }

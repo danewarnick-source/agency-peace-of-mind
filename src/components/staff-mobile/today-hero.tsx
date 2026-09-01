@@ -19,6 +19,8 @@ import { isClockableServiceCode } from "@/lib/service-billing";
 import { displayPersonName } from "@/lib/person-name";
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 import { useTodayDailyNoteClients } from "@/hooks/use-today-daily-notes";
+import { useCompletedPunchesToday } from "@/hooks/use-completed-punches-today";
+import { openClockableShifts } from "@/lib/caseload-open-work";
 import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 function fmtTime(iso: string) {
@@ -55,6 +57,7 @@ export function TodayHero() {
   const { data: caseload } = useCaseload();
   const { data: assignments } = useMyAssignments();
   const { data: todayNotes } = useTodayDailyNoteClients();
+  const { data: completedPunches = [] } = useCompletedPunchesToday();
   const now = Date.now();
 
   const hhsPeople = (caseload ?? []).filter((c) => {
@@ -185,10 +188,17 @@ export function TodayHero() {
     );
   }
 
-  const clockableShifts = shifts.filter((s) => !isDailyCode(s.job_code));
-  const dailyShifts = shifts.filter((s) => isDailyCode(s.job_code));
-  const shiftClientIds = new Set(shifts.map((s) => s.client_id));
-  const extraHhs = hhsPeople.filter((c) => !shiftClientIds.has(c.id));
+  const clockableShifts = openClockableShifts(
+    shifts.filter((s) => !isDailyCode(s.job_code)),
+    completedPunches,
+  );
+  const dailyShifts = shifts.filter(
+    (s) => isDailyCode(s.job_code) && !todayNotes?.has(s.client_id),
+  );
+  const openClockableClientIds = new Set(clockableShifts.map((s) => s.client_id));
+  const extraHhs = hhsPeople.filter(
+    (c) => !openClockableClientIds.has(c.id) && !todayNotes?.has(c.id),
+  );
 
   if (!clockableShifts.length && !dailyShifts.length && !extraHhs.length) {
     return (
@@ -201,9 +211,9 @@ export function TodayHero() {
             <Sun className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-base font-semibold">No shift scheduled today</h2>
+            <h2 className="text-base font-semibold">No open work on today's schedule</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Your caseload is below. Host home (HHS) opens the daily note. Start a new punch from the Punch pad tab.
+              Clocked-out shifts and finished daily notes leave this list. Your assigned people stay in the caseload below. Start a new punch from the Punch pad tab.
             </p>
           </div>
         </div>

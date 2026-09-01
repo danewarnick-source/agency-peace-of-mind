@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   useNectarPayPeriod, useLivePayPeriod,
 } from "@/hooks/use-nectar-pay-period";
+import { useStaffTimesheets } from "@/hooks/use-staff-timesheets";
 import { useCountUp } from "@/hooks/use-count-up";
 import { NectarBadge } from "@/components/nectar/nectar-brand";
 
@@ -29,6 +30,7 @@ export function NectarPayPeriodCard({
 } = {}) {
   const { data } = useNectarPayPeriod();
   const live = useLivePayPeriod();
+  const { data: timesheets = [], isLoading: timesheetsLoading } = useStaffTimesheets();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = openProp !== undefined;
   const open = isControlled ? openProp : uncontrolledOpen;
@@ -270,6 +272,52 @@ export function NectarPayPeriodCard({
               </Link>
             </li>
           </ul>
+
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-[var(--hive-chrome-text)]/80">
+            My timesheets
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--hive-chrome-text)]/65">
+            Read-only. Hours use the time you submitted, including any correction awaiting supervisor approval.
+          </p>
+          {timesheetsLoading ? (
+            <p className="mt-2 text-sm text-[var(--hive-chrome-text)]/70">Loading timesheets…</p>
+          ) : timesheets.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--hive-chrome-text)]/70">
+              No submitted timesheets in this pay period yet.
+            </p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {timesheets.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-lg bg-white/[0.06] px-3 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--hive-chrome-text)]">
+                        {row.person_label}
+                      </p>
+                      <p className="text-[11px] text-[var(--hive-chrome-text)]/70">
+                        {row.date_label}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-[var(--hive-chrome-text)]">
+                      {fmtHours(row.hours)}
+                    </span>
+                  </div>
+                  <p
+                    className={`mt-1 text-[11px] font-medium ${
+                      row.awaiting_approval
+                        ? "text-[var(--hive-gold)]"
+                        : "text-[var(--hive-chrome-text)]/70"
+                    }`}
+                  >
+                    {row.status}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

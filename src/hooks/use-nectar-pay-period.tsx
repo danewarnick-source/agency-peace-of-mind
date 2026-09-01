@@ -9,6 +9,7 @@ import { useMyAssignments } from "./use-my-assignments";
 import { useGeneralShift, useGeneralShiftLog } from "./use-general-shift";
 import { computePeriodBounds, type PaySchedule } from "@/lib/pay-periods";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { staffDisplayHours } from "@/lib/staff-display-hours";
 
 /**
  * NECTAR pay-period intelligence. Pay-period window comes from the staff
@@ -105,7 +106,9 @@ export function useNectarPayPeriod() {
       if (has_hourly_assignment) {
         const { data: tsRows, error } = await supabase
           .from("evv_timesheets")
-          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+          .select(
+            "client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, review_status",
+          )
           .eq("staff_id", user!.id)
           .gte("clock_in_timestamp", start.toISOString())
           .lte("clock_in_timestamp", end.toISOString());
@@ -115,6 +118,9 @@ export function useNectarPayPeriod() {
           service_type_code: string | null;
           clock_in_timestamp: string;
           clock_out_timestamp: string | null;
+          corrected_clock_in: string | null;
+          corrected_clock_out: string | null;
+          review_status: string | null;
         }>) {
           if (!r.clock_out_timestamp) continue;
           if (isDailyServiceCode(r.service_type_code)) continue;
@@ -125,10 +131,7 @@ export function useNectarPayPeriod() {
             if (allow === undefined) continue;
             if (allow && r.service_type_code && !allow.has(r.service_type_code)) continue;
           }
-          const hrs =
-            (new Date(r.clock_out_timestamp).getTime() -
-              new Date(r.clock_in_timestamp).getTime()) /
-            3_600_000;
+          const hrs = staffDisplayHours(r);
           if (hrs <= 0 || !isFinite(hrs)) continue;
           hourly_hours += hrs;
           per[r.client_id] = (per[r.client_id] ?? 0) + hrs;

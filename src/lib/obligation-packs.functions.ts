@@ -314,8 +314,6 @@ function buildMatrix(
       obligationIds: string[];
     }
   >();
-  const obById = new Map(obligations.map((o) => [o.id, o]));
-
   for (const ob of obligations) {
     if (ob.active === false) continue;
     const ref = packColumnForObligation(ob);
@@ -407,7 +405,6 @@ function buildMatrix(
     });
   }
 
-  void obById;
   return { columns, cells };
 }
 
@@ -723,10 +720,19 @@ export const assignObligationPack = createServerFn({ method: "POST" })
       userId,
     );
 
+    const assignEmpty =
+      assign.roles.length === 0 &&
+      assign.jobCodes.length === 0 &&
+      assign.groupIds.length === 0 &&
+      assign.userIds.length === 0;
     const assignedUsers = await resolveAssignUserIds(supabase, data.organizationId, assign);
+    const allStaff = assignEmpty
+      ? await ensureAllStaffGroupInternal(supabase, data.organizationId)
+      : null;
+    const groupIds = allStaff ? [allStaff] : assign.groupIds;
     const { data: rows, error } = await supabase
       .from("company_obligations")
-      .select("id, title, due_day_config, pack_key, is_locked")
+      .select("id, title, due_day_config, pack_key, is_locked, source")
       .eq("organization_id", data.organizationId);
     if (error) throw new Error(error.message);
 
@@ -736,6 +742,7 @@ export const assignObligationPack = createServerFn({ method: "POST" })
       due_day_config: unknown;
       pack_key?: string | null;
       is_locked: boolean | null;
+      source: string | null;
     }>) {
       const key =
         (typeof row.pack_key === "string" && row.pack_key.trim()) ||
@@ -755,9 +762,12 @@ export const assignObligationPack = createServerFn({ method: "POST" })
       });
       const patch: Record<string, unknown> = {
         due_day_config: nextConfig,
-        assigned_to_users: assignedUsers,
-        assigned_to_groups: assign.groupIds,
       };
+      // Hire / client / job-code auto-assign stays on contract items.
+      if (!row.is_locked && row.source !== "sow") {
+        patch.assigned_to_users = assignedUsers;
+        patch.assigned_to_groups = groupIds;
+      }
       if (name && !row.is_locked && isPackSentinel({ id: row.id, title: row.title, due_day_config: row.due_day_config })) {
         patch.title = name;
       }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ import {
   createObligationPack,
   type PackMatrix,
 } from "@/lib/obligation-packs.functions";
-import { isLockedPackKey, type PackAssignSpec } from "@/lib/obligation-packs";
+import { type PackAssignSpec } from "@/lib/obligation-packs";
 
 const ROLE_OPTIONS = [
   { key: "employee", label: "DSP / staff" },
@@ -310,6 +310,7 @@ export function AddPackItemDialog({
   packKey,
   packName,
   matrix,
+  initialStep = "choose",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -317,11 +318,15 @@ export function AddPackItemDialog({
   packKey: string;
   packName: string;
   matrix: PackMatrix | undefined;
+  initialStep?: "choose" | "existing" | "upload" | "attest";
 }) {
   const qc = useQueryClient();
   const addFn = useServerFn(addPackItem);
   const attachFn = useServerFn(attachExistingToPack);
-  const [step, setStep] = useState<"choose" | "existing" | "upload" | "attest">("choose");
+  const [step, setStep] = useState<"choose" | "existing" | "upload" | "attest">(initialStep);
+  useEffect(() => {
+    if (open) setStep(initialStep);
+  }, [open, initialStep]);
   const [title, setTitle] = useState("");
   const [required, setRequired] = useState(true);
   const [picked, setPicked] = useState<string[]>([]);
@@ -339,7 +344,7 @@ export function AddPackItemDialog({
           packKey,
           title: title.trim(),
           kind,
-          required: isLockedPackKey(packKey) ? required : required,
+          required,
           packName,
         },
       }),
@@ -377,7 +382,7 @@ export function AddPackItemDialog({
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
-        if (!v) setStep("choose");
+        setStep(v ? initialStep : "choose");
       }}
     >
       <DialogContent className="max-w-lg border-[var(--hive-border)] bg-[var(--hive-surface)]">

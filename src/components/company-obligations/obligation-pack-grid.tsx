@@ -75,6 +75,7 @@ export function ObligationPackGrid({
   const [createOpen, setCreateOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [addStep, setAddStep] = useState<"choose" | "existing" | "upload" | "attest">("choose");
   const [completeOpen, setCompleteOpen] = useState(false);
   const [activeCell, setActiveCell] = useState<PackMatrixCell | null>(null);
 
@@ -228,7 +229,30 @@ export function ObligationPackGrid({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setAddOpen(true)}>Add item to pack</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setAddStep("existing");
+                  setAddOpen(true);
+                }}
+              >
+                Existing item
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setAddStep("upload");
+                  setAddOpen(true);
+                }}
+              >
+                Request document upload
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setAddStep("attest");
+                  setAddOpen(true);
+                }}
+              >
+                Document to complete or attest
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -349,11 +373,15 @@ export function ObligationPackGrid({
       )}
       <AddPackItemDialog
         open={addOpen}
-        onOpenChange={setAddOpen}
+        onOpenChange={(v) => {
+          setAddOpen(v);
+          if (!v) setAddStep("choose");
+        }}
         orgId={orgId}
         packKey={packKey}
         packName={currentPack?.name ?? "Pack"}
         matrix={matrix}
+        initialStep={addStep}
       />
       <ManualCompletionDrawer
         open={completeOpen}

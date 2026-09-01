@@ -21,6 +21,7 @@ import {
 } from "@/lib/agency-policies";
 import { ensureOpenStaffObligationInternal } from "@/lib/ensure-staff-obligation";
 import { addToAllStaffGroupInternal, ensureAllStaffGroupInternal } from "@/lib/staff-groups.functions";
+import { mergeDueDayPackFields } from "@/lib/obligation-packs";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -163,7 +164,10 @@ async function fanOutPolicyObligation(
         "Read or watch this agency policy, then attest. No quiz.",
       source_policy_section: AGENCY_POLICY_SOURCE_SECTION,
       cadence: "one_time",
-      due_day_config: { days_after_hire: 30 },
+      due_day_config: mergeDueDayPackFields(
+        { days_after_hire: 30 },
+        { packKey: "onboarding", packName: "Onboarding", isRequired: true },
+      ),
       reminder_days_before: [14, 7, 3, 0],
       evidence_type: "attestation",
       attestation_text: AGENCY_POLICY_ATTESTATION,

@@ -93,7 +93,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     const nav = page.locator("aside");
     await nav.getByRole("link", { name: /Compliance/ }).click();
     await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
       timeout: 15_000,
     });
     await assertNoCrash(page, "nav → compliance");
@@ -104,7 +104,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     });
     await page.getByRole("link", { name: /View all/i }).first().click();
     await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
       timeout: 15_000,
     });
     await assertNoCrash(page, "home → company obligations");
@@ -149,60 +149,38 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     });
   });
 
-  test("Company obligations list: due / overdue / complete, filters, open read-only", async ({
+  test("Company obligations pack grid: locked tabs, staff rows, green/red cells", async ({
     page,
   }) => {
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Overdue items/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Credentials/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Client/i })).toBeVisible();
 
-    // Catalog rows live under Part I–IV, not the work queue (work queue is
-    // overdue/due-soon cards only).
-    await page.getByRole("tab", { name: "Part I — Administrative" }).click();
-    await expect(
-      page.getByText(/Emergency Management and Business Continuity Plan/i).first(),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Internal Quality Management Plan/i).first()).toBeVisible();
+    await expect(page.getByText(/Code of Conduct/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Jordan Lee/i).first()).toBeVisible();
 
-    await page.getByRole("tab", { name: "Part IV — Staff requirements" }).click();
-    await expect(page.getByText(/First Aid.*CPR|current First Aid, current CPR/i).first()).toBeVisible({
+    await page.getByRole("button", { name: /Credentials/i }).click();
+    await expect(page.getByText(/CPR \/ First Aid|30-day orientation/i).first()).toBeVisible({
       timeout: 10_000,
     });
 
-    const overdueBadge = page.getByText(/1 overdue/i);
-    if (await overdueBadge.first().isVisible().catch(() => false)) {
-      await expect(overdueBadge.first()).toBeVisible();
-    }
+    await page.getByRole("button", { name: /^Client$/i }).click();
+    await expect(page.getByText(/Client-specific training/i).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
-    await page.getByRole("tab", { name: /Other duties/i }).click();
-    await page.getByRole("button", { name: /^paused$/i }).click();
-    const handbook = page.getByText(/Staff handbook annual review/i);
-    if (await handbook.isVisible().catch(() => false)) {
-      await expect(handbook).toBeVisible();
-    }
-    await page.getByRole("button", { name: /^active$/i }).click();
-    await page.getByRole("tab", { name: /Work queue/i }).click();
-
-    const search = page.getByPlaceholder(/search/i);
+    const search = page.getByPlaceholder(/search staff/i);
     if (await search.isVisible().catch(() => false)) {
-      await search.fill("Emergency");
+      await search.fill("Jordan");
+      await expect(page.getByText(/Jordan Lee/i).first()).toBeVisible();
       await search.fill("");
     }
 
-    const card = page.locator("#obligation-e2e00000-0000-4000-a000-000000000021");
-    if (await card.isVisible().catch(() => false)) {
-      await card.getByRole("button").click();
-      await page.getByRole("menuitem", { name: /View history/i }).click();
-      await expect(page.getByText(/History — Emergency Management/i)).toBeVisible({
-        timeout: 10_000,
-      });
-      await expect(page.getByText(/All instances, most recent first/i)).toBeVisible();
-      await page.keyboard.press("Escape");
-    } else {
-      await expect(page.getByText(/Nothing overdue|Work queue/i).first()).toBeVisible();
-    }
+    await expect(page.getByRole("button", { name: /Add pack/i })).toBeVisible();
     await assertNoCrash(page, "company obligations");
     await shot(page, "company-obligations");
   });
@@ -211,10 +189,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await page.goto("/dashboard/deadlines", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
     await expect(page.url()).toMatch(/tab=action-required/);
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
+    await expect(page.getByRole("tab", { name: /Action Required/i })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole("tab", { name: /Action Required/i })).toBeVisible();
     await assertNoCrash(page, "deadlines redirect");
     await shot(page, "deadlines-action-required");
   });
@@ -227,18 +204,15 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
       timeout: 20_000,
     });
     await expect(page.getByText(/Company requirements assigned to you/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
     await assertNoCrash(page, "my-obligations");
     await shot(page, "my-obligations");
 
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
       timeout: 15_000,
     });
-    await page.getByRole("tab", { name: "Part I — Administrative" }).click();
-    await expect(
-      page.getByText(/Emergency Management and Business Continuity Plan/i).first(),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /My Obligations/i })).toHaveCount(0);
   });
 
@@ -318,9 +292,9 @@ test.describe("Permission wall — DSP vs admin", () => {
     await shot(page, "dsp-home");
 
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    const wall = page.getByText(/You do not have permission to view the compliance register/i);
+    const wall = page.getByText(/You do not have permission to view obligations/i);
     await expect(wall.last()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: /Compliance register/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toHaveCount(0);
     await shot(page, "dsp-company-obligations-wall");
 
     await page.goto("/dashboard/command-center", { waitUntil: "domcontentloaded" });

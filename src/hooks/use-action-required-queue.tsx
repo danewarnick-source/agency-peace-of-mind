@@ -13,6 +13,7 @@ import {
   listCompanyObligations,
   type ObligationListItem,
 } from "@/lib/company-obligations.functions";
+import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -306,6 +307,7 @@ export function useActionRequiredQueue(
 
     for (const o of obligationsQ.data ?? []) {
       if (!o.active) continue;
+      if (isPackSentinel(o) || !obligationIsRequired(o)) continue;
       if (o.rollup.overdue_count > 0) {
         const n = o.rollup.overdue_count;
         out.push({

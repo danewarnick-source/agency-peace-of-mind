@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { useCurrentOrg } from "./use-org";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { staffDisplayHours } from "@/lib/staff-display-hours";
 
 export type ClientCodeUsage = {
   client_id: string;
@@ -74,7 +75,9 @@ export function useClientUtilization() {
       // Hourly hours this week — all staff in org
       const { data: tsRows, error: tsErr } = await supabase
         .from("evv_timesheets")
-        .select("client_id, service_type_code, staff_id, clock_in_timestamp, clock_out_timestamp")
+        .select(
+          "client_id, service_type_code, staff_id, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, review_status",
+        )
         .eq("organization_id", org!.organization_id)
         .gte("clock_in_timestamp", week.start.toISOString())
         .lte("clock_in_timestamp", week.end.toISOString());
@@ -85,13 +88,13 @@ export function useClientUtilization() {
         staff_id: string | null;
         clock_in_timestamp: string;
         clock_out_timestamp: string | null;
+        corrected_clock_in: string | null;
+        corrected_clock_out: string | null;
+        review_status: string | null;
       }>) {
         if (!r.clock_out_timestamp || !r.service_type_code) continue;
         if (isDailyServiceCode(r.service_type_code)) continue;
-        const hrs =
-          (new Date(r.clock_out_timestamp).getTime() -
-            new Date(r.clock_in_timestamp).getTime()) /
-          3_600_000;
+        const hrs = staffDisplayHours(r);
         if (!isFinite(hrs) || hrs <= 0) continue;
         const row = touch(r.client_id, r.service_type_code);
         row.all_staff_hours += hrs;

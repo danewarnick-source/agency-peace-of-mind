@@ -257,4 +257,23 @@ describe("host-home daily assignment", () => {
       showTimeClock: true,
     });
   });
+
+  it("hides the HHS daily-note CTA after today's note is filed", () => {
+    assert.deepEqual(
+      caseloadCardActions({
+        codes: ["HHS"],
+        isOnTheClock: false,
+        dailyNoteDoneToday: true,
+      }),
+      { showDailyNote: false, showTimeClock: false },
+    );
+    assert.deepEqual(
+      caseloadCardActions({
+        codes: ["HHS", "SLH"],
+        isOnTheClock: true,
+        dailyNoteDoneToday: true,
+      }),
+      { showDailyNote: false, showTimeClock: true },
+    );
+  });
 });

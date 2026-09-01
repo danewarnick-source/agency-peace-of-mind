@@ -16,6 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { computeEntryUnits } from "@/lib/billing-units";
+import { invalidateStaffCaseloadWork } from "@/lib/staff-caseload-cache";
 import { monthlySupportHoursTarget } from "@/lib/scheduling/hhs-visit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -283,7 +284,10 @@ function ActiveClockPanel({ shift, userId }: { shift: Shift; userId?: string }) 
       }).eq("id", (activePunch as any).id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Clocked out"); qc.invalidateQueries({ queryKey: ["evv-active"] }); },
+    onSuccess: () => {
+      toast.success("Clocked out");
+      void invalidateStaffCaseloadWork(qc);
+    },
     onError: (e: any) => toast.error(e.message ?? "Clock-out failed"),
   });
 

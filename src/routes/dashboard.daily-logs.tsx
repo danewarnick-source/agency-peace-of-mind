@@ -29,6 +29,7 @@ import {
   Pen, ShieldAlert, Mic, MicOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateStaffCaseloadWork } from "@/lib/staff-caseload-cache";
 import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
@@ -600,6 +601,7 @@ function DailyLogDialog({
     qc.invalidateQueries({ queryKey: ["dl-rejected"] });
     qc.invalidateQueries({ queryKey: ["daily-logs-admin"] });
     qc.invalidateQueries({ queryKey: ["cmd-logs-pending"] });
+    await invalidateStaffCaseloadWork(qc);
 
     setSuccess({ backdated });
   }

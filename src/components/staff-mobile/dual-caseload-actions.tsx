@@ -26,9 +26,10 @@ export function DualCaseloadActions({
 }) {
   const noteCode = dailyNoteCode ? String(dailyNoteCode).trim() : "";
   const clockCode = isOnTheClock ? String(punchCode ?? "").trim() : "";
-  const noteLabel = noteCode
-    ? caseloadDailyNoteLabel({ code: noteCode, alreadyDoneToday: dailyNoteDone })
-    : "";
+  const noteLabel =
+    noteCode && !dailyNoteDone
+      ? caseloadDailyNoteLabel({ code: noteCode, alreadyDoneToday: false })
+      : "";
   const clockLabel = clockCode ? caseloadTimeClockLabel(clockCode) : "";
 
   if (!noteLabel && !clockLabel) return null;

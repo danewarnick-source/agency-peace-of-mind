@@ -21,6 +21,8 @@ import {
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { useTodayDailyNoteClients } from "@/hooks/use-today-daily-notes";
+import { useCompletedPunchesToday } from "@/hooks/use-completed-punches-today";
+import { scheduledShiftIsClockedOut } from "@/lib/caseload-open-work";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -232,7 +234,7 @@ function ClientDetail({
                 ? "Daily note · PCSP narrative · month-end paperwork"
                 : "Start a new punch from the Punch pad tab — not from this card."}
         </p>
-      ) : daily ? (
+      ) : daily && !dailyNoteDone ? (
         <div>
           <Button asChild size="lg" className="h-12 w-full text-base">
             <Link
@@ -240,13 +242,13 @@ function ClientDetail({
               params={{ clientId: c.id }}
               aria-label={`${caseloadDailyNoteLabel({
                 code: selected || "HHS",
-                alreadyDoneToday: dailyNoteDone,
+                alreadyDoneToday: false,
               })} for ${fullName}`}
             >
               <Home />
               {caseloadDailyNoteLabel({
                 code: selected || "HHS",
-                alreadyDoneToday: dailyNoteDone,
+                alreadyDoneToday: false,
               })}
             </Link>
           </Button>
@@ -301,6 +303,7 @@ function ClientRow({
     codes: effectiveCodes,
     isOnTheClock,
     hasClockableShiftToday: hasClockableToday,
+    dailyNoteDoneToday: dailyNoteDone,
   });
   const stackDual = stackDualCaseloadActions({
     codes: effectiveCodes,
@@ -371,7 +374,7 @@ function ClientRow({
               </span>
             ) : (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {hasHhs ? "Daily note" : "No shift today"}
+                {hasHhs ? (dailyNoteDone ? "Note filed" : "Daily note") : "No shift today"}
               </span>
             )}
             {hasTrainingDue && (
@@ -443,6 +446,7 @@ export function StaffClientGrid() {
   const { data: assignments } = useMyAssignments();
   const { data: todayShifts = [] } = useTodayShifts();
   const { data: todayNotes } = useTodayDailyNoteClients();
+  const { data: completedPunches = [] } = useCompletedPunchesToday();
   const fetchCT = useServerFn(getMyClientTrainingStatuses);
   const { data: ct } = useQuery({
     queryKey: ["my-client-training-statuses"],
@@ -476,14 +480,17 @@ export function StaffClientGrid() {
   const todayByClient = useMemo(() => {
     const map = new Map<string, TodayShiftRow>();
     for (const s of todayShifts) {
-      // Keep the earliest shift per client.
+      if (isClockableServiceCode(s.job_code) && scheduledShiftIsClockedOut(s, completedPunches)) {
+        continue;
+      }
+      // Keep the earliest still-open shift per client.
       const existing = map.get(s.client_id);
       if (!existing || new Date(s.starts_at) < new Date(existing.starts_at)) {
         map.set(s.client_id, s);
       }
     }
     return map;
-  }, [todayShifts]);
+  }, [todayShifts, completedPunches]);
 
   const source = caseload ?? [];
 

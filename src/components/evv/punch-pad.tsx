@@ -25,6 +25,7 @@ import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, maskMemberId, padM
 import { clientAuthorizedCodes } from "@/lib/assignment-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
+import { invalidateStaffCaseloadWork } from "@/lib/staff-caseload-cache";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
@@ -276,6 +277,7 @@ export function PunchPad({
     duration: string;
     evvClean: boolean;
     correctionSubmitted?: boolean;
+    awaitingApproval?: boolean;
   }>(null);
 
   // ── Clock-out compliance modal state ────────────────────────────────────────
@@ -1720,8 +1722,10 @@ export function PunchPad({
 
 
 
+    const displayIn = args.correction?.correctedInIso ?? active.clock_in_timestamp;
+    const displayOut = args.correction?.correctedOutIso ?? clockOut;
     const duration = fmtElapsed(
-      new Date(clockOut).getTime() - new Date(active.clock_in_timestamp).getTime(),
+      Math.max(0, new Date(displayOut).getTime() - new Date(displayIn).getTime()),
     );
     setShowCompliance(false);
     setOutVariance(null);
@@ -1730,8 +1734,9 @@ export function PunchPad({
       duration,
       evvClean: !args.outsideReason && !args.correction,
       correctionSubmitted: !!args.correction,
+      awaitingApproval: !!args.correction || !!args.outsideReason,
     });
-    await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+    await invalidateStaffCaseloadWork(qc);
   }
 
   async function submitCompliance() {
@@ -2064,9 +2069,15 @@ export function PunchPad({
   // RENDER
   // ────────────────────────────────────────────────────────────────────────────
 
-  const elapsed   = activeMatchesThisPad
-    ? fmtElapsed(now - new Date(active!.clock_in_timestamp).getTime())
-    : "00:00:00";
+  const elapsed = (() => {
+    if (correctionOpen && correctionHasChange && Number.isFinite(effectiveInMs)) {
+      return fmtElapsed(Math.max(0, effectiveOutMs - effectiveInMs));
+    }
+    if (activeMatchesThisPad) {
+      return fmtElapsed(now - new Date(active!.clock_in_timestamp).getTime());
+    }
+    return "00:00:00";
+  })();
   const isRunning = !!activeMatchesThisPad;
   const endIsEvv = isEvvLockedCode(active?.service_type_code ?? "");
   const startIsEvv = isEvvLockedCode(serviceCode);
@@ -2622,10 +2633,10 @@ export function PunchPad({
                 <div>
                   <p className={`text-base font-bold ${success?.evvClean ? "text-emerald-800 dark:text-emerald-200" : "text-amber-800 dark:text-amber-200"}`}>
                     {success?.correctionSubmitted
-                      ? "🕒 Correction Request Submitted"
+                      ? "Correction request submitted"
                       : success?.evvClean
-                      ? "✅ Shift Successfully Closed"
-                      : "⚠️ Shift Closed with Variance"}
+                      ? "Shift successfully closed"
+                      : "Shift closed with variance"}
                   </p>
                   <p className={`text-xs ${success?.evvClean ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
                     {success?.correctionSubmitted
@@ -2642,9 +2653,14 @@ export function PunchPad({
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Duration</span>
                 <span className="font-mono text-lg font-bold tabular-nums">{success?.duration}</span>
               </div>
+              {success?.awaitingApproval ? (
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Awaiting supervisor approval. These hours use the time you submitted, not the original raw clock span.
+                </p>
+              ) : null}
               <p className="text-sm text-muted-foreground">
                 {success?.correctionSubmitted
-                  ? "The shift is held for supervisor review. You can track its status on My Time Corrections. If approved, the corrected times replace the recorded times for billing; if denied, you'll see the reviewer's note there."
+                  ? "The shift is held for supervisor review. You can track its status on My timesheets from the Caseload Nectar pay card. If approved, the corrected times replace the recorded times for billing; if denied, you'll see the reviewer's note there."
                   : success?.evvClean
                   ? "Your timesheet has been submitted to EVV & Timesheet Control for administrative sign-off. No further action required."
                   : "Your timesheet has been submitted with a variance flag. An administrator will review the out-of-bounds justification before final approval."}

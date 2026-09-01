@@ -158,6 +158,20 @@ describe("staff phone leftover search + tab scroll (source)", () => {
     assert.doesNotMatch(home, /form overdue|CE hrs left/);
   });
 
+  it("Nectar pay card hosts the read-only timesheet list — not a sixth tab", () => {
+    const card = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/nectar-pay-period-card.tsx", import.meta.url)),
+      "utf8",
+    );
+    const tabs = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/staff-bottom-tabs.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(card, /My timesheets/);
+    assert.match(card, /Awaiting supervisor approval|row\.status/);
+    assert.equal([...tabs.matchAll(/to: "\/dashboard/g)].length, 5);
+  });
+
   it("session PIN lock is gone", () => {
     const workspace = readFileSync(
       fileURLToPath(new URL("../routes/dashboard.workspace.$clientId.tsx", import.meta.url)),

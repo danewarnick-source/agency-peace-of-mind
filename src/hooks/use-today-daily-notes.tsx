@@ -5,7 +5,7 @@ import { denverYmd } from "@/lib/denver-date";
 
 /**
  * Client IDs that already have a daily note for America/Denver today.
- * Drives "Complete daily note (HHS)" vs "Open daily note (HHS)" on caseload.
+ * Caseload hides the open-work daily-note CTA for these people.
  */
 export function useTodayDailyNoteClients() {
   const { data: org } = useCurrentOrg();

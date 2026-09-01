@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, savePrnForm, saveIncidentReport } from "@/lib/hhs.functions";
 import { denverYmd } from "@/lib/denver-date";
+import { invalidateStaffCaseloadWork } from "@/lib/staff-caseload-cache";
 import { useClientFeature } from "@/lib/client-features";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 import { DailyNoteMedsBlock, type DailyNoteMedication } from "@/components/medications/daily-note-meds-block";
@@ -243,6 +244,7 @@ function DailyNoteTab({
   const drawingRef = useRef(false);
   const hasSigRef  = useRef(false);
 
+  const qc = useQueryClient();
   const evalFn = useServerFn(evaluateShiftNote);
   const saveFn = useServerFn(saveDailyRecord);
   const pcsp   = client.pcsp_goals ?? [];
@@ -389,6 +391,7 @@ function DailyNoteTab({
         },
       });
       toast.success("Daily progress note saved.");
+      await invalidateStaffCaseloadWork(qc);
       navigate({ to: "/dashboard" });
     } catch (e) {
       toast.error((e as Error).message || "Could not save note.");

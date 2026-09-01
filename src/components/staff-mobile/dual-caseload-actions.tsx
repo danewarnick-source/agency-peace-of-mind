@@ -2,11 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { Clock, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { caseloadDailyNoteLabel, caseloadTimeClockLabel } from "@/lib/assignment-codes";
+import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 /**
  * Caseload card actions. Daily note is always available for HHS/host-home.
- * Time clock is only the return path for an already-open punch — never a
- * start-punch / Open Punch pad control.
+ * End shift is only the return path for an already-open punch — it opens
+ * the verification form, never a start-punch / punch-pad control.
  */
 export function DualCaseloadActions({
   clientId,
@@ -55,7 +56,7 @@ export function DualCaseloadActions({
           <Link
             to="/dashboard/workspace/$clientId"
             params={{ clientId }}
-            search={{ tab: "clock-in", ...(clockCode ? { code: clockCode } : {}) }}
+            search={staffClockOutSearch(clockCode || null)}
             aria-label={`${clockLabel} for ${fullName}`}
           >
             <Clock className="h-4 w-4" />

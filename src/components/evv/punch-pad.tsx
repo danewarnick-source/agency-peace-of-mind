@@ -937,9 +937,8 @@ export function PunchPad({
   // ────────────────────────────────────────────────────────────────────────────
 
   // Structured PCSP goals for the active shift's client come through the
-  // canonical shared reader (`useClientCareData`), which owns the
-  // staff-visibility filter (goal is complete AND job_codes match the
-  // shift's service code). No screen re-implements this filter.
+  // canonical shared reader (`useClientCareData`). Clock-out shows every
+  // visible on-file goal (untagged included). No screen re-filters.
   const activeClientIdForGoals = active?.client_id ?? null;
   const careData = useClientCareData(
     activeClientIdForGoals,
@@ -948,8 +947,12 @@ export function PunchPad({
 
   const activeClientGoals = useMemo<string[]>(() => {
     const rows = careData.data?.visibility.goalsForStaff ?? [];
-    return rows.map((g) => g.goal.trim()).filter((s) => s.length > 0);
-  }, [careData.data]);
+    const fromCare = rows.map((g) => g.goal.trim()).filter((s) => s.length > 0);
+    if (fromCare.length > 0) return fromCare;
+    return (lockedClient?.pcspGoals ?? [])
+      .map((g) => String(g).trim())
+      .filter((s) => s.length > 0);
+  }, [careData.data, lockedClient?.pcspGoals]);
 
 
 
@@ -2310,7 +2313,7 @@ export function PunchPad({
             >
               {busy
                 ? <Loader2 className="h-5 w-5 animate-spin" />
-                : <><Square className="h-5 w-5 fill-current" /> {endIsEvv ? "⏹️ END EVV SHIFT" : "⏹️ CLOCK OUT"}</>}
+                : <><Square className="h-5 w-5 fill-current" /> {endIsEvv ? "END EVV SHIFT" : "CLOCK OUT"}</>}
             </button>
           </div>
         ) : (
@@ -2671,7 +2674,7 @@ export function PunchPad({
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <DialogHeader className="shrink-0 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
-              <DialogTitle className="pr-8 text-base sm:text-lg">📋 Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
+              <DialogTitle className="pr-8 text-base sm:text-lg">Shift Verification &amp; Medicaid Compliance Form</DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
                 Complete the goals tracker and progress note below to submit your timesheet.
               </DialogDescription>
@@ -2686,12 +2689,12 @@ export function PunchPad({
               <div className="grid gap-4">
                 {/* PCSP goals */}
                 <div className="grid gap-2">
-                  <h3 className="text-sm font-semibold">🎯 Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
+                  <h3 className="text-sm font-semibold">Person-Centered Support Plan (PCSP) Objectives Tracker</h3>
                   <div className="grid gap-1.5 rounded-md border border-border p-3">
                     {activeClientGoals.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        No PCSP goals tagged for {active?.service_type_code ?? "this service code"} on this individual.
-                        Goals only appear here when an admin has tagged them with the service code you're clocked in under.
+                        No PCSP goals on file for this individual.
+                        Goals come from the uploaded PCSP on the client profile.
                         Use baseline monitoring below.
                       </p>
                     )}
@@ -2746,7 +2749,7 @@ export function PunchPad({
                 {/* Narrative */}
                 <div className="grid gap-2">
                   <Label htmlFor="evv-narrative">
-                    📝 Mandatory Progress Note &amp; Narrative Log
+                    Mandatory Progress Note &amp; Narrative Log
                   </Label>
                   {activeClientGoals.length > 0 && (
                     <div className="rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-foreground">

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Rocket, Clock } from "lucide-react";
 import { useTodayShift } from "@/hooks/use-today-shift";
+import { staffClockOutSearch } from "@/lib/staff-clock-out";
 
 export function TodayShiftBanner() {
   const { shift, active } = useTodayShift();
@@ -27,7 +28,7 @@ export function TodayShiftBanner() {
             <Link
               to="/dashboard/workspace/$clientId"
               params={{ clientId: active.client_id }}
-              search={{ tab: "clock-in" }}
+              search={staffClockOutSearch(active.service_type_code)}
             >
               Return to Active Shift
             </Link>

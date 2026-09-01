@@ -178,7 +178,7 @@ describe("host-home daily assignment", () => {
       caseloadDailyNoteLabel({ code: "HHS", alreadyDoneToday: true }),
       "Complete daily note (HHS)",
     );
-    assert.equal(caseloadTimeClockLabel("DSI"), "Open time clock (DSI)");
+    assert.equal(caseloadTimeClockLabel("DSI"), "End shift (DSI)");
   });
 
   it("clockable-only with no open punch → no Open Punch pad on the card", () => {
@@ -210,7 +210,7 @@ describe("host-home daily assignment", () => {
       showDailyNote: false,
       showTimeClock: true,
     });
-    assert.equal(caseloadTimeClockLabel("SLH"), "Open time clock (SLH)");
+    assert.equal(caseloadTimeClockLabel("SLH"), "End shift (SLH)");
   });
 
   it("never stacks a start-punch button onto a host-home daily-note card", () => {

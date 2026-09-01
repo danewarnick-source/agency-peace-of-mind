@@ -186,5 +186,15 @@ export default defineConfig({
       ...(process.env.VITE_E2E_HARNESS === "1" ? [e2eSupabaseMockPlugin()] : []),
       mcpPlugin(),
     ],
+    // Vercel production after #233 died SIGKILL during Nitro "rendering
+    // chunks" on an 8 GB Hobby builder. Gzip size reporting and wide
+    // Rollup parallelism spike RSS in that exact phase.
+    build: {
+      reportCompressedSize: false,
+      sourcemap: false,
+      rollupOptions: {
+        maxParallelFileOps: 2,
+      },
+    },
   },
 });

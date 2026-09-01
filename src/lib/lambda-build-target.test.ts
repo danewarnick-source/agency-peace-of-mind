@@ -10,7 +10,12 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
 
   it("package.json keeps build / build:aws and adds build:lambda", () => {
     const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
-    assert.equal(pkg.scripts.build, "NODE_OPTIONS=--max-old-space-size=8192 vite build");
+    // 6144, not 8192: Vercel Hobby/Pro builders are 8 GB. An 8 GB heap
+    // plus native/Vite overhead is what SIGKILL'd production after #233.
+    assert.equal(pkg.scripts.build, "NODE_OPTIONS=--max-old-space-size=6144 vite build");
+    assert.match(pkg.scripts["build:dev"], /max-old-space-size=6144/);
+    assert.match(pkg.scripts["build:aws"], /max-old-space-size=6144/);
+    assert.match(pkg.scripts["build:lambda"], /max-old-space-size=6144/);
     assert.match(pkg.scripts["build:aws"], /BUILD_TARGET=aws vite build/);
     assert.doesNotMatch(pkg.scripts["build:aws"], /BUILD_TARGET=lambda/);
     assert.match(pkg.scripts["build:lambda"], /BUILD_TARGET=lambda vite build/);
@@ -27,6 +32,8 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     assert.match(src, /NITRO_AWS_LAMBDA_PRESET/);
     assert.match(src, /preset: "node-server"/);
     assert.match(src, /dir: "dist-aws"/);
+    assert.match(src, /reportCompressedSize:\s*false/);
+    assert.match(src, /maxParallelFileOps:\s*2/);
     assert.doesNotMatch(src, /BUILD_TARGET === "aws".*aws-lambda/s);
   });
 

@@ -34,6 +34,7 @@ import { Route as AuditorRouteImport } from './routes/auditor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DemoIndexRouteImport } from './routes/demo.index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
@@ -41,6 +42,9 @@ import { Route as TrainingCourseRouteImport } from './routes/training.course'
 import { Route as TrainingConfirmRouteImport } from './routes/training.confirm'
 import { Route as SignPolicyDocumentIdRouteImport } from './routes/sign-policy.$documentId'
 import { Route as E2eComplianceDeskRouteImport } from './routes/e2e.compliance-desk'
+import { Route as DemoCRouteImport } from './routes/demo.c'
+import { Route as DemoBRouteImport } from './routes/demo.b'
+import { Route as DemoARouteImport } from './routes/demo.a'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
@@ -357,6 +361,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemoIndexRoute = DemoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DemoRoute,
+} as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -391,6 +400,21 @@ const E2eComplianceDeskRoute = E2eComplianceDeskRouteImport.update({
   id: '/e2e/compliance-desk',
   path: '/e2e/compliance-desk',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DemoCRoute = DemoCRouteImport.update({
+  id: '/c',
+  path: '/c',
+  getParentRoute: () => DemoRoute,
+} as any)
+const DemoBRoute = DemoBRouteImport.update({
+  id: '/b',
+  path: '/b',
+  getParentRoute: () => DemoRoute,
+} as any)
+const DemoARoute = DemoARouteImport.update({
+  id: '/a',
+  path: '/a',
+  getParentRoute: () => DemoRoute,
 } as any)
 const DashboardTracksRoute = DashboardTracksRouteImport.update({
   id: '/tracks',
@@ -1446,7 +1470,7 @@ export interface FileRoutesByFullPath {
   '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/demo': typeof DemoRoute
+  '/demo': typeof DemoRouteWithChildren
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/join': typeof JoinRoute
@@ -1531,6 +1555,9 @@ export interface FileRoutesByFullPath {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/demo/a': typeof DemoARoute
+  '/demo/b': typeof DemoBRoute
+  '/demo/c': typeof DemoCRoute
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/training/confirm': typeof TrainingConfirmRoute
@@ -1538,6 +1565,7 @@ export interface FileRoutesByFullPath {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/demo/': typeof DemoIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/aws/db': typeof ApiAwsDbRoute
@@ -1669,7 +1697,6 @@ export interface FileRoutesByTo {
   '/billing-locked': typeof BillingLockedRoute
   '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
-  '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/join': typeof JoinRoute
@@ -1748,6 +1775,9 @@ export interface FileRoutesByTo {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/demo/a': typeof DemoARoute
+  '/demo/b': typeof DemoBRoute
+  '/demo/c': typeof DemoCRoute
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/training/confirm': typeof TrainingConfirmRoute
@@ -1755,6 +1785,7 @@ export interface FileRoutesByTo {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/demo': typeof DemoIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/aws/db': typeof ApiAwsDbRoute
@@ -1888,7 +1919,7 @@ export interface FileRoutesById {
   '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/demo': typeof DemoRoute
+  '/demo': typeof DemoRouteWithChildren
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/join': typeof JoinRoute
@@ -1973,6 +2004,9 @@ export interface FileRoutesById {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/demo/a': typeof DemoARoute
+  '/demo/b': typeof DemoBRoute
+  '/demo/c': typeof DemoCRoute
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/training/confirm': typeof TrainingConfirmRoute
@@ -1980,6 +2014,7 @@ export interface FileRoutesById {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/demo/': typeof DemoIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/aws/db': typeof ApiAwsDbRoute
@@ -2199,6 +2234,9 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/demo/a'
+    | '/demo/b'
+    | '/demo/c'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/training/confirm'
@@ -2206,6 +2244,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/demo/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/aws/db'
@@ -2337,7 +2376,6 @@ export interface FileRouteTypes {
     | '/billing-locked'
     | '/classes'
     | '/contact'
-    | '/demo'
     | '/employee'
     | '/forgot-password'
     | '/join'
@@ -2416,6 +2454,9 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/demo/a'
+    | '/demo/b'
+    | '/demo/c'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/training/confirm'
@@ -2423,6 +2464,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal'
     | '/dashboard'
+    | '/demo'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/aws/db'
@@ -2640,6 +2682,9 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/demo/a'
+    | '/demo/b'
+    | '/demo/c'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/training/confirm'
@@ -2647,6 +2692,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/demo/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/aws/db'
@@ -2780,7 +2826,7 @@ export interface RootRouteChildren {
   ClassesRoute: typeof ClassesRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
-  DemoRoute: typeof DemoRoute
+  DemoRoute: typeof DemoRouteWithChildren
   EmployeeRoute: typeof EmployeeRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   JoinRoute: typeof JoinRoute
@@ -3001,6 +3047,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demo/': {
+      id: '/demo/'
+      path: '/'
+      fullPath: '/demo/'
+      preLoaderRoute: typeof DemoIndexRouteImport
+      parentRoute: typeof DemoRoute
+    }
     '/dashboard/': {
       id: '/dashboard/'
       path: '/'
@@ -3049,6 +3102,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/e2e/compliance-desk'
       preLoaderRoute: typeof E2eComplianceDeskRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/demo/c': {
+      id: '/demo/c'
+      path: '/c'
+      fullPath: '/demo/c'
+      preLoaderRoute: typeof DemoCRouteImport
+      parentRoute: typeof DemoRoute
+    }
+    '/demo/b': {
+      id: '/demo/b'
+      path: '/b'
+      fullPath: '/demo/b'
+      preLoaderRoute: typeof DemoBRouteImport
+      parentRoute: typeof DemoRoute
+    }
+    '/demo/a': {
+      id: '/demo/a'
+      path: '/a'
+      fullPath: '/demo/a'
+      preLoaderRoute: typeof DemoARouteImport
+      parentRoute: typeof DemoRoute
     }
     '/dashboard/tracks': {
       id: '/dashboard/tracks'
@@ -4906,6 +4980,22 @@ const TrainingRouteWithChildren = TrainingRoute._addFileChildren(
   TrainingRouteChildren,
 )
 
+interface DemoRouteChildren {
+  DemoARoute: typeof DemoARoute
+  DemoBRoute: typeof DemoBRoute
+  DemoCRoute: typeof DemoCRoute
+  DemoIndexRoute: typeof DemoIndexRoute
+}
+
+const DemoRouteChildren: DemoRouteChildren = {
+  DemoARoute: DemoARoute,
+  DemoBRoute: DemoBRoute,
+  DemoCRoute: DemoCRoute,
+  DemoIndexRoute: DemoIndexRoute,
+}
+
+const DemoRouteWithChildren = DemoRoute._addFileChildren(DemoRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -4916,7 +5006,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClassesRoute: ClassesRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
-  DemoRoute: DemoRoute,
+  DemoRoute: DemoRouteWithChildren,
   EmployeeRoute: EmployeeRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   JoinRoute: JoinRoute,

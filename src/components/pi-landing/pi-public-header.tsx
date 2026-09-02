@@ -9,8 +9,7 @@ import {
 } from "@/lib/public-landing-nav";
 
 const NAV = [
-  { href: "/#what-you-get", label: "What you get" },
-  { href: "/#product", label: "The office" },
+  { href: "/#why", label: "Why" },
   { href: "/pricing", label: "Pricing", to: "/pricing" as const },
 ] as const;
 

@@ -5,8 +5,8 @@ export const PI_PRODUCT_SHORT = "PI";
 export const PI_WORDMARK = "PROVIDER INTERFACE";
 export const PI_HEADLINE = "The day got smaller.";
 export const PI_SUBHEAD = "Go home. It stays standing.";
-export const PI_HERO_SUPPORT =
-  "People, the schedule, notes already written, trainings, the shop — and Nectar — in one quiet office. Newer providers. The day stays done.";
+/** One supporting line under the headline. Not a feature list. */
+export const PI_HERO_SUPPORT = PI_SUBHEAD;
 
 export const PI_NAVY = "#0b1220";
 export const PI_NAVY_RAISED = "#111827";
@@ -17,7 +17,7 @@ export const PI_ACTION = "#1e3a5f";
 
 export const PI_PAGE_TITLE = "Provider Interface — Go home. It stays standing.";
 export const PI_PAGE_DESCRIPTION =
-  "Provider Interface. One quiet office for people, the schedule, notes, trainings, and Nectar. $69 per client / month. $350 minimum. The day stays done.";
+  "Provider Interface. One number. The whole office. $69 per client / month. $350 minimum. Nectar included. The day stays done.";
 
 export const PI_SIGN_IN = "Sign in";
 export const PI_TALK_TO_US = "Talk to us";
@@ -33,7 +33,9 @@ export const PI_LIST_PRICE_LEAD = "The list price is the price.";
 export const PI_LIST_PRICE_CONTRAST = "No setup fee. No add-ons for Nectar. Training optional.";
 export const PI_LIST_PRICE_INCLUDED =
   "One number. The whole office. People, the schedule, notes already written, trainings in the room, the shop — and Nectar — are in that number. Nothing extra to unlock the rest.";
-export const PI_FOUNDING_QUIET = "Founding rates for the first five agencies — talk to us.";
+export const PI_TRAINING_QUIET = "Training is the only add-on.";
+export const PI_TRAINING_QUIET_LINK = "See pricing.";
+export const PI_FOUNDING_QUIET = "First five agencies, talk to us.";
 export const PI_SIGNUP_PRICE_LINE = "Plans start at $69 per client / month ($350 minimum).";
 export const PI_ENTERPRISE_LINE = "Custom work. No public dollar amount.";
 export const PI_PRICING_PAGE_TITLE = "Pricing — Provider Interface";
@@ -89,6 +91,13 @@ export const PI_FORBIDDEN_PUBLIC_PRICES = [
   "True North Supports stays $0",
   "True North stays free",
 ] as const;
+
+export const PI_PROBLEM_KICKER = "Sunday night";
+export const PI_PROBLEM_HEADLINE = "The day does not stay done.";
+export const PI_PROBLEM_BODY =
+  "A teaser rate, then a setup fee. Then add-ons for AI. Then modules. The week is still in your head when you close the laptop.";
+export const PI_DIFFERENCE_HEADLINE = "One number. The whole office.";
+export const PI_DIFFERENCE_BODY = "Nectar is in that number. You can go home. It stays standing.";
 
 export const PI_WHAT_YOU_GET = [
   {

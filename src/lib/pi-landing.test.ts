@@ -5,6 +5,8 @@ import {
   PI_FORBIDDEN_MARKETING,
   PI_FORBIDDEN_PUBLIC_PRICES,
   PI_FOUNDING_QUIET,
+  PI_DIFFERENCE_BODY,
+  PI_DIFFERENCE_HEADLINE,
   PI_HEADLINE,
   PI_HERO_SUPPORT,
   PI_LIST_MINIMUM_DOLLARS,
@@ -42,7 +44,9 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_WORDMARK, "PROVIDER INTERFACE");
     assert.equal(PI_HEADLINE, "The day got smaller.");
     assert.equal(PI_SUBHEAD, "Go home. It stays standing.");
-    assert.match(PI_HERO_SUPPORT, /Nectar/);
+    assert.equal(PI_HERO_SUPPORT, PI_SUBHEAD);
+    assert.match(PI_DIFFERENCE_BODY, /Nectar/);
+    assert.equal(PI_DIFFERENCE_HEADLINE, "One number. The whole office.");
     assert.match(PI_PAGE_TITLE, /Provider Interface/);
     assert.match(PI_PAGE_DESCRIPTION, /Nectar/);
   });
@@ -55,7 +59,7 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_LIST_PRICE_LEAD, "The list price is the price.");
     assert.equal(PI_LIST_PRICE_CONTRAST, "No setup fee. No add-ons for Nectar. Training optional.");
     assert.match(PI_SIGNUP_PRICE_LINE, /\$69 per client \/ month \(\$350 minimum\)/);
-    assert.match(PI_FOUNDING_QUIET, /first five agencies/);
+    assert.match(PI_FOUNDING_QUIET, /[Ff]irst five agencies/);
     assert.doesNotMatch(PI_FOUNDING_QUIET, /\$/);
     assert.deepEqual(
       PI_TRAINING_ADDONS.map((row) => row.price),
@@ -68,16 +72,25 @@ describe("Provider Interface marketing homepage", () => {
     const landing = read(new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url));
     const pricing = read(new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url));
     const shots = read(new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url));
+    const header = read(new URL("../components/pi-landing/pi-public-header.tsx", import.meta.url));
     assert.match(page, /PiMarketingPage/);
-    assert.match(landing, /what-you-get/);
-    assert.match(landing, /PiProductShots/);
+    assert.doesNotMatch(landing, /what-you-get/);
+    assert.doesNotMatch(landing, /PiProductShots/);
+    assert.doesNotMatch(landing, /PI_WHAT_YOU_GET/);
+    assert.match(landing, /id="why"/);
     assert.match(landing, /PiPricingSection/);
+    assert.match(landing, /compact/);
     assert.match(landing, /to="\/login"/);
     assert.match(landing, /to="\/contact"/);
+    assert.doesNotMatch(header, /What you get/);
+    assert.doesNotMatch(header, /The office/);
+    assert.match(header, /\/#why/);
     assert.match(shots, /Nectar/);
     assert.match(pricing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(pricing, /PI_TRAINING_ADDONS/);
+    assert.match(pricing, /PI_TRAINING_QUIET/);
     assert.match(pricing, /PI_LIST_PRICE_CONTRAST/);
+    assert.match(pricing, /compact/);
     assert.doesNotMatch(pricing, /FOUNDING_PER_STAFF_CENTS|LIST_VOLUME_TIERS|ANNUAL_DISCOUNT/);
     assert.doesNotMatch(landing, /PublicLandingHeader|HexBackdrop|HeroPhone|HiveWordmark|Honeycomb|hivecertify/);
     for (const word of PI_FORBIDDEN_MARKETING) {

@@ -12,6 +12,8 @@ import {
   PI_SIGN_IN,
   PI_TALK_TO_US,
   PI_TRAINING_ADDONS,
+  PI_TRAINING_QUIET,
+  PI_TRAINING_QUIET_LINK,
 } from "@/lib/pi-landing";
 
 const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as const;
@@ -19,12 +21,18 @@ const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as c
 export function PiPricingSection({
   heading = "The number",
   showEnterprise = false,
+  compact = false,
 }: {
   heading?: string;
   showEnterprise?: boolean;
+  /** Landing: price + contrast + one training line. /pricing keeps the fuller grid. */
+  compact?: boolean;
 }) {
   return (
-    <section id="pricing" className="scroll-mt-24 px-5 py-20 sm:px-8 md:py-28">
+    <section
+      id="pricing"
+      className={`scroll-mt-24 px-5 sm:px-8 ${compact ? "py-16 md:py-20" : "py-20 md:py-28"}`}
+    >
       <div className="mx-auto max-w-3xl">
         {heading ? (
           <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#f3efe6]/45">
@@ -50,41 +58,53 @@ export function PiPricingSection({
         <p className="mt-10 text-xl font-medium leading-snug text-[#f3efe6] sm:text-2xl">
           {PI_LIST_PRICE_CONTRAST}
         </p>
-        <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
-          {PI_LIST_PRICE_INCLUDED}
-        </p>
 
-        <dl className="mt-12 divide-y divide-white/[0.08] border-y border-white/[0.08]">
-          {PI_INCLUDED_IN_PRICE.map((row) => (
-            <div key={row.title} className="grid gap-1 py-5 sm:grid-cols-[minmax(10rem,14rem)_1fr] sm:gap-8">
-              <dt className="text-sm font-medium text-[#f3efe6]">{row.title}</dt>
-              <dd className="text-sm leading-relaxed text-[#f3efe6]/62">{row.body}</dd>
+        {compact ? (
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
+            {PI_TRAINING_QUIET}{" "}
+            <Link to="/pricing" className="underline decoration-[#f3efe6]/30 underline-offset-4 hover:text-[#f3efe6]">
+              {PI_TRAINING_QUIET_LINK}
+            </Link>
+          </p>
+        ) : (
+          <>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
+              {PI_LIST_PRICE_INCLUDED}
+            </p>
+
+            <dl className="mt-12 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+              {PI_INCLUDED_IN_PRICE.map((row) => (
+                <div key={row.title} className="grid gap-1 py-5 sm:grid-cols-[minmax(10rem,14rem)_1fr] sm:gap-8">
+                  <dt className="text-sm font-medium text-[#f3efe6]">{row.title}</dt>
+                  <dd className="text-sm leading-relaxed text-[#f3efe6]/62">{row.body}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="mt-14">
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#f3efe6]/45">
+                Training, optional
+              </p>
+              <h3
+                className="mt-3 text-2xl font-medium tracking-[-0.02em] text-[#f3efe6] sm:text-3xl"
+                style={NEWSREADER}
+              >
+                The only add-on.
+              </h3>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#f3efe6]/62">
+                Everything else is in the list price. Training is optional, and priced in the open.
+              </p>
+              <ul className="mt-8 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+                {PI_TRAINING_ADDONS.map((row) => (
+                  <li key={row.name} className="flex items-baseline justify-between gap-4 py-4 text-sm">
+                    <span className="text-[#f3efe6]">{row.name}</span>
+                    <span className="tabular-nums text-[#f3efe6]/80">{row.price}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </dl>
-
-        <div className="mt-14">
-          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#f3efe6]/45">
-            Training, optional
-          </p>
-          <h3
-            className="mt-3 text-2xl font-medium tracking-[-0.02em] text-[#f3efe6] sm:text-3xl"
-            style={NEWSREADER}
-          >
-            The only add-on.
-          </h3>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#f3efe6]/62">
-            Everything else is in the list price. Training is optional, and priced in the open.
-          </p>
-          <ul className="mt-8 divide-y divide-white/[0.08] border-y border-white/[0.08]">
-            {PI_TRAINING_ADDONS.map((row) => (
-              <li key={row.name} className="flex items-baseline justify-between gap-4 py-4 text-sm">
-                <span className="text-[#f3efe6]">{row.name}</span>
-                <span className="tabular-nums text-[#f3efe6]/80">{row.price}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+          </>
+        )}
 
         {showEnterprise ? (
           <div className="mt-14 border-t border-white/[0.08] pt-10">

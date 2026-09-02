@@ -16,6 +16,12 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
 import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.functions";
+import { ensureSignupWorkspace } from "@/lib/signup-workspace.functions";
+import {
+  SIGNUP_CONFIRM_EMAIL_MESSAGE,
+  messageForSignupWorkspaceReason,
+  signupHasSession,
+} from "@/lib/signup-workspace";
 import {
   AUTH_PWNED_PASSWORD_MESSAGE,
   hibpRangeIncludesSha1,
@@ -217,6 +223,14 @@ function SignupPage() {
   const [form, setForm] = useState<FormState>(initialForm);
   const checkEmail = useServerFn(checkEmailExists);
   const checkPwnedRange = useServerFn(checkPasswordPwnedRange);
+  const ensureWorkspace = useServerFn(ensureSignupWorkspace);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await (supabase as any).auth.getSession();
+      if (signupHasSession(data.session)) setStep(1);
+    })();
+  }, []);
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
@@ -249,7 +263,13 @@ function SignupPage() {
               />
             )}
             {step === 1 && (
-              <Step3Business form={form} update={update} onBack={goBack} onNext={() => setStep(2)} />
+              <Step3Business
+                form={form}
+                update={update}
+                ensureWorkspace={ensureWorkspace}
+                onBack={goBack}
+                onNext={() => setStep(2)}
+              />
             )}
             {step === 2 && (
               <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
@@ -289,6 +309,7 @@ function Step1Account({
   onNext: () => void;
 }) {
   const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(null);
   const [passwordWeakErr, setPasswordWeakErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -362,7 +383,7 @@ function Step1Account({
         setBusy(false);
         return;
       }
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -384,6 +405,11 @@ function Step1Account({
         setBusy(false);
         return;
       }
+      if (!signupHasSession(signUpData.session)) {
+        setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        setBusy(false);
+        return;
+      }
       toast.success("Account created — let's set up your business.");
       setBusy(false);
       onNext();
@@ -396,6 +422,15 @@ function Step1Account({
   return (
     <>
       <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
+      {confirmEmailMsg ? (
+        <div
+          role="alert"
+          data-testid="signup-confirm-email"
+          className="mb-4 rounded-md border border-[var(--hive-danger)]/50 bg-[var(--hive-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--hive-danger-fg)]"
+        >
+          {confirmEmailMsg}
+        </div>
+      ) : null}
       <div className="grid gap-4">
         <Field
           label="Email address"
@@ -524,11 +559,17 @@ function PwRule({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 function Step3Business({
   form,
   update,
+  ensureWorkspace,
   onBack,
   onNext,
 }: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
+  ensureWorkspace: (input: { data: { agencyName?: string } }) => Promise<{
+    ok: boolean;
+    orgId: string | null;
+    reason: "no_session" | "org_query_error" | "trigger_blocked" | "provision_failed" | null;
+  }>;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -546,17 +587,24 @@ function Step3Business({
     }
     setBusy(true);
     try {
-      const { data: userResp } = await supabase.auth.getUser();
+      const { data: sessionResp } = await (supabase as any).auth.getSession();
+      if (!signupHasSession(sessionResp?.session)) {
+        toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        setBusy(false);
+        return;
+      }
+
+      const { data: userResp } = await (supabase as any).auth.getUser();
       const uid = userResp.user?.id;
       if (!uid) {
-        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+        toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
         setBusy(false);
         return;
       }
 
       // Best-effort profile update — don't block on failure.
       try {
-        await supabase.from("profiles").update({
+        await (supabase as any).from("profiles").update({
           full_name: form.contactName,
           agency_name: form.agencyName,
         }).eq("id", uid);
@@ -564,23 +612,19 @@ function Step3Business({
         /* non-blocking */
       }
 
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id")
-        .eq("created_by", uid)
-        .limit(1);
-      const orgId = orgs?.[0]?.id;
-      if (!orgId) {
-        toast.error("Your workspace isn't ready yet — please refresh and try again.");
+      const ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
+      if (!ensured?.ok || !ensured.orgId) {
+        toast.error(messageForSignupWorkspaceReason(ensured?.reason));
         setBusy(false);
         return;
       }
+      const orgId = ensured.orgId;
 
       const isTrainingOnly =
         typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("flow") === "training";
 
-      const { error: orgErr } = await supabase
+      const { error: orgErr } = await (supabase as any)
         .from("organizations")
         .update({
           name: form.agencyName,

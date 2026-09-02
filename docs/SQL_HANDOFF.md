@@ -6,6 +6,126 @@ it worked before moving on.
 
 ---
 
+## ACTION — Signup Continue / dead rbac_roles trigger (2026-09-02)
+
+**Run this so new-provider Continue can create a workspace.** Confirmed on
+live Hive-Platform (`dhrrukdcigiiqksibdfb`) 2026-09-02 23:26 UTC:
+
+1. Auth `/signup` returned 200 `user_confirmation_requested` (confirm-email
+   is on). No session. Account still advanced. Continue then hit
+   `getUser()` with no uid — toast *Your workspace isn't ready yet*.
+2. `handle_new_user` also failed: `relation "public.rbac_roles" does not
+   exist`. Trigger `seed_rbac_after_org_insert` still calls
+   `seed_system_rbac_roles` after every org insert. `rbac_roles` was
+   dropped. The function's `EXCEPTION WHEN OTHERS` swallowed it, so the
+   new auth user has **no profile, no org, no membership**.
+3. No org named `Test agency 1` — Continue never reached the update.
+
+Do **not** log or select emails, names, or phones. Counts and ids only.
+
+**Block A — drop the leftover trigger** (also in
+`supabase/migrations/20260903010000_signup_drop_dead_rbac_seed_trigger.sql`):
+
+```sql
+DROP TRIGGER IF EXISTS seed_rbac_after_org_insert ON public.organizations;
+
+CREATE OR REPLACE FUNCTION public.trg_seed_rbac_on_new_org()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF to_regclass('public.rbac_roles') IS NULL THEN
+    RETURN NEW;
+  END IF;
+  PERFORM public.seed_system_rbac_roles(NEW.id);
+  RETURN NEW;
+END;
+$$;
+
+SELECT
+  to_regclass('public.rbac_roles') IS NULL AS rbac_roles_gone,
+  EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'seed_rbac_after_org_insert'
+  ) AS leftover_trigger_still_attached;
+```
+
+**What you'll see:** `rbac_roles_gone = t`, `leftover_trigger_still_attached = f`.
+
+**Block B — diagnose last 7 days (ids only, no PHI):**
+
+```sql
+SELECT string_agg(u.id::text, E'\n' ORDER BY u.created_at) AS users_missing_profile
+FROM auth.users u
+LEFT JOIN public.profiles p ON p.id = u.id
+WHERE p.id IS NULL
+  AND u.created_at > now() - interval '7 days';
+```
+
+**Block C — repair those users (profile + org + admin membership).** Safe
+to re-run. Does not touch True North. Does not print emails.
+
+```sql
+WITH missing AS (
+  SELECT u.id, u.email, u.raw_user_meta_data
+  FROM auth.users u
+  LEFT JOIN public.profiles p ON p.id = u.id
+  WHERE p.id IS NULL
+    AND u.created_at > now() - interval '7 days'
+    AND coalesce(u.raw_user_meta_data->>'created_via', '') NOT IN ('invitation', 'manual_admin')
+),
+ins_profiles AS (
+  INSERT INTO public.profiles (id, email, full_name, agency_name)
+  SELECT
+    m.id,
+    m.email,
+    NULLIF(btrim(m.raw_user_meta_data->>'full_name'), ''),
+    m.raw_user_meta_data->>'agency_name'
+  FROM missing m
+  ON CONFLICT (id) DO NOTHING
+  RETURNING id
+),
+ins_orgs AS (
+  INSERT INTO public.organizations (name, slug, created_by)
+  SELECT
+    COALESCE(
+      NULLIF(btrim(m.raw_user_meta_data->>'agency_name'), ''),
+      split_part(m.email, '@', 1) || '''s workspace'
+    ),
+    lower(regexp_replace(
+      COALESCE(
+        NULLIF(btrim(m.raw_user_meta_data->>'agency_name'), ''),
+        split_part(m.email, '@', 1) || '''s workspace'
+      ) || '-' || substr(m.id::text, 1, 6),
+      '[^a-z0-9]+', '-', 'g'
+    )),
+    m.id
+  FROM missing m
+  WHERE NOT EXISTS (SELECT 1 FROM public.organizations o WHERE o.created_by = m.id)
+  RETURNING id, created_by
+),
+ins_members AS (
+  INSERT INTO public.organization_members (organization_id, user_id, role)
+  SELECT io.id, io.created_by, 'admin'
+  FROM ins_orgs io
+  ON CONFLICT (organization_id, user_id) DO NOTHING
+  RETURNING user_id
+)
+SELECT
+  (SELECT COUNT(*) FROM missing) AS users_missing_profile,
+  (SELECT COUNT(*) FROM ins_profiles) AS profiles_inserted,
+  (SELECT COUNT(*) FROM ins_orgs) AS orgs_inserted,
+  (SELECT COUNT(*) FROM ins_members) AS memberships_inserted;
+```
+
+**What you'll see:** counts only. After Block A, new signups can insert an
+org again. After Block C, the unconfirmed walk user can finish once they
+confirm email and return.
+
+---
+
 ## ACTION — Obligation packs (custom tabs + required flag) (2026-09-01)
 
 **Do not run this until Dane approves the PR.** This is an add-only migration.

@@ -58,9 +58,13 @@ function serverFnHay(req: { url: () => string; postData: () => string | null }) 
   return `${url} ${decodeServerFnMeta(url)} ${body}`.toLowerCase();
 }
 
-async function installSignupMocks(page: Page, opts?: { emailExists?: boolean; pwnedRange?: string }) {
+async function installSignupMocks(
+  page: Page,
+  opts?: { emailExists?: boolean; pwnedRange?: string; signUpNoSession?: boolean },
+) {
   const emailExists = opts?.emailExists === true;
   const pwnedRange = opts?.pwnedRange ?? "";
+  const signUpNoSession = opts?.signUpNoSession === true;
 
   const handleServerFn = async (route: Route) => {
     const req = route.request();
@@ -75,13 +79,24 @@ async function installSignupMocks(page: Page, opts?: { emailExists?: boolean; pw
       });
     }
     const hay = serverFnHay(req);
-    let parsed: { data?: { email?: string; organizationId?: string } } | null = null;
+    let parsed: {
+      data?: { email?: string; organizationId?: string; sha1Prefix?: string; agencyName?: string };
+    } | null = null;
     try {
-      parsed = JSON.parse(req.postData() ?? "{}") as { data?: { email?: string; organizationId?: string } };
+      parsed = JSON.parse(req.postData() ?? "{}") as {
+        data?: { email?: string; organizationId?: string; sha1Prefix?: string; agencyName?: string };
+      };
     } catch {
       parsed = null;
     }
-    if (hay.includes("checkpasswordpwned") || hay.includes("pwnedrange")) {
+    if (hay.includes("ensuresignupworkspace") || typeof parsed?.data?.agencyName === "string") {
+      return fulfillJson(route, { result: { ok: true, orgId: ORG_ID, reason: null } });
+    }
+    if (
+      hay.includes("checkpasswordpwned") ||
+      hay.includes("pwnedrange") ||
+      typeof parsed?.data?.sha1Prefix === "string"
+    ) {
       return fulfillJson(route, { result: { range: pwnedRange } });
     }
     if (
@@ -131,18 +146,24 @@ async function installSignupMocks(page: Page, opts?: { emailExists?: boolean; pw
     }
     if (/\/auth\/v1\/signup/i.test(url) && method === "POST") {
       const now = new Date().toISOString();
-      return fulfillJson(route, {
-        access_token: `${b64url({ alg: "none" })}.${b64url({ sub: USER_ID, email: EMAIL })}.e2e`,
+      const user = {
+        id: USER_ID,
+        email: EMAIL,
+        email_confirmed_at: signUpNoSession ? null : now,
+        user_metadata: { full_name: "Dane Walk" },
+      };
+      if (signUpNoSession) {
+        return fulfillJson(route, { user, session: null });
+      }
+      const access_token = `${b64url({ alg: "none" })}.${b64url({ sub: USER_ID, email: EMAIL })}.e2e`;
+      const session = {
+        access_token,
         token_type: "bearer",
         expires_in: 86400,
         refresh_token: "e2e-refresh",
-        user: {
-          id: USER_ID,
-          email: EMAIL,
-          email_confirmed_at: now,
-          user_metadata: { full_name: "Dane Walk" },
-        },
-      });
+        user,
+      };
+      return fulfillJson(route, { ...session, session, user });
     }
     if (/\/auth\/v1\//i.test(url)) {
       return fulfillJson(route, {
@@ -215,7 +236,8 @@ test.describe("new-provider signup walk", () => {
     await shot(page, "signup_step_agency_not_true_north.png");
 
     await page.getByRole("button", { name: /continue/i }).click();
-    await expect(page.getByTestId("signup-plan-quote")).toBeVisible();
+    await expect(page.getByTestId("signup-plan-quote")).toBeVisible({ timeout: 15_000 });
+    await shot(page, "signup_business_continue_ok.png");
     await expect(page.getByTestId("signup-plan-quote")).toContainText("$69");
     await expect(page.getByTestId("signup-plan-quote")).toContainText("$350");
     await expect(page.getByTestId("signup-plan-math")).toContainText("$828");
@@ -267,8 +289,22 @@ test.describe("new-provider signup walk", () => {
       "Password is known to be weak and easy to guess, please choose a different one.",
     );
     await expect(page.getByRole("button", { name: /create account/i })).toBeDisabled();
-    await page.getByRole("button", { name: /show password/i }).click();
+    await page.getByTestId("signup-password").locator("..").getByRole("button", { name: /show password/i }).click();
     await shot(page, "signup_password_weak_easy_bar.png");
+  });
+
+  test("confirm-email signup stays on Account and does not show the workspace toast", async ({ page }) => {
+    await installSignupMocks(page, { signUpNoSession: true });
+    await page.goto("/signup", { waitUntil: "domcontentloaded" });
+    await fillReactInput(page, "signup-email", EMAIL);
+    await fillReactInput(page, "signup-password", "Testpass1");
+    await fillReactInput(page, "signup-confirm", "Testpass1");
+    await page.getByRole("button", { name: /create account/i }).click();
+    await expect(page.getByTestId("signup-confirm-email")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("signup-confirm-email")).toContainText(/confirm the email we sent/i);
+    await expect(page.getByText(/tell us about your business/i)).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/workspace isn't ready/i);
+    await shot(page, "signup_confirm_email_before_continue.png");
   });
 
   test("exact duplicate email is still blocked; plus-alias is not treated as the base address", async ({

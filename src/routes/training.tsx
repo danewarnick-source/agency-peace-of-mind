@@ -6,7 +6,6 @@ import {
   PUBLIC_TRAINING_ALA_CARTE,
   TRAINING_PRICE_CENTS,
   formatUsdFromCents,
-  publicTrainingBundleSavingsCents,
 } from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/training")({
@@ -16,7 +15,7 @@ export const Route = createFileRoute("/training")({
       {
         name: "description",
         content:
-          "Staff complete assigned training inside Provider Interface on My Obligations. Agencies do not sell seats to staff. True North Supports stays $0.",
+          "Staff complete assigned training inside Provider Interface on My Obligations. Agencies do not sell seats to staff. Training is optional.",
       },
       { property: "og:title", content: "Training — Provider Interface" },
       { property: "og:type", content: "website" },
@@ -42,24 +41,21 @@ function TrainingExplainer() {
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-[#f3efe6]/62">
             Staff never buy seats. An admin submits a class roster for CPR, Mandt, or the training
-            package. Assigned work shows up on My Obligations. True North Supports is always $0.
+            pack. Assigned work shows up on My Obligations. Training is the only add-on — optional,
+            and priced in the open.
           </p>
           <ul className="mt-6 space-y-2 rounded-xl border border-white/[0.10] bg-white/[0.03] p-4 text-sm">
             {PUBLIC_TRAINING_ALA_CARTE.map((row) => (
               <li key={row.sku} className="flex items-baseline justify-between gap-3">
                 <span>{row.name}</span>
-                <span className="font-semibold">{formatUsdFromCents(row.priceCents)} / seat</span>
+                <span className="font-semibold">{formatUsdFromCents(row.priceCents)}</span>
               </li>
             ))}
             <li className="flex items-baseline justify-between gap-3 border-t border-white/[0.08] pt-2">
-              <span>Training package</span>
+              <span>Pack</span>
               <span className="font-semibold">
-                {formatUsdFromCents(TRAINING_PRICE_CENTS.full_program)} / seat
+                {formatUsdFromCents(TRAINING_PRICE_CENTS.full_program)}
               </span>
-            </li>
-            <li className="text-xs text-[#f3efe6]/45">
-              Package saves {formatUsdFromCents(publicTrainingBundleSavingsCents())}. True North is
-              never charged.
             </li>
           </ul>
           <div className="mt-8 flex flex-wrap gap-3">

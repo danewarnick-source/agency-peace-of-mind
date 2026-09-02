@@ -2,6 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
 import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
 import { PiPricingSection } from "@/components/pi-landing/pi-pricing";
+import {
+  PI_PRICING_PAGE_DESCRIPTION,
+  PI_PRICING_PAGE_TITLE,
+  PI_SIGN_IN,
+} from "@/lib/pi-landing";
 
 const NEWSREADER =
   "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap";
@@ -9,18 +14,10 @@ const NEWSREADER =
 export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
-      { title: "Pricing — Provider Interface" },
-      {
-        name: "description",
-        content:
-          "Provider Interface pricing: $125/staff, $500/mo minimum, volume rates, founding for the first five paying agencies, and training seats.",
-      },
-      { property: "og:title", content: "Pricing — Provider Interface" },
-      {
-        property: "og:description",
-        content:
-          "Clear platform and training prices. True North Supports stays free.",
-      },
+      { title: PI_PRICING_PAGE_TITLE },
+      { name: "description", content: PI_PRICING_PAGE_DESCRIPTION },
+      { property: "og:title", content: PI_PRICING_PAGE_TITLE },
+      { property: "og:description", content: PI_PRICING_PAGE_DESCRIPTION },
     ],
     links: [{ rel: "stylesheet", href: NEWSREADER }],
   }),
@@ -40,19 +37,19 @@ function PricingPage() {
             className="mt-3 text-4xl font-medium tracking-[-0.02em] sm:text-6xl"
             style={{ fontFamily: '"Newsreader", "Times New Roman", serif' }}
           >
-            The numbers, in one place
+            One number. The whole office.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-[#f3efe6]/62">
-            Same prices as the homepage. Sign in when you are ready.
+            The list price is the price. Sign in when you are ready.
           </p>
           <Link
             to="/login"
             className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-[#f3efe6] px-6 text-sm font-medium text-[#0b1220] hover:bg-[#f3efe6]/90"
           >
-            Sign in
+            {PI_SIGN_IN}
           </Link>
         </div>
-        <PiPricingSection heading="" />
+        <PiPricingSection heading="" showEnterprise />
       </main>
       <PiPublicFooter />
     </div>

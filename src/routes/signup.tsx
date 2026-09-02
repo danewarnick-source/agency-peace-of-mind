@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -19,12 +19,8 @@ import { checkEmailExists } from "@/lib/signup-checks.functions";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import { createSubscriptionCheckoutFn } from "@/lib/stripe-checkout.functions";
-import { getSignupPricingFn } from "@/lib/hive-pricing.functions";
-import {
-  formatUsdFromCents,
-  quoteHiveSubscription,
-  type BillingInterval,
-} from "@/lib/hive-pricing";
+import { type BillingInterval } from "@/lib/hive-pricing";
+import { PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
@@ -619,60 +615,9 @@ function Step4Pricing({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const pricingFn = useServerFn(getSignupPricingFn);
-  const [schedule, setSchedule] = useState<"list" | "founding">("founding");
-  const [slots, setSlots] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    pricingFn()
-      .then((r) => {
-        if (cancelled) return;
-        setSchedule(r.schedule);
-        setSlots(r.foundingSlotsRemaining);
-      })
-      .catch(() => {
-        if (!cancelled) setSchedule("founding");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pricingFn]);
-
-  const quote = quoteHiveSubscription({
-    staffCount: form.staffCount,
-    clientCount: form.clientCount,
-    schedule,
-    interval: form.interval,
-  });
-
   return (
     <>
-      <Header
-        title="Staff & billing"
-        subtitle="Billed per active staff. True North Supports is never charged here. Enterprise custom work is contact-us — no public dollar amount."
-      />
-      {schedule === "founding" && (
-        <div
-          className="mb-4 rounded-lg border px-3 py-2 text-sm"
-          data-testid="founding-rate-note"
-          style={{
-            background: "rgba(244,169,58,0.10)",
-            borderColor: "rgba(244,169,58,0.35)",
-            color: "#f7c172",
-          }}
-        >
-          Founding rate for the first 5 paying agencies: $79 / staff, $299 / month minimum
-          {slots != null ? ` · ${slots} founding slot${slots === 1 ? "" : "s"} left` : ""}. After 12
-          months you step up to list.
-        </div>
-      )}
-      {schedule === "list" && (
-        <div className="mb-4 rounded-lg border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-3 py-2 text-sm text-[var(--hive-text)]">
-          List rate: $125 / staff (1–19 clients), $109 at 20–49, $99 at 50+. $500 / month minimum.
-          Annual saves 20%.
-        </div>
-      )}
+      <Header title="About your office" subtitle={PI_SIGNUP_PRICE_LINE} />
       <div className="grid gap-4">
         <Field label="How many active staff?">
           <TextInput
@@ -688,37 +633,6 @@ function Step4Pricing({
             onChange={(v) => update("clientCount", Math.max(0, Number(v) || 0))}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => update("interval", "monthly")}
-            className="rounded-xl p-3 text-left"
-            style={{
-              background: form.interval === "monthly" ? "rgba(244,169,58,0.10)" : "rgba(255,255,255,0.03)",
-              border: `1px solid ${form.interval === "monthly" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
-            }}
-          >
-            <div className="text-xs uppercase tracking-wider text-[var(--hive-text-muted)]">Monthly</div>
-            <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.monthlyCents)}</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => update("interval", "annual")}
-            className="rounded-xl p-3 text-left"
-            style={{
-              background: form.interval === "annual" ? "rgba(244,169,58,0.10)" : "rgba(255,255,255,0.03)",
-              border: `1px solid ${form.interval === "annual" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
-            }}
-          >
-            <div className="text-xs uppercase tracking-wider text-[var(--hive-text-muted)]">Annual · 20% off</div>
-            <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.billedCents)}</div>
-          </button>
-        </div>
-        <p className="text-xs text-[var(--hive-text-muted)]">
-          {formatUsdFromCents(quote.perStaffCents)} per staff
-          {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum applied` : ""}.
-          Training is separate (full program $300 / staff; TNS skips it).
-        </p>
       </div>
       <NavButtons onBack={onBack} onNext={onNext} />
     </>
@@ -735,22 +649,7 @@ function Step6Payment({
   onComplete: () => Promise<void>;
 }) {
   const checkoutFn = useServerFn(createSubscriptionCheckoutFn);
-  const pricingFn = useServerFn(getSignupPricingFn);
   const [busy, setBusy] = useState(false);
-  const [schedule, setSchedule] = useState<"list" | "founding">("founding");
-
-  useEffect(() => {
-    pricingFn()
-      .then((r) => setSchedule(r.schedule))
-      .catch(() => setSchedule("founding"));
-  }, [pricingFn]);
-
-  const quote = quoteHiveSubscription({
-    staffCount: form.staffCount,
-    clientCount: form.clientCount,
-    schedule,
-    interval: form.interval,
-  });
 
   const submit = async () => {
     setBusy(true);
@@ -815,21 +714,11 @@ function Step6Payment({
         </span>
       </div>
 
-      <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4 text-sm" data-testid="pricing-schedule">
-        <div className="text-xs uppercase tracking-wider text-[#f7c172]">
-          {quote.schedule === "founding" ? "Founding" : "List"} · {form.staffCount} staff
-        </div>
-        <div className="mt-1 text-2xl font-bold">
-          {formatUsdFromCents(form.interval === "annual" ? quote.billedCents : quote.monthlyCents)}
-          <span className="text-base font-normal text-[var(--hive-text-muted)]">
-            {form.interval === "annual" ? "/year" : "/mo"}
-          </span>
-        </div>
-        <p className="mt-2 text-xs text-[var(--hive-text-muted)]">
-          {formatUsdFromCents(quote.perStaffCents)} per staff
-          {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum` : ""}.
-          Training is one-time and separate. Enterprise is contact us.
-        </p>
+      <div
+        className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4 text-sm"
+        data-testid="pricing-schedule"
+      >
+        <p className="text-[var(--hive-text)]">{PI_SIGNUP_PRICE_LINE}</p>
       </div>
 
       <NavButtons onBack={onBack} onNext={submit} loading={busy} nextLabel="Pay with Stripe" />

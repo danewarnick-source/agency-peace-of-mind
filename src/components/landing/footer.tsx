@@ -1,33 +1,30 @@
 import { Link } from "@tanstack/react-router";
-import { HiveWordmark } from "@/components/brand/hive-mark";
+import { PiWordmark } from "@/components/pi-landing/pi-mark";
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden border-t border-[var(--hive-border)] bg-[var(--hive-bg)] py-14 text-[var(--hive-text)]">
+    <footer className="relative overflow-hidden border-t border-white/[0.08] bg-[#0b1220] py-14 text-[#f3efe6]">
       <div className="relative mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-start justify-between gap-10 md:flex-row md:items-start">
-          <HiveWordmark to="/" tone="canvas" />
+          <PiWordmark to="/" compact />
 
           <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-sm md:grid-cols-3">
-            <Link to="/pricing" className="text-[var(--hive-text-muted)] transition hover:text-[var(--hive-gold)]">
+            <Link to="/pricing" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Pricing
             </Link>
-            <Link to="/contact" className="text-[var(--hive-text-muted)] transition hover:text-[var(--hive-gold)]">
+            <Link to="/contact" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Contact
             </Link>
-            <Link to="/login" className="text-[var(--hive-text-muted)] transition hover:text-[var(--hive-gold)]">
+            <Link to="/login" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Sign in
             </Link>
-            <Link to="/signup" className="text-[var(--hive-text-muted)] transition hover:text-[var(--hive-gold)]">
+            <Link to="/signup" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Get started
             </Link>
           </div>
-
-          <p className="font-medium text-[var(--hive-gold)]">hivecertify.com</p>
         </div>
-        <div className="mt-12 flex flex-col items-start justify-between gap-2 border-t border-[var(--hive-border)] pt-6 text-xs text-[var(--hive-text-muted)] md:flex-row md:items-center">
-          <p>© {new Date().getFullYear()} Hive. All rights reserved.</p>
-          <p>HIPAA-aligned · Utah DSPD · Community Supports Waiver</p>
+        <div className="mt-12 border-t border-white/[0.08] pt-6 text-xs text-[#f3efe6]/40">
+          <p>© {new Date().getFullYear()} Provider Interface. All rights reserved.</p>
         </div>
       </div>
     </footer>

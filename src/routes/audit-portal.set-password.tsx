@@ -7,7 +7,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/audit-portal/set-password")({
   head: () => ({
     meta: [
-      { title: "Set password — HIVE State Audit Portal" },
+      { title: "Set password — Provider Interface State Audit Portal" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),

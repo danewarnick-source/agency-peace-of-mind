@@ -29,7 +29,7 @@ const searchSchema = z.object({ connected: z.coerce.number().optional() });
 
 export const Route = createFileRoute("/dashboard/settings/gmail")({
   validateSearch: (s) => searchSchema.parse(s),
-  head: () => ({ meta: [{ title: "Gmail referral ingestion — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Gmail referral ingestion — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="manage_referrals">
       <GmailSettingsPage />

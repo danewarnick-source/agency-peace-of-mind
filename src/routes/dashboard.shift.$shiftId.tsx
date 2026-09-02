@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/dashboard/shift/$shiftId")({
-  head: () => ({ meta: [{ title: "Shift Overview — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Shift Overview — Provider Interface" }] }),
   component: ShiftOverviewPage,
 });
 

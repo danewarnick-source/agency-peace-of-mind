@@ -8,7 +8,7 @@
  */
 
 export const LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE =
-  "Complete Hive Launchpad before clocking in. Open Hive Training to finish.";
+  "Complete Launchpad before clocking in. Open Training to finish.";
 
 export const LAUNCHPAD_ASSIGN_BLOCKED_MESSAGE =
   "This staff member has not completed Launchpad and cannot be assigned as a sole worker.";

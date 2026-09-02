@@ -23,7 +23,7 @@ import { setRolePermission, resetRoleToDefaults } from "@/lib/permissions.functi
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/permissions")({
-  head: () => ({ meta: [{ title: "Permissions — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Permissions — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="manage_permissions">
       <PermissionsPage />

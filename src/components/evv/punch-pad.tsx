@@ -2163,7 +2163,7 @@ export function PunchPad({
                 to="/dashboard/hive-training"
                 className="inline-flex items-center rounded-md bg-[#1A2B47] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#1A2B47]/90"
               >
-                Open Hive Training
+                Open Training
               </Link>
               <Link
                 to="/dashboard/my-obligations"

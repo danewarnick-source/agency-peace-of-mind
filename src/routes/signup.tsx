@@ -10,7 +10,7 @@ import {
   Loader2,
   ShieldCheck,
 } from "lucide-react";
-import { HiveWordmark } from "@/components/brand/hive-mark";
+import { PiWordmark } from "@/components/pi-landing/pi-mark";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,8 +30,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
-      { title: "Get started — HIVE" },
-      { name: "description", content: "Create your Hive account and start running your DSPD agency from one place." },
+      { title: "Get started — Provider Interface" },
+      { name: "description", content: "Create your Provider Interface account and start running your agency from one place." },
     ],
   }),
   component: SignupPage,
@@ -39,10 +39,10 @@ export const Route = createFileRoute("/signup")({
 
 /* ──────────────────────────── design tokens ──────────────────────────── */
 
-const JAKARTA = '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif';
-const NAVY_BG = "var(--hive-canvas)";
-const AMBER = "var(--hive-gold)";
-const AMBER_GRAD = "var(--hive-gold)";
+const JAKARTA = '"Inter", ui-sans-serif, system-ui, sans-serif';
+const NAVY_BG = "#0b1220";
+const AMBER = "#f3efe6";
+const AMBER_GRAD = "#f3efe6";
 
 const inputStyle: React.CSSProperties = {
   background: "var(--hive-surface)",
@@ -88,21 +88,8 @@ const initialForm: FormState = {
 
 /* ──────────────────────────── shell ──────────────────────────── */
 
-function HexPattern() {
-  return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.08]">
-      <defs>
-        <pattern id="hex" width="80" height="92" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
-          <polygon points="40,2 78,24 78,68 40,90 2,68 2,24" fill="none" stroke="var(--hive-gold)" strokeWidth="1" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#hex)" />
-    </svg>
-  );
-}
-
 function Brand() {
-  return <HiveWordmark to="/" tone="canvas" />;
+  return <PiWordmark to="/" />;
 }
 
 function Stepper({ step }: { step: number }) {
@@ -189,8 +176,8 @@ function NavButtons({
         type="button"
         onClick={onNext}
         disabled={nextDisabled || loading}
-        className="group h-11 min-w-[160px] border-0 text-[#1a1208] shadow-lg shadow-amber-900/20 hover:brightness-105"
-        style={{ fontFamily: JAKARTA, fontWeight: 700, backgroundImage: AMBER_GRAD }}
+        className="group h-11 min-w-[160px] border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827]"
+        style={{ fontFamily: JAKARTA, fontWeight: 700 }}
       >
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -219,20 +206,19 @@ function SignupPage() {
   const goBack = () => setStep((s) => Math.max(0, s - 1));
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-[var(--hive-text)]" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
-      <HexPattern />
+    <div className="relative min-h-screen overflow-hidden text-[#f3efe6]" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
       <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 md:py-12">
         <header className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
-          <Link to="/login" className="text-sm text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]">
-            Already have an account? <span className="font-medium text-[var(--hive-gold)]">Sign in</span>
+          <Link to="/login" className="text-sm text-[#f3efe6]/60 hover:text-[#f3efe6]">
+            Already have an account? <span className="font-medium text-[#f3efe6]">Sign in</span>
           </Link>
         </header>
 
         <main className="mx-auto w-full max-w-2xl flex-1">
           <Stepper step={step} />
           <div
-            className="rounded-2xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-6 shadow-[var(--shadow-card)] sm:p-8"
+            className="rounded-2xl border border-white/[0.10] bg-[#f3efe6] p-6 text-[#0b1220] shadow-[0_24px_60px_-30px_rgba(0,0,0,0.55)] sm:p-8"
           >
             {step === 0 && (
               <Step1Account
@@ -552,7 +538,7 @@ function Step3Business({
 
   return (
     <>
-      <Header title="Tell us about your business" subtitle="This becomes your workspace name across Hive." />
+      <Header title="Tell us about your business" subtitle="This becomes your workspace name across Provider Interface." />
       <div className="grid gap-4">
         <Field label="Agency or company name">
           <TextInput value={form.agencyName} onChange={(v) => update("agencyName", v)} placeholder="True North Supports" />
@@ -581,10 +567,10 @@ function Step3Business({
           ) : null}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="State" hint="Hive is currently Utah DSPD only.">
+          <Field label="State" hint="Utah for now. You can add more later.">
             <TextInput value="Utah" onChange={() => {}} disabled />
           </Field>
-          <Field label="DSPD provider number" hint="Optional — you can add this later in settings.">
+          <Field label="Provider number" hint="Optional — you can add this later in settings.">
             <TextInput value={form.providerNumber} onChange={(v) => update("providerNumber", v)} placeholder="" />
           </Field>
         </div>
@@ -664,7 +650,7 @@ function Step4Pricing({
     <>
       <Header
         title="Staff & billing"
-        subtitle="Hive is billed per active staff. True North Supports is never charged here. Enterprise custom work is contact-us — no public dollar amount."
+        subtitle="Billed per active staff. True North Supports is never charged here. Enterprise custom work is contact-us — no public dollar amount."
       />
       {schedule === "founding" && (
         <div
@@ -790,7 +776,7 @@ function Step6Payment({
         },
       });
       if (r.exempt) {
-        toast.success("Welcome to Hive — this company is comped.");
+        toast.success("Welcome to Provider Interface — this company is comped.");
         await onComplete();
         return;
       }
@@ -810,7 +796,7 @@ function Step6Payment({
   return (
     <>
       <Header
-        title="Pay to activate Hive"
+        title="Pay to activate Provider Interface"
         subtitle="You will be sent to Stripe Checkout. The dashboard stays locked until payment succeeds."
       />
 

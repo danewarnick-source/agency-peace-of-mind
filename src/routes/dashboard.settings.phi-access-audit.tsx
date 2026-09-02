@@ -30,7 +30,7 @@ import { listPhiAccessAudit } from "@/lib/phi-access-audit.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard/settings/phi-access-audit")({
-  head: () => ({ meta: [{ title: "PHI access log — HIVE" }] }),
+  head: () => ({ meta: [{ title: "PHI access log — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <PhiAccessAuditPage />

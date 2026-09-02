@@ -42,7 +42,7 @@ export const ADDON_CATALOG: Record<AddonId, AddonDef> = {
   nectar_infusion: {
     id: "nectar_infusion",
     name: "NECTAR Infusion",
-    blurb: "Guided Mode, plain-language answers, and NECTAR-accelerated controls across HIVE.",
+    blurb: "Guided Mode, plain-language answers, and NECTAR-accelerated controls across Provider Interface.",
   },
   internal_audit: {
     id: "internal_audit",
@@ -52,17 +52,17 @@ export const ADDON_CATALOG: Record<AddonId, AddonDef> = {
   requirements_engine: {
     id: "requirements_engine",
     name: "Requirements Engine",
-    blurb: "NECTAR extracts requirements from authoritative sources; HIVE Exec approves.",
+    blurb: "NECTAR extracts requirements from authoritative sources; Exec approves.",
   },
   priority_support: {
     id: "priority_support",
     name: "Priority Support",
-    blurb: "Faster SLAs in the HIVE Support Queue.",
+    blurb: "Faster SLAs in the Support Queue.",
   },
   hive_training: {
     id: "hive_training",
-    name: "HIVE Training",
-    blurb: "DSPD-aligned course library with competency sign-off and verifiable certificates.",
+    name: "Training",
+    blurb: "Course library with competency sign-off and verifiable certificates.",
   },
 };
 
@@ -70,7 +70,7 @@ export const TIER_CATALOG: TierDef[] = [
   {
     id: "starter",
     name: "Starter",
-    tagline: "Baseline HIVE — daily ops, documentation, billing.",
+    tagline: "Baseline — daily ops, documentation, and time.",
     monthlyPriceCents: 0,
     priceKind: "included",
     addons: [],
@@ -78,7 +78,7 @@ export const TIER_CATALOG: TierDef[] = [
   },
   {
     id: "pro",
-    name: "Hive",
+    name: "Provider Interface",
     tagline: "Full platform, billed per active staff (list or founding).",
     monthlyPriceCents: null,
     priceKind: "per_staff",
@@ -86,7 +86,7 @@ export const TIER_CATALOG: TierDef[] = [
     highlights: [
       "Everything in Starter",
       "NECTAR Infusion",
-      "HIVE Training hub (courses billed per staff)",
+      "Training hub (courses billed per staff)",
       "Volume rates as client count grows",
     ],
   },
@@ -98,7 +98,7 @@ export const TIER_CATALOG: TierDef[] = [
     priceKind: "contact",
     addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"],
     highlights: [
-      "Everything in Hive",
+      "Everything in Provider Interface",
       "Internal Audit / QA",
       "Requirements Engine",
       "Priority Support",

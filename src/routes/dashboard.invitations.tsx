@@ -20,7 +20,7 @@ import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/invitations")({
-  head: () => ({ meta: [{ title: "Invitations — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Invitations — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="invite_staff">
       <InvitationsPage />

@@ -9,7 +9,7 @@ import { AlertTriangle, Brain, ChevronRight } from "lucide-react";
 import { BC_CONFIG, type BcCode } from "@/lib/behavior-support";
 
 export const Route = createFileRoute("/dashboard/behaviorist")({
-  head: () => ({ meta: [{ title: "Behaviorist Caseload — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Behaviorist Caseload — Provider Interface" }] }),
   component: BehavioristCaseload,
 });
 

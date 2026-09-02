@@ -31,7 +31,7 @@ import {
  * Contractors so there is one source of truth.
  */
 export const Route = createFileRoute("/dashboard/financial/employees")({
-  head: () => ({ meta: [{ title: "Employees — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Employees — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_financial_employees">
       <EmployeesPage />

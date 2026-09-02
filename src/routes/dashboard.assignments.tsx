@@ -22,7 +22,7 @@ import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.f
 import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
-  head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Caseloads — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_staff_records">
       <AssignmentsPage />

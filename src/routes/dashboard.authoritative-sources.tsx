@@ -5,7 +5,7 @@ import { FeatureGate } from "@/components/upgrade-gate";
 export const Route = createFileRoute("/dashboard/authoritative-sources")({
   head: () => ({
     meta: [
-      { title: "Authoritative Sources — HIVE" },
+      { title: "Authoritative Sources — Provider Interface" },
       {
         name: "description",
         content:

@@ -15,7 +15,7 @@ import { listMyPendingHistoricalTimesheets } from "@/lib/historical-timesheet-co
 import { listMyPendingHistoricalDailyNotes } from "@/lib/historical-daily-note-attestation.functions";
 
 export const Route = createFileRoute("/dashboard/my-historical-records")({
-  head: () => ({ meta: [{ title: "Historical records — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Historical records — Provider Interface" }] }),
   component: MyHistoricalRecordsPage,
 });
 

@@ -10,7 +10,7 @@ import { ALL_PERMISSIONS, PERMISSION_LABEL, type Permission } from "@/lib/rbac";
 import { requestPermission } from "@/lib/permissions.functions";
 
 export const Route = createFileRoute("/unauthorized")({
-  head: () => ({ meta: [{ title: "Unauthorized — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Unauthorized — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { perm?: Permission; page?: string } => {
     const out: { perm?: Permission; page?: string } = {};
     if (typeof s.perm === "string" && (ALL_PERMISSIONS as readonly string[]).includes(s.perm)) {

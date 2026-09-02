@@ -112,7 +112,7 @@ function HiveTrainingHub() {
   const classRosterLocked = !featureOn
     ? <FeatureLockedRoute featureKey="hive_training" />
     : !hasAddon("hive_training")
-      ? <FeatureLocked featureName="HIVE Training" />
+      ? <FeatureLocked featureName="Training" />
       : null;
 
   return (
@@ -123,7 +123,7 @@ function HiveTrainingHub() {
         </div>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">HIVE Training</h1>
+            <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">Training</h1>
             {realIsAdmin && !isAdmin && (
               <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground text-xs px-2 py-0.5">
                 Previewing as staff
@@ -386,10 +386,9 @@ function ReadinessBanner({
           <div>
             <div className="text-base font-semibold">Your team is current. Keep it that way.</div>
             <p className="text-sm text-white/80 mt-1 max-w-2xl">
-              Built by DSPD providers, for DSPD providers. Every course maps to a named DSPD
-              requirement — CPR/First Aid, Mandt de-escalation, and DSPD provider orientation —
-              with in-app competency sign-off and a verifiable certificate for state audit. We
-              track expirations so nothing lapses on your watch.
+              CPR/First Aid, Mandt, and the 30-day orientation live here — with sign-off
+              and a certificate when each one is done. We track expirations so nothing
+              lapses on your watch.
             </p>
           </div>
         </div>
@@ -427,7 +426,7 @@ function LaunchpadRoster({
       <div>
         <h2 className="text-lg font-semibold text-[#1A2B47]">Launchpad clock-in gate</h2>
         <p className="text-sm text-muted-foreground">
-          Staff must pass Hive Launchpad before the punch pad will clock them in.
+          Staff must pass Launchpad before the punch pad will clock them in.
           This list reads the live pass flag — it is not a test override.
         </p>
       </div>
@@ -950,23 +949,23 @@ function Storefront({
       {
         type: "package" as const,
         title: "Training package",
-        blurb: "CPR, Mandt, and the in-Hive 30-day course for the same roster. Saves $75 versus buying each seat.",
+        blurb: "CPR, Mandt, and the in-platform 30-day course for the same roster. Saves $75 versus buying each seat.",
         featured: true,
       },
       {
         type: "cpr_first_aid" as const,
         title: "CPR / First Aid",
-        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+        blurb: "External class. After pay, Exec gets one alert. Staff see an obligation until you upload the card.",
       },
       {
         type: "mandt" as const,
         title: "Mandt",
-        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+        blurb: "External class. After pay, Exec gets one alert. Staff see an obligation until you upload the card.",
       },
       {
         type: "thirty_day" as const,
         title: "30-day orientation",
-        blurb: "In-Hive course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
+        blurb: "In-platform course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
       },
     ] as const
   ).map((card) => {
@@ -1331,7 +1330,7 @@ function AutoRenewCard({ orgId, catalog }: { orgId: string; catalog: CatalogRow[
           <div>
             <h2 className="text-lg font-semibold text-[#1A2B47]">Auto-renew expiring trainings</h2>
             <p className="text-sm text-muted-foreground max-w-xl">
-              Set it once. HIVE re-purchases and re-assigns seats before certificates expire — no gap, no chase, no scramble.
+              Set it once. The office re-purchases and re-assigns seats before certificates expire — no gap, no chase, no scramble.
             </p>
           </div>
         </div>

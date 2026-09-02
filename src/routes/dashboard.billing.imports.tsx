@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Upload } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/billing/imports")({
-  head: () => ({ meta: [{ title: "520 Imports — HIVE" }] }),
+  head: () => ({ meta: [{ title: "520 Imports — Provider Interface" }] }),
   component: ImportsPage,
 });
 

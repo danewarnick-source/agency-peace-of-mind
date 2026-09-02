@@ -34,7 +34,7 @@ import {
 } from "@/lib/financial-distributions.functions";
 
 export const Route = createFileRoute("/dashboard/financial/distributions")({
-  head: () => ({ meta: [{ title: "Distributions — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Distributions — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin"]}>
       <DistributionsPage />

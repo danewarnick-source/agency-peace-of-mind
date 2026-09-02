@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/dashboard/hive-exec/approvals")({
-  head: () => ({ meta: [{ title: "Extraction Approvals — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Extraction Approvals — Provider Interface" }] }),
   component: ApprovalsPage,
 });
 

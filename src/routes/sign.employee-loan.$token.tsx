@@ -16,7 +16,7 @@ import {
 } from "@/lib/employee-loans.functions";
 
 export const Route = createFileRoute("/sign/employee-loan/$token")({
-  head: () => ({ meta: [{ title: "Sign loan agreement — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Sign loan agreement — Provider Interface" }] }),
   component: SignEmployeeLoanPage,
 });
 

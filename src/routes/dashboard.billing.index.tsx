@@ -10,7 +10,7 @@ import { isDailyServiceCode } from "@/lib/service-billing";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/dashboard/billing/")({
-  head: () => ({ meta: [{ title: "Billing Overview — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Billing Overview — Provider Interface" }] }),
   component: BillingOverviewPage,
 });
 

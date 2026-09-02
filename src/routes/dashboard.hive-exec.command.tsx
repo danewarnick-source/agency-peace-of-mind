@@ -3,7 +3,7 @@ import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import { CommandCenterLanding } from "@/components/hive-exec/command/command-landing";
 
 export const Route = createFileRoute("/dashboard/hive-exec/command")({
-  head: () => ({ meta: [{ title: "Executive Command Center — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Executive Command Center — Provider Interface" }] }),
   component: () => (
     <RequireHiveExecutive>
       <CommandCenterLanding />

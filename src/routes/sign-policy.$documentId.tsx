@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { trackAnnualPolicyRenewal } from "@/lib/policy-signatures.functions";
 
 export const Route = createFileRoute("/sign-policy/$documentId")({
-  head: () => ({ meta: [{ title: "Policy acknowledgment required — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Policy acknowledgment required — Provider Interface" }] }),
   component: SignPolicyGate,
 });
 
@@ -233,7 +233,7 @@ function SignPolicyGate() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-6 text-center">
         <p className="text-sm text-muted-foreground">This policy is no longer available.</p>
-        <Button onClick={() => navigate({ to: "/dashboard" })}>Continue to HIVE</Button>
+        <Button onClick={() => navigate({ to: "/dashboard" })}>Continue</Button>
       </div>
     );
   }

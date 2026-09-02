@@ -18,7 +18,7 @@ const search = z.object({
 });
 
 export const Route = createFileRoute("/dashboard/hub/documentation")({
-  head: () => ({ meta: [{ title: "Documentation — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Documentation — Provider Interface" }] }),
   validateSearch: (s) => search.parse(s),
 
   component: DocumentationHub,

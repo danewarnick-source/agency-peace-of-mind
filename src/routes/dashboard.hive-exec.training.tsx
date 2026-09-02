@@ -28,7 +28,7 @@ import {
 } from "@/lib/training-enrollments.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/training")({
-  head: () => ({ meta: [{ title: "HIVE — Training Fulfillment" }] }),
+  head: () => ({ meta: [{ title: "Training Fulfillment — Provider Interface Exec" }] }),
   component: () => (
     <RequireHiveExecutive>
       <TrainingFulfillmentPage />

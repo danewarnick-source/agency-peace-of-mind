@@ -18,7 +18,7 @@ import { getRhsCodes, getRhsClients, getRhsDays } from "@/lib/financial-rhs.func
  * rate from client_billing_codes.rate_per_unit (service_code='RHS').
  */
 export const Route = createFileRoute("/dashboard/financial/rhs")({
-  head: () => ({ meta: [{ title: "RHS — HIVE" }] }),
+  head: () => ({ meta: [{ title: "RHS — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_financial_rhs">
       <RhsPage />

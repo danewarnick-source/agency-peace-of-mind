@@ -10,7 +10,7 @@ import { SteveDockPanel } from "@/components/hive-exec/command/steve-panel";
 import { OpenCompanyViews } from "@/components/hive-exec/open-company-views";
 
 export const Route = createFileRoute("/dashboard/hive-exec")({
-  head: () => ({ meta: [{ title: "Executive Command Center — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Executive Command Center — Provider Interface" }] }),
   component: () => (
     <RequireHiveExecutive>
       <ExecCommandCenterLayout />

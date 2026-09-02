@@ -45,7 +45,7 @@ import { HhsInfoTooltip } from "@/components/scheduling/hhs-info-tooltip";
 import { HhsExplainerBanner } from "@/components/scheduling/hhs-explainer-banner";
 
 export const Route = createFileRoute("/dashboard/schedule")({
-  head: () => ({ meta: [{ title: "My Schedule — HIVE" }] }),
+  head: () => ({ meta: [{ title: "My Schedule — Provider Interface" }] }),
   component: SchedulePage,
 });
 

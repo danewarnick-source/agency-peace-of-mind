@@ -21,12 +21,12 @@ import {
 export const Route = createFileRoute("/dashboard/employees/hire-dates")({
   head: () => ({
     meta: [
-      { title: "Set staff hire dates — HIVE" },
+      { title: "Set staff hire dates — Provider Interface" },
       {
         name: "description",
         content: "Review and bulk-update staff hire dates so compliance due dates calculate correctly.",
       },
-      { property: "og:title", content: "Set staff hire dates — HIVE" },
+      { property: "og:title", content: "Set staff hire dates — Provider Interface" },
       {
         property: "og:description",
         content: "Review and bulk-update staff hire dates so compliance due dates calculate correctly.",

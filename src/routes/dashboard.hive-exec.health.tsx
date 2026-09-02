@@ -7,7 +7,7 @@ import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import { listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/health")({
-  head: () => ({ meta: [{ title: "Account Health — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Account Health — Provider Interface Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
       <AccountHealth />

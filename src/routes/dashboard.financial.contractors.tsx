@@ -22,7 +22,7 @@ import {
 } from "@/lib/financial-contractors.functions";
 
 export const Route = createFileRoute("/dashboard/financial/contractors")({
-  head: () => ({ meta: [{ title: "Contractors — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Contractors — Provider Interface" }] }),
   component: ContractorsPage,
 });
 

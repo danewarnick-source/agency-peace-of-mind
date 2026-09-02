@@ -40,7 +40,7 @@ function shell({ preheader, heading, bodyHtml, ctaLabel, ctaHref, footerNote }: 
       <tr><td style="background:${NAVY};padding:24px 32px;">
         <table role="presentation" width="100%"><tr>
           <td style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">
-            <span style="color:${AMBER};">●</span> HIVE
+            Provider Interface
           </td>
           <td align="right" style="font-size:12px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;">Billing</td>
         </tr></table>
@@ -54,7 +54,7 @@ function shell({ preheader, heading, bodyHtml, ctaLabel, ctaHref, footerNote }: 
       ${foot}
       <tr><td style="background:${BG};padding:20px 32px;border-top:1px solid ${BORDER};font-size:12px;color:${MUTED};">
         Need help? Email <a href="mailto:support@hive.app" style="color:${NAVY};text-decoration:underline;">support@hive.app</a>. <br>
-        © Hive. Compliance platform for DSPD providers.
+        © Provider Interface.
       </td></tr>
     </table>
   </td></tr>
@@ -63,7 +63,7 @@ function shell({ preheader, heading, bodyHtml, ctaLabel, ctaHref, footerNote }: 
 }
 
 function plain(parts: string[]): string {
-  return parts.filter(Boolean).join("\n\n") + "\n\n— Hive\nsupport@hive.app";
+  return parts.filter(Boolean).join("\n\n") + "\n\n— Provider Interface\nsupport@hive.app";
 }
 
 function money(cents?: number | null): string {
@@ -114,7 +114,7 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
         ? `<p style="margin:0 0 16px;"><strong>Reason from card issuer:</strong> ${vars.reason}</p>`
         : "";
       const body = `
-        <p style="margin:0 0 16px;">We weren't able to process your most recent Hive payment of <strong>${money(vars.amountCents)}</strong>.</p>
+        <p style="margin:0 0 16px;">We weren't able to process your most recent payment of <strong>${money(vars.amountCents)}</strong>.</p>
         ${reasonLine}
         <p style="margin:0 0 16px;">You have <strong>30 days</strong> from today to update your payment method before your account is locked and your staff lose access.</p>
         <p style="margin:0;">Update your card now to keep things running smoothly.</p>`;
@@ -140,20 +140,20 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
       const days = vars.daysRemaining ?? 23;
       const subject = `Reminder — update your payment method (${days} days remaining)`;
       const body = `
-        <p style="margin:0 0 16px;">This is a second notice that your most recent Hive payment of <strong>${money(vars.amountCents)}</strong> hasn't gone through.</p>
+        <p style="margin:0 0 16px;">This is a second notice that your most recent payment of <strong>${money(vars.amountCents)}</strong> hasn't gone through.</p>
         <p style="margin:0 0 16px;font-size:18px;"><strong style="color:${NAVY};">${days} days</strong> remaining until your account is locked.</p>
         <p style="margin:0;">Updating your card takes about a minute and restores billing immediately.</p>`;
       return {
         subject,
         html: shell({
-          preheader: `${days} days until your Hive account is locked.`,
+          preheader: `${days} days until your Provider Interface account is locked.`,
           heading: `${days} days to update your payment method`,
           bodyHtml: body,
           ctaLabel: "Update payment method",
           ctaHref: link,
         }),
         text: plain([
-          `Reminder: ${days} days until your Hive account is locked.`,
+          `Reminder: ${days} days until your Provider Interface account is locked.`,
           `Failed amount: ${money(vars.amountCents)}.`,
           `Update: ${link}`,
         ]),
@@ -162,10 +162,10 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
 
     case "payment_failed_day21": {
       const days = vars.daysRemaining ?? 9;
-      const subject = `Urgent — your Hive account locks in ${days} days`;
+      const subject = `Urgent — your Provider Interface account locks in ${days} days`;
       const body = `
         <p style="margin:0 0 16px;color:#B91C1C;"><strong>This is an urgent notice.</strong></p>
-        <p style="margin:0 0 16px;">Your Hive account will be <strong>locked in ${days} days</strong>. After 30 days of non-payment, every staff member at ${agency} will lose access to the platform — schedules, eMAR, daily logs, and reports will all be unavailable until billing is restored.</p>
+        <p style="margin:0 0 16px;">Your Provider Interface account will be <strong>locked in ${days} days</strong>. After 30 days of non-payment, every staff member at ${agency} will lose access to the platform — schedules, eMAR, daily logs, and reports will all be unavailable until billing is restored.</p>
         <p style="margin:0 0 16px;">To prevent disruption to your team and clients, please update your payment method today.</p>
         <p style="margin:0;color:${MUTED};font-size:13px;">If you're having trouble updating, reply to this email or contact <a href="mailto:support@hive.app" style="color:${NAVY};">support@hive.app</a>.</p>`;
       return {
@@ -178,7 +178,7 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
           ctaHref: link,
         }),
         text: plain([
-          `URGENT: ${agency}'s Hive account locks in ${days} days.`,
+          `URGENT: ${agency}'s Provider Interface account locks in ${days} days.`,
           `After 30 days of non-payment, all staff lose access.`,
           `Update: ${link}`,
           `Support: support@hive.app`,
@@ -187,23 +187,23 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
     }
 
     case "account_locked": {
-      const subject = "Your Hive account has been locked";
+      const subject = "Your Provider Interface account has been locked";
       const body = `
-        <p style="margin:0 0 16px;">Your Hive account for <strong>${agency}</strong> has been locked due to 30+ days of unpaid balance.</p>
+        <p style="margin:0 0 16px;">Your Provider Interface account for <strong>${agency}</strong> has been locked due to 30+ days of unpaid balance.</p>
         <p style="margin:0 0 16px;">All staff have been locked out of the platform.</p>
         <p style="margin:0 0 16px;"><strong>To restore access:</strong> update your payment method. As soon as payment is processed, the account unlocks immediately and all staff regain access.</p>`;
       return {
         subject,
         html: shell({
           preheader: "Account locked — update payment to restore access.",
-          heading: "Your Hive account has been locked",
+          heading: "Your Provider Interface account has been locked",
           bodyHtml: body,
           ctaLabel: "Restore access",
           ctaHref: link,
           footerNote: `Need to talk to a human? Email <a href="mailto:support@hive.app" style="color:${NAVY};">support@hive.app</a> and we'll get you back online.`,
         }),
         text: plain([
-          `Your Hive account for ${agency} has been locked due to 30+ days of unpaid balance.`,
+          `Your Provider Interface account for ${agency} has been locked due to 30+ days of unpaid balance.`,
           `All staff are now locked out.`,
           `Restore access by updating your payment method. Access returns immediately on success.`,
           `Update: ${link}`,
@@ -212,20 +212,20 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
     }
 
     case "account_locked_staff": {
-      const subject = "Your Hive access has been suspended";
+      const subject = "Your access has been suspended";
       const body = `
-        <p style="margin:0 0 16px;">Your agency's Hive account has a billing issue, so platform access is temporarily suspended for everyone at <strong>${agency}</strong>.</p>
+        <p style="margin:0 0 16px;">Your agency's Provider Interface account has a billing issue, so platform access is temporarily suspended for everyone at <strong>${agency}</strong>.</p>
         <p style="margin:0 0 16px;"><strong>What to do:</strong> Please contact your agency administrator. This is an admin-only action — there's nothing you can do from your end to restore access.</p>
         <p style="margin:0;color:${MUTED};font-size:13px;">As soon as your administrator resolves the billing issue, your access will be restored automatically.</p>`;
       return {
         subject,
         html: shell({
           preheader: "Contact your agency administrator to restore access.",
-          heading: "Your Hive access is suspended",
+          heading: "Your access is suspended",
           bodyHtml: body,
         }),
         text: plain([
-          `Your agency's Hive account has a billing issue.`,
+          `Your agency's Provider Interface account has a billing issue.`,
           `Please contact your agency administrator — only an admin can resolve this.`,
           `Access returns automatically once billing is restored.`,
         ]),
@@ -271,12 +271,12 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
     }
 
     case "account_restored": {
-      const subject = "Payment successful — your Hive account is fully restored";
+      const subject = "Payment successful — your Provider Interface account is fully restored";
       const receipt = vars.receiptId ? `<p style="margin:0 0 8px;color:${MUTED};font-size:13px;">Receipt: ${vars.receiptId}</p>` : "";
       const body = `
         <p style="margin:0 0 16px;">Great news — your payment of <strong>${money(vars.amountCents)}</strong> went through.</p>
-        <p style="margin:0 0 16px;">${agency}'s Hive account is fully restored and all staff have access again.</p>
-        <p style="margin:0 0 16px;color:${MUTED};font-size:13px;">Thanks for keeping your team running on Hive.</p>
+        <p style="margin:0 0 16px;">${agency}'s Provider Interface account is fully restored and all staff have access again.</p>
+        <p style="margin:0 0 16px;color:${MUTED};font-size:13px;">Thanks for keeping your team running.</p>
         ${receipt}`;
       return {
         subject,
@@ -289,7 +289,7 @@ export function renderBillingEmail(kind: BillingEmailKind, vars: BillingEmailVar
         }),
         text: plain([
           `Payment of ${money(vars.amountCents)} processed.`,
-          `${agency}'s Hive account is fully restored — all staff have access.`,
+          `${agency}'s Provider Interface account is fully restored — all staff have access.`,
           vars.receiptId ? `Receipt: ${vars.receiptId}` : "",
         ]),
       };

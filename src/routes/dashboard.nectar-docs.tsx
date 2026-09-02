@@ -5,7 +5,7 @@ import { FeatureGate } from "@/components/upgrade-gate";
 export const Route = createFileRoute("/dashboard/nectar-docs")({
   head: () => ({
     meta: [
-      { title: "Company Docs — HIVE" },
+      { title: "Company Docs — Provider Interface" },
       {
         name: "description",
         content:

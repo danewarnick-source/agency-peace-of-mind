@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/my-obligations_/course/$instanceId")({
-  head: () => ({ meta: [{ title: "Staff training — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Staff training — Provider Interface" }] }),
   component: InHiveCoursePage,
 });
 
@@ -61,7 +61,7 @@ function InHiveCoursePage() {
     return (
       <div className="space-y-3 p-4">
         <p className="text-sm text-muted-foreground">
-          This obligation does not open an in-Hive course.
+          This obligation does not open an in-platform course.
         </p>
         <Link to="/dashboard/my-obligations" className="text-sm font-medium text-[var(--hive-ink)] hover:underline">
           Back to My Obligations

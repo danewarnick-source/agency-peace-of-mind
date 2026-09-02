@@ -24,7 +24,7 @@ import { StaffGroupsPanel } from "@/components/settings/staff-groups-panel";
 import { ScopeAssignmentsPanel } from "@/components/settings/scope-assignments-panel";
 
 export const Route = createFileRoute("/dashboard/settings/team-access")({
-  head: () => ({ meta: [{ title: "Team access — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Team access — Provider Interface" }] }),
   component: TeamAccessPage,
 });
 

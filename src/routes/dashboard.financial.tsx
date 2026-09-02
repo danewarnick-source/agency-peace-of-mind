@@ -24,7 +24,7 @@ function FinancialError({ error }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createFileRoute("/dashboard/financial")({
-  head: () => ({ meta: [{ title: "Financial — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Financial — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <FinancialLayout />

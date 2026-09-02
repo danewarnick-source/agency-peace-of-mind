@@ -18,7 +18,7 @@ import {
 } from "@/lib/financial-gross.functions";
 
 export const Route = createFileRoute("/dashboard/financial/gross")({
-  head: () => ({ meta: [{ title: "Gross — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Gross — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_financial_tns_gross">
       <GrossPage />

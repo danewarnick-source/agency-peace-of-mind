@@ -56,8 +56,8 @@ const ENTERPRISE_FEATURES = [
 const FULL_PROGRAM = [
   "CPR & First Aid",
   "Mandt behavioral intervention",
-  "30-day DSPD required training",
-  "Hands-on Hive platform walkthrough",
+  "30-day orientation",
+  "Hands-on platform walkthrough",
   "Competency verification & sign-off",
   "12 hrs custom ongoing training content / year",
 ];

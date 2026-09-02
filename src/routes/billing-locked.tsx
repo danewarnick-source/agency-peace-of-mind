@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Hexagon, Loader2, Mail } from "lucide-react";
+import { CreditCard, Loader2, Mail } from "lucide-react";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/billing-locked")({
-  head: () => ({ meta: [{ title: "Account locked — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
   component: BillingLockedPage,
 });
 
@@ -188,17 +189,17 @@ function BillingLockedPage() {
     <div className="min-h-screen bg-[#0F1A2E] px-4 py-12 text-white" data-testid="billing-paywall">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         <div className="mb-6 flex items-center gap-2">
-          <Hexagon className="h-7 w-7 text-[#F5A524]" fill="#F5A524" />
-          <span className="text-xl font-extrabold tracking-tight">HIVE</span>
+          <PiMark className="h-7 w-7 text-[#f3efe6]" />
+          <span className="text-xl font-semibold tracking-tight">Provider Interface</span>
         </div>
 
         <h1 className="text-2xl font-bold sm:text-3xl">
-          {unpaid ? "Finish payment to use Hive" : "Your agency's account is currently locked"}
+          {unpaid ? "Finish payment to use Provider Interface" : "Your agency's account is currently locked"}
         </h1>
         <p className="mt-3 text-white/70">
           {unpaid
-            ? `${state.agencyName} needs an active Hive subscription before anyone can use the dashboard.`
-            : `${state.agencyName}'s Hive account is locked until billing is current.`}
+            ? `${state.agencyName} needs an active Provider Interface subscription before anyone can use the dashboard.`
+            : `${state.agencyName}'s account is locked until billing is current.`}
         </p>
 
         {state.testMode && (
@@ -216,7 +217,7 @@ function BillingLockedPage() {
             {!state.paymentsConfigured && (
               <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
                 {state.paymentsMessage ??
-                  "Payments are not set up yet. A Hive Executive needs to add the Stripe test keys."}
+                  "Payments are not set up yet. An Exec needs to add the Stripe test keys."}
               </div>
             )}
             <div

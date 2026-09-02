@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 
 export const Route = createFileRoute("/dashboard/my-time-corrections")({
-  head: () => ({ meta: [{ title: "My time corrections — HIVE" }] }),
+  head: () => ({ meta: [{ title: "My time corrections — Provider Interface" }] }),
   component: MyTimeCorrectionsPage,
 });
 

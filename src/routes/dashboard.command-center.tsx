@@ -35,7 +35,7 @@ const cmdSearch = z.object({
 });
 
 export const Route = createFileRoute("/dashboard/command-center")({
-  head: () => ({ meta: [{ title: "Agency Command Center — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Agency Command Center — Provider Interface" }] }),
   validateSearch: cmdSearch,
   component: CommandCenter,
 });

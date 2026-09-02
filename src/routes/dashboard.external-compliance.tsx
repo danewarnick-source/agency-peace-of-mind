@@ -3,7 +3,7 @@ import { ExternalCompliancePage } from "@/components/pages/external-compliance-p
 import { FeatureGate } from "@/components/upgrade-gate";
 
 export const Route = createFileRoute("/dashboard/external-compliance")({
-  head: () => ({ meta: [{ title: "External Compliance — HIVE" }] }),
+  head: () => ({ meta: [{ title: "External Compliance — Provider Interface" }] }),
   component: () => (
     <FeatureGate featureKey="nectar">
       <ExternalCompliancePage />

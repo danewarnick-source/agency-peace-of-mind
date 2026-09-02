@@ -24,7 +24,7 @@ import {
 } from "@/lib/financial-totals.functions";
 
 export const Route = createFileRoute("/dashboard/financial/totals")({
-  head: () => ({ meta: [{ title: "Totals — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Totals — Provider Interface" }] }),
   component: TotalsPage,
 });
 

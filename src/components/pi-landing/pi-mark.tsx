@@ -1,9 +1,10 @@
+import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { PI_WORDMARK } from "@/lib/pi-landing";
+import { PI_PRODUCT_NAME, PI_PRODUCT_SHORT, PI_WORDMARK } from "@/lib/pi-landing";
 
 /**
  * Cream straight-bar π. Left leg shorter than the right.
- * Not a squiggly mathematical pi. Not gold.
+ * Not a squiggly mathematical pi. Not gold. Not a honeycomb.
  */
 export function PiMark({
   className,
@@ -18,7 +19,7 @@ export function PiMark({
       fill="none"
       aria-hidden={title ? undefined : true}
       role={title ? "img" : undefined}
-      className={cn("text-[#f3efe6]", className)}
+      className={cn("text-current", className)}
     >
       {title ? <title>{title}</title> : null}
       <path d="M6 10H42" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square" />
@@ -31,21 +32,54 @@ export function PiMark({
 export function PiWordmark({
   className,
   compact = false,
+  short = false,
+  to,
+  tone = "chrome",
+  markClassName,
+  wordClassName,
 }: {
   className?: string;
   compact?: boolean;
+  /** Compact chrome: π + PI. Full marketing: π + PROVIDER INTERFACE. */
+  short?: boolean;
+  to?: "/";
+  /** chrome = cream on dusk; canvas = cream on dusk public pages. */
+  tone?: "chrome" | "canvas";
+  markClassName?: string;
+  wordClassName?: string;
 }) {
-  return (
-    <span className={cn("inline-flex items-center gap-3 text-[#f3efe6]", className)}>
-      <PiMark className={compact ? "h-7 w-7" : "h-8 w-8"} title={PI_WORDMARK} />
+  const label = short ? PI_PRODUCT_SHORT : PI_WORDMARK;
+  const inner = (
+    <span
+      className={cn(
+        "inline-flex items-center gap-3",
+        tone === "canvas" ? "text-[#f3efe6]" : "text-[#f3efe6]",
+        className,
+      )}
+    >
+      <PiMark
+        className={cn(compact || short ? "h-7 w-7" : "h-8 w-8", "shrink-0", markClassName)}
+        title={PI_PRODUCT_NAME}
+      />
       <span
         className={cn(
           "font-sans font-medium uppercase tracking-[0.22em] text-[#f3efe6]",
-          compact ? "text-[11px]" : "text-[12px] sm:text-[13px]",
+          compact || short ? "text-[11px]" : "text-[12px] sm:text-[13px]",
+          wordClassName,
         )}
       >
-        {PI_WORDMARK}
+        {label}
       </span>
     </span>
   );
+
+  if (to) {
+    return (
+      <Link to={to} className="inline-flex items-center" aria-label={PI_PRODUCT_NAME}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return inner;
 }

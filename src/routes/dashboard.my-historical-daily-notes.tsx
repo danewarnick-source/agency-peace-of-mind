@@ -25,7 +25,7 @@ import {
 } from "@/lib/historical-daily-note-attestation-text";
 
 export const Route = createFileRoute("/dashboard/my-historical-daily-notes")({
-  head: () => ({ meta: [{ title: "Historical daily notes to attest — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Historical daily notes to attest — Provider Interface" }] }),
   component: MyHistoricalDailyNotesPage,
 });
 

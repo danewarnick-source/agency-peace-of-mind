@@ -1,22 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, Calendar, CheckCircle2, Hexagon } from "lucide-react";
+import { ArrowRight, Calendar, CheckCircle2 } from "lucide-react";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/demo")({
   head: () => ({
     meta: [
-      { title: "Book a demo — HIVE" },
+      { title: "Book a demo — Provider Interface" },
       {
         name: "description",
         content:
-          "Talk to someone who has actually billed a Medicaid waiver. Book a 30-minute walkthrough of HIVE for your DSPD agency.",
+          "Talk to someone about Provider Interface. Book a 30-minute walkthrough of the office.",
       },
-      { property: "og:title", content: "Book a demo — HIVE" },
+      { property: "og:title", content: "Book a demo — Provider Interface" },
       {
         property: "og:description",
-        content: "A 30-minute walkthrough of HIVE for DSPD agency directors and owners.",
+        content: "A 30-minute walkthrough of Provider Interface.",
       },
     ],
   }),
@@ -55,9 +56,9 @@ function DemoPage() {
       style={{ background: NAVY_BG, fontFamily: JAKARTA }}
     >
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-        <Link to="/" className="flex items-center gap-2">
-          <Hexagon className="h-6 w-6" style={{ color: AMBER }} />
-          <span className="text-lg font-semibold tracking-tight">HIVE</span>
+        <Link to="/" className="flex items-center gap-2 text-[#f3efe6]">
+          <PiMark className="h-6 w-6" />
+          <span className="text-sm font-medium uppercase tracking-[0.18em]">Provider Interface</span>
         </Link>
         <nav className="flex items-center gap-3 text-sm">
           <Link to="/pricing" className="text-white/70 hover:text-white">
@@ -131,7 +132,7 @@ function DemoPage() {
               </h1>
               <p className="mt-3 text-white/70">
                 Tell us a little about your agency and we&apos;ll set up a 30-minute walkthrough — no
-                sales script, just the parts of HIVE that matter for your services.
+                sales script, just the parts of Provider Interface that matter for your services.
               </p>
 
               <form onSubmit={submit} className="mt-7 grid gap-4">

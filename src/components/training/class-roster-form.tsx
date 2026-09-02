@@ -147,7 +147,7 @@ export function ClassRosterDialog({
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not submit the roster.";
       if (msg.includes("payments_not_configured") || msg.includes("STRIPE_SECRET_KEY")) {
-        toast.error("Payments are not set up yet. Ask a Hive Executive to add the Stripe test keys.");
+        toast.error("Payments are not set up yet. Ask an Exec to add the Stripe test keys.");
       } else {
         toast.error(msg);
       }
@@ -181,8 +181,8 @@ export function ClassRosterDialog({
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           {isExternal
-            ? "One submit is one class. After payment, Hive Executive gets one alert. Staff only see an obligation. Upload the card when the class is done."
-            : "Buying a 30-day seat assigns the in-Hive 30-day course from My Obligations. This is not an external class."}
+            ? "One submit is one class. After payment, Exec gets one alert. Staff only see an obligation. Upload the card when the class is done."
+            : "Buying a 30-day seat assigns the in-platform 30-day course from My Obligations. This is not an external class."}
         </p>
         {billingExempt && (
           <p className="rounded-md border border-[#C8881E]/30 bg-[#FFF9EE] px-3 py-2 text-xs text-[#1A2B47]">

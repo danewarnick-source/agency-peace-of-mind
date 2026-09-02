@@ -9,7 +9,7 @@ import { FeatureGate } from "@/components/upgrade-gate";
 const search = z.object({ tab: z.enum(["sources", "docs", "external"]).optional() });
 
 export const Route = createFileRoute("/dashboard/hub/knowledge")({
-  head: () => ({ meta: [{ title: "Knowledge base — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Knowledge base — Provider Interface" }] }),
   validateSearch: (s) => search.parse(s),
   component: () => (
     <FeatureGate featureKey="nectar">

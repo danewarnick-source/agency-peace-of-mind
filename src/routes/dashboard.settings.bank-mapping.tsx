@@ -14,7 +14,7 @@ import { Landmark, Link2, Loader2, Save, RefreshCw, Zap, ArrowLeft, CheckCircle2
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/settings/bank-mapping")({
-  head: () => ({ meta: [{ title: "Bank Mapping — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Bank Mapping — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="manage_organization_settings">
       <BankMappingPage />

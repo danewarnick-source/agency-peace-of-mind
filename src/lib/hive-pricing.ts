@@ -40,8 +40,8 @@ export const TRAINING_PRICE_CENTS = {
 export const PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES = [
   "CPR & First Aid",
   "Mandt behavioral intervention",
-  "30-day DSPD required training",
-  "Hands-on Hive platform walkthrough",
+  "30-day orientation",
+  "Hands-on platform walkthrough",
   "Competency verification & sign-off",
   "12 hrs custom ongoing training content / year",
 ] as const;
@@ -61,7 +61,7 @@ export const PUBLIC_TRAINING_ALA_CARTE: readonly PublicTrainingAlaCarteItem[] = 
     sku: "thirty_day",
     name: "30-day orientation",
     priceCents: TRAINING_PRICE_CENTS.thirty_day,
-    sub: "In-Hive course from My Obligations",
+    sub: "In-platform course from My Obligations",
   },
 ];
 

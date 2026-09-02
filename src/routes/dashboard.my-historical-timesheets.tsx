@@ -25,7 +25,7 @@ import {
 } from "@/lib/historical-timesheet-confirmation.functions";
 
 export const Route = createFileRoute("/dashboard/my-historical-timesheets")({
-  head: () => ({ meta: [{ title: "Historical timesheets to confirm — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Historical timesheets to confirm — Provider Interface" }] }),
   component: MyHistoricalTimesheetsPage,
 });
 

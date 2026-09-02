@@ -14,7 +14,7 @@ import {
 import { ApprovalDialog } from "@/components/billing/ApprovalDialog";
 
 export const Route = createFileRoute("/dashboard/hive-exec/billing-approvals")({
-  head: () => ({ meta: [{ title: "HIVE — Billing Code Approvals" }] }),
+  head: () => ({ meta: [{ title: "Billing Code Approvals — Provider Interface Exec" }] }),
   component: BillingApprovalsPage,
 });
 

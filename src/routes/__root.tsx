@@ -208,24 +208,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "var(--hive-canvas)" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "Hive" },
-      { title: "Hive" },
+      { name: "apple-mobile-web-app-title", content: "Provider Interface" },
+      { title: "Provider Interface" },
       {
         name: "description",
         content:
-          "Modern employee training and certification platform for teams that take compliance seriously.",
+          "One quiet office for people, the schedule, notes, trainings, and Nectar.",
       },
-      { property: "og:title", content: "HIVE" },
-      { name: "twitter:title", content: "HIVE" },
+      { property: "og:title", content: "Provider Interface" },
+      { name: "twitter:title", content: "Provider Interface" },
       {
         property: "og:description",
         content:
-          "Modern employee training and certification platform for teams that take compliance seriously.",
+          "One quiet office for people, the schedule, notes, trainings, and Nectar.",
       },
       {
         name: "twitter:description",
         content:
-          "Modern employee training and certification platform for teams that take compliance seriously.",
+          "One quiet office for people, the schedule, notes, trainings, and Nectar.",
       },
       {
         property: "og:image",

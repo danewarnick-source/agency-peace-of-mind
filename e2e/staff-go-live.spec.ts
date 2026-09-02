@@ -84,7 +84,7 @@ test.describe("Hive STAFF go-live — punch pad", () => {
     page,
   }) => {
     await gotoScenario(page, "launchpad-blocked");
-    await expect(page.getByText(/Complete Hive Launchpad before clocking in/i)).toBeVisible();
+    await expect(page.getByText(/Complete Launchpad before clocking in/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Clock in/i })).toBeDisabled();
     expect(await page.evaluate(() => window.__e2e.timesheetWrites)).toBe(0);
     expect(await page.evaluate(() => window.__e2e.clockInCalls.length)).toBe(0);

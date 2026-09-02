@@ -24,7 +24,7 @@ import { type EmarStatus, normalizeEmarStatus } from "@/lib/emar-status";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/emar")({
-  head: () => ({ meta: [{ title: "Today's Pass — HIVE eMAR" }] }),
+  head: () => ({ meta: [{ title: "Today's Pass — Provider Interface eMAR" }] }),
   component: EmarPage,
 });
 

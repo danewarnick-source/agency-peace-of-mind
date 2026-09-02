@@ -27,7 +27,7 @@ function SettingsPage() {
   const [dbaName, setDbaName] = useState("");
   const [displayAcronym, setDisplayAcronym] = useState("");
   const [dhhsProviderId, setDhhsProviderId] = useState("");
-  const [evvVendorName, setEvvVendorName] = useState("Hive");
+  const [evvVendorName, setEvvVendorName] = useState("Provider Interface");
   const [incidentAiEnabled, setIncidentAiEnabled] = useState(true);
   const [goLiveDate, setGoLiveDate] = useState("");
   const [orgCreatedAt, setOrgCreatedAt] = useState("");
@@ -61,7 +61,7 @@ function SettingsPage() {
           } | null;
           if (d) {
             setDhhsProviderId(d.dhhs_provider_id ?? "");
-            setEvvVendorName(d.evv_vendor_name ?? "Hive");
+            setEvvVendorName(d.evv_vendor_name ?? "Provider Interface");
             setIncidentAiEnabled(d.incident_ai_review_enabled !== false);
             setOrgCreatedAt((d.created_at ?? "").slice(0, 10));
             setGoLiveDate(d.go_live_date ?? "");
@@ -97,7 +97,7 @@ function SettingsPage() {
         dba_name: dbaName.trim() || null,
         display_acronym: displayAcronym.trim() || null,
         dhhs_provider_id: dhhsProviderId.trim() || null,
-        evv_vendor_name: evvVendorName.trim() || "Hive",
+        evv_vendor_name: evvVendorName.trim() || "Provider Interface",
         incident_ai_review_enabled: incidentAiEnabled,
         go_live_date: goLiveDate || null,
       } as any)
@@ -118,7 +118,7 @@ function SettingsPage() {
           <h2 className="text-base font-semibold">Profile &amp; organization</h2>
           <p className="text-sm text-muted-foreground">
             All identity-related information in one place — your profile, your
-            organization, and who Hive contacts about billing.
+            organization, and who we contact about billing.
           </p>
         </header>
 
@@ -150,9 +150,9 @@ function SettingsPage() {
                   <div className="grid gap-2"><Label htmlFor="dba_name">Doing-business-as (DBA)</Label><Input id="dba_name" value={dbaName} onChange={(e) => setDbaName(e.target.value)} placeholder="Optional" /></div>
                   <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
                   <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
-                  <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
+                  <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Provider Interface" /></div>
                   <div className="grid gap-2">
-                    <Label htmlFor="go_live_date">Hive go-live date</Label>
+                    <Label htmlFor="go_live_date">Go-live date</Label>
                     <Input
                       id="go_live_date"
                       type="date"
@@ -161,7 +161,7 @@ function SettingsPage() {
                       placeholder={orgCreatedAt}
                     />
                     <p className="text-xs text-muted-foreground">
-                      When your team actually started documenting in Hive. Deadlines and audit
+                      When your team actually started documenting in Provider Interface. Deadlines and audit
                       packets never flag periods before this date as missing.
                       {orgCreatedAt && !goLiveDate ? ` Defaults to your account creation date (${orgCreatedAt}) until set.` : ""}
                     </p>
@@ -316,7 +316,7 @@ function SettingsPage() {
             <div className="flex items-start gap-4">
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><CreditCard className="h-5 w-5" /></div>
               <div>
-                <h2 className="text-base font-semibold">HIVE Subscription</h2>
+                <h2 className="text-base font-semibold">Subscription</h2>
                 <p className="mt-1 text-sm text-muted-foreground">See your plan, pay, or manage the card on file.</p>
               </div>
             </div>
@@ -444,8 +444,8 @@ function BillingContactSection({ organizationId }: { organizationId: string }) {
         <Receipt className="h-4 w-4 text-muted-foreground" /> Billing contact
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        Who Hive should contact for urgent billing or account issues. Changes here are visible to the
-        Hive operations team and stay in sync with their records.
+        Who we should contact for urgent billing or account issues. Changes here stay in sync with
+        our records.
       </p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">

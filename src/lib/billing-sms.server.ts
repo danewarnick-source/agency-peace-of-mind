@@ -41,13 +41,13 @@ function fmtAmount(cents: number | null | undefined): string {
 function buildBody(kind: BillingSmsKind, amountCents: number | null | undefined, link: string): string {
   switch (kind) {
     case "payment_declined_day0":
-      return `Hive: Your ${fmtAmount(amountCents)} payment was declined. Update your card to keep your team's access active: ${link}`;
+      return `Provider Interface: Your ${fmtAmount(amountCents)} payment was declined. Update your card to keep your team's access active: ${link}`;
     case "payment_declined_day21":
-      return `Hive: Your account locks in 9 days. Your entire team will lose access until payment is processed. Update now: ${link}`;
+      return `Provider Interface: Your account locks in 9 days. Your entire team will lose access until payment is processed. Update now: ${link}`;
     case "account_locked":
-      return `Hive: Your agency's Hive account is now locked. All staff are signed out. Update payment to restore access immediately: ${link}`;
+      return `Provider Interface: Your agency's account is now locked. All staff are signed out. Update payment to restore access immediately: ${link}`;
     case "card_expiring_7":
-      return `Hive: Your card on file expires in 7 days. Update it now to avoid a payment failure: ${link}`;
+      return `Provider Interface: Your card on file expires in 7 days. Update it now to avoid a payment failure: ${link}`;
   }
 }
 

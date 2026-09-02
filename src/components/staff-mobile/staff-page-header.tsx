@@ -1,16 +1,20 @@
-import { Hexagon, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 
 /**
- * Crisp page header for staff app pages — matches the admin-side
- * eyebrow + title + subhead pattern (Plus Jakarta Sans, hex motif,
- * restrained amber accent).
+ * Crisp page header for staff app pages — eyebrow + title + subhead.
+ * Default mark is the cream π, not a honeycomb.
  *
  * Mobile-first: title scales from text-xl → text-2xl at sm.
  */
+function DefaultEyebrowMark({ className }: { className?: string; strokeWidth?: number }) {
+  return <PiMark className={className} title="Provider Interface" />;
+}
+
 export function StaffPageHeader({
   eyebrow,
-  eyebrowIcon: EyebrowIcon = Hexagon,
+  eyebrowIcon: EyebrowIcon = DefaultEyebrowMark,
   title,
   subtitle,
   actions,

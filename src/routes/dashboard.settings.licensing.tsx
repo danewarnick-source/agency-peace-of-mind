@@ -4,7 +4,7 @@ import { useOrgActiveServiceCodes } from "@/hooks/use-org-service-codes";
 import { OrgComplianceDocumentsSection } from "@/components/settings/org-compliance-documents-section";
 
 export const Route = createFileRoute("/dashboard/settings/licensing")({
-  head: () => ({ meta: [{ title: "Provider Licenses & Certifications — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Provider Licenses & Certifications — Provider Interface" }] }),
   component: LicensingSettingsPage,
 });
 

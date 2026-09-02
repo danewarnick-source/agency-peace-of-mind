@@ -94,4 +94,4 @@ export function trainingRequiresCharge(opts: {
   return true;
 }
 
-export const UNPAID_LOCK_REASON = "Payment required to use Hive";
+export const UNPAID_LOCK_REASON = "Payment required to use Provider Interface";

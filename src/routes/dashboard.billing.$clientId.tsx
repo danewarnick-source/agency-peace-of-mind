@@ -26,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
 
 export const Route = createFileRoute("/dashboard/billing/$clientId")({
-  head: () => ({ meta: [{ title: "Client Billing — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Billing — Provider Interface" }] }),
   component: ClientBillingDetail,
 });
 

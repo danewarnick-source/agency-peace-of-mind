@@ -129,7 +129,7 @@ export function InHiveCoursePlayer({
         instanceId,
         evidenceTypeUsed: IN_HIVE_COURSE_EVIDENCE,
         attestationSignedAt: new Date().toISOString(),
-        attestationTextSnapshot: `${obligationTitle} completed in Hive.`,
+        attestationTextSnapshot: `${obligationTitle} completed in Provider Interface.`,
       },
     });
   }, [recordFn, organizationId, instanceId, obligationTitle]);
@@ -256,7 +256,7 @@ export function InHiveCoursePlayer({
           </Link>
         </Button>
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">In-Hive course</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">In-platform course</p>
           <h1 className="text-lg font-semibold leading-tight">{courseTitle(courseId)}</h1>
           <p className="text-xs text-muted-foreground mt-1">
             {completedCodes.size} of {topics.length} topics done

@@ -47,7 +47,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/dashboard/summaries")({
   validateSearch: searchSchema,
-  head: () => ({ meta: [{ title: "Summaries — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Summaries — Provider Interface" }] }),
   component: SummariesPage,
 });
 

@@ -13,7 +13,7 @@ import { Download, ShieldAlert } from "lucide-react";
 import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
 
 export const Route = createFileRoute("/dashboard/admin/emar-audit")({
-  head: () => ({ meta: [{ title: "eMAR Audit — HIVE" }] }),
+  head: () => ({ meta: [{ title: "eMAR Audit — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="approve_shift_notes">
       <AuditPage />

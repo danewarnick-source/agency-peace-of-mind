@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { AuthShell } from "./login";
 
 export const Route = createFileRoute("/forgot-password")({
-  head: () => ({ meta: [{ title: "Reset password — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Reset password — Provider Interface" }] }),
   component: ForgotPassword,
 });
 
@@ -39,13 +39,13 @@ function ForgotPassword() {
       ) : (
         <form onSubmit={onSubmit} className="grid gap-4">
           <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" required /></div>
-          <Button type="submit" disabled={busy} className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
+          <Button type="submit" disabled={busy} className="bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827]">
             {busy ? "Sending…" : "Send reset link"}
           </Button>
         </form>
       )}
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Remembered it? <Link to="/login" className="font-medium text-accent hover:underline">Sign in</Link>
+        Remembered it? <Link to="/login" className="font-medium text-[#0b1220] hover:underline">Sign in</Link>
       </p>
     </AuthShell>
   );

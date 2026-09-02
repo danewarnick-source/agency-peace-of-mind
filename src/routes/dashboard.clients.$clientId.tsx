@@ -171,7 +171,7 @@ const search = z.object({
 });
 
 export const Route = createFileRoute("/dashboard/clients/$clientId")({
-  head: () => ({ meta: [{ title: "Client Profile — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Profile — Provider Interface" }] }),
   validateSearch: search,
   component: () => (
     <RequirePermission perm="view_clients">

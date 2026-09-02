@@ -1084,7 +1084,7 @@ function InventoryTab({ stateCode }: { stateCode: string }) {
         },
       }),
     onSuccess: () => {
-      toast.success("Structural gap filed — HIVE Executive ticket created.");
+      toast.success("Structural gap filed — Provider Interface Executive ticket created.");
       qc.invalidateQueries({ queryKey: ["state-structural-gaps", stateCode] });
     },
     onError: (e) => toast.error((e as Error).message),

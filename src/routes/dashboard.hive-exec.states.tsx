@@ -6,7 +6,7 @@ import { useState } from "react";
 import { listPlatformStates } from "@/lib/state-templates.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/states")({
-  head: () => ({ meta: [{ title: "States — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "States — Provider Interface Executive" }] }),
   component: StatesIndexPage,
 });
 

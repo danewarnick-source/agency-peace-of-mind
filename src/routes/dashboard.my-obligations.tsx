@@ -41,7 +41,7 @@ function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
 }
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
-  head: () => ({ meta: [{ title: "My obligations — HIVE" }] }),
+  head: () => ({ meta: [{ title: "My obligations — Provider Interface" }] }),
   component: MyObligationsPage,
 });
 
@@ -371,7 +371,7 @@ function OpenCard({
       <div className="mt-3 space-y-2">
         {courseId ? (
           <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-sm font-medium">In-Hive course</p>
+            <p className="text-sm font-medium">In-platform course</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Open the course from here. Finish each topic, then pass the competency exam (80%,
               three tries). Completing the exam greens this obligation.

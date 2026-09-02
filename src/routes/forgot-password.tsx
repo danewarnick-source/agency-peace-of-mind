@@ -45,7 +45,7 @@ function ForgotPassword() {
         </form>
       )}
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Remembered it? <Link to="/login" className="font-medium text-accent hover:underline">Sign in</Link>
+        Remembered it? <Link to="/login" className="font-medium text-[#0b1220] hover:underline">Sign in</Link>
       </p>
     </AuthShell>
   );

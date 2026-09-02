@@ -386,6 +386,7 @@ function Step1Account({
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
+              data-testid="signup-password"
               className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
               style={inputStyle}
             />
@@ -413,6 +414,7 @@ function Step1Account({
               autoComplete="new-password"
               value={form.confirm}
               onChange={(e) => update("confirm", e.target.value)}
+              data-testid="signup-confirm"
               className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
               style={inputStyle}
             />

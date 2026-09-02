@@ -3,6 +3,7 @@
  * or charges Stripe. Screenshots are for Dane's review.
  */
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -57,8 +58,9 @@ function serverFnHay(req: { url: () => string; postData: () => string | null }) 
   return `${url} ${decodeServerFnMeta(url)} ${body}`.toLowerCase();
 }
 
-async function installSignupMocks(page: Page, opts?: { emailExists?: boolean }) {
+async function installSignupMocks(page: Page, opts?: { emailExists?: boolean; pwnedRange?: string }) {
   const emailExists = opts?.emailExists === true;
+  const pwnedRange = opts?.pwnedRange ?? "";
 
   const handleServerFn = async (route: Route) => {
     const req = route.request();
@@ -78,6 +80,9 @@ async function installSignupMocks(page: Page, opts?: { emailExists?: boolean }) 
       parsed = JSON.parse(req.postData() ?? "{}") as { data?: { email?: string; organizationId?: string } };
     } catch {
       parsed = null;
+    }
+    if (hay.includes("checkpasswordpwned") || hay.includes("pwnedrange")) {
+      return fulfillJson(route, { result: { range: pwnedRange } });
     }
     if (
       hay.includes("checkemailexists") ||
@@ -247,6 +252,23 @@ test.describe("new-provider signup walk", () => {
     );
     await page.getByRole("button", { name: /pay with stripe/i }).click();
     await page.waitForTimeout(800);
+  });
+
+  test("pwned password shows Auth weak/easy bar before submit", async ({ page }) => {
+    const password = "Password1";
+    const sha1 = createHash("sha1").update(password).digest("hex").toUpperCase();
+    await installSignupMocks(page, { pwnedRange: `${sha1.slice(5)}:99\n` });
+    await page.goto("/signup", { waitUntil: "domcontentloaded" });
+    await fillReactInput(page, "signup-email", EMAIL);
+    await fillReactInput(page, "signup-password", password);
+    await page.getByTestId("signup-password").blur();
+    await expect(page.getByTestId("signup-password-weak")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("signup-password-weak")).toContainText(
+      "Password is known to be weak and easy to guess, please choose a different one.",
+    );
+    await expect(page.getByRole("button", { name: /create account/i })).toBeDisabled();
+    await page.getByRole("button", { name: /show password/i }).click();
+    await shot(page, "signup_password_weak_easy_bar.png");
   });
 
   test("exact duplicate email is still blocked; plus-alias is not treated as the base address", async ({

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -15,7 +15,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
-import { checkEmailExists } from "@/lib/signup-checks.functions";
+import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.functions";
+import {
+  AUTH_PWNED_PASSWORD_MESSAGE,
+  hibpRangeIncludesSha1,
+  hibpSha1Prefix,
+  isAuthPwnedPasswordMessage,
+  sha1HexUpper,
+  weakPasswordCopyFromAuth,
+} from "@/lib/signup-password";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import {
@@ -208,6 +216,7 @@ function SignupPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(initialForm);
   const checkEmail = useServerFn(checkEmailExists);
+  const checkPwnedRange = useServerFn(checkPasswordPwnedRange);
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
@@ -235,6 +244,7 @@ function SignupPage() {
                 form={form}
                 update={update}
                 checkEmail={checkEmail}
+                checkPwnedRange={checkPwnedRange}
                 onNext={() => setStep(1)}
               />
             )}
@@ -269,23 +279,58 @@ function Step1Account({
   form,
   update,
   checkEmail,
+  checkPwnedRange,
   onNext,
 }: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
   checkEmail: (input: { data: { email: string } }) => Promise<{ exists: boolean }>;
+  checkPwnedRange: (input: { data: { sha1Prefix: string } }) => Promise<{ range: string }>;
   onNext: () => void;
 }) {
   const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [passwordWeakErr, setPasswordWeakErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const weakCheckGen = useRef(0);
 
   const lenOk = form.password.length >= 8;
   const numOk = /\d/.test(form.password);
   const matchOk = form.password.length > 0 && form.password === form.confirm;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+
+  const verifyPasswordPwned = useCallback(async (password: string): Promise<boolean> => {
+    const gen = ++weakCheckGen.current;
+    if (password.length < 8) {
+      setPasswordWeakErr(null);
+      return false;
+    }
+    try {
+      const sha1 = await sha1HexUpper(password);
+      const { range } = await checkPwnedRange({ data: { sha1Prefix: hibpSha1Prefix(sha1) } });
+      if (gen !== weakCheckGen.current) return false;
+      const pwned = hibpRangeIncludesSha1(range, sha1);
+      setPasswordWeakErr(pwned ? AUTH_PWNED_PASSWORD_MESSAGE : null);
+      return pwned;
+    } catch {
+      if (gen !== weakCheckGen.current) return false;
+      // fail-open — Auth still rejects on submit
+      return false;
+    }
+  }, [checkPwnedRange]);
+
+  useEffect(() => {
+    if (form.password.length < 8) {
+      setPasswordWeakErr(null);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void verifyPasswordPwned(form.password);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [form.password, verifyPasswordPwned]);
 
   const verifyEmail = async () => {
     if (!emailValid) return;
@@ -308,6 +353,7 @@ function Step1Account({
     if (!emailValid) return setEmailErr("Please enter a valid email address.");
     if (!lenOk || !numOk) return toast.error("Password must be at least 8 characters and include a number.");
     if (!matchOk) return toast.error("Passwords don't match.");
+    if (await verifyPasswordPwned(form.password)) return;
     setBusy(true);
     try {
       const r = await checkEmail({ data: { email: form.email } });
@@ -330,6 +376,8 @@ function Step1Account({
       if (error) {
         if (/already/i.test(error.message)) {
           setEmailErr("An account with this email already exists. Sign in instead?");
+        } else if (isAuthPwnedPasswordMessage(error.message)) {
+          setPasswordWeakErr(weakPasswordCopyFromAuth(error.message));
         } else {
           toast.error(error.message);
         }
@@ -386,6 +434,11 @@ function Step1Account({
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
+              onBlur={() => {
+                void verifyPasswordPwned(form.password);
+              }}
+              aria-invalid={passwordWeakErr ? true : undefined}
+              aria-describedby={passwordWeakErr ? "signup-password-weak" : undefined}
               data-testid="signup-password"
               className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
               style={inputStyle}
@@ -400,6 +453,16 @@ function Step1Account({
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          {passwordWeakErr ? (
+            <div
+              id="signup-password-weak"
+              role="alert"
+              data-testid="signup-password-weak"
+              className="rounded-md border border-[var(--hive-danger)]/50 bg-[var(--hive-danger-soft)] px-3 py-2 text-xs font-medium text-[var(--hive-danger-fg)]"
+            >
+              {passwordWeakErr}
+            </div>
+          ) : null}
         </Field>
 
         <ul className="-mt-1 grid gap-1 text-xs">
@@ -435,7 +498,7 @@ function Step1Account({
         showBack={false}
         onNext={submit}
         loading={busy}
-        nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr}
+        nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr || !!passwordWeakErr}
         nextLabel="Create account"
       />
     </>

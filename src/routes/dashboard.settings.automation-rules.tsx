@@ -22,7 +22,7 @@ import { ArrowLeft, Plus, Pencil, Wand2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/settings/automation-rules")({
-  head: () => ({ meta: [{ title: "Automation Rules — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Automation Rules — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="manage_organization_settings">
       <AutomationRulesPage />

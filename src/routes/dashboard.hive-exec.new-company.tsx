@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { createCompany } from "@/lib/hive-exec-admin.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/new-company")({
-  head: () => ({ meta: [{ title: "Add New Company — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Add New Company — Provider Interface Executive" }] }),
   component: NewCompanyPage,
 });
 

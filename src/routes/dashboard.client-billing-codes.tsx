@@ -16,7 +16,7 @@ import { Trash2, Plus } from "lucide-react";
 import { RequireRole } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/client-billing-codes")({
-  head: () => ({ meta: [{ title: "Client Billing Codes — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Billing Codes — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <ClientBillingCodesPage />

@@ -14,7 +14,7 @@ import { AuditFeed } from "@/components/behavior-support/audit-feed";
 import { SowDeadlinesPanel } from "@/components/behavior-support/sow-deadlines";
 
 export const Route = createFileRoute("/dashboard/behavior-support/$clientId")({
-  head: () => ({ meta: [{ title: "Behavior Support — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Behavior Support — Provider Interface" }] }),
   component: BehaviorSupportClientPage,
 });
 

@@ -53,7 +53,7 @@ export function StaffTrainingEnrollmentsCard({
     return <div className="text-sm text-muted-foreground">Loading…</div>;
   }
   if (rows.length === 0) {
-    return <div className="text-sm text-muted-foreground">No Hive Training enrollments for this staff member.</div>;
+    return <div className="text-sm text-muted-foreground">No training enrollments for this staff member.</div>;
   }
 
   return (

@@ -26,16 +26,16 @@ export const PUBLIC_MOBILE_MENU_BUTTON_CLASS = [
   "relative z-20",
   "inline-flex h-11 w-11 min-h-[44px] min-w-[44px] shrink-0",
   "touch-manipulation items-center justify-center",
-  "rounded-md border border-[var(--hive-border)]",
-  "bg-[var(--hive-bg)] text-[var(--hive-text)]",
+  "rounded-md border border-[#f3efe6]/25",
+  "bg-[#0b1220] text-[#f3efe6]",
   "pointer-events-auto md:hidden",
   "[&_svg]:pointer-events-none",
 ].join(" ");
 
 export const PUBLIC_MARKETING_NAV_CLASS = [
   "sticky top-0 z-50 isolate pointer-events-auto",
-  "border-b border-[var(--hive-border)]",
-  "bg-[color-mix(in_srgb,var(--hive-bg)_92%,transparent)] backdrop-blur-md",
+  "border-b border-white/[0.08]",
+  "bg-[#0b1220]/92 backdrop-blur-md text-[#f3efe6]",
 ].join(" ");
 
 export const PUBLIC_MARKETING_NAV_SAFE_AREA_STYLE = {

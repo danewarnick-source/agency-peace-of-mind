@@ -71,7 +71,7 @@ function ClientsHub() {
 }
 
 export const Route = createFileRoute("/dashboard/hub/clients")({
-  head: () => ({ meta: [{ title: "Clients — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Clients — Provider Interface" }] }),
   validateSearch: (s) => search.parse(s),
   component: ClientsHub,
 });

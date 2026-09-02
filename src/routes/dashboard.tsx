@@ -136,7 +136,7 @@ function DashboardShellError({ error }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — Provider Interface" }] }),
   // Lockout gate — runs on every dashboard navigation. If the user's active
   // org has org_subscriptions.locked_at set, redirect to /billing-locked.
   // Admins keep access to the billing/subscription page so they can pay.
@@ -787,7 +787,7 @@ function DashboardLayout() {
                     <h1 className="truncate text-lg font-semibold tracking-tight">{pageTitle}</h1>
                     <p className="truncate text-xs text-muted-foreground">
                       {isHiveExecView ? (
-                        "HIVE Platform · Executive Command Center"
+                        "Provider Interface · Exec"
                       ) : isStatePreview ? (
                         `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
                       ) : (
@@ -1054,7 +1054,7 @@ function SidebarBody({
   return (
     <>
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <HiveWordmark markClassName="h-8 w-8" wordClassName="text-[1.35rem]" tone="chrome" />
+        <HiveWordmark short markClassName="h-8 w-8" wordClassName="text-[13px]" tone="chrome" />
       </div>
 
       {(isAdminCapable || isExecutive) && (
@@ -1300,7 +1300,7 @@ function SidebarBody({
               <div className="min-w-0">
                 <span className="text-sm font-bold tracking-wide text-[var(--hive-chrome-text)]">Nectar</span>
                 <p className="text-[11px] leading-relaxed text-[var(--hive-chrome-text)]/55">
-                  The brain. Tabs below feed it the data the rest of Hive reads from.
+                  The brain. Tabs below feed it the data the rest of Provider Interface reads from.
                 </p>
               </div>
             </div>
@@ -1367,9 +1367,9 @@ function SidebarBody({
           <div className="mt-2">
             {isHiveExecView ? (
               <div className="flex items-center justify-between">
-                <span className="truncate">HIVE Platform</span>
+                <span className="truncate">Provider Interface</span>
                 <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
-                  HIVE Exec
+                  Exec
                 </span>
               </div>
             ) : (

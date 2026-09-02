@@ -46,7 +46,7 @@ import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
-  head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Daily Logs — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { focus?: string } =>
     typeof s.focus === "string" ? { focus: s.focus } : {},
   component: DailyLogsPage,

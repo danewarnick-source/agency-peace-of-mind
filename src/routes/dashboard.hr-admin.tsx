@@ -29,7 +29,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { EmployeeLoansPanel } from "@/components/employee-loans/EmployeeLoansPanel";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
-  head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),
+  head: () => ({ meta: [{ title: "HR Admin — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_staff_records">
       <HrAdminPage />

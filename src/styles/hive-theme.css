@@ -1,17 +1,16 @@
 /**
- * Hive locked room — steel chrome, pale canvas, sparse gold jewelry.
+ * Provider Interface room — dusk navy chrome, pale canvas, cream π.
  *
- * Tokens locked from Dane's Employees / Scheduler / Documentation mocks.
  * Import this file from src/styles.css so every surface inherits the same room.
  *
- * Product name on screen: Hive (never Hive Certify, never Keel)
+ * Product name on screen: Provider Interface (never Hive Certify)
  * AI agent name: Nectar (never Ask Hive, never Compass)
- * Domain hivecertify.com: marketing footer / login footer only
- * Hex mark: gold outline — not a filled honeycomb, not a letter H
+ * Do not print hivecertify.com on marketing or login.
+ * Mark: straight-bar π, left leg shorter. Not a honeycomb.
  */
 
 :root {
-  --hive-sidebar: #3e5368;
+  --hive-sidebar: #0b1220;
   --hive-chrome-text: #f3efe6;
   --hive-canvas: #f4f6f8;
   --hive-bg: #f4f6f8;
@@ -155,7 +154,7 @@
     background-color: #eef1f4;
   }
 
-  /* Thin gold left bar — active nav. Never a gold fill box. */
+  /* Thin cream left bar — active nav. Never a gold fill box. */
   .hive-nav-active {
     position: relative;
     color: var(--hive-chrome-text);
@@ -169,7 +168,7 @@
     bottom: 6px;
     width: 2px;
     border-radius: 1px;
-    background: var(--hive-gold);
+    background: var(--hive-chrome-text);
   }
 
   .hive-status-active {

@@ -48,7 +48,7 @@ function EmployeesHub() {
 }
 
 export const Route = createFileRoute("/dashboard/hub/employees")({
-  head: () => ({ meta: [{ title: "Employees — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Employees — Provider Interface" }] }),
   validateSearch: (s) => search.parse(s),
   component: EmployeesHub,
 });

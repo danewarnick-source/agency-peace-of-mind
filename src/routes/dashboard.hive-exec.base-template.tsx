@@ -11,7 +11,7 @@ import {
 import type { BaseTemplateSchema, BaseTemplateVersion } from "@/lib/state-base-versions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/base-template")({
-  head: () => ({ meta: [{ title: "Base template versions — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Base template versions — Provider Interface Executive" }] }),
   component: BaseTemplatePage,
 });
 

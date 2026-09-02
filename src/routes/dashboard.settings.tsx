@@ -316,7 +316,7 @@ function SettingsPage() {
             <div className="flex items-start gap-4">
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><CreditCard className="h-5 w-5" /></div>
               <div>
-                <h2 className="text-base font-semibold">HIVE Subscription</h2>
+                <h2 className="text-base font-semibold">Subscription</h2>
                 <p className="mt-1 text-sm text-muted-foreground">See your plan, pay, or manage the card on file.</p>
               </div>
             </div>

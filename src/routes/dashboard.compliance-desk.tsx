@@ -149,7 +149,7 @@ function GpsBypassBadge({ row }: { row: Pick<Row, "gps_in_bypassed" | "gps_in_by
 }
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
-  head: () => ({ meta: [{ title: "EVV & Timesheet Control — HIVE" }] }),
+  head: () => ({ meta: [{ title: "EVV & Timesheet Control — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     focus: typeof s.focus === "string" ? s.focus : undefined,
   }),

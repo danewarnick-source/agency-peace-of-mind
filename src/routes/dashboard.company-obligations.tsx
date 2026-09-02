@@ -36,7 +36,7 @@ function parseCompanyObligationsSearch(s: Record<string, unknown>): CompanyOblig
 }
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
-  head: () => ({ meta: [{ title: "Obligations — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Obligations — Provider Interface" }] }),
   validateSearch: parseCompanyObligationsSearch,
   component: CompanyObligationsPage,
 });

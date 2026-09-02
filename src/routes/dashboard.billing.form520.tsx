@@ -33,7 +33,7 @@ import { RequireRole } from "@/components/rbac-guard";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/billing/form520")({
-  head: () => ({ meta: [{ title: "520 Billing — HIVE" }] }),
+  head: () => ({ meta: [{ title: "520 Billing — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <Billing520Page />

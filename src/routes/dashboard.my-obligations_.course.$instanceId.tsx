@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/my-obligations_/course/$instanceId")({
-  head: () => ({ meta: [{ title: "Staff training — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Staff training — Provider Interface" }] }),
   component: InHiveCoursePage,
 });
 

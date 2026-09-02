@@ -26,7 +26,7 @@ import {
 } from "@/lib/financial-nectar.functions";
 
 export const Route = createFileRoute("/dashboard/financial/nectar")({
-  head: () => ({ meta: [{ title: "NECTAR Financial — HIVE" }] }),
+  head: () => ({ meta: [{ title: "NECTAR Financial — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <NectarFinancialPage />

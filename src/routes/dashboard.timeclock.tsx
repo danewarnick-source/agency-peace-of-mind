@@ -4,7 +4,7 @@ import { GeneralTimeClock } from "@/components/staff-mobile/general-time-clock";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/timeclock")({
-  head: () => ({ meta: [{ title: "General Time Clock — HIVE" }] }),
+  head: () => ({ meta: [{ title: "General Time Clock — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { end?: string } =>
     typeof s.end === "string" ? { end: s.end } : {},
   component: TimeClockPage,

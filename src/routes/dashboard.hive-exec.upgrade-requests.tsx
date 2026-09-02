@@ -7,7 +7,7 @@ import { listUpgradeRequests, resolveUpgradeRequest, type UpgradeRequestRow } fr
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/hive-exec/upgrade-requests")({
-  head: () => ({ meta: [{ title: "Upgrade Requests — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Upgrade Requests — Provider Interface Executive" }] }),
   component: UpgradeRequestsPage,
 });
 

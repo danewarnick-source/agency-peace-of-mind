@@ -27,7 +27,7 @@ import { getBillingSnapshot } from "@/lib/financial-hub.functions";
  * permission-gated server fns the tabs use — no ungated path here.
  */
 export const Route = createFileRoute("/dashboard/hub/finances")({
-  head: () => ({ meta: [{ title: "Finances — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Finances — Provider Interface" }] }),
   component: FinancesHub,
 });
 

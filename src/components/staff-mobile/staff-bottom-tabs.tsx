@@ -70,7 +70,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                   data-tour={`nav.${t.to.replace(/^\/dashboard\/?/, "") || "home"}`}
                   className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight transition-all duration-150 active:scale-[0.95] ${
                     active
-                      ? "text-[var(--hive-gold)]"
+                      ? "text-[#f3efe6]"
                       : "text-[var(--hive-chrome-text)]/65 hover:text-[var(--hive-chrome-text)]"
                   }`}
                 >

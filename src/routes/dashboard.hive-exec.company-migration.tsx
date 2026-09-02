@@ -23,7 +23,7 @@ import {
 export const Route = createFileRoute("/dashboard/hive-exec/company-migration")({
   head: () => ({
     meta: [
-      { title: "Company Migration — HIVE Executive" },
+      { title: "Company Migration — Provider Interface Executive" },
       {
         name: "description",
         content:

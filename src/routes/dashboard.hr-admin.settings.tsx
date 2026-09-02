@@ -6,7 +6,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypesProposal } from "@/components/hr/staff-types-proposal";
 
 export const Route = createFileRoute("/dashboard/hr-admin/settings")({
-  head: () => ({ meta: [{ title: "HR Settings — HIVE" }] }),
+  head: () => ({ meta: [{ title: "HR Settings — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="edit_staff_records">
       <HrSettingsPage />

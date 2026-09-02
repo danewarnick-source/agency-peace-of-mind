@@ -44,7 +44,7 @@ import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { AuditorShareManager } from "@/components/audit/auditor-share-manager";
 
 export const Route = createFileRoute("/dashboard/audit")({
-  head: () => ({ meta: [{ title: "Audit — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Audit — Provider Interface" }] }),
   component: AuditPage,
 });
 

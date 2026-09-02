@@ -43,7 +43,7 @@ import { toast } from "sonner";
 
 
 export const Route = createFileRoute("/dashboard/internal-audit")({
-  head: () => ({ meta: [{ title: "Internal Audit — NECTAR — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Internal Audit — NECTAR — Provider Interface" }] }),
   component: () => (
     <RequirePermission perm="view_analytics">
       <FeatureGate featureKey="state_audit">

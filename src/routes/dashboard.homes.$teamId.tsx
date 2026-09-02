@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { ChoreChartForTeam } from "@/components/chores/chore-chart-mount";
 
 export const Route = createFileRoute("/dashboard/homes/$teamId")({
-  head: () => ({ meta: [{ title: "Home details — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Home details — Provider Interface" }] }),
   component: HomeDetailPage,
 });
 

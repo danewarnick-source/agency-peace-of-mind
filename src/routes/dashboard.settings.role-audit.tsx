@@ -10,7 +10,7 @@ import { History, ArrowLeft } from "lucide-react";
 import { listRoleChangeAuditLog } from "@/lib/team-access.functions";
 
 export const Route = createFileRoute("/dashboard/settings/role-audit")({
-  head: () => ({ meta: [{ title: "Role history — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Role history — Provider Interface" }] }),
   component: RoleAuditPage,
 });
 

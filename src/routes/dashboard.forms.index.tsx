@@ -28,7 +28,7 @@ import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/")({
-  head: () => ({ meta: [{ title: "Forms — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Forms — Provider Interface" }] }),
   component: FormsIndex,
 });
 

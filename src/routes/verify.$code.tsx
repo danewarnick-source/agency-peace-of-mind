@@ -6,8 +6,8 @@ import { GraduationCap, CheckCircle2, XCircle } from "lucide-react";
 export const Route = createFileRoute("/verify/$code")({
   head: ({ params }) => ({
     meta: [
-      { title: `Verify certificate ${params.code} — HIVE` },
-      { name: "description", content: "Public certificate verification for HIVE issued credentials." },
+      { title: `Verify certificate ${params.code} — Provider Interface` },
+      { name: "description", content: "Public certificate verification for Provider Interface issued credentials." },
     ],
   }),
   component: VerifyPage,
@@ -37,7 +37,7 @@ function VerifyPage() {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
             <GraduationCap className="h-4 w-4" />
           </span>
-          HIVE
+          Provider Interface
         </Link>
         <div className="rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Certificate verification</p>

@@ -60,7 +60,7 @@ const workspaceSearch = z.object({
   verify: z.string().optional(),
 });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
-  head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Workspace — Provider Interface" }] }),
   validateSearch: workspaceSearch,
   component: ClientWorkspace,
 });

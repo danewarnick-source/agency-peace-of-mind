@@ -9,7 +9,7 @@ import { listMyAuditPackages } from "@/lib/audit-portal.functions";
 export const Route = createFileRoute("/audit-portal/")({
   head: () => ({
     meta: [
-      { title: "State Audit Portal — HIVE" },
+      { title: "State Audit Portal — Provider Interface" },
       { name: "description", content: "Secure portal for state auditors reviewing DSPD provider records." },
       { name: "robots", content: "noindex,nofollow" },
     ],

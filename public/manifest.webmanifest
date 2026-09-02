@@ -1,13 +1,13 @@
 {
-  "name": "Hive",
-  "short_name": "Hive",
-  "description": "HIVE \u2014 DSPD compliance, scheduling, EVV, and daily documentation.",
+  "name": "Provider Interface",
+  "short_name": "PI",
+  "description": "One quiet office for people, the schedule, notes, trainings, and Nectar.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#0d112b",
-  "background_color": "#0d112b",
+  "theme_color": "#0b1220",
+  "background_color": "#0b1220",
   "icons": [
     {
       "src": "/icon-192.png",

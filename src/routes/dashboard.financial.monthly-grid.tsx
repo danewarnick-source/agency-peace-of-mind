@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/monthly-grid")({
-  head: () => ({ meta: [{ title: "Monthly Grid — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Monthly Grid — Provider Interface" }] }),
   component: MonthlyGridPage,
 });
 

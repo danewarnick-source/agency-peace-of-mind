@@ -42,7 +42,7 @@ function hubTabFromRecordsDesk(search: { tab?: string; cc?: string }): HubTab {
 }
 
 export const Route = createFileRoute("/dashboard/records-desk")({
-  head: () => ({ meta: [{ title: "Records Desk — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Records Desk — Provider Interface" }] }),
   validateSearch: recordsDeskSearch,
   beforeLoad: ({ search }) => {
     const next = hubTabFromRecordsDesk(search);

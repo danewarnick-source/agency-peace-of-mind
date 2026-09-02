@@ -447,8 +447,8 @@ function StaffProfilePage() {
           <CollapsibleSectionGroup
             storageKey={sectionStorageKey(staffId, "hive-training")}
             label="Training"
-            hint="Hive Training enrollments and certificate status"
-            summary="Hive Training enrollments"
+            hint="Training enrollments and certificate status"
+            summary="Training enrollments"
             divider
           >
             <SectionPanel icon={GraduationCap} accent="sky">

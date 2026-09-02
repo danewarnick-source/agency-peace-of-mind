@@ -20,7 +20,7 @@ import {
 } from "@/lib/historical-daily-note-attestation.functions";
 
 export const Route = createFileRoute("/dashboard/historical-daily-notes-former-staff")({
-  head: () => ({ meta: [{ title: "Attest on behalf of former staff — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Attest on behalf of former staff — Provider Interface" }] }),
   component: FormerStaffAttestPage,
 });
 

@@ -19,7 +19,7 @@ import { ApprovalDialog } from "@/components/billing/ApprovalDialog";
 
 
 export const Route = createFileRoute("/dashboard/inbox")({
-  head: () => ({ meta: [{ title: "Inbox — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Inbox — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <InboxPage />

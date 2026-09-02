@@ -30,7 +30,7 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
 const BUCKET = "message-attachments";
 
 export const Route = createFileRoute("/dashboard/hive-exec/messages")({
-  head: () => ({ meta: [{ title: "Message Center — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Message Center — Provider Interface Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
       <MessageCenterPage />

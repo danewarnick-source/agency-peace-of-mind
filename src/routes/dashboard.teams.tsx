@@ -4,7 +4,7 @@ import { createFileRoute, Navigate, redirect } from "@tanstack/react-router";
 // of the Scheduling page's tab so it stays reachable regardless of the
 // Schedule V2 cut-over flag). Both SSR and client renders redirect.
 export const Route = createFileRoute("/dashboard/teams")({
-  head: () => ({ meta: [{ title: "Homes & Teams — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Homes & Teams — Provider Interface" }] }),
   loader: () => {
     throw redirect({ to: "/dashboard/homes", replace: true });
   },

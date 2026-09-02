@@ -31,7 +31,7 @@ import { PublishModal } from "@/components/forms/publish-modal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/forms/$formId/edit")({
-  head: () => ({ meta: [{ title: "Edit form — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Edit form — Provider Interface" }] }),
   component: EditForm,
 });
 

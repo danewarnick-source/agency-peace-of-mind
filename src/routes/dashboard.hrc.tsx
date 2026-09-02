@@ -23,7 +23,7 @@ import {
 } from "@/lib/hrc-restrictions";
 
 export const Route = createFileRoute("/dashboard/hrc")({
-  head: () => ({ meta: [{ title: "Human Rights Committee (HRC) — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Human Rights Committee (HRC) — Provider Interface" }] }),
   component: HrcPage,
 });
 

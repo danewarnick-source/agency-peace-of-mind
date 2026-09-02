@@ -3,7 +3,7 @@ export function renderErrorPage(): string {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Preview is warming up — HIVE</title>
+    <title>Preview is warming up — Provider Interface</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#3E5368" />
     <style>
@@ -30,7 +30,7 @@ export function renderErrorPage(): string {
         overflow: hidden;
       }
       .band {
-        background: #3E5368;
+        background: #0b1220;
         color: #F3EFE6;
         padding: 1.25rem 1.75rem;
         display: flex;
@@ -126,8 +126,8 @@ export function renderErrorPage(): string {
   <body>
     <main class="card" role="alert" aria-live="polite">
       <div class="band">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none"><polygon points="12,2.2 21.2,7.5 21.2,16.5 12,21.8 2.8,16.5 2.8,7.5" stroke="#C9A227" stroke-width="1.55" stroke-linejoin="round"/></svg></span>
-        <span>HIVE preview</span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M6 10H42" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M15 10V28" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M33 10V40" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/></svg></span>
+        <span>Provider Interface preview</span>
         <small>Status: warming up</small>
       </div>
       <div class="body">
@@ -144,7 +144,7 @@ export function renderErrorPage(): string {
           <span class="status" id="status"><span class="spinner" aria-hidden="true"></span><span id="status-text"></span></span>
         </div>
         <div class="foot">
-          Still stuck after a minute? Reload the editor and rebuild, or contact your HIVE admin.
+          Still stuck after a minute? Reload the editor and rebuild, or contact your admin.
         </div>
       </div>
     </main>

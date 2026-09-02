@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/nectar-company-profile")({
-  head: () => ({ meta: [{ title: "NECTAR Company Profile — HIVE" }] }),
+  head: () => ({ meta: [{ title: "NECTAR Company Profile — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { from?: string; step?: string | number } => {
     const out: { from?: string; step?: string | number } = {};
     if (typeof s.from === "string") out.from = s.from;

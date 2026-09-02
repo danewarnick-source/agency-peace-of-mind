@@ -232,7 +232,7 @@ function serverFnPayload(world: HiveE2EWorld, req: Request): unknown {
       throw Object.assign(new Error("Launchpad blocked"), {
         status: 400,
         message:
-          "Complete Hive Launchpad before clocking in. Open Hive Training to finish.",
+          "Complete Launchpad before clocking in. Open Training to finish.",
       });
     }
     throw Object.assign(new Error("E2E does not punch"), {

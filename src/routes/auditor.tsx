@@ -16,8 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 import {
-  Hexagon,
   ShieldCheck,
   Loader2,
   LogOut,
@@ -37,7 +37,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/auditor")({
-  head: () => ({ meta: [{ title: "Auditor Portal — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Auditor Portal — Provider Interface" }] }),
   validateSearch: (s) => searchSchema.parse(s),
   component: AuditorPortal,
 });
@@ -67,10 +67,10 @@ function AuditorPortal() {
       <header className="border-b border-[color:var(--border-light)] bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-semibold" style={{ color: navy }}>
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#141a3d] text-white">
-              <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2.5} />
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0b1220] text-[#f3efe6]">
+              <PiMark className="h-4 w-4" />
             </span>
-            HIVE
+            Provider Interface
             <span className="text-xs font-normal text-muted-foreground border-l border-[color:var(--border-light)] ml-2 pl-2">
               Auditor Portal
             </span>

@@ -14,7 +14,7 @@ import {
 } from "@/lib/hive-exec-admin.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/permissions")({
-  head: () => ({ meta: [{ title: "Permissions & Roles — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Permissions & Roles — Provider Interface Executive" }] }),
   component: PermissionsPage,
 });
 

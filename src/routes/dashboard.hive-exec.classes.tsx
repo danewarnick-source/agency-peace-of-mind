@@ -16,7 +16,7 @@ import { formatUsdFromCents } from "@/lib/hive-pricing";
 import { ClassCardStatus } from "@/components/training/class-card-upload";
 
 export const Route = createFileRoute("/dashboard/hive-exec/classes")({
-  head: () => ({ meta: [{ title: "Training — Hive Executive" }] }),
+  head: () => ({ meta: [{ title: "Training — Provider Interface Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
       <ExecClassesPage />

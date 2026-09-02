@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Hexagon, LogOut, User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -18,6 +18,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 import { preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
 
 export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
@@ -59,8 +60,8 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     >
       <div className="flex h-14 w-full items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
-            <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2.5} />
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-[#f3efe6]">
+            <PiMark className="h-5 w-5" title="Provider Interface" />
           </span>
           <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
         </div>

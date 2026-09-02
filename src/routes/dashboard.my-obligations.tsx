@@ -41,7 +41,7 @@ function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
 }
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
-  head: () => ({ meta: [{ title: "My obligations — HIVE" }] }),
+  head: () => ({ meta: [{ title: "My obligations — Provider Interface" }] }),
   component: MyObligationsPage,
 });
 

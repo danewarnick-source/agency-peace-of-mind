@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/dashboard/reimbursements")({
-  head: () => ({ meta: [{ title: "Activity Reimbursement Approvals — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Activity Reimbursement Approvals — Provider Interface" }] }),
   component: ReimbursementApprovalsPage,
 });
 

@@ -23,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/dashboard/hive-exec/plans")({
-  head: () => ({ meta: [{ title: "Plans & Billing — HIVE Executive" }] }),
+  head: () => ({ meta: [{ title: "Plans & Billing — Provider Interface Executive" }] }),
   component: () => (
     <RequireHiveExecutive>
       <PlansAndBilling />

@@ -50,7 +50,7 @@ import { HiveMark } from "@/components/brand/hive-mark";
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
     meta: [
-      { title: "Scheduler — HIVE" },
+      { title: "Scheduler — Provider Interface" },
       { name: "description", content: "Schedule, Day Program, and Staff view" },
     ],
     links: [
@@ -175,9 +175,9 @@ function SchedulerPage() {
       {/* Brand bar with tabs — light work area, gold jewelry only */}
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--hive-border)] bg-[var(--hive-surface)] px-4 py-3 text-[var(--hive-text)]">
         <div className="flex items-center gap-2">
-          <HiveMark className="h-8 w-8" />
+          <HiveMark className="h-8 w-8 text-[var(--hive-text)]" />
           <div>
-            <div className="text-sm font-bold tracking-[0.14em] text-[var(--hive-text)]">HIVE SCHEDULER</div>
+            <div className="text-sm font-bold tracking-[0.14em] text-[var(--hive-text)]">SCHEDULER</div>
           </div>
         </div>
         <div className="ml-2 flex items-center gap-1">

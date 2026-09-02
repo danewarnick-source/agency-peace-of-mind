@@ -6,7 +6,7 @@ import { AuditorPackagePreview } from "@/components/audit-portal/auditor-package
 export const Route = createFileRoute("/audit-portal/$packageId")({
   head: () => ({
     meta: [
-      { title: "Audit Package — HIVE State Audit Portal" },
+      { title: "Audit Package — Provider Interface State Audit Portal" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),

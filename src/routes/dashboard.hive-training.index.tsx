@@ -112,7 +112,7 @@ function HiveTrainingHub() {
   const classRosterLocked = !featureOn
     ? <FeatureLockedRoute featureKey="hive_training" />
     : !hasAddon("hive_training")
-      ? <FeatureLocked featureName="HIVE Training" />
+      ? <FeatureLocked featureName="Training" />
       : null;
 
   return (
@@ -123,7 +123,7 @@ function HiveTrainingHub() {
         </div>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">HIVE Training</h1>
+            <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">Training</h1>
             {realIsAdmin && !isAdmin && (
               <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground text-xs px-2 py-0.5">
                 Previewing as staff
@@ -427,7 +427,7 @@ function LaunchpadRoster({
       <div>
         <h2 className="text-lg font-semibold text-[#1A2B47]">Launchpad clock-in gate</h2>
         <p className="text-sm text-muted-foreground">
-          Staff must pass Hive Launchpad before the punch pad will clock them in.
+          Staff must pass Launchpad before the punch pad will clock them in.
           This list reads the live pass flag — it is not a test override.
         </p>
       </div>
@@ -1331,7 +1331,7 @@ function AutoRenewCard({ orgId, catalog }: { orgId: string; catalog: CatalogRow[
           <div>
             <h2 className="text-lg font-semibold text-[#1A2B47]">Auto-renew expiring trainings</h2>
             <p className="text-sm text-muted-foreground max-w-xl">
-              Set it once. HIVE re-purchases and re-assigns seats before certificates expire — no gap, no chase, no scramble.
+              Set it once. The office re-purchases and re-assigns seats before certificates expire — no gap, no chase, no scramble.
             </p>
           </div>
         </div>

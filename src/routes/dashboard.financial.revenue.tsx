@@ -50,7 +50,7 @@ import { getRevenueClientPills } from "@/lib/financial-detail.functions";
 import { BillingDetailDialog } from "@/components/financial/billing-detail-dialog";
 
 export const Route = createFileRoute("/dashboard/financial/revenue")({
-  head: () => ({ meta: [{ title: "Revenue — Financial — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Revenue — Financial — Provider Interface" }] }),
   component: RevenuePage,
 });
 

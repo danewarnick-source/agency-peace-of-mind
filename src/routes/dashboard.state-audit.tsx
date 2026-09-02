@@ -30,7 +30,7 @@ import { resolveAuthOrigin } from "@/lib/auth-redirect";
 
 
 export const Route = createFileRoute("/dashboard/state-audit")({
-  head: () => ({ meta: [{ title: "State Audit Packages — HIVE" }] }),
+  head: () => ({ meta: [{ title: "State Audit Packages — Provider Interface" }] }),
   component: () => (
     <FeatureGate featureKey="state_audit">
       <StateAuditPage />

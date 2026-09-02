@@ -7,7 +7,7 @@ export function DuskDeskStill() {
       <img
         src="/pi-dusk-desk-hero.png"
         alt=""
-        className="block h-[min(58vh,640px)] w-full object-cover object-[center_62%] sm:h-[min(64vh,760px)]"
+        className="block h-[min(42vh,480px)] w-full object-cover object-[center_62%] sm:h-[min(48vh,560px)]"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b1220] via-[#0b1220]/15 to-[#0b1220]/70" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#0b1220] to-transparent" />

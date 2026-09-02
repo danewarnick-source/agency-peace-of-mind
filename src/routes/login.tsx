@@ -3,8 +3,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
-import { HiveWordmark } from "@/components/brand/hive-mark";
-import { HexBackdrop } from "@/components/brand/hex-backdrop";
+import { PiWordmark } from "@/components/pi-landing/pi-mark";
 
 import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
@@ -29,7 +28,7 @@ function isSafeNext(v: unknown): v is string {
 }
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — Hive" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { next?: string } =>
     isSafeNext(s.next) ? { next: s.next as string } : {},
   component: LoginPage,
@@ -37,8 +36,7 @@ export const Route = createFileRoute("/login")({
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--hive-bg)] text-[var(--hive-text)]">
-      <HexBackdrop opacity={0.16} />
+    <div className="relative min-h-screen overflow-hidden bg-[#0b1220] text-[#f3efe6]">
       <div className="relative flex min-h-screen flex-col items-center justify-center px-6 py-12">
         {children}
       </div>
@@ -180,29 +178,26 @@ function LoginPage() {
   };
 
   const fieldClass =
-    "flex h-12 w-full rounded-md border border-[var(--hive-border)] bg-[var(--hive-bg)] px-3 py-2 text-base text-[var(--hive-text)] outline-none placeholder:text-[var(--hive-text-muted)] focus:ring-2 focus:ring-[var(--hive-gold)]/40";
+    "flex h-12 w-full rounded-md border border-white/[0.12] bg-[#0b1220] px-3 py-2 text-base text-[#f3efe6] outline-none placeholder:text-[#f3efe6]/40 focus:ring-2 focus:ring-[#f3efe6]/25";
 
   return (
     <AuthFrame>
       <div className="flex w-full max-w-md flex-col items-center">
-        <HiveWordmark to="/" tone="canvas" />
-        <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
-          Utah DSPD · Community Supports Waiver.
-        </p>
+        <PiWordmark to="/" />
 
-        <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
+        <div className="mt-8 w-full rounded-xl border border-white/[0.10] bg-[#111827] p-7">
           <div className="mb-7 text-center">
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--hive-text)]">
+            <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#f3efe6]">
               Welcome back
             </h1>
-            <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">
-              Sign in to your Hive account
+            <p className="mt-1.5 text-sm text-[#f3efe6]/60">
+              Sign in to your Provider Interface account
             </p>
           </div>
 
           <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
             <div className="grid gap-2">
-              <Label htmlFor="identifier" className="text-[var(--hive-text-muted)]">
+              <Label htmlFor="identifier" className="text-[#f3efe6]/70">
                 Email
               </Label>
               <input
@@ -219,7 +214,7 @@ function LoginPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password" className="text-[var(--hive-text-muted)]">
+              <Label htmlFor="password" className="text-[#f3efe6]/70">
                 Password
               </Label>
               <div className="relative">
@@ -235,7 +230,7 @@ function LoginPage() {
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--hive-text-muted)] hover:text-[var(--hive-text)]"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[#f3efe6]/50 hover:text-[#f3efe6]"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -243,44 +238,50 @@ function LoginPage() {
               </div>
               <Link
                 to="/forgot-password"
-                className="text-xs font-medium text-[var(--hive-gold)] hover:text-[var(--hive-gold-hover)]"
+                className="text-xs font-medium text-[#f3efe6]/70 hover:text-[#f3efe6]"
               >
                 Forgot password?
               </Link>
             </div>
 
-            <Button type="submit" disabled={busy} className="h-11 w-full">
+            <Button
+              type="submit"
+              disabled={busy}
+              className="h-11 w-full bg-[#f3efe6] text-[#0b1220] hover:bg-[#f3efe6]/90"
+            >
               {busy ? "Signing in…" : "Sign in"}
             </Button>
           </form>
 
-          <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--hive-text-muted)]">
-            <div className="absolute inset-x-0 top-1/2 h-px bg-[var(--hive-border)]" />
-            <span className="relative bg-[var(--hive-surface)] px-3">or</span>
+          <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-[#f3efe6]/40">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-white/[0.10]" />
+            <span className="relative bg-[#111827] px-3">or</span>
           </div>
 
-          <Button asChild variant="outline" className="h-11 w-full">
+          <Button
+            asChild
+            variant="outline"
+            className="h-11 w-full border-[#f3efe6]/25 bg-transparent text-[#f3efe6] hover:bg-white/[0.06] hover:text-[#f3efe6]"
+          >
             <Link to="/signup">Get started</Link>
           </Button>
 
           <button
             type="button"
             onClick={google}
-            className="mt-4 w-full text-center text-xs text-[var(--hive-text-muted)] hover:text-[var(--hive-gold)]"
+            className="mt-4 w-full text-center text-xs text-[#f3efe6]/50 hover:text-[#f3efe6]"
           >
             Continue with Google
           </button>
         </div>
-
-        <p className="mt-8 text-sm font-medium text-[var(--hive-gold)]">hivecertify.com</p>
       </div>
     </AuthFrame>
   );
 }
 
 /**
- * Shared dark auth shell used by forgot-password / reset-password.
- * Matches the locked Hive login visual language.
+ * Shared dusk auth shell used by forgot-password / reset-password.
+ * Matches the Provider Interface login visual language.
  */
 export function AuthShell({
   title,
@@ -294,20 +295,16 @@ export function AuthShell({
   return (
     <AuthFrame>
       <div className="flex w-full max-w-md flex-col items-center">
-        <HiveWordmark to="/" tone="canvas" />
-        <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
-          Utah DSPD · Community Supports Waiver.
-        </p>
-        <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
+        <PiWordmark to="/" />
+        <div className="mt-8 w-full rounded-xl border border-white/[0.10] bg-[#f3efe6] p-7 text-[#0b1220]">
           <div className="mb-7 text-center">
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--hive-text)]">
+            <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#0b1220]">
               {title}
             </h1>
-            <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">{subtitle}</p>
+            <p className="mt-1.5 text-sm text-[#0b1220]/65">{subtitle}</p>
           </div>
           {children}
         </div>
-        <p className="mt-8 text-sm font-medium text-[var(--hive-gold)]">hivecertify.com</p>
       </div>
     </AuthFrame>
   );

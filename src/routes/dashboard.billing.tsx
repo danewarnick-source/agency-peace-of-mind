@@ -26,7 +26,7 @@ function BillingError({ error }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createFileRoute("/dashboard/billing")({
-  head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Billing — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>): { focus?: string } =>
     typeof s.focus === "string" ? { focus: s.focus } : {},
   component: () => (
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/dashboard/billing")({
 
 const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boolean; perm?: Permission }> = [
   { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
-  { to: "/dashboard/billing/subscription", label: "HIVE Subscription", icon: CreditCard },
+  { to: "/dashboard/billing/subscription", label: "Subscription", icon: CreditCard },
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },

@@ -10,7 +10,7 @@ import { getForm, listSubmissions } from "@/lib/forms.functions";
 import type { FormField } from "@/lib/forms-utils";
 
 export const Route = createFileRoute("/dashboard/forms/$formId/submissions")({
-  head: () => ({ meta: [{ title: "Submissions — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Submissions — Provider Interface" }] }),
   component: SubmissionsView,
 });
 

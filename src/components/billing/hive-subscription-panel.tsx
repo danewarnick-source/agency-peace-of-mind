@@ -189,7 +189,7 @@ export function HiveSubscriptionPanel() {
   return (
     <div className="mx-auto max-w-2xl space-y-4" data-testid="hive-subscription-page">
       <header>
-        <h2 className="font-display text-xl font-semibold">HIVE Subscription</h2>
+        <h2 className="font-display text-xl font-semibold">Subscription</h2>
         <p className="text-sm text-muted-foreground">
           Per active staff. List rates drop as client count grows. Enterprise is contact-us — no
           public dollar amount.

@@ -28,7 +28,7 @@ import {
 
 export const Route = createFileRoute("/join")({
   head: () => ({
-    meta: [{ title: "Join your provider — HIVE" }, { name: "robots", content: "noindex,nofollow" }],
+    meta: [{ title: "Join your provider — Provider Interface" }, { name: "robots", content: "noindex,nofollow" }],
   }),
   validateSearch: (s: Record<string, unknown>): { invite?: string; token?: string } => {
     const invite = typeof s.invite === "string" && s.invite.trim() ? s.invite : undefined;

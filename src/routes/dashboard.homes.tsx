@@ -8,7 +8,7 @@ import { HomesTeamsBoard } from "@/components/scheduling/homes-teams-board";
  * Renders the exact same HomesTeamsBoard component — no logic changes.
  */
 export const Route = createFileRoute("/dashboard/homes")({
-  head: () => ({ meta: [{ title: "Homes & Teams — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Homes & Teams — Provider Interface" }] }),
   component: HomesPage,
 });
 

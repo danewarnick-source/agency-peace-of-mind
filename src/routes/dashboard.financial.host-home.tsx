@@ -19,7 +19,7 @@ import {
 } from "@/lib/financial-host-home.functions";
 
 export const Route = createFileRoute("/dashboard/financial/host-home")({
-  head: () => ({ meta: [{ title: "Host Home — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Host Home — Provider Interface" }] }),
   component: HostHomePage,
 });
 

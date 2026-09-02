@@ -22,7 +22,7 @@ import { LoanEditor } from "@/components/loans/loan-editor";
 import { listOrgLoans } from "@/lib/client-loans.functions";
 
 export const Route = createFileRoute("/dashboard/client-loans")({
-  head: () => ({ meta: [{ title: "Client Loan Ledger — HIVE" }] }),
+  head: () => ({ meta: [{ title: "Client Loan Ledger — Provider Interface" }] }),
   component: () => (
     <RequireRole roles={["admin"]}>
       <ClientLoansPage />

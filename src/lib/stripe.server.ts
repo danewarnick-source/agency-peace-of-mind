@@ -15,7 +15,9 @@ export function getStripe(): Stripe {
     throw new Error(cfg.message ?? "Payments are not set up yet.");
   }
   if (isStripeLiveSecretKey(env.secretKey)) {
-    throw new Error("Live Stripe keys are blocked. Use test-mode keys only.");
+    throw new Error(
+      "TEST MODE only. Live Stripe keys are blocked. This host cannot charge a real card. Use sk_test_ / pk_test_ keys.",
+    );
   }
   if (!cached) {
     cached = new Stripe(env.secretKey);

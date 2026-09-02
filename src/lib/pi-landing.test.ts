@@ -88,6 +88,34 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_FORBIDDEN_MARKETING.includes("Nectar" as never), false);
   });
 
+  it("signup walk posts list price, optional training, and no True North placeholder", () => {
+    const signup = read(new URL("../routes/signup.tsx", import.meta.url));
+    assert.match(signup, /PI_SIGNUP_PRICE_LINE|PI_LIST_PRICE_DISPLAY/);
+    assert.match(signup, /Skip training/);
+    assert.match(signup, /4242 4242 4242 4242/);
+    assert.match(signup, /pricingModel: "pi_list"/);
+    assert.match(signup, /fromSignup: true/);
+    assert.doesNotMatch(signup, /True North Supports/);
+    assert.doesNotMatch(signup, /founding/i);
+  });
+
+  it("keeps leftover staff dollars off signup, paywall, and Hive Exec copy", () => {
+    const leftovers = ["$125", "$79", "$500", "$299"];
+    const files = [
+      new URL("../routes/signup.tsx", import.meta.url),
+      new URL("../routes/billing-locked.tsx", import.meta.url),
+      new URL("../components/billing/hive-subscription-panel.tsx", import.meta.url),
+      new URL("../routes/dashboard.hive-exec.plans.tsx", import.meta.url),
+      new URL("../routes/dashboard.hive-exec.$orgId.tsx", import.meta.url),
+    ];
+    for (const file of files) {
+      const text = read(file);
+      for (const banned of leftovers) {
+        assert.equal(text.includes(banned), false, `${file.pathname} must not post ${banned}`);
+      }
+    }
+  });
+
   it("keeps old staff prices and True North-free lines off public surfaces", () => {
     for (const file of PUBLIC_FILES) {
       const text = read(file);

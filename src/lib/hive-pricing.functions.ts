@@ -125,8 +125,8 @@ export const setOrgPricingScheduleFn = createServerFn({ method: "POST" })
       target_org_id: data.organizationId,
       summary:
         data.schedule === "founding"
-          ? "Marked company founding ($79 / staff, $299 min, 12 months)"
-          : "Marked company list pricing ($125 / $109 / $99 per staff, $500 min)",
+          ? "Marked company founding (internal schedule; checkout stays list $69 / client, $350 min)"
+          : "Marked company list pricing ($69 / client, $350 min)",
     });
 
     return { ok: true, foundingEndsAt: patch.founding_ends_at ?? null };

@@ -2,10 +2,11 @@
  * HIVE subscription tier catalog.
  *
  * Entitlements (what features a company gets) live here.
- * Dollar amounts for self-serve Hive do NOT — those are per-staff list/founding
- * rates in src/lib/hive-pricing.ts. Do not put $499 / $1,299 on these rows.
+ * Dollar amounts for self-serve Hive do NOT live here — public list is
+ * $69 / client ($350 min) in src/lib/pi-landing.ts. Leftover staff math in
+ * hive-pricing.ts is unused for checkout. Do not put $499 / $1,299 on these rows.
  *
- * Public checkout is per-staff Hive (hive_standard / pro). Enterprise is
+ * Public checkout is PI list (hive_standard / pro). Enterprise is
  * contact-us — Hive Exec assigns it. Starter is comped / not self-serve.
  */
 
@@ -33,7 +34,7 @@ export interface TierDef {
   tagline: string;
   /** Flat monthly cents, or null when the price is per-staff / contact-us / included. */
   monthlyPriceCents: number | null;
-  priceKind: "per_staff" | "contact" | "included" | "custom";
+  priceKind: "per_client" | "per_staff" | "contact" | "included" | "custom";
   addons: AddonId[];
   highlights: string[];
 }
@@ -79,15 +80,15 @@ export const TIER_CATALOG: TierDef[] = [
   {
     id: "pro",
     name: "Provider Interface",
-    tagline: "Full platform, billed per active staff (list or founding).",
+    tagline: "Full platform, billed $69 per client / month ($350 minimum).",
     monthlyPriceCents: null,
-    priceKind: "per_staff",
+    priceKind: "per_client",
     addons: ["nectar_infusion", "hive_training"],
     highlights: [
       "Everything in Starter",
       "NECTAR Infusion",
-      "Training hub (courses billed per staff)",
-      "Volume rates as client count grows",
+      "Training hub (courses billed separately)",
+      "$69 per client / month ($350 minimum)",
     ],
   },
   {
@@ -137,7 +138,8 @@ export function isPublicSelfServeTier(id: string | null | undefined): boolean {
 }
 
 export function formatTierPrice(t: TierDef): string {
-  if (t.priceKind === "per_staff") return "Per staff";
+  if (t.priceKind === "per_client") return "$69 / client";
+  if (t.priceKind === "per_staff") return "$69 / client";
   if (t.priceKind === "contact" || t.priceKind === "custom") return "Contact us";
   if (t.priceKind === "included" || t.monthlyPriceCents === 0) return "Included";
   if (t.monthlyPriceCents == null) return "Contact us";

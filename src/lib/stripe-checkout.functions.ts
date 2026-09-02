@@ -16,12 +16,21 @@ import {
 } from "@/lib/billing-access";
 import {
   PAYMENTS_NOT_CONFIGURED,
+  isStripeLiveSecretKey,
   readStripeEnv,
   stripePaymentsConfigured,
+  resolveAgencyCheckoutPricingModel,
   stripePriceIdForTrainingSku,
   stripeUnitAmountForTrainingSku,
+  subscriptionLineItemsForPiListQuote,
   subscriptionLineItemsForQuote,
 } from "@/lib/stripe-config";
+import {
+  isSignupTrainingAddonId,
+  quotePiListSubscription,
+  quoteSignupTrainingAddon,
+  type SignupTrainingAddonId,
+} from "@/lib/pi-signup-pricing";
 import { appOriginFromRequest, getStripe } from "@/lib/stripe.server";
 import { activateSubscriptionFromCheckout } from "@/lib/stripe-webhook";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
@@ -271,6 +280,19 @@ async function activateExemptOrg(orgId: string, plan: "hive_standard" | "enterpr
   }
 }
 
+/** Public — signup payment step needs to know TEST MODE vs live-blocked before Checkout. */
+export const getSignupPaymentsStatusFn = createServerFn({ method: "GET" }).handler(async () => {
+  const env = readStripeEnv();
+  const cfg = stripePaymentsConfigured(env);
+  const liveBlocked = isStripeLiveSecretKey(env.secretKey);
+  return {
+    paymentsConfigured: cfg.ok,
+    testMode: cfg.testMode,
+    liveBlocked,
+    message: cfg.message,
+  };
+});
+
 export const getBillingStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input?: { organizationId?: string | null }) => {
@@ -305,7 +327,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       billedCents: 0,
       minimumApplied: false,
       minimumCents: 0,
-      quoteLabel: "List",
+      quoteLabel: "List · $69 per client / month ($350 minimum)",
       foundingSlotsRemaining: 0,
       payingOrgCount: 0,
     };
@@ -354,23 +376,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       (sub as { staff_count?: number | null } | null)?.staff_count || usage.staff || 1,
     );
     const clientCount = clampClientCount(usage.clients || org.approxClientCount || 0);
-    const interval: BillingInterval =
-      (sub as { billing_interval?: string | null } | null)?.billing_interval === "annual"
-        ? "annual"
-        : "monthly";
-    let schedule: PricingSchedule = org.pricingSchedule ?? "list";
-    let foundingEndsAt = org.foundingEndsAt;
-    if (!org.pricingSchedule && !exempt) {
-      const paying = await countPayingOrgs();
-      schedule = signupScheduleFromPayingCount(paying);
-    }
-    const quote = quoteHiveSubscription({
-      staffCount,
-      clientCount,
-      schedule,
-      interval,
-      foundingEndsAt,
-    });
+    const quote = quotePiListSubscription({ clientCount, interval: "monthly" });
     let payingOrgCount = 0;
     try {
       payingOrgCount = await countPayingOrgs();
@@ -393,12 +399,12 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       currentPeriodEnd: (sub?.current_period_end as string | null) ?? null,
       hasStripeCustomer: !!(sub as { stripe_customer_id?: string | null } | null)?.stripe_customer_id,
       orgName: org.name,
-      pricingSchedule: quote.schedule,
-      foundingEndsAt,
-      staffCount: quote.staffCount,
+      pricingSchedule: "list" as PricingSchedule,
+      foundingEndsAt: org.foundingEndsAt,
+      staffCount,
       clientCount: quote.clientCount,
-      interval: quote.interval,
-      perStaffCents: quote.perStaffCents,
+      interval: "monthly" as BillingInterval,
+      perStaffCents: quote.perClientCents,
       monthlyCents: quote.monthlyCents,
       billedCents: quote.billedCents,
       minimumApplied: quote.minimumApplied,
@@ -416,14 +422,21 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
     staffCount?: number;
     clientCount?: number;
     interval?: BillingInterval;
+    pricingModel?: "pi_list" | "hive_staff";
+    trainingAddon?: SignupTrainingAddonId | "none" | null;
+    fromSignup?: boolean;
   }) => {
     const organizationId = String(input?.organizationId ?? "");
     if (!UUID_RE.test(organizationId)) throw new Error("Invalid organization.");
+    const trainingRaw = String(input?.trainingAddon ?? "none");
     return {
       organizationId,
       staffCount: input?.staffCount != null ? clampStaffCount(input.staffCount) : undefined,
       clientCount: input?.clientCount != null ? clampClientCount(input.clientCount) : undefined,
       interval: input?.interval === "annual" ? ("annual" as const) : ("monthly" as const),
+      pricingModel: resolveAgencyCheckoutPricingModel(input?.pricingModel),
+      trainingAddon: isSignupTrainingAddonId(trainingRaw) ? trainingRaw : ("none" as const),
+      fromSignup: input?.fromSignup === true,
     };
   })
   .handler(async ({ data, context }) => {
@@ -456,21 +469,62 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       data.clientCount ?? usage.clients ?? org.approxClientCount ?? 0,
     );
     const interval: BillingInterval = data.interval;
-    const assigned = await resolveOrgSchedule(org);
-    const quote = quoteHiveSubscription({
-      staffCount,
-      clientCount,
-      schedule: assigned.schedule,
-      interval,
-      foundingEndsAt: assigned.foundingEndsAt,
-    });
+    const usePiList = data.pricingModel === "pi_list";
+    const training = quoteSignupTrainingAddon(data.trainingAddon);
 
-    await supabaseAdmin
-      .from("organizations")
-      .update({ approx_client_count: clientCount })
-      .eq("id", data.organizationId);
+    let monthlyCents: number;
+    let billedCents: number;
+    let scheduleLabel: string;
+    let built: { lineItems: ReturnType<typeof subscriptionLineItemsForPiListQuote>["lineItems"]; discounts?: Array<{ coupon: string }> };
 
-    await ensurePausedSubscription(data.organizationId, quote);
+    if (usePiList) {
+      const quote = quotePiListSubscription({ clientCount, interval: "monthly" });
+      monthlyCents = quote.monthlyCents;
+      billedCents = quote.billedCents;
+      scheduleLabel = "list";
+      built = subscriptionLineItemsForPiListQuote(quote, training);
+      const { error: scheduleErr } = await supabaseAdmin
+        .from("organizations")
+        .update({
+          approx_client_count: clientCount,
+          pricing_schedule: "list",
+        })
+        .eq("id", data.organizationId);
+      if (scheduleErr && !/pricing_schedule|approx_client_count/i.test(scheduleErr.message ?? "")) {
+        throw new Error(scheduleErr.message);
+      }
+      await ensurePausedSubscription(data.organizationId, {
+        ...quoteHiveSubscription({
+          staffCount,
+          clientCount,
+          schedule: "list",
+          interval: "monthly",
+        }),
+        monthlyCents: quote.monthlyCents,
+        billedCents: quote.billedCents,
+        clientCount: quote.clientCount,
+        interval: "monthly",
+        schedule: "list",
+      });
+    } else {
+      const assigned = await resolveOrgSchedule(org);
+      const quote = quoteHiveSubscription({
+        staffCount,
+        clientCount,
+        schedule: assigned.schedule,
+        interval,
+        foundingEndsAt: assigned.foundingEndsAt,
+      });
+      monthlyCents = quote.monthlyCents;
+      billedCents = quote.billedCents;
+      scheduleLabel = quote.schedule;
+      built = subscriptionLineItemsForQuote(quote);
+      await supabaseAdmin
+        .from("organizations")
+        .update({ approx_client_count: clientCount })
+        .eq("id", data.organizationId);
+      await ensurePausedSubscription(data.organizationId, quote);
+    }
 
     const { data: sub } = await supabaseAdmin
       .from("org_subscriptions")
@@ -492,25 +546,30 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
     }
 
-    const built = subscriptionLineItemsForQuote(quote);
     const origin = appOriginFromRequest(getRequest());
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
       client_reference_id: data.organizationId,
       success_url: `${origin}/dashboard/billing/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard/billing/subscription?checkout=cancelled`,
+      cancel_url: data.fromSignup
+        ? `${origin}/signup?checkout=cancelled`
+        : `${origin}/dashboard/billing/subscription?checkout=cancelled`,
       line_items: built.lineItems,
       ...(built.discounts ? { discounts: built.discounts } : {}),
       metadata: {
         hive_kind: "subscription",
         organization_id: data.organizationId,
         plan: "hive_standard",
-        pricing_schedule: quote.schedule,
-        staff_count: String(quote.staffCount),
-        client_count: String(quote.clientCount),
-        interval: quote.interval,
-        monthly_cents: String(quote.monthlyCents),
+        pricing_model: usePiList ? "pi_list" : "hive_staff",
+        pricing_schedule: scheduleLabel,
+        staff_count: String(staffCount),
+        client_count: String(clientCount),
+        interval: usePiList ? "monthly" : interval,
+        monthly_cents: String(monthlyCents),
+        billed_cents: String(billedCents),
+        training_addon: training.id,
+        training_cents: String(training.priceCents),
         purchaser_user_id: context.userId,
       },
       subscription_data: {
@@ -518,9 +577,11 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
           hive_kind: "subscription",
           organization_id: data.organizationId,
           plan: "hive_standard",
-          pricing_schedule: quote.schedule,
-          staff_count: String(quote.staffCount),
-          interval: quote.interval,
+          pricing_model: usePiList ? "pi_list" : "hive_staff",
+          pricing_schedule: scheduleLabel,
+          staff_count: String(staffCount),
+          client_count: String(clientCount),
+          interval: usePiList ? "monthly" : interval,
         },
       },
     });

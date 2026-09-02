@@ -56,9 +56,9 @@ function Header() {
         <div>
           <h2 className="font-display text-lg font-semibold">Plans &amp; Billing</h2>
           <p className="text-sm text-muted-foreground">
-            Define entitlements, mark a company founding vs list, or billing-exempt
-            so they never hit Stripe. New agencies pay per staff (founding until 5
-            paying companies exist, then list). Enterprise is contact us.
+            Define entitlements, mark a company billing-exempt so they never hit
+            Stripe, or keep leftover founding/list schedule notes. New agencies pay
+            $69 per client / month ($350 minimum). Enterprise is contact us.
           </p>
         </div>
       </div>
@@ -353,10 +353,10 @@ function StripeStatusSection() {
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h3 className="font-display text-base font-semibold">Stripe (test mode)</h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        New agencies pay per active staff: founding $79 / staff ($299 min) until 5
-        paying companies exist, then list $125 / $109 / $99 with a $500 minimum.
-        Annual is 20% off. Enterprise is contact us. Comped companies (True North,
-        or anyone you mark exempt) never see a paywall. Webhook URL:{" "}
+        New agencies pay $69 per client / month ($350 minimum). Checkout uses the
+        PI list catalog — not leftover staff seats. Enterprise is contact us. Comped
+        companies (True North, or anyone you mark exempt) never see a paywall. Webhook
+        URL:{" "}
         <span className="font-mono">/api/stripe/webhook</span>
       </p>
       <div className="mt-3 rounded-lg border border-border bg-background p-4">

@@ -1,12 +1,8 @@
 /**
- * Confirmed Hive list / founding / training prices.
+ * Leftover Hive staff list / founding math. Public signup and checkout do not
+ * use these dollars — those are $69 / client and $350 min in pi-landing.ts.
  *
- * List (public /pricing): $125 / staff (1–19 clients), $109 (20–49), $99 (50+),
- * $500 / month minimum, annual 20% off. Enterprise is contact-us — no dollar amount.
- *
- * Founding (first 5 paying orgs, 12 months, then list): $79 / staff, $299 minimum.
- *
- * Training is one-time per staff (Mandt name stays): CPR $100, 30-day $75,
+ * Training cents below are still the locked add-on amounts: CPR $100, 30-day $75,
  * Mandt $200, package $300. True North / billing-exempt skip it.
  */
 

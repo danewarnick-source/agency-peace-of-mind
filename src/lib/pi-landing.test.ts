@@ -88,6 +88,16 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_FORBIDDEN_MARKETING.includes("Nectar" as never), false);
   });
 
+  it("signup walk posts list price, optional training, and no True North placeholder", () => {
+    const signup = read(new URL("../routes/signup.tsx", import.meta.url));
+    assert.match(signup, /PI_SIGNUP_PRICE_LINE|PI_LIST_PRICE_DISPLAY/);
+    assert.match(signup, /Skip training/);
+    assert.match(signup, /4242 4242 4242 4242/);
+    assert.match(signup, /pricingModel: "pi_list"/);
+    assert.doesNotMatch(signup, /True North Supports/);
+    assert.doesNotMatch(signup, /founding/i);
+  });
+
   it("keeps old staff prices and True North-free lines off public surfaces", () => {
     for (const file of PUBLIC_FILES) {
       const text = read(file);

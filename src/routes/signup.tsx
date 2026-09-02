@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -18,9 +18,19 @@ import { authRedirectUrl } from "@/lib/auth-redirect";
 import { checkEmailExists } from "@/lib/signup-checks.functions";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
-import { createSubscriptionCheckoutFn } from "@/lib/stripe-checkout.functions";
-import { type BillingInterval } from "@/lib/hive-pricing";
-import { PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import {
+  createSubscriptionCheckoutFn,
+  getSignupPaymentsStatusFn,
+} from "@/lib/stripe-checkout.functions";
+import { formatUsdFromCents, type BillingInterval } from "@/lib/hive-pricing";
+import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import {
+  SIGNUP_AGENCY_PLACEHOLDER,
+  SIGNUP_TRAINING_ADDONS,
+  quotePiListSubscription,
+  quoteSignupTrainingAddon,
+  type SignupTrainingAddonId,
+} from "@/lib/pi-signup-pricing";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
@@ -50,7 +60,8 @@ const inputStyle: React.CSSProperties = {
 const STEPS = [
   "Account",
   "Your business",
-  "Staff & billing",
+  "Plan",
+  "Training",
   "Payment",
 ] as const;
 
@@ -67,6 +78,7 @@ interface FormState {
   staffCount: number;
   clientCount: number;
   interval: BillingInterval;
+  trainingAddon: SignupTrainingAddonId | "none";
 }
 
 const initialForm: FormState = {
@@ -80,6 +92,7 @@ const initialForm: FormState = {
   staffCount: 8,
   clientCount: 12,
   interval: "monthly",
+  trainingAddon: "none",
 };
 
 /* ──────────────────────────── shell ──────────────────────────── */
@@ -215,6 +228,7 @@ function SignupPage() {
           <Stepper step={step} />
           <div
             className="rounded-2xl border border-white/[0.10] bg-[#f3efe6] p-6 text-[#0b1220] shadow-[0_24px_60px_-30px_rgba(0,0,0,0.55)] sm:p-8"
+            data-testid="signup-new-agency"
           >
             {step === 0 && (
               <Step1Account
@@ -231,6 +245,9 @@ function SignupPage() {
               <Step4Pricing form={form} update={update} onBack={goBack} onNext={() => setStep(3)} />
             )}
             {step === 3 && (
+              <Step5Training form={form} update={update} onBack={goBack} onNext={() => setStep(4)} />
+            )}
+            {step === 4 && (
               <Step6Payment
                 form={form}
                 onBack={goBack}
@@ -356,7 +373,8 @@ function Step1Account({
             onBlur={verifyEmail}
             className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
             style={inputStyle}
-            placeholder="you@agency.com"
+            placeholder="you+agency@gmail.com"
+            data-testid="signup-email"
           />
           {checking && <span className="text-xs text-[var(--hive-text-muted)]">Checking…</span>}
         </Field>
@@ -537,7 +555,12 @@ function Step3Business({
       <Header title="Tell us about your business" subtitle="This becomes your workspace name across Provider Interface." />
       <div className="grid gap-4">
         <Field label="Agency or company name">
-          <TextInput value={form.agencyName} onChange={(v) => update("agencyName", v)} placeholder="True North Supports" />
+          <TextInput
+            value={form.agencyName}
+            onChange={(v) => update("agencyName", v)}
+            placeholder={SIGNUP_AGENCY_PLACEHOLDER}
+            testId="signup-agency-name"
+          />
         </Field>
         <Field label="Primary contact (full name)">
           <TextInput value={form.contactName} onChange={(v) => update("contactName", v)} placeholder="Jane Doe" />
@@ -582,12 +605,14 @@ function TextInput({
   placeholder,
   type = "text",
   disabled,
+  testId,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
   disabled?: boolean;
+  testId?: string;
 }) {
   return (
     <input
@@ -596,6 +621,7 @@ function TextInput({
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      data-testid={testId}
       className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40 disabled:opacity-60"
       style={inputStyle}
     />
@@ -615,26 +641,126 @@ function Step4Pricing({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const quote = quotePiListSubscription({ clientCount: form.clientCount });
   return (
     <>
-      <Header title="About your office" subtitle={PI_SIGNUP_PRICE_LINE} />
+      <Header title="Your plan" subtitle={PI_SIGNUP_PRICE_LINE} />
+      <div
+        className="mb-5 rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4"
+        data-testid="signup-plan-quote"
+      >
+        <p className="text-lg font-semibold text-[var(--hive-text)]">
+          {PI_LIST_PRICE_DISPLAY} <span className="text-sm font-normal text-[var(--hive-text-muted)]">{PI_LIST_PRICE_UNIT}</span>
+        </p>
+        <p className="mt-1 text-sm text-[var(--hive-text-muted)]">{PI_LIST_MINIMUM_LINE}</p>
+        <p className="mt-3 text-sm text-[var(--hive-text)]" data-testid="signup-plan-math">
+          {quote.summaryLine}
+        </p>
+      </div>
       <div className="grid gap-4">
-        <Field label="How many active staff?">
-          <TextInput
-            type="number"
-            value={String(form.staffCount)}
-            onChange={(v) => update("staffCount", Math.max(1, Number(v) || 1))}
-          />
-        </Field>
-        <Field label="About how many clients?">
+        <Field label="About how many clients?" hint="Billing is per client. Staff count does not change the price.">
           <TextInput
             type="number"
             value={String(form.clientCount)}
             onChange={(v) => update("clientCount", Math.max(0, Number(v) || 0))}
           />
         </Field>
+        <Field label="How many active staff?" hint="For your workspace only — not billed.">
+          <TextInput
+            type="number"
+            value={String(form.staffCount)}
+            onChange={(v) => update("staffCount", Math.max(1, Number(v) || 1))}
+          />
+        </Field>
       </div>
       <NavButtons onBack={onBack} onNext={onNext} />
+    </>
+  );
+}
+
+function Step5Training({
+  form,
+  update,
+  onBack,
+  onNext,
+}: {
+  form: FormState;
+  update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const skip = () => {
+    update("trainingAddon", "none");
+    onNext();
+  };
+  return (
+    <>
+      <Header
+        title="Optional training"
+        subtitle="Take one add-on now, or skip. You can buy training later from the office."
+      />
+      <div className="grid gap-2" data-testid="signup-training-step">
+        {SIGNUP_TRAINING_ADDONS.map((addon) => {
+          const selected = form.trainingAddon === addon.id;
+          return (
+            <button
+              key={addon.id}
+              type="button"
+              data-testid={`signup-training-${addon.id}`}
+              onClick={() => update("trainingAddon", addon.id)}
+              className="flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left"
+              style={{
+                borderColor: selected ? "#0b1220" : "var(--hive-border)",
+                background: selected ? "rgba(11,18,32,0.06)" : "var(--hive-canvas)",
+              }}
+            >
+              <span>
+                <span className="block font-medium text-[var(--hive-text)]">{addon.name}</span>
+                {addon.savingsHint ? (
+                  <span className="block text-xs text-[var(--hive-text-muted)]">{addon.savingsHint}</span>
+                ) : null}
+              </span>
+              <span className="text-sm font-semibold text-[var(--hive-text)]">
+                {formatUsdFromCents(addon.priceCents)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-7 flex items-center justify-between gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onBack}
+          className="h-11"
+          style={{ fontFamily: JAKARTA }}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back
+        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={skip}
+            className="h-11"
+            data-testid="signup-training-skip"
+            style={{ fontFamily: JAKARTA }}
+          >
+            Skip training
+          </Button>
+          <Button
+            type="button"
+            onClick={onNext}
+            disabled={form.trainingAddon === "none"}
+            className="group h-11 min-w-[140px] border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827]"
+            style={{ fontFamily: JAKARTA, fontWeight: 700 }}
+          >
+            Continue
+            <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Button>
+        </div>
+      </div>
     </>
   );
 }
@@ -649,7 +775,39 @@ function Step6Payment({
   onComplete: () => Promise<void>;
 }) {
   const checkoutFn = useServerFn(createSubscriptionCheckoutFn);
+  const paymentsStatusFn = useServerFn(getSignupPaymentsStatusFn);
   const [busy, setBusy] = useState(false);
+  const [payStatus, setPayStatus] = useState<{
+    paymentsConfigured: boolean;
+    testMode: boolean;
+    liveBlocked: boolean;
+    message: string | null;
+  } | null>(null);
+  const quote = quotePiListSubscription({ clientCount: form.clientCount });
+  const training = quoteSignupTrainingAddon(form.trainingAddon);
+  const liveBlocked = payStatus?.liveBlocked === true;
+  const canPay = !liveBlocked && (payStatus == null || payStatus.paymentsConfigured);
+
+  useEffect(() => {
+    let cancelled = false;
+    void paymentsStatusFn()
+      .then((status) => {
+        if (!cancelled) setPayStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPayStatus({
+            paymentsConfigured: false,
+            testMode: false,
+            liveBlocked: false,
+            message: "Could not read payment status.",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentsStatusFn]);
 
   const submit = async () => {
     setBusy(true);
@@ -671,7 +829,9 @@ function Step6Payment({
           organizationId: orgId,
           staffCount: form.staffCount,
           clientCount: form.clientCount,
-          interval: form.interval,
+          interval: "monthly",
+          pricingModel: "pi_list",
+          trainingAddon: form.trainingAddon,
         },
       });
       if (r.exempt) {
@@ -680,9 +840,8 @@ function Step6Payment({
         return;
       }
       if (r.error || !r.url) {
-        toast.error(r.error ?? "Could not start checkout. Your workspace is saved; you can pay from the subscription page.");
+        toast.error(r.error ?? "Could not start checkout. Stay on this page — do not use a live card.");
         setBusy(false);
-        await onComplete();
         return;
       }
       window.location.href = r.url;
@@ -699,29 +858,68 @@ function Step6Payment({
         subtitle="You will be sent to Stripe Checkout. The dashboard stays locked until payment succeeds."
       />
 
-      <div
-        className="mb-5 flex items-start gap-3 rounded-lg border p-3 text-sm"
-        data-testid="stripe-test-mode-hint"
-        style={{
-          background: "rgba(244,169,58,0.10)",
-          borderColor: "rgba(244,169,58,0.35)",
-          color: "#f7c172",
-        }}
-      >
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>
-          <strong>TEST MODE</strong> — no real charge. Use card 4242 4242 4242 4242, any future expiry, any CVC, any ZIP.
-        </span>
-      </div>
+      {liveBlocked ? (
+        <div
+          className="mb-5 flex items-start gap-3 rounded-lg border p-3 text-sm"
+          data-testid="stripe-live-blocked"
+          style={{
+            background: "rgba(244,63,94,0.10)",
+            borderColor: "rgba(244,63,94,0.35)",
+            color: "#9f1239",
+          }}
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong>Live charges are blocked.</strong>{" "}
+            {payStatus?.message ??
+              "This host has live Stripe keys. Use a preview URL with test keys. Do not pay here."}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="mb-5 flex items-start gap-3 rounded-lg border p-3 text-sm"
+          data-testid="stripe-test-mode-hint"
+          style={{
+            background: "rgba(244,169,58,0.12)",
+            borderColor: "rgba(180,120,20,0.45)",
+            color: "#7a4b00",
+          }}
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong>TEST MODE</strong> — no real charge. Use card 4242 4242 4242 4242, any future expiry, any CVC, any ZIP.
+            {payStatus && !payStatus.paymentsConfigured ? (
+              <>
+                {" "}
+                {payStatus.message ?? "Payments are not set up on this host yet."}
+              </>
+            ) : null}
+          </span>
+        </div>
+      )}
 
       <div
         className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4 text-sm"
         data-testid="pricing-schedule"
       >
-        <p className="text-[var(--hive-text)]">{PI_SIGNUP_PRICE_LINE}</p>
+        <p className="font-medium text-[var(--hive-text)]">{PI_SIGNUP_PRICE_LINE}</p>
+        <p className="mt-2 text-[var(--hive-text)]">{quote.summaryLine}</p>
+        {training.id !== "none" ? (
+          <p className="mt-1 text-[var(--hive-text)]">
+            Training · {training.name}: {formatUsdFromCents(training.priceCents)} one-time
+          </p>
+        ) : (
+          <p className="mt-1 text-[var(--hive-text-muted)]">Training skipped.</p>
+        )}
       </div>
 
-      <NavButtons onBack={onBack} onNext={submit} loading={busy} nextLabel="Pay with Stripe" />
+      <NavButtons
+        onBack={onBack}
+        onNext={submit}
+        loading={busy}
+        nextDisabled={!canPay}
+        nextLabel="Pay with Stripe"
+      />
     </>
   );
 }

@@ -2,6 +2,20 @@
 
 Hive charges companies in **Stripe test / sandbox only**. No real cards are charged. Do not switch this to live keys.
 
+## New-provider signup walk (`/signup`)
+
+This is the walk Dane repeats with Gmail plus-aliases (`danewarnick+pi1@gmail.com`, `+pi2`, …).
+
+- **Plan:** $69 per client / month, **$350 minimum**. Checkout sends Stripe `price_data` for that quote. It does **not** use the old $125 / staff sandbox Price IDs.
+- **No founding dollars** on the form. New agencies on this walk are list, not $79 / $299.
+- **Training (optional, skip allowed):** CPR / First Aid $100, 30-day $75, Mandt $200, Pack $300 (saves $75 vs all three). One-time line on the same Checkout.
+- **TEST MODE card:** `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP.
+- **Plus-aliases are distinct users.** The unique-email guard still blocks the exact same address. Do not treat `danewarnick@gmail.com` and `danewarnick+pi1@gmail.com` as the same.
+- **True North Supports stays comped.** Do not name the test agency “True North Supports” (that name is billing-exempt).
+- **Live keys are blocked.** If the host has `sk_live_`, Checkout fails closed and tells you to use a preview URL with `sk_test_` / `pk_test_`. Prefer [providerinterface.com](https://providerinterface.com/signup) only when that host is also TEST MODE. If production Stripe is live, use the PR preview.
+
+Old $125 / staff and founding $79 products below are leftover sandbox catalog for Hive Exec / the subscription panel. They are not what `/signup` charges.
+
 ## Linked account
 
 | | |

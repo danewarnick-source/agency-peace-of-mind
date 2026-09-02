@@ -17,6 +17,7 @@ import {
   type HiveQuote,
   trainingPriceCentsForSku,
 } from "./hive-pricing.ts";
+import type { PiListQuote, SignupTrainingQuote } from "./pi-signup-pricing.ts";
 
 /** Hive sandbox (test mode). Not a secret. */
 export const STRIPE_TEST_ACCOUNT_ID = "acct_1Ti6CMIQWmyptLnb";
@@ -128,7 +129,8 @@ export function stripeClientConfigured(env: StripePriceEnv = readStripeEnv()): {
   if (isStripeLiveSecretKey(env.secretKey)) {
     return {
       ok: false,
-      message: "Live Stripe keys are blocked. Use test-mode keys (sk_test_ / pk_test_) only.",
+      message:
+        "TEST MODE only. Live Stripe keys are blocked. This host cannot charge a real card. Use a preview URL with sk_test_ / pk_test_ keys.",
       testMode: false,
     };
   }
@@ -312,6 +314,49 @@ export function subscriptionLineItemsForQuote(
     discounts: undefined,
     pick: pickResolved,
   };
+}
+
+/**
+ * New-provider signup: always $69/client with a $350 floor via price_data.
+ * Never the sandbox $125 / $79 staff Price IDs. Optional one-time training.
+ */
+export function subscriptionLineItemsForPiListQuote(
+  quote: PiListQuote,
+  training?: SignupTrainingQuote | null,
+): { lineItems: StripeLineItem[] } {
+  const items: StripeLineItem[] = [
+    {
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: quote.billedCents,
+        recurring: { interval: quote.interval === "annual" ? "year" : "month" },
+        product_data: {
+          name: quote.productName,
+          metadata: {
+            pricing_model: "pi_list",
+            client_count: String(quote.clientCount),
+            per_client_cents: String(quote.perClientCents),
+            minimum_cents: String(quote.minimumCents),
+          },
+        },
+      },
+    },
+  ];
+  if (training && training.id !== "none" && training.priceCents > 0) {
+    items.push({
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: training.priceCents,
+        product_data: {
+          name: `Training · ${training.name}`,
+          metadata: { hive_kind: "signup_training", training_addon: training.id },
+        },
+      },
+    });
+  }
+  return { lineItems: items };
 }
 
 export const PAYMENTS_NOT_CONFIGURED = "payments_not_configured";

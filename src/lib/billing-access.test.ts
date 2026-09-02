@@ -16,10 +16,12 @@ import {
   stripePriceIdForTrainingSku,
   stripeSeatPriceForQuote,
   subscriptionLineItemsForQuote,
+  subscriptionLineItemsForPiListQuote,
   readStripeEnv,
   STRIPE_SANDBOX_PRICE_IDS,
 } from "./stripe-config.ts";
 import { quoteHiveSubscription } from "./hive-pricing.ts";
+import { quotePiListSubscription, quoteSignupTrainingAddon } from "./pi-signup-pricing.ts";
 
 describe("billing-access", () => {
   it("True North name match is exempt even without the flag", () => {
@@ -200,6 +202,23 @@ describe("stripe-config", () => {
     );
     assert.equal(r.ok, false);
     assert.match(r.message ?? "", /Live Stripe keys are blocked/);
+    assert.match(r.message ?? "", /TEST MODE only/);
+    assert.match(r.message ?? "", /preview URL/);
+  });
+
+  it("signup list checkout uses price_data at $69/client with $350 floor, not $125 seats", () => {
+    const quote = quotePiListSubscription({ clientCount: 5 });
+    const items = subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("pack"));
+    assert.equal(items.lineItems.length, 2);
+    assert.equal(items.lineItems[0]?.price, undefined);
+    assert.equal(items.lineItems[0]?.price_data?.unit_amount, 35_000);
+    assert.equal(items.lineItems[0]?.price_data?.recurring?.interval, "month");
+    assert.match(items.lineItems[0]?.price_data?.product_data.name ?? "", /\$69\/client/);
+    assert.equal(items.lineItems[1]?.price_data?.unit_amount, 30_000);
+    assert.notEqual(items.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatList);
+    const twelve = subscriptionLineItemsForPiListQuote(quotePiListSubscription({ clientCount: 12 }));
+    assert.equal(twelve.lineItems[0]?.price_data?.unit_amount, 82_800);
+    assert.equal(twelve.lineItems.length, 1);
   });
 
   it("accepts test keys; seat Price IDs default to the Hive sandbox products", () => {

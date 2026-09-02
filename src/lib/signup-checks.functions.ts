@@ -1,14 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
+import { isValidSignupEmail, normalizeSignupEmail } from "@/lib/signup-email";
 
 /**
  * Public server fn — returns whether an auth user already exists for the given email.
  * Uses the admin client to look up by email. Safe to call unauthenticated because
  * it only returns a boolean (no PII), and is rate-limited by the platform.
+ *
+ * Exact mailbox only (trim + lowercase). Plus-aliases stay distinct:
+ * danewarnick@gmail.com and danewarnick+pi1@gmail.com are different users.
+ * Do not strip +tags. Do not Gmail-dot-normalize.
  */
 export const checkEmailExists = createServerFn({ method: "POST" })
   .inputValidator((input: { email: string }) => {
-    const email = String(input?.email ?? "").trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const email = normalizeSignupEmail(String(input?.email ?? ""));
+    if (!email || !isValidSignupEmail(email)) {
       throw new Error("Invalid email");
     }
     return { email };

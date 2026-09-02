@@ -19,6 +19,7 @@ import {
   subscriptionLineItemsForPiListQuote,
   monthlyCentsFromPiListLineItems,
   readStripeEnv,
+  resolveAgencyCheckoutPricingModel,
   STRIPE_SANDBOX_PRICE_IDS,
 } from "./stripe-config.ts";
 import { quoteHiveSubscription } from "./hive-pricing.ts";
@@ -205,6 +206,12 @@ describe("stripe-config", () => {
     assert.match(r.message ?? "", /Live Stripe keys are blocked/);
     assert.match(r.message ?? "", /TEST MODE only/);
     assert.match(r.message ?? "", /preview URL/);
+  });
+
+  it("agency Checkout defaults to PI list, not leftover hive_staff seats", () => {
+    assert.equal(resolveAgencyCheckoutPricingModel(undefined), "pi_list");
+    assert.equal(resolveAgencyCheckoutPricingModel("pi_list"), "pi_list");
+    assert.equal(resolveAgencyCheckoutPricingModel("hive_staff"), "hive_staff");
   });
 
   it("signup list checkout uses PI catalog prices: $69 × clients XOR $350 floor, not $125 seats", () => {

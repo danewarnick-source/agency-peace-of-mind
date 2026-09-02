@@ -19,6 +19,7 @@ import {
   isStripeLiveSecretKey,
   readStripeEnv,
   stripePaymentsConfigured,
+  resolveAgencyCheckoutPricingModel,
   stripePriceIdForTrainingSku,
   stripeUnitAmountForTrainingSku,
   subscriptionLineItemsForPiListQuote,
@@ -326,7 +327,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       billedCents: 0,
       minimumApplied: false,
       minimumCents: 0,
-      quoteLabel: "List",
+      quoteLabel: "List · $69 per client / month ($350 minimum)",
       foundingSlotsRemaining: 0,
       payingOrgCount: 0,
     };
@@ -375,23 +376,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       (sub as { staff_count?: number | null } | null)?.staff_count || usage.staff || 1,
     );
     const clientCount = clampClientCount(usage.clients || org.approxClientCount || 0);
-    const interval: BillingInterval =
-      (sub as { billing_interval?: string | null } | null)?.billing_interval === "annual"
-        ? "annual"
-        : "monthly";
-    let schedule: PricingSchedule = org.pricingSchedule ?? "list";
-    let foundingEndsAt = org.foundingEndsAt;
-    if (!org.pricingSchedule && !exempt) {
-      const paying = await countPayingOrgs();
-      schedule = signupScheduleFromPayingCount(paying);
-    }
-    const quote = quoteHiveSubscription({
-      staffCount,
-      clientCount,
-      schedule,
-      interval,
-      foundingEndsAt,
-    });
+    const quote = quotePiListSubscription({ clientCount, interval: "monthly" });
     let payingOrgCount = 0;
     try {
       payingOrgCount = await countPayingOrgs();
@@ -414,12 +399,12 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       currentPeriodEnd: (sub?.current_period_end as string | null) ?? null,
       hasStripeCustomer: !!(sub as { stripe_customer_id?: string | null } | null)?.stripe_customer_id,
       orgName: org.name,
-      pricingSchedule: quote.schedule,
-      foundingEndsAt,
-      staffCount: quote.staffCount,
+      pricingSchedule: "list" as PricingSchedule,
+      foundingEndsAt: org.foundingEndsAt,
+      staffCount,
       clientCount: quote.clientCount,
-      interval: quote.interval,
-      perStaffCents: quote.perStaffCents,
+      interval: "monthly" as BillingInterval,
+      perStaffCents: quote.perClientCents,
       monthlyCents: quote.monthlyCents,
       billedCents: quote.billedCents,
       minimumApplied: quote.minimumApplied,
@@ -439,6 +424,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
     interval?: BillingInterval;
     pricingModel?: "pi_list" | "hive_staff";
     trainingAddon?: SignupTrainingAddonId | "none" | null;
+    fromSignup?: boolean;
   }) => {
     const organizationId = String(input?.organizationId ?? "");
     if (!UUID_RE.test(organizationId)) throw new Error("Invalid organization.");
@@ -448,8 +434,9 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       staffCount: input?.staffCount != null ? clampStaffCount(input.staffCount) : undefined,
       clientCount: input?.clientCount != null ? clampClientCount(input.clientCount) : undefined,
       interval: input?.interval === "annual" ? ("annual" as const) : ("monthly" as const),
-      pricingModel: input?.pricingModel === "pi_list" ? ("pi_list" as const) : ("hive_staff" as const),
+      pricingModel: resolveAgencyCheckoutPricingModel(input?.pricingModel),
       trainingAddon: isSignupTrainingAddonId(trainingRaw) ? trainingRaw : ("none" as const),
+      fromSignup: input?.fromSignup === true,
     };
   })
   .handler(async ({ data, context }) => {
@@ -565,7 +552,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       customer: customerId,
       client_reference_id: data.organizationId,
       success_url: `${origin}/dashboard/billing/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: usePiList
+      cancel_url: data.fromSignup
         ? `${origin}/signup?checkout=cancelled`
         : `${origin}/dashboard/billing/subscription?checkout=cancelled`,
       line_items: built.lineItems,

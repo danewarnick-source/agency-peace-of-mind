@@ -404,8 +404,8 @@ function CompanyDetailPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Plan">
               <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                <option value="hive_standard">Hive (per staff — list or founding)</option>
-                <option value="pro">Hive / Pro (same per-staff entitlements)</option>
+                <option value="hive_standard">Provider Interface (list — $69 / client)</option>
+                <option value="pro">Provider Interface / Pro (same list entitlements)</option>
                 <option value="enterprise">Enterprise (contact us — set MRR manually)</option>
                 <option value="starter">Starter (comped / not self-serve)</option>
                 <option value="custom">Custom</option>
@@ -493,7 +493,7 @@ function CompanyDetailPage() {
           <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
             <div className="text-sm font-medium">Pricing schedule</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Founding is $79 / staff ($299 min) for 12 months, then list. List is $125 / $109 / $99 per staff with a $500 minimum.
+              Public list is $69 per client / month ($350 minimum). Founding is leftover internal schedule only — it does not change checkout line items.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button

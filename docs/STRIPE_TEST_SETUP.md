@@ -14,7 +14,7 @@ This is the walk Dane repeats with Gmail plus-aliases (`danewarnick+pi1@gmail.co
 - **True North Supports stays comped.** Do not name the test agency “True North Supports” (that name is billing-exempt).
 - **Live keys are blocked.** If the host has `sk_live_`, Checkout fails closed and tells you to use a preview URL with `sk_test_` / `pk_test_`. Prefer [providerinterface.com](https://providerinterface.com/signup) only when that host is also TEST MODE. If production Stripe is live, use the PR preview.
 
-Old $125 / staff and founding $79 products below are leftover sandbox catalog for Hive Exec / the subscription panel. They are not what `/signup` charges.
+Old $125 / staff and founding $79 products below are leftover sandbox catalog IDs. They are not what `/signup`, billing-locked, or the in-app subscription page charges.
 
 ## Linked account
 
@@ -28,19 +28,13 @@ Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 
 ## Confirmed prices
 
-**List** (public at `/pricing`):
+**List** (public at `/pricing`, `/signup`, and in-app pay):
 
-- $125 per active staff / month (1–19 clients)
-- $109 / staff at 20–49 clients, $99 / staff at 50+
-- **$500 / month minimum** (4 seats at the $125 list price)
-- Annual = 20% off
+- **$69 per client / month**
+- **$350 / month minimum**
 - Enterprise = contact us (no dollar amount in Stripe)
 
-**Founding** (first 5 paying companies, 12 months, then list):
-
-- $79 per staff / month
-- **$299 / month minimum**
-- Hive Exec can mark a company founding vs list
+Leftover Hive staff math ($125 / $109 / $99, $500 min, founding $79 / $299) stays in `hive-pricing.ts` only. Do not show it or charge it.
 
 **Exempt:** True North Supports LLC is billing-exempt forever. Never charge seats or training. Hive Exec can toggle exempt on other companies. Dane’s `danewarnick@gmail` test companies are **not** auto-exempt — they pay unless he comps them.
 
@@ -68,7 +62,7 @@ These **Price IDs** are test-mode identifiers on `acct_1Ti6CMIQWmyptLnb`. Hive u
 | Training CPR/First Aid | $100 one-time | — | `price_1UBNX2IQWMytpLnb5aoUlkAt` | `STRIPE_PRICE_TRAINING_CPR` |
 | Training 30-day | $75 one-time | — | `price_1UBNZHIQWMytpLnbRsc9uWlG` | `STRIPE_PRICE_TRAINING_THIRTY_DAY` |
 
-Volume rates ($109 / $99) and annual (20% off) still use Stripe `price_data` until those products exist. The app still enforces the $500 list minimum and $299 founding minimum.
+Do **not** put leftover Hive seat Price IDs (`STRIPE_PRICE_SEAT_LIST` / `STRIPE_PRICE_SEAT_FOUNDING`) on agency Checkout line items.
 
 Do **not** create or wire $499 Pro, $1,299 Enterprise, or $49 training extras.
 

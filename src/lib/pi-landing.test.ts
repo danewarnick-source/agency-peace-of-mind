@@ -94,8 +94,26 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(signup, /Skip training/);
     assert.match(signup, /4242 4242 4242 4242/);
     assert.match(signup, /pricingModel: "pi_list"/);
+    assert.match(signup, /fromSignup: true/);
     assert.doesNotMatch(signup, /True North Supports/);
     assert.doesNotMatch(signup, /founding/i);
+  });
+
+  it("keeps leftover staff dollars off signup, paywall, and Hive Exec copy", () => {
+    const leftovers = ["$125", "$79", "$500", "$299"];
+    const files = [
+      new URL("../routes/signup.tsx", import.meta.url),
+      new URL("../routes/billing-locked.tsx", import.meta.url),
+      new URL("../components/billing/hive-subscription-panel.tsx", import.meta.url),
+      new URL("../routes/dashboard.hive-exec.plans.tsx", import.meta.url),
+      new URL("../routes/dashboard.hive-exec.$orgId.tsx", import.meta.url),
+    ];
+    for (const file of files) {
+      const text = read(file);
+      for (const banned of leftovers) {
+        assert.equal(text.includes(banned), false, `${file.pathname} must not post ${banned}`);
+      }
+    }
   });
 
   it("keeps old staff prices and True North-free lines off public surfaces", () => {

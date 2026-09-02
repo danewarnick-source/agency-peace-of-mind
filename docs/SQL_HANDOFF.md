@@ -288,12 +288,14 @@ You want `training_classes | training_class_roster` and
 
 ## ACTION — Stripe billing: founding vs list (2026-08-28)
 
-**What this is for:** Dane's confirmed prices. New agencies pay **per active staff**
-(list or founding), not the old $499 / $1,299 flat plans.
+**Superseded for public checkout:** list is now **$69 per client / month, $350 minimum**.
+The columns below still exist. Do not treat the old staff dollars as current.
 
-- List: $125 / staff (1–19 clients), $109 (20–49), $99 (50+), $500 / month minimum, 20% off annual.
-- Founding (first 5 paying companies, 12 months): $79 / staff, $299 / month minimum.
-- Hive Exec can mark a company founding or list. True North stays billing-exempt and is never charged.
+**What this is for (historical):** columns so Hive Exec can mark founding vs list.
+
+- Public list (current): $69 / client, $350 / month minimum.
+- Leftover staff math is unused for signup and Checkout.
+- Hive Exec can still mark a company founding or list. True North stays billing-exempt and is never charged.
 - Dane's `danewarnick@gmail` test companies are **not** auto-exempt — they pay unless he comps them.
 
 **Run this** after the billing-exempt block below (or together if that already ran).

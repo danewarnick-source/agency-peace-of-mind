@@ -9,11 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { isComplimentaryHiveOrg } from "@/lib/current-org";
-import {
-  formatUsdFromCents,
-  quoteHiveSubscription,
-  type BillingInterval,
-} from "@/lib/hive-pricing";
+import { formatUsdFromCents } from "@/lib/hive-pricing";
+import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
 import {
   confirmCheckoutSessionFn,
   createPortalSessionFn,
@@ -37,7 +35,6 @@ export function HiveSubscriptionPanel() {
   const [busy, setBusy] = useState(false);
   const [staffCount, setStaffCount] = useState(4);
   const [clientCount, setClientCount] = useState(10);
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
   const waitingForOrg = orgQ.isPending || (!orgId && orgQ.isFetching);
 
   // Same resolution as the sidebar. A blank hive.activeOrgId is not "no org."
@@ -90,19 +87,12 @@ export function HiveSubscriptionPanel() {
     if (!d) return;
     setStaffCount(d.staffCount || 4);
     setClientCount(d.clientCount || 0);
-    setInterval(d.interval === "annual" ? "annual" : "monthly");
-  }, [d?.staffCount, d?.clientCount, d?.interval]);
+  }, [d?.staffCount, d?.clientCount]);
 
   const quote = useMemo(() => {
     if (!d) return null;
-    return quoteHiveSubscription({
-      staffCount,
-      clientCount,
-      schedule: d.pricingSchedule,
-      interval,
-      foundingEndsAt: d.foundingEndsAt,
-    });
-  }, [d, staffCount, clientCount, interval]);
+    return quotePiListSubscription({ clientCount, interval: "monthly" });
+  }, [d, clientCount]);
 
   if (waitingForOrg) {
     return (
@@ -136,7 +126,8 @@ export function HiveSubscriptionPanel() {
           organizationId: d.organizationId,
           staffCount,
           clientCount,
-          interval,
+          interval: "monthly",
+          pricingModel: "pi_list",
         },
       });
       if (r.exempt) {
@@ -180,20 +171,13 @@ export function HiveSubscriptionPanel() {
       ? "Payment needed"
       : (d.status ?? "unknown").replace("_", " ");
 
-  const rateKind = complimentary
-    ? "Exempt"
-    : quote?.schedule === "founding"
-      ? "Founding"
-      : "List";
+  const rateKind = complimentary ? "Exempt" : "List";
 
   return (
     <div className="mx-auto max-w-2xl space-y-4" data-testid="hive-subscription-page">
       <header>
         <h2 className="font-display text-xl font-semibold">Subscription</h2>
-        <p className="text-sm text-muted-foreground">
-          Per active staff. List rates drop as client count grows. Enterprise is contact-us — no
-          public dollar amount.
-        </p>
+        <p className="text-sm text-muted-foreground">{PI_SIGNUP_PRICE_LINE}</p>
       </header>
 
       {d.testMode && (
@@ -214,7 +198,7 @@ export function HiveSubscriptionPanel() {
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950"
           data-testid="comped-note"
         >
-          {d.orgName ?? "This company"} is billing-exempt. Provider Interface never charges seats or training.
+          {d.orgName ?? "This company"} is billing-exempt. Provider Interface never charges this company.
           True North Supports is set this way on purpose. Dane can toggle this in Exec for
           other companies — test orgs are not auto-exempt.
         </div>
@@ -236,27 +220,18 @@ export function HiveSubscriptionPanel() {
             {complimentary
               ? "No charge"
               : quote
-                ? `${fmtMoney(quote.perStaffCents)} / staff`
-                : "Per staff"}
+                ? `${PI_LIST_PRICE_DISPLAY} ${PI_LIST_PRICE_UNIT}`
+                : PI_LIST_PRICE_UNIT}
           </div>
         </div>
         {!complimentary && quote && (
           <div className="mt-2 space-y-1 text-sm">
+            <div>{PI_LIST_MINIMUM_LINE}</div>
             <div>
               Monthly: <span className="font-medium">{fmtMoney(quote.monthlyCents)}</span>
               {quote.minimumApplied ? ` (${fmtMoney(quote.minimumCents)} minimum applied)` : ""}
             </div>
-            {quote.interval === "annual" && (
-              <div className="text-muted-foreground">
-                Billed annually (20% off): {fmtMoney(quote.billedCents)} / year
-              </div>
-            )}
-            <div className="text-xs text-muted-foreground">{quote.label}</div>
-            {d.foundingEndsAt && quote.schedule === "founding" && (
-              <div className="text-xs text-muted-foreground">
-                Founding rate through {new Date(d.foundingEndsAt).toLocaleDateString()}, then list.
-              </div>
-            )}
+            <div className="text-xs text-muted-foreground">{quote.summaryLine}</div>
           </div>
         )}
         <div className="mt-2 text-sm">
@@ -272,45 +247,19 @@ export function HiveSubscriptionPanel() {
       {!complimentary && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
           <div className="text-sm font-medium">Pay for Provider Interface</div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="sub-staff">Active staff</Label>
-              <Input
-                id="sub-staff"
-                type="number"
-                min={1}
-                max={500}
-                value={staffCount}
-                onChange={(e) => setStaffCount(Number(e.target.value) || 1)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="sub-clients">Active clients</Label>
-              <Input
-                id="sub-clients"
-                type="number"
-                min={0}
-                max={5000}
-                value={clientCount}
-                onChange={(e) => setClientCount(Number(e.target.value) || 0)}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={interval === "monthly" ? "default" : "outline"}
-              onClick={() => setInterval("monthly")}
-            >
-              Monthly
-            </Button>
-            <Button
-              type="button"
-              variant={interval === "annual" ? "default" : "outline"}
-              onClick={() => setInterval("annual")}
-            >
-              Annual · 20% off
-            </Button>
+          <div>
+            <Label htmlFor="sub-clients">Active clients</Label>
+            <Input
+              id="sub-clients"
+              type="number"
+              min={0}
+              max={5000}
+              value={clientCount}
+              onChange={(e) => setClientCount(Number(e.target.value) || 0)}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Billing is per client. Staff count does not change the price.
+            </p>
           </div>
           <p className="text-xs text-muted-foreground">
             Enterprise custom work is not sold here.{" "}
@@ -327,7 +276,7 @@ export function HiveSubscriptionPanel() {
               className="bg-[var(--hive-text)] text-white hover:bg-[#1a2a5a]"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              {d.lockedAt || !d.hasStripeCustomer ? "Pay with Stripe" : "Update seats"}
+              {d.lockedAt || !d.hasStripeCustomer ? "Pay with Stripe" : "Update plan"}
             </Button>
             {d.hasStripeCustomer && (
               <Button variant="outline" disabled={busy || !d.paymentsConfigured} onClick={manage}>

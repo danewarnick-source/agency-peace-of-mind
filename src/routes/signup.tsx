@@ -940,6 +940,7 @@ function Step6Payment({
           clientCount: form.clientCount,
           interval: "monthly",
           pricingModel: "pi_list",
+          fromSignup: true,
           trainingAddon: form.trainingAddon,
         },
       });

@@ -10,11 +10,8 @@ import {
   createSubscriptionCheckoutFn,
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
-import {
-  formatUsdFromCents,
-  quoteHiveSubscription,
-  type BillingInterval,
-} from "@/lib/hive-pricing";
+import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
@@ -29,7 +26,6 @@ function BillingLockedPage() {
   const [busy, setBusy] = useState(false);
   const [staffCount, setStaffCount] = useState(4);
   const [clientCount, setClientCount] = useState(10);
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [state, setState] = useState<{
     loading: boolean;
     authed: boolean;
@@ -40,8 +36,6 @@ function BillingLockedPage() {
     paymentsConfigured: boolean;
     paymentsMessage: string | null;
     lockReason: string | null;
-    pricingSchedule: "list" | "founding";
-    foundingEndsAt: string | null;
   }>({
     loading: true,
     authed: false,
@@ -52,8 +46,6 @@ function BillingLockedPage() {
     paymentsConfigured: false,
     paymentsMessage: null,
     lockReason: null,
-    pricingSchedule: "founding",
-    foundingEndsAt: null,
   });
 
   useEffect(() => {
@@ -117,7 +109,6 @@ function BillingLockedPage() {
       if (cancelled) return;
       setStaffCount(status.staffCount || 4);
       setClientCount(status.clientCount || 0);
-      setInterval(status.interval === "annual" ? "annual" : "monthly");
       setState({
         loading: false,
         authed: true,
@@ -128,8 +119,6 @@ function BillingLockedPage() {
         paymentsConfigured: status.paymentsConfigured,
         paymentsMessage: status.paymentsMessage,
         lockReason: status.lockReason,
-        pricingSchedule: status.pricingSchedule === "list" ? "list" : "founding",
-        foundingEndsAt: status.foundingEndsAt,
       });
     })();
     return () => {
@@ -138,15 +127,8 @@ function BillingLockedPage() {
   }, [navigate, statusFn, confirmFn]);
 
   const quote = useMemo(
-    () =>
-      quoteHiveSubscription({
-        staffCount,
-        clientCount,
-        schedule: state.pricingSchedule,
-        interval,
-        foundingEndsAt: state.foundingEndsAt,
-      }),
-    [staffCount, clientCount, state.pricingSchedule, state.foundingEndsAt, interval],
+    () => quotePiListSubscription({ clientCount, interval: "monthly" }),
+    [clientCount],
   );
 
   const pay = async () => {
@@ -158,7 +140,8 @@ function BillingLockedPage() {
           organizationId: state.orgId,
           staffCount,
           clientCount,
-          interval,
+          interval: "monthly",
+          pricingModel: "pi_list",
         },
       });
       if (r.exempt) {
@@ -224,67 +207,25 @@ function BillingLockedPage() {
               className="rounded-lg border border-white/10 bg-white/5 px-4 py-3"
               data-testid="pricing-schedule"
             >
-              <div className="text-xs uppercase tracking-wider text-[#F5A524]">
-                {quote.schedule === "founding" ? "Founding rate" : "List rate"}
-              </div>
+              <div className="text-xs uppercase tracking-wider text-[#F5A524]">List rate</div>
               <div className="mt-1 text-2xl font-bold">
-                {formatUsdFromCents(quote.perStaffCents)}
-                <span className="text-base font-normal text-white/60"> / staff / month</span>
+                {PI_LIST_PRICE_DISPLAY}
+                <span className="text-base font-normal text-white/60"> {PI_LIST_PRICE_UNIT}</span>
               </div>
-              <p className="mt-1 text-sm text-white/70">
-                {formatUsdFromCents(quote.monthlyCents)} / month
-                {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum applied` : ""}
-                {interval === "annual"
-                  ? ` · annual ${formatUsdFromCents(quote.billedCents)} (20% off)`
-                  : ""}
-              </p>
+              <p className="mt-1 text-sm text-white/70">{PI_LIST_MINIMUM_LINE}</p>
+              <p className="mt-1 text-sm text-white/70">{quote.summaryLine}</p>
+              <p className="mt-1 text-xs text-white/50">{PI_SIGNUP_PRICE_LINE}</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-white/60">
-                Active staff
-                <input
-                  type="number"
-                  min={1}
-                  className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-2 py-2 text-sm text-white"
-                  value={staffCount}
-                  onChange={(e) => setStaffCount(Number(e.target.value) || 1)}
-                />
-              </label>
-              <label className="text-xs text-white/60">
-                Clients
-                <input
-                  type="number"
-                  min={0}
-                  className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-2 py-2 text-sm text-white"
-                  value={clientCount}
-                  onChange={(e) => setClientCount(Number(e.target.value) || 0)}
-                />
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setInterval("monthly")}
-                className="rounded-lg border px-3 py-2 text-sm"
-                style={{
-                  borderColor: interval === "monthly" ? "#F5A524" : "rgba(255,255,255,0.15)",
-                  background: interval === "monthly" ? "rgba(245,165,36,0.12)" : "transparent",
-                }}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setInterval("annual")}
-                className="rounded-lg border px-3 py-2 text-sm"
-                style={{
-                  borderColor: interval === "annual" ? "#F5A524" : "rgba(255,255,255,0.15)",
-                  background: interval === "annual" ? "rgba(245,165,36,0.12)" : "transparent",
-                }}
-              >
-                Annual · 20% off
-              </button>
-            </div>
+            <label className="text-xs text-white/60">
+              Clients
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-2 py-2 text-sm text-white"
+                value={clientCount}
+                onChange={(e) => setClientCount(Number(e.target.value) || 0)}
+              />
+            </label>
             <Button
               size="lg"
               data-testid="pay-with-stripe"

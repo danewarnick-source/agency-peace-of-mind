@@ -31,9 +31,9 @@ export const STRIPE_SANDBOX_PRICE_IDS = {
   seatList: "price_1U9EeRIQWMytpLnbNurGi0Vq",
   /** Hive seat founding, $79/mo, prod_V9XmH5qQO0TjHi — hive_staff only, never PI list signup */
   seatFounding: "price_1U9EgWIQWMytpLnbyBvs2f4L",
-  /** PI list $69/client/mo — signup Checkout */
+  /** PI list $69/client/mo — agency Checkout (signup + in-app pay) */
   piListPerClient: "price_1UBNUYIQWMytpLnbpygoWdLw",
-  /** PI list $350/mo minimum — signup Checkout when clients × $69 < $350 */
+  /** PI list $350/mo minimum — agency Checkout when clients × $69 < $350 */
   piListMinimum: "price_1UBNUYIQWMytpLnbpDKqVRhB",
   /** Full program / package $300 one-time (older hive catalog) */
   trainingFull: "price_1U9EhyIQWMytpLnbg2nkCFd8",
@@ -174,6 +174,13 @@ export function stripePaymentsConfigured(env: StripePriceEnv = readStripeEnv()):
   testMode: boolean;
 } {
   return stripeClientConfigured(env);
+}
+
+/** Agency Checkout is PI list unless a caller explicitly asks for leftover hive_staff math. */
+export function resolveAgencyCheckoutPricingModel(
+  value: "pi_list" | "hive_staff" | null | undefined,
+): "pi_list" | "hive_staff" {
+  return value === "hive_staff" ? "hive_staff" : "pi_list";
 }
 
 export type StripeSeatPricePick = {

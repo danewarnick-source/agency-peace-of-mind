@@ -243,6 +243,9 @@ test.describe("new-provider signup walk", () => {
     await expect(page.getByTestId("signup-plan-math")).toContainText("$828");
     await expect(page.locator("body")).not.toContainText("$79");
     await expect(page.locator("body")).not.toContainText("$125");
+    await expect(page.locator("body")).not.toContainText("$500");
+    await expect(page.locator("body")).not.toContainText("$299");
+    await expect(page.locator("body")).not.toContainText(/founding/i);
     await shot(page, "signup_step_plan_69_350.png");
 
     await page.getByRole("button", { name: /continue/i }).click();
@@ -258,7 +261,14 @@ test.describe("new-provider signup walk", () => {
     await expect(page.getByTestId("stripe-test-mode-hint")).toBeVisible();
     await expect(page.getByTestId("stripe-test-mode-hint")).toContainText("4242 4242 4242 4242");
     await expect(page.getByTestId("pricing-schedule")).toContainText("$828");
+    await expect(page.getByTestId("pricing-schedule")).toContainText("$69");
+    await expect(page.getByTestId("pricing-schedule")).toContainText("$350");
     await expect(page.getByTestId("pricing-schedule")).toContainText(/training skipped/i);
+    await expect(page.locator("body")).not.toContainText("$79");
+    await expect(page.locator("body")).not.toContainText("$125");
+    await expect(page.locator("body")).not.toContainText("$500");
+    await expect(page.locator("body")).not.toContainText("$299");
+    await expect(page.locator("body")).not.toContainText(/founding/i);
     await shot(page, "signup_step_payment_test_mode.png");
 
     await page.route("https://checkout.stripe.com/**", (route) =>
@@ -273,7 +283,15 @@ test.describe("new-provider signup walk", () => {
       }),
     );
     await page.getByRole("button", { name: /pay with stripe/i }).click();
-    await page.waitForTimeout(800);
+    await expect(page.getByRole("heading", { name: /stripe checkout/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("body")).toContainText("$69/client");
+    await expect(page.locator("body")).toContainText("$350");
+    await expect(page.locator("body")).toContainText("$828.00");
+    await expect(page.locator("body")).not.toContainText("$125");
+    await expect(page.locator("body")).not.toContainText("$79");
+    await expect(page.locator("body")).not.toContainText("$299");
+    await expect(page.locator("body")).not.toContainText("$500");
+    await shot(page, "signup_checkout_path_69_350.png");
   });
 
   test("pwned password shows Auth weak/easy bar before submit", async ({ page }) => {

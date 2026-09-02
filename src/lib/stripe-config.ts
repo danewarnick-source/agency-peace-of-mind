@@ -245,8 +245,8 @@ export function subscriptionLineItemsForQuote(
   const recurringInterval: "month" | "year" = quote.interval === "annual" ? "year" : "month";
   const productName =
     quote.schedule === "founding"
-      ? `Hive founding · ${quote.staffCount} staff`
-      : `Hive · ${quote.staffCount} staff · ${quote.volumeLabel}`;
+      ? `Provider Interface founding · ${quote.staffCount} staff`
+      : `Provider Interface · ${quote.staffCount} staff · ${quote.volumeLabel}`;
 
   const listSeatMonthly =
     quote.schedule === "list" &&
@@ -284,7 +284,7 @@ export function subscriptionLineItemsForQuote(
           currency: "usd",
           unit_amount: topUp,
           recurring: { interval: "month" },
-          product_data: { name: "Hive monthly minimum top-up" },
+          product_data: { name: "Provider Interface monthly minimum top-up" },
         },
       });
     }

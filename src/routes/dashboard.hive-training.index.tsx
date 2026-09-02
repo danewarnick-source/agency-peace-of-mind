@@ -386,10 +386,9 @@ function ReadinessBanner({
           <div>
             <div className="text-base font-semibold">Your team is current. Keep it that way.</div>
             <p className="text-sm text-white/80 mt-1 max-w-2xl">
-              Built by DSPD providers, for DSPD providers. Every course maps to a named DSPD
-              requirement — CPR/First Aid, Mandt de-escalation, and DSPD provider orientation —
-              with in-app competency sign-off and a verifiable certificate for state audit. We
-              track expirations so nothing lapses on your watch.
+              CPR/First Aid, Mandt, and the 30-day orientation live here — with sign-off
+              and a certificate when each one is done. We track expirations so nothing
+              lapses on your watch.
             </p>
           </div>
         </div>
@@ -950,23 +949,23 @@ function Storefront({
       {
         type: "package" as const,
         title: "Training package",
-        blurb: "CPR, Mandt, and the in-Hive 30-day course for the same roster. Saves $75 versus buying each seat.",
+        blurb: "CPR, Mandt, and the in-platform 30-day course for the same roster. Saves $75 versus buying each seat.",
         featured: true,
       },
       {
         type: "cpr_first_aid" as const,
         title: "CPR / First Aid",
-        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+        blurb: "External class. After pay, Exec gets one alert. Staff see an obligation until you upload the card.",
       },
       {
         type: "mandt" as const,
         title: "Mandt",
-        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+        blurb: "External class. After pay, Exec gets one alert. Staff see an obligation until you upload the card.",
       },
       {
         type: "thirty_day" as const,
         title: "30-day orientation",
-        blurb: "In-Hive course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
+        blurb: "In-platform course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
       },
     ] as const
   ).map((card) => {

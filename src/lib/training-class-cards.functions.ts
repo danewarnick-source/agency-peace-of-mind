@@ -199,7 +199,7 @@ export const attachTrainingClassCard = createServerFn({ method: "POST" })
 
     const type = cls.training_type as TrainingClassType;
     if (type === "thirty_day") {
-      throw new Error("30-day orientation is completed in Hive, not with a class card.");
+      throw new Error("30-day orientation is completed in Provider Interface, not with a class card.");
     }
     const titleGroups =
       type === "package"

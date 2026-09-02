@@ -214,15 +214,15 @@ export function HiveSubscriptionPanel() {
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950"
           data-testid="comped-note"
         >
-          {d.orgName ?? "This company"} is billing-exempt. Hive never charges seats or training.
-          True North Supports is set this way on purpose. Dane can toggle this in Hive Exec for
+          {d.orgName ?? "This company"} is billing-exempt. Provider Interface never charges seats or training.
+          True North Supports is set this way on purpose. Dane can toggle this in Exec for
           other companies — test orgs are not auto-exempt.
         </div>
       )}
 
       {!d.paymentsConfigured && !complimentary && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-          {d.paymentsMessage ?? "Payments are not set up yet. Ask a Hive Executive to add the Stripe test keys."}
+          {d.paymentsMessage ?? "Payments are not set up yet. Ask an Exec to add the Stripe test keys."}
         </div>
       )}
 
@@ -271,7 +271,7 @@ export function HiveSubscriptionPanel() {
 
       {!complimentary && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
-          <div className="text-sm font-medium">Pay for Hive</div>
+          <div className="text-sm font-medium">Pay for Provider Interface</div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="sub-staff">Active staff</Label>

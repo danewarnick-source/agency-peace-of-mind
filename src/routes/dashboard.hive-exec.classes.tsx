@@ -62,10 +62,10 @@ function ExecClassesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Hive Executive</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Provider Interface · Exec</div>
           <h2 className="font-display text-xl font-semibold">Training</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            One row per class an admin submitted. CPR and Mandt are external. The package includes those plus the in-Hive 30-day course.
+            One row per class an admin submitted. CPR and Mandt are external. The package includes those plus the in-platform 30-day course.
           </p>
         </div>
         <div className="inline-flex rounded-lg border bg-card p-1 text-sm">

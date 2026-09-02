@@ -10,7 +10,7 @@ export function ImpersonationBanner() {
 
   const exit = () => {
     stop();
-    toast.success("Restored Hive Executive credentials");
+    toast.success("Restored Exec credentials");
     navigate({ to: "/dashboard/hive-exec" });
   };
 

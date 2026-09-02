@@ -498,7 +498,7 @@ const D_STEPS: Step[] = [
   { type: "lesson", kicker: "Lesson 2 of 3", title: "How to report: facts, timing, and content",
     lead: "A good incident report is prompt, factual, and objective \u2014 what you saw and did, not your guesses about why.",
     facts: [
-      { t: "Report the same day.", b: "Notify your supervisor or file in Hive as soon as you discover it." },
+      { t: "Report the same day.", b: "Notify your supervisor or file it in Provider Interface as soon as you discover it." },
       { t: "Include the facts.", b: "Who, what, when, where, what you observed, and what you did." },
       { t: "Be objective.", b: "Write what you saw and heard \u2014 not opinions or blame." },
       { t: "Note who you notified.", b: "911, the nurse, your supervisor, the guardian." },

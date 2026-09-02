@@ -87,7 +87,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                   </span>
                   <span className="truncate">{t.label}</span>
                   {active && (
-                    <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--hive-gold)]" />
+                    <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[#f3efe6]" />
                   )}
                 </Link>
               )}

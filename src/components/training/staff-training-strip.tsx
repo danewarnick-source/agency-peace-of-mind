@@ -57,7 +57,7 @@ export function StaffTrainingStrip({
             <span
               key={t.baselineKey}
               className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-              title="Enable HIVE Training on your plan to assign this course."
+              title="Enable Training on your plan to assign this course."
             >
               <Lock className="h-3 w-3" />
               <span className="truncate max-w-[180px]">{t.title}</span>
@@ -69,7 +69,7 @@ export function StaffTrainingStrip({
             key={t.baselineKey}
             to="/dashboard/hive-training"
             className="inline-flex items-center gap-1 rounded-full border border-[#C8881E]/40 bg-[#C8881E]/10 px-2 py-0.5 text-[11px] font-medium text-[#C8881E] hover:bg-[#C8881E]/20 transition-colors"
-            title={`Assign ${t.title} on the HIVE Training hub`}
+            title={`Assign ${t.title} on the Training hub`}
           >
             <Plus className="h-3 w-3" />
             <span className="truncate max-w-[180px]">Assign: {t.title}</span>

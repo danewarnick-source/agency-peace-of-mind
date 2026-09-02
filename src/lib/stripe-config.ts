@@ -27,22 +27,32 @@ export const STRIPE_TEST_ACCOUNT_ID = "acct_1Ti6CMIQWmyptLnb";
  * is unset. Override in the host environment; never commit secret keys.
  */
 export const STRIPE_SANDBOX_PRICE_IDS = {
-  /** Hive seat list, $125/mo, prod_V9XjHA2R4jLnn3 */
+  /** Hive seat list, $125/mo, prod_V9XjHA2R4jLnn3 — hive_staff only, never PI list signup */
   seatList: "price_1U9EeRIQWMytpLnbNurGi0Vq",
-  /** Hive seat founding, $79/mo, prod_V9XmH5qQO0TjHi */
+  /** Hive seat founding, $79/mo, prod_V9XmH5qQO0TjHi — hive_staff only, never PI list signup */
   seatFounding: "price_1U9EgWIQWMytpLnbyBvs2f4L",
-  /** Full program / package $300 one-time, prod_V9Xn9njjImRO15 */
+  /** PI list $69/client/mo — signup Checkout */
+  piListPerClient: "price_1UBNUYIQWMytpLnbpygoWdLw",
+  /** PI list $350/mo minimum — signup Checkout when clients × $69 < $350 */
+  piListMinimum: "price_1UBNUYIQWMytpLnbpDKqVRhB",
+  /** Full program / package $300 one-time (older hive catalog) */
   trainingFull: "price_1U9EhyIQWMytpLnbg2nkCFd8",
+  /** PI list Pack $300 one-time */
+  trainingPack: "price_1UBNeDIQWMytpLnbUy61NTkr",
+  /** PI list CPR / First Aid $100 one-time */
+  trainingCpr: "price_1UBNX2IQWMytpLnb5aoUlkAt",
   /**
-   * Stale sandbox CPR Price ID ($75). Do not use as a default — locked CPR is $100.
-   * Checkout uses price_data unless STRIPE_PRICE_TRAINING_CPR is set to a $100 price.
+   * Stale sandbox CPR Price ID ($75). Do not use as a default.
    */
   trainingCprStale75: "price_1U9EjNIQWMytpLnbPnfRb6Yz",
-  /** Mandt $200, prod_V9XqoHqzqR8JaY */
-  trainingMandt: "price_1U9EkmIQWMytpLnb2coYT0rn",
+  /** PI list Mandt $200 one-time */
+  trainingMandt: "price_1UBNbjIQWMytpLnbRJlOEOpM",
+  /** Older hive Mandt catalog ($200). Env can still point here. */
+  trainingMandtLegacy: "price_1U9EkmIQWMytpLnb2coYT0rn",
+  /** PI list 30-day $75 one-time */
+  trainingThirtyDay: "price_1UBNZHIQWMytpLnbRsc9uWlG",
   /**
    * Stale sandbox DSPD Price ID ($100). Locked 30-day is $75.
-   * Checkout uses price_data unless STRIPE_PRICE_TRAINING_THIRTY_DAY is set.
    */
   trainingDspdStale100: "price_1U9Em5IQWMytpLnb2of9BFOj",
 } as const;
@@ -59,7 +69,10 @@ export type StripePriceEnv = {
   priceStaffFoundingAnnual: string | null;
   couponFounding: string | null;
   couponAnnual: string | null;
+  pricePiListPerClient: string | null;
+  pricePiListMinimum: string | null;
   priceTrainingFull: string | null;
+  priceTrainingPack: string | null;
   priceTrainingCpr: string | null;
   priceTrainingMandt: string | null;
   priceTrainingThirtyDay: string | null;
@@ -85,18 +98,28 @@ export function readStripeEnv(env: NodeJS.Dict<string> = process.env): StripePri
     priceStaffFoundingAnnual: emptyToNull(env.STRIPE_PRICE_STAFF_FOUNDING_ANNUAL),
     couponFounding: emptyToNull(env.STRIPE_COUPON_FOUNDING),
     couponAnnual: emptyToNull(env.STRIPE_COUPON_ANNUAL),
+    pricePiListPerClient:
+      emptyToNull(env.STRIPE_PRICE_PI_LIST_PER_CLIENT) ?? STRIPE_SANDBOX_PRICE_IDS.piListPerClient,
+    pricePiListMinimum:
+      emptyToNull(env.STRIPE_PRICE_PI_LIST_MINIMUM) ?? STRIPE_SANDBOX_PRICE_IDS.piListMinimum,
     priceTrainingFull:
       emptyToNull(env.STRIPE_PRICE_TRAINING_FULL) ??
       emptyToNull(env.STRIPE_PRICE_TRAINING) ??
       STRIPE_SANDBOX_PRICE_IDS.trainingFull,
-    // No stale $75 CPR default — use price_data at $100 unless Dane sets a new Price ID.
-    priceTrainingCpr: emptyToNull(env.STRIPE_PRICE_TRAINING_CPR),
+    priceTrainingPack:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_PACK) ?? STRIPE_SANDBOX_PRICE_IDS.trainingPack,
+    priceTrainingCpr:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_CPR) ?? STRIPE_SANDBOX_PRICE_IDS.trainingCpr,
     priceTrainingMandt:
       emptyToNull(env.STRIPE_PRICE_TRAINING_MANDT) ?? STRIPE_SANDBOX_PRICE_IDS.trainingMandt,
     priceTrainingThirtyDay:
-      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ?? emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD),
+      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ??
+      emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD) ??
+      STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay,
     priceTrainingDspd:
-      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ?? emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD),
+      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ??
+      emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD) ??
+      STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay,
   };
 }
 
@@ -193,6 +216,7 @@ export function stripePriceIdForTrainingSku(
 ): string | null {
   if (typeof catalogPriceId === "string" && catalogPriceId.startsWith("price_")) return catalogPriceId;
   const key = sku.trim().toLowerCase().replace(/-/g, "_");
+  if (key === "pack") return env.priceTrainingPack ?? env.priceTrainingFull;
   if (key === "full_program" || key === "full" || key === "package") return env.priceTrainingFull;
   if (key === "cpr_first_aid" || key === "cpr") return env.priceTrainingCpr;
   if (key === "mandt") return env.priceTrainingMandt;
@@ -317,15 +341,42 @@ export function subscriptionLineItemsForQuote(
 }
 
 /**
- * New-provider signup: always $69/client with a $350 floor via price_data.
- * Never the sandbox $125 / $79 staff Price IDs. Optional one-time training.
+ * New-provider signup: $69/client catalog price × quantity, or the $350
+ * minimum catalog price — never both (that would double-charge).
+ * Never the sandbox $125 / $79 staff Price IDs. Optional one-time training
+ * uses the matching TEST catalog Price IDs.
  */
 export function subscriptionLineItemsForPiListQuote(
   quote: PiListQuote,
   training?: SignupTrainingQuote | null,
+  env: StripePriceEnv = readStripeEnv(),
 ): { lineItems: StripeLineItem[] } {
-  const items: StripeLineItem[] = [
-    {
+  const items: StripeLineItem[] = [];
+  if (quote.minimumApplied) {
+    if (env.pricePiListMinimum) {
+      items.push({ price: env.pricePiListMinimum, quantity: 1 });
+    } else {
+      items.push({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: quote.billedCents,
+          recurring: { interval: "month" },
+          product_data: {
+            name: quote.productName,
+            metadata: {
+              pricing_model: "pi_list",
+              client_count: String(quote.clientCount),
+              minimum_applied: "true",
+            },
+          },
+        },
+      });
+    }
+  } else if (env.pricePiListPerClient) {
+    items.push({ price: env.pricePiListPerClient, quantity: quote.clientCount });
+  } else {
+    items.push({
       quantity: 1,
       price_data: {
         currency: "usd",
@@ -341,22 +392,45 @@ export function subscriptionLineItemsForPiListQuote(
           },
         },
       },
-    },
-  ];
-  if (training && training.id !== "none" && training.priceCents > 0) {
-    items.push({
-      quantity: 1,
-      price_data: {
-        currency: "usd",
-        unit_amount: training.priceCents,
-        product_data: {
-          name: `Training · ${training.name}`,
-          metadata: { hive_kind: "signup_training", training_addon: training.id },
-        },
-      },
     });
   }
+  if (training && training.id !== "none" && training.priceCents > 0) {
+    const trainingPriceId = stripePriceIdForTrainingSku(training.id, null, env);
+    if (trainingPriceId) {
+      items.push({ price: trainingPriceId, quantity: 1 });
+    } else {
+      items.push({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: training.priceCents,
+          product_data: {
+            name: `Training · ${training.name}`,
+            metadata: { hive_kind: "signup_training", training_addon: training.id },
+          },
+        },
+      });
+    }
+  }
   return { lineItems: items };
+}
+
+/** Reconstruct monthly cents from PI list catalog lines (tests / sanity). Training omitted. */
+export function monthlyCentsFromPiListLineItems(
+  items: StripeLineItem[],
+  env: StripePriceEnv = readStripeEnv(),
+): number {
+  let monthly = 0;
+  for (const item of items) {
+    if (item.price && env.pricePiListPerClient && item.price === env.pricePiListPerClient) {
+      monthly += 6_900 * item.quantity;
+    } else if (item.price && env.pricePiListMinimum && item.price === env.pricePiListMinimum) {
+      monthly += 35_000 * item.quantity;
+    } else if (item.price_data?.recurring && typeof item.price_data.unit_amount === "number") {
+      monthly += item.price_data.unit_amount * item.quantity;
+    }
+  }
+  return monthly;
 }
 
 export const PAYMENTS_NOT_CONFIGURED = "payments_not_configured";

@@ -6,7 +6,7 @@ Hive charges companies in **Stripe test / sandbox only**. No real cards are char
 
 This is the walk Dane repeats with Gmail plus-aliases (`danewarnick+pi1@gmail.com`, `+pi2`, …).
 
-- **Plan:** $69 per client / month, **$350 minimum**. Checkout sends Stripe `price_data` for that quote. It does **not** use the old $125 / staff sandbox Price IDs.
+- **Plan:** $69 per client / month, **$350 minimum**. Checkout uses the TEST catalog Price IDs (`pi_list_per_client` × client count, **or** `pi_list_minimum` when the floor applies — never both). It does **not** use the old $125 / staff sandbox Price IDs.
 - **No founding dollars** on the form. New agencies on this walk are list, not $79 / $299.
 - **Training (optional, skip allowed):** CPR / First Aid $100, 30-day $75, Mandt $200, Pack $300 (saves $75 vs all three). One-time line on the same Checkout.
 - **TEST MODE card:** `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP.
@@ -60,10 +60,13 @@ These **Price IDs** are test-mode identifiers on `acct_1Ti6CMIQWmyptLnb`. Hive u
 |---|---|---|---|---|
 | Hive seat list | $125 / month | `prod_V9XjHA2R4jLnn3` | `price_1U9EeRIQWMytpLnbNurGi0Vq` | `STRIPE_PRICE_SEAT_LIST` |
 | Hive seat founding | $79 / month | `prod_V9XmH5qQO0TjHi` | `price_1U9EgWIQWMytpLnbyBvs2f4L` | `STRIPE_PRICE_SEAT_FOUNDING` |
-| Training package | $300 one-time | `prod_V9Xn9njjImRO15` | `price_1U9EhyIQWMytpLnbg2nkCFd8` | `STRIPE_PRICE_TRAINING_FULL` |
-| Training Mandt | $200 one-time | `prod_V9XqoHqzqR8JaY` | `price_1U9EkmIQWMytpLnb2coYT0rn` | `STRIPE_PRICE_TRAINING_MANDT` |
-| Training CPR/First Aid | **$100 locked** | old sandbox product is still $75 — do not use as default | — | `STRIPE_PRICE_TRAINING_CPR` (optional; omit to charge $100 via `price_data`) |
-| Training 30-day | **$75 locked** | old DSPD sandbox product is still $100 — do not use as default | — | `STRIPE_PRICE_TRAINING_THIRTY_DAY` (optional; omit to charge $75 via `price_data`) |
+| PI list per client | $69 / month | — | `price_1UBNUYIQWMytpLnbpygoWdLw` | `STRIPE_PRICE_PI_LIST_PER_CLIENT` |
+| PI list minimum | $350 / month | — | `price_1UBNUYIQWMytpLnbpDKqVRhB` | `STRIPE_PRICE_PI_LIST_MINIMUM` |
+| Training package (legacy hive) | $300 one-time | `prod_V9Xn9njjImRO15` | `price_1U9EhyIQWMytpLnbg2nkCFd8` | `STRIPE_PRICE_TRAINING_FULL` |
+| Training Pack (PI list signup) | $300 one-time | — | `price_1UBNeDIQWMytpLnbUy61NTkr` | `STRIPE_PRICE_TRAINING_PACK` |
+| Training Mandt | $200 one-time | — | `price_1UBNbjIQWMytpLnbRJlOEOpM` | `STRIPE_PRICE_TRAINING_MANDT` |
+| Training CPR/First Aid | $100 one-time | — | `price_1UBNX2IQWMytpLnb5aoUlkAt` | `STRIPE_PRICE_TRAINING_CPR` |
+| Training 30-day | $75 one-time | — | `price_1UBNZHIQWMytpLnbRsc9uWlG` | `STRIPE_PRICE_TRAINING_THIRTY_DAY` |
 
 Volume rates ($109 / $99) and annual (20% off) still use Stripe `price_data` until those products exist. The app still enforces the $500 list minimum and $299 founding minimum.
 
@@ -83,10 +86,13 @@ Optional overrides (defaults are the sandbox Price IDs above):
 
 - `STRIPE_PRICE_SEAT_LIST`
 - `STRIPE_PRICE_SEAT_FOUNDING`
+- `STRIPE_PRICE_PI_LIST_PER_CLIENT`
+- `STRIPE_PRICE_PI_LIST_MINIMUM`
 - `STRIPE_PRICE_TRAINING_FULL`
-- `STRIPE_PRICE_TRAINING_CPR` — only if you create a new **$100** CPR Price ID
+- `STRIPE_PRICE_TRAINING_PACK`
+- `STRIPE_PRICE_TRAINING_CPR`
 - `STRIPE_PRICE_TRAINING_MANDT`
-- `STRIPE_PRICE_TRAINING_THIRTY_DAY` — only if you create a new **$75** 30-day Price ID
+- `STRIPE_PRICE_TRAINING_THIRTY_DAY`
 - `STRIPE_PRICE_TRAINING_DSPD` — leftover alias for the 30-day price
 
 Class roster checkout always sends Stripe `price_data` at the locked amounts, so a stale $75 CPR Price ID cannot undercharge.

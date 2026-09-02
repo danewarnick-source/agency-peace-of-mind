@@ -17,6 +17,7 @@ import {
   stripeSeatPriceForQuote,
   subscriptionLineItemsForQuote,
   subscriptionLineItemsForPiListQuote,
+  monthlyCentsFromPiListLineItems,
   readStripeEnv,
   STRIPE_SANDBOX_PRICE_IDS,
 } from "./stripe-config.ts";
@@ -206,19 +207,60 @@ describe("stripe-config", () => {
     assert.match(r.message ?? "", /preview URL/);
   });
 
-  it("signup list checkout uses price_data at $69/client with $350 floor, not $125 seats", () => {
-    const quote = quotePiListSubscription({ clientCount: 5 });
-    const items = subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("pack"));
-    assert.equal(items.lineItems.length, 2);
-    assert.equal(items.lineItems[0]?.price, undefined);
-    assert.equal(items.lineItems[0]?.price_data?.unit_amount, 35_000);
-    assert.equal(items.lineItems[0]?.price_data?.recurring?.interval, "month");
-    assert.match(items.lineItems[0]?.price_data?.product_data.name ?? "", /\$69\/client/);
-    assert.equal(items.lineItems[1]?.price_data?.unit_amount, 30_000);
-    assert.notEqual(items.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatList);
-    const twelve = subscriptionLineItemsForPiListQuote(quotePiListSubscription({ clientCount: 12 }));
-    assert.equal(twelve.lineItems[0]?.price_data?.unit_amount, 82_800);
+  it("signup list checkout uses PI catalog prices: $69 × clients XOR $350 floor, not $125 seats", () => {
+    const env = readStripeEnv({});
+    const five = quotePiListSubscription({ clientCount: 5 });
+    const fiveItems = subscriptionLineItemsForPiListQuote(five, quoteSignupTrainingAddon("pack"), env);
+    assert.equal(five.minimumApplied, true);
+    assert.equal(fiveItems.lineItems.length, 2);
+    assert.equal(fiveItems.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.piListMinimum);
+    assert.equal(fiveItems.lineItems[0]?.quantity, 1);
+    assert.equal(fiveItems.lineItems[1]?.price, STRIPE_SANDBOX_PRICE_IDS.trainingPack);
+    assert.equal(
+      fiveItems.lineItems.some((row) => row.price === STRIPE_SANDBOX_PRICE_IDS.piListPerClient),
+      false,
+      "floor must not also charge $69 × clients",
+    );
+    assert.equal(monthlyCentsFromPiListLineItems(fiveItems.lineItems, env), 35_000);
+    assert.notEqual(fiveItems.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatList);
+    assert.notEqual(fiveItems.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatFounding);
+
+    const twelve = subscriptionLineItemsForPiListQuote(quotePiListSubscription({ clientCount: 12 }), null, env);
     assert.equal(twelve.lineItems.length, 1);
+    assert.equal(twelve.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.piListPerClient);
+    assert.equal(twelve.lineItems[0]?.quantity, 12);
+    assert.equal(
+      twelve.lineItems.some((row) => row.price === STRIPE_SANDBOX_PRICE_IDS.piListMinimum),
+      false,
+      "at-or-above floor must not also charge the $350 price",
+    );
+    assert.equal(monthlyCentsFromPiListLineItems(twelve.lineItems, env), 82_800);
+
+    const six = subscriptionLineItemsForPiListQuote(quotePiListSubscription({ clientCount: 6 }), null, env);
+    assert.equal(six.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.piListPerClient);
+    assert.equal(six.lineItems[0]?.quantity, 6);
+    assert.equal(monthlyCentsFromPiListLineItems(six.lineItems, env), 41_400);
+  });
+
+  it("signup training add-ons use the matching TEST catalog Price IDs", () => {
+    const env = readStripeEnv({});
+    const quote = quotePiListSubscription({ clientCount: 12 });
+    assert.equal(
+      subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("cpr_first_aid"), env).lineItems[1]?.price,
+      STRIPE_SANDBOX_PRICE_IDS.trainingCpr,
+    );
+    assert.equal(
+      subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("thirty_day"), env).lineItems[1]?.price,
+      STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay,
+    );
+    assert.equal(
+      subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("mandt"), env).lineItems[1]?.price,
+      STRIPE_SANDBOX_PRICE_IDS.trainingMandt,
+    );
+    assert.equal(
+      subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("pack"), env).lineItems[1]?.price,
+      STRIPE_SANDBOX_PRICE_IDS.trainingPack,
+    );
   });
 
   it("accepts test keys; seat Price IDs default to the Hive sandbox products", () => {
@@ -256,10 +298,31 @@ describe("stripe-config", () => {
     assert.equal(env.priceStaffListMonthly, "price_1U9EeRIQWMytpLnbNurGi0Vq");
     assert.equal(env.priceStaffFoundingMonthly, "price_1U9EgWIQWMytpLnbyBvs2f4L");
     assert.equal(env.priceTrainingFull, "price_1U9EhyIQWMytpLnbg2nkCFd8");
-    assert.equal(env.priceTrainingCpr, null);
-    assert.equal(env.priceTrainingMandt, "price_1U9EkmIQWMytpLnb2coYT0rn");
-    assert.equal(env.priceTrainingThirtyDay, null);
-    assert.equal(env.priceTrainingDspd, null);
+    assert.equal(env.pricePiListPerClient, STRIPE_SANDBOX_PRICE_IDS.piListPerClient);
+    assert.equal(env.pricePiListMinimum, STRIPE_SANDBOX_PRICE_IDS.piListMinimum);
+    assert.equal(env.priceTrainingCpr, STRIPE_SANDBOX_PRICE_IDS.trainingCpr);
+    assert.equal(env.priceTrainingMandt, STRIPE_SANDBOX_PRICE_IDS.trainingMandt);
+    assert.equal(env.priceTrainingThirtyDay, STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay);
+    assert.equal(env.priceTrainingPack, STRIPE_SANDBOX_PRICE_IDS.trainingPack);
+    assert.equal(env.priceTrainingDspd, STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay);
+  });
+
+  it("STRIPE_PRICE_PI_LIST_* and training env vars override PI catalog defaults", () => {
+    const env = readStripeEnv({
+      STRIPE_PRICE_PI_LIST_PER_CLIENT: "price_custom_client",
+      STRIPE_PRICE_PI_LIST_MINIMUM: "price_custom_min",
+      STRIPE_PRICE_TRAINING_PACK: "price_custom_pack",
+    });
+    assert.equal(env.pricePiListPerClient, "price_custom_client");
+    assert.equal(env.pricePiListMinimum, "price_custom_min");
+    assert.equal(env.priceTrainingPack, "price_custom_pack");
+    const items = subscriptionLineItemsForPiListQuote(
+      quotePiListSubscription({ clientCount: 12 }),
+      quoteSignupTrainingAddon("pack"),
+      env,
+    );
+    assert.equal(items.lineItems[0]?.price, "price_custom_client");
+    assert.equal(items.lineItems[1]?.price, "price_custom_pack");
   });
 
   it("STRIPE_PRICE_SEAT_LIST / STRIPE_PRICE_SEAT_FOUNDING override sandbox defaults", () => {

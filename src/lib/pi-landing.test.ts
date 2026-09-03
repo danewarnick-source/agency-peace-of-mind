@@ -112,6 +112,15 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(signup, /Just need training\? Buy classes without the office/);
     assert.match(signup, /signup-training-only-link/);
     assert.match(signup, /to="\/training"/);
+    const account = signup.slice(
+      signup.indexOf("function Step1Account"),
+      signup.indexOf("function Step3Business"),
+    );
+    const training = signup.slice(signup.indexOf("function Step5Training"));
+    assert.doesNotMatch(account, /Just need training\?/);
+    assert.match(training, /Just need training\? Buy classes without the office\./);
+    assert.match(training, /to="\/training"/);
+    assert.match(training, /Skip training/);
     assert.match(signup, /4242 4242 4242 4242/);
     assert.match(signup, /pricingModel: "pi_list"/);
     assert.match(signup, /fromSignup: true/);

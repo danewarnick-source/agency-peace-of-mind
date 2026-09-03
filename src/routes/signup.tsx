@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
 import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.functions";
 import { ensureSignupWorkspace } from "@/lib/signup-workspace.functions";
+import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import {
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
   SIGNUP_PROVISION_FAILED_MESSAGE,
@@ -33,9 +34,13 @@ import {
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import {
   SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE,
+  SIGNUP_BUSINESS_VERIFY_SELECT,
+  isSignupServerFnFailure,
   orgIdFromCreatedByRow,
+  orgIdFromEnsureWorkspaceResult,
   orgIdFromMembershipRow,
   signupBusinessOrgPatch,
+  signupBusinessWriteOk,
 } from "@/lib/signup-business";
 import {
   createSubscriptionCheckoutFn,
@@ -268,6 +273,7 @@ function SignupPage() {
   const checkEmail = useServerFn(checkEmailExists);
   const checkPwnedRange = useServerFn(checkPasswordPwnedRange);
   const ensureWorkspace = useServerFn(ensureSignupWorkspace);
+  const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
 
   useEffect(() => {
     void (async () => {
@@ -311,6 +317,7 @@ function SignupPage() {
                 form={form}
                 update={update}
                 ensureWorkspace={ensureWorkspace}
+                setSmsPhoneFn={setSmsPhoneFn}
                 onBack={goBack}
                 onNext={() => setStep(2)}
               />
@@ -713,16 +720,14 @@ function Step3Business({
   form,
   update,
   ensureWorkspace,
+  setSmsPhoneFn,
   onBack,
   onNext,
 }: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  ensureWorkspace: (input: { data: { agencyName?: string } }) => Promise<{
-    ok: boolean;
-    orgId: string | null;
-    reason: "no_session" | "org_query_error" | "trigger_blocked" | "provision_failed" | null;
-  }>;
+  ensureWorkspace: (input: { data: { agencyName?: string } }) => Promise<unknown>;
+  setSmsPhoneFn: (input: { data: { organizationId: string; phone: string } }) => Promise<unknown>;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -765,23 +770,14 @@ function Step3Business({
       }
 
       let orgId: string | null = null;
-      try {
-        const ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
-        if (ensured?.ok) orgId = ensured.orgId;
-      } catch (e) {
-        console.warn("[signup] ensure workspace failed", e);
-      }
-
-      if (!orgId) {
-        const { data: member } = await (supabase as any)
-          .from("organization_members")
-          .select("organization_id")
-          .eq("user_id", uid)
-          .eq("active", true)
-          .limit(1)
-          .maybeSingle();
-        orgId = orgIdFromMembershipRow(member);
-      }
+      const { data: member } = await (supabase as any)
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", uid)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      orgId = orgIdFromMembershipRow(member);
       if (!orgId) {
         const { data: created } = await (supabase as any)
           .from("organizations")
@@ -790,6 +786,23 @@ function Step3Business({
           .limit(1)
           .maybeSingle();
         orgId = orgIdFromCreatedByRow(created);
+      }
+      if (!orgId) {
+        let ensured: unknown;
+        try {
+          ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
+        } catch (e) {
+          console.warn("[signup] ensure workspace failed", e);
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        if (isSignupServerFnFailure(ensured)) {
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        orgId = orgIdFromEnsureWorkspaceResult(ensured);
       }
       if (!orgId) {
         toast.error(SIGNUP_PROVISION_FAILED_MESSAGE);
@@ -820,10 +833,38 @@ function Step3Business({
           }),
         )
         .eq("id", orgId)
-        .select("id")
+        .select(SIGNUP_BUSINESS_VERIFY_SELECT)
         .maybeSingle();
-      if (orgErr || !updated?.id) {
+      if (orgErr) {
         console.warn("[signup] business org update failed", { code: orgErr?.code ?? "no_row" });
+        toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+        setBusy(false);
+        return;
+      }
+
+      let row = updated;
+      if (!signupBusinessWriteOk(row)) {
+        try {
+          const sms = await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
+          if (isSignupServerFnFailure(sms)) {
+            toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+            setBusy(false);
+            return;
+          }
+        } catch (e) {
+          console.warn("[signup] sms phone save failed", e);
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        const { data: reread } = await (supabase as any)
+          .from("organizations")
+          .select(SIGNUP_BUSINESS_VERIFY_SELECT)
+          .eq("id", orgId)
+          .maybeSingle();
+        row = reread;
+      }
+      if (!signupBusinessWriteOk(row)) {
         toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
         setBusy(false);
         return;

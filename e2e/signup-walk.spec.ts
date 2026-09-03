@@ -60,11 +60,19 @@ function serverFnHay(req: { url: () => string; postData: () => string | null }) 
 
 async function installSignupMocks(
   page: Page,
-  opts?: { emailExists?: boolean; pwnedRange?: string; signUpNoSession?: boolean },
+  opts?: {
+    emailExists?: boolean;
+    pwnedRange?: string;
+    signUpNoSession?: boolean;
+    orgPatchOmitsPhone?: boolean;
+    smsPhoneServerFn500?: boolean;
+  },
 ) {
   const emailExists = opts?.emailExists === true;
   const pwnedRange = opts?.pwnedRange ?? "";
   const signUpNoSession = opts?.signUpNoSession === true;
+  const orgPatchOmitsPhone = opts?.orgPatchOmitsPhone === true;
+  const smsPhoneServerFn500 = opts?.smsPhoneServerFn500 === true;
 
   const handleServerFn = async (route: Route) => {
     const req = route.request();
@@ -116,6 +124,18 @@ async function installSignupMocks(
       });
     }
     if (hay.includes("setbillingsmsphone")) {
+      if (smsPhoneServerFn500) {
+        return fulfillJson(
+          route,
+          {
+            status: 500,
+            unhandled: true,
+            message:
+              "Server function info not found for 81909d505cfb3331d5d9a7438f345a15a0a3c55b2b3c3edef8d6e7a316ade347",
+          },
+          500,
+        );
+      }
       return fulfillJson(route, { result: { ok: true, phone: "+18015550123" } });
     }
     if (hay.includes("createsubscriptioncheckout")) {
@@ -181,10 +201,18 @@ async function installSignupMocks(
       });
     }
     if (/\/rest\/v1\/organizations/i.test(url)) {
+      const orgRow = {
+        id: ORG_ID,
+        created_by: USER_ID,
+        name: "Sunrise Supports",
+        account_contact_name: "Dane Walk",
+        billing_sms_phone: orgPatchOmitsPhone ? null : "+18015550123",
+        state_code: "UT",
+      };
       if (method === "GET") {
-        return fulfillJson(route, [{ id: ORG_ID, created_by: USER_ID, name: "Sunrise Supports" }]);
+        return fulfillJson(route, [orgRow]);
       }
-      return fulfillJson(route, { id: ORG_ID });
+      return fulfillJson(route, orgRow);
     }
     if (/\/rest\/v1\/profiles/i.test(url)) {
       return fulfillJson(route, { id: USER_ID, email: EMAIL });
@@ -411,6 +439,26 @@ test.describe("new-provider signup walk", () => {
     await expect(page.getByTestId("signup-training-skip")).toBeVisible();
     await expect(page.getByRole("button", { name: /^back$/i })).toBeVisible();
     await shot(page, "signup_step_training_mobile_footer.png");
+  });
+
+  test("Business Continue stays on the step when the phone write fails", async ({ page }) => {
+    await installSignupMocks(page, { orgPatchOmitsPhone: true, smsPhoneServerFn500: true });
+    await page.goto("/signup", { waitUntil: "networkidle" });
+    await fillReactInput(page, "signup-email", EMAIL);
+    await fillReactInput(page, "signup-password", "Testpass1");
+    await fillReactInput(page, "signup-confirm", "Testpass1");
+    await page.getByTestId("signup-tos-checkbox").check();
+    await page.getByTestId("signup-baa-checkbox").check();
+    await page.getByRole("button", { name: /create account/i }).click();
+    await expect(page.getByText(/tell us about your business/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("signup-agency-name").fill("Sunrise Supports");
+    await page.getByPlaceholder("Jane Doe").fill("Dane Walk");
+    await page.getByPlaceholder("(801) 555-0123").fill("8015550123");
+    await page.getByRole("button", { name: /continue/i }).click();
+    await expect(page.getByText(/couldn't save your business details/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/tell us about your business/i)).toBeVisible();
+    await expect(page.getByTestId("signup-plan-quote")).toHaveCount(0);
+    await shot(page, "signup_business_phone_write_blocked.png");
   });
 
   test("terms and BAA pages name Provider Interface LLC", async ({ page }) => {

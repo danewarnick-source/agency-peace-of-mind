@@ -72,6 +72,10 @@ export const updateBillingSmsPhone = createServerFn({ method: "POST" })
 
 // Used during signup, where the user is the org creator (no role row yet
 // may exist). Caller passes organizationId looked up via `created_by`.
+// Production id is sha256("src/lib/billing-sms.functions.ts--setBillingSmsPhoneAtSignup_createServerFn_handler")
+// = 81909d505cfb3331d5d9a7438f345a15a0a3c55b2b3c3edef8d6e7a316ade347.
+// Must stay imported from signup.tsx so the deploy registers that hash;
+// a stale client still POSTs it after Business Continue.
 export const setBillingSmsPhoneAtSignup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpdateInput) => {

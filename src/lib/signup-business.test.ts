@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   asSignupOrgId,
+  isSignupServerFnFailure,
   orgIdFromCreatedByRow,
+  orgIdFromEnsureWorkspaceResult,
   orgIdFromMembershipRow,
   signupBusinessOrgPatch,
+  signupBusinessWriteOk,
 } from "./signup-business.ts";
 
 describe("signup business org patch", () => {
@@ -49,5 +52,51 @@ describe("signup org id parsers", () => {
     assert.equal(orgIdFromCreatedByRow({ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1" }), "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1");
     assert.equal(asSignupOrgId(""), null);
     assert.equal(orgIdFromMembershipRow({ organization_id: null }), null);
+  });
+});
+
+describe("signup server fn failure", () => {
+  it("treats unhandled 500 and missing-fn hashes as hard failures", () => {
+    assert.equal(
+      isSignupServerFnFailure({
+        status: 500,
+        unhandled: true,
+        message:
+          "Server function info not found for 81909d505cfb3331d5d9a7438f345a15a0a3c55b2b3c3edef8d6e7a316ade347",
+      }),
+      true,
+    );
+    assert.equal(isSignupServerFnFailure({ ok: true, orgId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1" }), false);
+    assert.equal(orgIdFromEnsureWorkspaceResult({ status: 500, unhandled: true, message: "x" }), null);
+    assert.equal(
+      orgIdFromEnsureWorkspaceResult({ ok: true, orgId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1" }),
+      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+    );
+  });
+});
+
+describe("signup business write gate", () => {
+  it("requires name, contact, phone, and state before Continue advances", () => {
+    assert.equal(
+      signupBusinessWriteOk({
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        name: "Walk Test Agency",
+        account_contact_name: "Walk Tester",
+        billing_sms_phone: "+18015550123",
+        state_code: "UT",
+      }),
+      true,
+    );
+    assert.equal(
+      signupBusinessWriteOk({
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        name: "Walk Test Agency",
+        account_contact_name: "Walk Tester",
+        billing_sms_phone: null,
+        state_code: "UT",
+      }),
+      false,
+    );
+    assert.equal(signupBusinessWriteOk(null), false);
   });
 });

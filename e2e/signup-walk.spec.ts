@@ -359,7 +359,7 @@ test.describe("new-provider signup walk", () => {
     await page.goto("/signup", { waitUntil: "domcontentloaded" });
     await fillReactInput(page, "signup-email", "danewarnick+pi1@gmail.com");
     await page.getByTestId("signup-email").blur();
-    await expect(page.getByText(/already exists/i)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/already in use/i)).toBeVisible({ timeout: 20_000 });
     await shot(page, "signup_exact_email_blocked.png");
   });
 

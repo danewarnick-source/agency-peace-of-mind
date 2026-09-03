@@ -35,7 +35,9 @@ export const checkEmailExists = createServerFn({ method: "POST" })
       .ilike("email", data.email)
       .limit(1)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      throw new Error(error.message || error.code || "Couldn't check that email.");
+    }
     return { exists: !!row };
   });
 

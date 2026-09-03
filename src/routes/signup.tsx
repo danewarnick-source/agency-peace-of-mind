@@ -49,6 +49,12 @@ import {
   type TrainingPersonRow,
 } from "@/lib/pi-signup-pricing";
 import { toast } from "sonner";
+import {
+  SIGNUP_EMAIL_IN_USE_MESSAGE,
+  humanizeSignupAccountError,
+  isAlreadyUsedEmailError,
+  isMissingLegalAttestationsError,
+} from "@/lib/signup-account-error";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -322,13 +328,13 @@ function SignupPage() {
           </div>
         </main>
         <p className="mt-8 text-center text-xs text-[#f3efe6]/40">
-          <Link to="/terms" className="hover:text-[#f3efe6]">
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
             Terms
-          </Link>
+          </a>
           {" · "}
-          <Link to="/baa" className="hover:text-[#f3efe6]">
+          <a href="/baa" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
             BAA
-          </Link>
+          </a>
         </p>
       </div>
     </div>
@@ -402,7 +408,7 @@ function Step1Account({
     try {
       const r = await checkEmail({ data: { email: form.email } });
       if (r.exists) {
-        setEmailErr("An account with this email already exists. Sign in instead?");
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
       }
     } catch {
       // soft-fail; we'll re-check on submit
@@ -426,11 +432,20 @@ function Step1Account({
         const r = await checkEmail({ data: { email: form.email } });
         exists = r.exists;
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        if (!/Missing Supabase environment variable/i.test(msg)) throw e;
+        if (isAlreadyUsedEmailError(e)) {
+          setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        if (isMissingLegalAttestationsError(e)) {
+          toast.error(humanizeSignupAccountError(e));
+          setBusy(false);
+          return;
+        }
+        /* empty / unknown server-fn payload — unique-email still runs on signUp */
       }
       if (exists) {
-        setEmailErr("An account with this email already exists. Sign in instead?");
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
         setBusy(false);
         return;
       }
@@ -446,12 +461,12 @@ function Step1Account({
         },
       });
       if (error) {
-        if (/already/i.test(error.message)) {
-          setEmailErr("An account with this email already exists. Sign in instead?");
+        if (isAlreadyUsedEmailError(error) || /already/i.test(error.message ?? "")) {
+          setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
         } else if (isAuthPwnedPasswordMessage(error.message)) {
           setPasswordWeakErr(weakPasswordCopyFromAuth(error.message));
         } else {
-          toast.error(error.message);
+          toast.error(humanizeSignupAccountError(error));
         }
         setBusy(false);
         return;
@@ -465,7 +480,11 @@ function Step1Account({
       setBusy(false);
       onNext();
     } catch (e) {
-      toast.error((e as Error).message);
+      if (isAlreadyUsedEmailError(e)) {
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
+      } else {
+        toast.error(humanizeSignupAccountError(e));
+      }
       setBusy(false);
     }
   };
@@ -593,13 +612,15 @@ function Step1Account({
         />
         <span>
           I agree to the{" "}
-          <Link
-            to="/terms"
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-tos-link"
           >
             Terms
-          </Link>
+          </a>
           .
         </span>
       </label>
@@ -617,13 +638,15 @@ function Step1Account({
         />
         <span>
           I am authorized to bind this agency. I have read the{" "}
-          <Link
-            to="/baa"
+          <a
+            href="/baa"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-baa-link"
           >
             Business Associate Agreement
-          </Link>{" "}
+          </a>{" "}
           and I agree to it on behalf of this agency.
         </span>
       </label>

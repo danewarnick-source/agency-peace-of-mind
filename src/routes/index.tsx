@@ -12,6 +12,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: PI_PAGE_DESCRIPTION },
       { property: "og:title", content: PI_PAGE_TITLE },
       { property: "og:description", content: PI_PAGE_DESCRIPTION },
+      { name: "twitter:title", content: PI_PAGE_TITLE },
+      { name: "twitter:description", content: PI_PAGE_DESCRIPTION },
     ],
     links: [{ rel: "stylesheet", href: NEWSREADER }],
   }),

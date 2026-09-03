@@ -1,18 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
 import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
-import { PiProductShots } from "@/components/pi-landing/pi-product-shots";
 import { PiPricingSection } from "@/components/pi-landing/pi-pricing";
 import { DuskDeskStill } from "@/components/pi-landing/dusk-desk-still";
 import {
-  PI_CTA_BODY,
-  PI_CTA_HEADLINE,
+  PI_DIFFERENCE_BODY,
+  PI_DIFFERENCE_HEADLINE,
   PI_HEADLINE,
-  PI_HERO_SUPPORT,
+  PI_PROBLEM_BODY,
+  PI_PROBLEM_HEADLINE,
+  PI_PROBLEM_KICKER,
   PI_SIGN_IN,
   PI_SUBHEAD,
   PI_TALK_TO_US,
-  PI_WHAT_YOU_GET,
 } from "@/lib/pi-landing";
 
 const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as const;
@@ -46,9 +46,6 @@ export function PiMarketingPage() {
             >
               {PI_SUBHEAD}
             </p>
-            <p className="mx-auto mt-6 max-w-2xl text-center text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
-              {PI_HERO_SUPPORT}
-            </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
                 to="/login"
@@ -69,61 +66,33 @@ export function PiMarketingPage() {
             <DuskDeskStill />
           </div>
 
-          <PiPricingSection heading="The number" />
-
-          <section id="what-you-get" className="scroll-mt-24 px-5 py-20 sm:px-8 md:py-28">
-            <div className="mx-auto max-w-6xl">
+          <section id="why" className="scroll-mt-24 px-5 py-16 sm:px-8 md:py-20">
+            <div className="mx-auto max-w-3xl">
               <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#f3efe6]/45">
-                What you get for this
+                {PI_PROBLEM_KICKER}
               </p>
               <h2
-                className="mt-3 max-w-3xl text-3xl font-medium leading-[1.12] tracking-[-0.02em] sm:text-5xl"
+                className="mt-3 text-3xl font-medium leading-[1.12] tracking-[-0.02em] sm:text-5xl"
                 style={NEWSREADER}
               >
-                Peace of mind. Ease. One quiet office.
+                {PI_PROBLEM_HEADLINE}
               </h2>
+              <p className="mt-5 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
+                {PI_PROBLEM_BODY}
+              </p>
+              <h3
+                className="mt-12 text-2xl font-medium leading-[1.15] tracking-[-0.02em] sm:text-4xl"
+                style={NEWSREADER}
+              >
+                {PI_DIFFERENCE_HEADLINE}
+              </h3>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
-                The result of paying one number: the day stays done. Sunday-night dread gone. Newer
-                providers, the office already knows the work.
+                {PI_DIFFERENCE_BODY}
               </p>
-              <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                {PI_WHAT_YOU_GET.map((item) => (
-                  <article key={item.title} className="border-t border-white/[0.08] pt-5">
-                    <h3 className="font-sans text-lg font-semibold tracking-tight">{item.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-[#f3efe6]/62">{item.body}</p>
-                  </article>
-                ))}
-              </div>
             </div>
           </section>
 
-          <PiProductShots />
-
-          <section className="px-5 py-20 sm:px-8 md:py-28">
-            <div className="mx-auto max-w-3xl text-center">
-              <h2
-                className="text-3xl font-medium leading-[1.12] tracking-[-0.02em] sm:text-5xl"
-                style={NEWSREADER}
-              >
-                {PI_CTA_HEADLINE}
-              </h2>
-              <p className="mt-4 text-base text-[#f3efe6]/62 sm:text-lg">{PI_CTA_BODY}</p>
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  to="/login"
-                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#f3efe6] px-6 text-sm font-medium text-[#0b1220] hover:bg-[#f3efe6]/90"
-                >
-                  {PI_SIGN_IN}
-                </Link>
-                <Link
-                  to="/contact"
-                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#f3efe6]/25 px-6 text-sm font-medium text-[#f3efe6] hover:bg-white/[0.06]"
-                >
-                  {PI_TALK_TO_US}
-                </Link>
-              </div>
-            </div>
-          </section>
+          <PiPricingSection heading="The number" compact />
         </main>
 
         <PiPublicFooter />

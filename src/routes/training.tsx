@@ -319,6 +319,7 @@ function TrainingPurchasePage() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Link
                 to="/signup"
+                data-testid="training-office-link"
                 className="text-sm text-[#0b1220]/60 underline-offset-4 hover:text-[#0b1220] hover:underline"
               >
                 Need the office instead?

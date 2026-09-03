@@ -149,6 +149,18 @@ describe("training-only public copy", () => {
     assert.doesNotMatch(page, /Hive Certify/);
     assert.doesNotMatch(page, /DSPD/);
     assert.doesNotMatch(page, /\$69|\$350/);
-    assert.match(page, /Just need training|Buy classes|Training/);
+    assert.match(page, /Need the office instead\?/);
+    assert.match(page, /to="\/signup"/);
+  });
+
+  it("keeps the quiet cross-links between signup Training and /training", () => {
+    const training = readFileSync(new URL("../routes/training.tsx", import.meta.url), "utf8");
+    const signup = readFileSync(new URL("../routes/signup.tsx", import.meta.url), "utf8");
+    assert.match(signup, /Just need training\? Buy classes without the office\./);
+    assert.match(signup, /data-testid="signup-training-only-link"/);
+    assert.match(signup, /to="\/training"/);
+    assert.match(training, /Need the office instead\?/);
+    assert.match(training, /data-testid="training-office-link"/);
+    assert.match(training, /to="\/signup"/);
   });
 });

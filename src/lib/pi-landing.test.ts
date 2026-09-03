@@ -110,6 +110,8 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(signup, /PI_SIGNUP_PRICE_LINE|PI_LIST_PRICE_DISPLAY/);
     assert.match(signup, /Skip training/);
     assert.match(signup, /Just need training\? Buy classes without the office/);
+    assert.match(signup, /signup-training-only-link/);
+    assert.match(signup, /to="\/training"/);
     assert.match(signup, /4242 4242 4242 4242/);
     assert.match(signup, /pricingModel: "pi_list"/);
     assert.match(signup, /fromSignup: true/);

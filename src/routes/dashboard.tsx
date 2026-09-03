@@ -146,6 +146,12 @@ export const Route = createFileRoute("/dashboard")({
     if (typeof window === "undefined") return; // SSR has no session
     try {
       const returned = parseCheckoutReturnSearch(window.location.search);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
       if (returned.session_id) {
         const confirmed = await confirmCheckoutSessionFn({
           data: { sessionId: returned.session_id },
@@ -158,11 +164,6 @@ export const Route = createFileRoute("/dashboard")({
           }
         }
       }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
 
       // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
       const { data: auditor } = await supabase

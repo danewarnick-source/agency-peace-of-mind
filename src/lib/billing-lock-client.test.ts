@@ -39,5 +39,6 @@ describe("billing-lock-client", () => {
       /success_url: `\$\{origin\}\/dashboard\?checkout=success&session_id=\{CHECKOUT_SESSION_ID\}`/,
     );
     assert.match(checkout, /organizationId: orgId/);
+    assert.match(checkout, /activateSubscriptionFromCheckout/);
   });
 });

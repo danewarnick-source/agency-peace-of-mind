@@ -38,6 +38,7 @@ function BillingLockedPage() {
     paymentsConfigured: boolean;
     paymentsMessage: string | null;
     lockReason: string | null;
+    confirmError: string | null;
   }>({
     loading: true,
     authed: false,
@@ -48,6 +49,7 @@ function BillingLockedPage() {
     paymentsConfigured: false,
     paymentsMessage: null,
     lockReason: null,
+    confirmError: null,
   });
 
   useEffect(() => {
@@ -70,6 +72,7 @@ function BillingLockedPage() {
       // Confirm the Stripe session BEFORE reading lock state. A prior bounce
       // from /dashboard used to drop session_id; when it is present, fulfill
       // first so the next status read sees status=active.
+      let confirmError: string | null = null;
       if (returned.session_id) {
         const r = await confirmFn({ data: { sessionId: returned.session_id } }).catch(() => null);
         if (r?.organizationId) {
@@ -81,11 +84,11 @@ function BillingLockedPage() {
           }
         }
         if (r?.ok && !cancelled) {
-          const paid = await statusFn({ data: { organizationId: activeOrgId } });
-          if (paid.billingExempt || !paid.accessLocked) {
-            navigate({ to: "/dashboard", replace: true });
-            return;
-          }
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
+        if (r && !r.ok && r.error) {
+          confirmError = r.error;
         }
       }
 
@@ -140,6 +143,7 @@ function BillingLockedPage() {
         paymentsConfigured: status.paymentsConfigured,
         paymentsMessage: status.paymentsMessage,
         lockReason: status.lockReason,
+        confirmError,
       });
     })();
     return () => {
@@ -205,6 +209,16 @@ function BillingLockedPage() {
             ? `${state.agencyName} needs an active Provider Interface subscription before anyone can use the dashboard.`
             : `${state.agencyName}'s account is locked until billing is current.`}
         </p>
+
+        {state.confirmError && (
+          <div
+            role="alert"
+            data-testid="checkout-confirm-error"
+            className="mt-6 w-full rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-left text-sm text-red-200"
+          >
+            {state.confirmError}
+          </div>
+        )}
 
         {state.testMode && (
           <div

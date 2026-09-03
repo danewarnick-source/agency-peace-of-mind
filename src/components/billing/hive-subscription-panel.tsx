@@ -77,11 +77,7 @@ export function HiveSubscriptionPanel() {
         if (r.ok) {
           toast.success("Payment received. Your company is unlocked.");
           await qc.invalidateQueries({ queryKey: ["hive-billing-status"] });
-          const paidOrgId = r.organizationId ?? orgId;
-          const next = await statusFn({ data: { organizationId: paidOrgId ?? undefined } });
-          if (!cancelled && (next.billingExempt || !next.accessLocked)) {
-            window.location.replace("/dashboard");
-          }
+          if (!cancelled) window.location.replace("/dashboard");
         } else if (r.error) {
           toast.error(humanizeCheckoutConfirmError(r.error));
         }

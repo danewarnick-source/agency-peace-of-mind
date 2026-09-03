@@ -760,11 +760,17 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
     }
 
     const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(data.sessionId);
+    const session = await stripe.checkout.sessions.retrieve(data.sessionId, {
+      expand: ["subscription"],
+    });
     if (session.payment_status !== "paid" && session.status !== "complete") {
       return { ok: false, error: "Payment is not complete yet.", organizationId: null };
     }
-    const orgId = session.metadata?.organization_id;
+    const orgId =
+      session.metadata?.organization_id ||
+      (typeof session.client_reference_id === "string" && UUID_RE.test(session.client_reference_id)
+        ? session.client_reference_id
+        : "");
     if (!orgId) {
       return { ok: false, error: "Checkout session is missing the company id.", organizationId: null };
     }
@@ -803,29 +809,46 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
       return { ok: true, error: null as string | null, organizationId: orgId };
     }
 
+    const subscriptionRef = session.subscription;
+    const subscriptionId =
+      typeof subscriptionRef === "string"
+        ? subscriptionRef
+        : subscriptionRef && typeof subscriptionRef === "object" && "id" in subscriptionRef
+          ? String((subscriptionRef as { id?: string }).id ?? "") || null
+          : null;
+    const periodEndUnix =
+      subscriptionRef && typeof subscriptionRef === "object" && "current_period_end" in subscriptionRef
+        ? Number((subscriptionRef as { current_period_end?: number }).current_period_end)
+        : NaN;
+
     try {
-      const { readSupabaseAdminEnv } = await import("@/lib/supabase-public-env");
-      const writer = readSupabaseAdminEnv() ? supabaseAdmin : context.supabase;
-      await activateSubscriptionFromCheckout(
+      const wrote = await activateSubscriptionFromCheckout(
         {
           orgId,
           plan: session.metadata?.plan || "hive_standard",
           customerId: typeof session.customer === "string" ? session.customer : null,
-          subscriptionId: typeof session.subscription === "string" ? session.subscription : null,
+          subscriptionId,
           paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
           amountCents: session.amount_total ?? Number(session.metadata?.monthly_cents ?? 0),
-          periodEndIso: null,
+          periodEndIso: Number.isFinite(periodEndUnix) && periodEndUnix > 0
+            ? new Date(periodEndUnix * 1000).toISOString()
+            : null,
           eventId: `checkout_confirm:${session.id}`,
           staffCount: Number(session.metadata?.staff_count ?? 0) || null,
           billingInterval: session.metadata?.interval === "annual" ? "annual" : "monthly",
           monthlyCents: Number(session.metadata?.monthly_cents ?? 0) || null,
         },
-        writer,
+        context.supabase,
       );
-      return { ok: true, error: null, organizationId: orgId };
+      return {
+        ok: true,
+        error: null,
+        organizationId: orgId,
+        status: wrote ? "active" : "exempt",
+      };
     } catch (e) {
       const { humanizeCheckoutConfirmError } = await import("@/lib/signup-checkout-error");
-      return { ok: false, error: humanizeCheckoutConfirmError(e), organizationId: orgId };
+      return { ok: false, error: humanizeCheckoutConfirmError(e), organizationId: orgId, status: null };
     }
   });
 

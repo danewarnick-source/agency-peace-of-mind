@@ -15,6 +15,7 @@ import { shouldKeepPrepaidAccess, syncPiListQuantityForOrg } from "@/lib/pi-list
 import { mrrCentsForPlan } from "@/lib/stripe-config";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
 import { fulfillTrainingClass } from "@/lib/training-class-fulfillment.server";
+import { fulfillTrainingOnlyOrder } from "@/lib/training-only-fulfillment.server";
 import { normalizeTierId } from "@/lib/hive-tiers";
 
 export type StripeLikeEvent = {
@@ -171,6 +172,17 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
     case "checkout.session.completed": {
       const hiveKind = meta.hive_kind ?? (obj.mode === "payment" && meta.catalog_id ? "training" : "subscription");
       const orgId = meta.organization_id || (await orgIdFromCustomer(customerId));
+      if (hiveKind === "training_only") {
+        const orderId = meta.training_only_order_id || asString(obj.client_reference_id);
+        if (!orderId) break;
+        await fulfillTrainingOnlyOrder({
+          orderId,
+          stripeSessionId: asString(obj.id),
+          stripePaymentIntentId: asString(obj.payment_intent),
+          amountCents: typeof obj.amount_total === "number" ? obj.amount_total : 0,
+        });
+        break;
+      }
       if (hiveKind === "training_class") {
         if (!meta.class_id || !orgId) break;
         await fulfillTrainingClass({

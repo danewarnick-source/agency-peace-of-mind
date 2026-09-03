@@ -50,6 +50,8 @@ type Props = {
   obligationTitle: string;
   alreadyComplete: boolean;
   examResetAfterIso: string | null;
+  /** Public training-only seats have no office obligation to close. */
+  skipObligation?: boolean;
 };
 
 function topicsForCourse(courseId: InHiveCourseId): Topic[] {
@@ -66,6 +68,7 @@ export function InHiveCoursePlayer({
   obligationTitle,
   alreadyComplete,
   examResetAfterIso,
+  skipObligation = false,
 }: Props) {
   const qc = useQueryClient();
   const recordFn = useServerFn(recordCompletion);
@@ -123,6 +126,7 @@ export function InHiveCoursePlayer({
   });
 
   const markObligation = useCallback(async () => {
+    if (skipObligation || !organizationId) return;
     await recordFn({
       data: {
         organizationId,
@@ -132,7 +136,7 @@ export function InHiveCoursePlayer({
         attestationTextSnapshot: `${obligationTitle} completed in Provider Interface.`,
       },
     });
-  }, [recordFn, organizationId, instanceId, obligationTitle]);
+  }, [recordFn, organizationId, instanceId, obligationTitle, skipObligation]);
 
   const finishCourse = useMutation({
     mutationFn: markObligation,
@@ -249,12 +253,16 @@ export function InHiveCoursePlayer({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row md:items-start">
       <aside className="w-full shrink-0 space-y-3 md:sticky md:top-4 md:w-72 lg:w-80">
-        <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" asChild>
-          <Link to="/dashboard/my-obligations">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            My Obligations
-          </Link>
-        </Button>
+        {skipObligation ? (
+          <p className="text-xs text-muted-foreground">Training-only course</p>
+        ) : (
+          <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" asChild>
+            <Link to="/dashboard/my-obligations">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              My Obligations
+            </Link>
+          </Button>
+        )}
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">In-platform course</p>
           <h1 className="text-lg font-semibold leading-tight">{courseTitle(courseId)}</h1>
@@ -352,6 +360,7 @@ export function InHiveCoursePlayer({
             alreadyComplete={alreadyComplete}
             finishPending={finishCourse.isPending}
             onMarkObligation={() => finishCourse.mutate()}
+            hideObligation={skipObligation}
           />
         )}
       </div>
@@ -371,6 +380,7 @@ function ExamPane({
   alreadyComplete,
   finishPending,
   onMarkObligation,
+  hideObligation = false,
 }: {
   title: string;
   questions: ExamQuestion[];
@@ -383,6 +393,7 @@ function ExamPane({
   alreadyComplete: boolean;
   finishPending: boolean;
   onMarkObligation: () => void;
+  hideObligation?: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const last = attempts[attempts.length - 1];
@@ -418,13 +429,16 @@ function ExamPane({
           <CardTitle>Exam passed</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <p>Score {last?.scorePct ?? "—"}%. This obligation is complete when the course is recorded.</p>
+          <p>
+            Score {last?.scorePct ?? "—"}%.
+            {hideObligation ? " Course complete." : " This obligation is complete when the course is recorded."}
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={onDownload}>
               <Download className="h-4 w-4 mr-2" />
               Download auditor export
             </Button>
-            {!alreadyComplete && (
+            {!alreadyComplete && !hideObligation && (
               <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
                 Record on My Obligations
               </Button>

@@ -12,6 +12,9 @@ export function Footer() {
             <Link to="/pricing" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Pricing
             </Link>
+            <Link to="/training" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
+              Training
+            </Link>
             <Link to="/contact" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Contact
             </Link>

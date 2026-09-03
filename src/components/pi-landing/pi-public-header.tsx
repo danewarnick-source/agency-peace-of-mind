@@ -11,6 +11,7 @@ import {
 const NAV = [
   { href: "/#why", label: "Why" },
   { href: "/pricing", label: "Pricing", to: "/pricing" as const },
+  { href: "/training", label: "Training", to: "/training" as const },
 ] as const;
 
 export function PiPublicHeader() {

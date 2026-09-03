@@ -87,6 +87,8 @@ describe("Provider Interface marketing homepage", () => {
     assert.doesNotMatch(header, /What you get/);
     assert.doesNotMatch(header, /The office/);
     assert.match(header, /\/#why/);
+    assert.match(header, /\/training/);
+    assert.match(header, /Training/);
     assert.match(shots, /Nectar/);
     assert.match(pricing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(pricing, /PI_TRAINING_ADDONS/);
@@ -107,6 +109,7 @@ describe("Provider Interface marketing homepage", () => {
     const signup = read(new URL("../routes/signup.tsx", import.meta.url));
     assert.match(signup, /PI_SIGNUP_PRICE_LINE|PI_LIST_PRICE_DISPLAY/);
     assert.match(signup, /Skip training/);
+    assert.match(signup, /Just need training\? Buy classes without the office/);
     assert.match(signup, /4242 4242 4242 4242/);
     assert.match(signup, /pricingModel: "pi_list"/);
     assert.match(signup, /fromSignup: true/);

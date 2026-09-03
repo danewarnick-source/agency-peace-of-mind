@@ -10,6 +10,9 @@ export function PiPublicFooter() {
           <Link to="/pricing" className="hover:text-[#f3efe6]">
             Pricing
           </Link>
+          <Link to="/training" className="hover:text-[#f3efe6]">
+            Training
+          </Link>
           <Link to="/login" className="hover:text-[#f3efe6]">
             Sign in
           </Link>

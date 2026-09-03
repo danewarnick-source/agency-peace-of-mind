@@ -1,7 +1,9 @@
+import { readPublishableSupabaseEnv } from "./aws/env.ts";
+
 /**
  * Password sign-in against the publishable-key Auth API (not service role).
  * Used by login.server.ts so CloudFront/ECS can sign in with
- * SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY only.
+ * VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (or the Lovable aliases).
  */
 
 export const GENERIC_PASSWORD_ERROR = "Invalid username or password";
@@ -53,10 +55,7 @@ export type PasswordSignInServerDeps = {
 export function readPublishableAuthEnv(
   env: Record<string, string | undefined> = process.env,
 ): { url: string; key: string } | null {
-  const url = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
-  const key = (env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || "").trim();
-  if (!url || !key) return null;
-  return { url, key };
+  return readPublishableSupabaseEnv(env);
 }
 
 function isEmailIdentifier(identifier: string): boolean {

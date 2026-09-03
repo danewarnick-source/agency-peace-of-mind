@@ -427,7 +427,7 @@ function Step1Account({
         setBusy(false);
         return;
       }
-      const { data: signUpData, error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await (supabase as any).auth.signUp({
         email: form.email,
         password: form.password,
         options: {

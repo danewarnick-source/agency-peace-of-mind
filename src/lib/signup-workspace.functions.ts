@@ -42,9 +42,9 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       return { ok: false, orgId: null, reason: "no_session" };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSupabaseAdminOrNull } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const admin = supabaseAdmin as any;
+    const admin = (getSupabaseAdminOrNull() ?? context.supabase) as any;
 
     const findOrg = async (): Promise<{ orgId: string | null; reason: SignupWorkspaceReason | null }> => {
       const { data: org, error } = await admin

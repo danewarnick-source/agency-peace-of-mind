@@ -11,8 +11,13 @@ import { getAwsDataClient } from "@/lib/aws/db-client.server";
 import { getS3StorageAdapter } from "@/lib/aws/s3-storage.server";
 import { createAwsAuthAdmin } from "@/lib/aws/auth-admin.server";
 
+function readAdminUrl(): string {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  return url && url.trim() ? url.trim() : "";
+}
+
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_URL = readAdminUrl();
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -39,7 +44,7 @@ type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
 let _liveAdmin: AdminClient | null | undefined;
 function liveAdminOrNull(): AdminClient | null {
   if (_liveAdmin !== undefined) return _liveAdmin;
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!readAdminUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     _liveAdmin = null;
     return null;
   }
@@ -50,6 +55,10 @@ function liveAdminOrNull(): AdminClient | null {
     _liveAdmin = null;
     return null;
   }
+}
+
+export function getSupabaseAdminOrNull(): AdminClient | null {
+  return liveAdminOrNull();
 }
 
 function requireLive(): AdminClient {

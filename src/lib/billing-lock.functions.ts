@@ -1,15 +1,18 @@
 /**
- * Server-side billing lock. Reads org_subscriptions with the admin client so
- * a just-paid active row is visible even when browser RLS hides the table
- * (org admin/manager SELECT only) or the client REST call errors.
+ * Server-side billing lock. Reads org + org_subscriptions with the signed-in
+ * session first (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — the names the
+ * host already has). Uses the service-role client only when that env is
+ * already present — never requires it, never invents a new name.
  *
- * No PHI in logs. True North stays unlocked via isBillingExempt.
+ * Missing org_subscriptions row still locks (fail-closed). An active paid
+ * row the admin can SELECT unlocks. True North stays unlocked via
+ * isBillingExempt. No PHI in logs.
  */
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isBillingExempt, orgAccessIsLocked } from "@/lib/billing-access";
+import { readSupabaseAdminEnv } from "@/lib/supabase-public-env";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -20,8 +23,15 @@ type LockOrgRow = {
   billingExempt: boolean;
 };
 
-async function loadLockOrg(orgId: string): Promise<LockOrgRow | null> {
-  const full = await supabaseAdmin
+type LockSubRow = {
+  status: string | null;
+  locked_at: string | null;
+  stripe_subscription_id: string | null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readLockOrg(db: any, orgId: string): Promise<LockOrgRow | null> {
+  const full = await db
     .from("organizations")
     .select("name, legal_name, dba_name, billing_exempt")
     .eq("id", orgId)
@@ -40,7 +50,7 @@ async function loadLockOrg(orgId: string): Promise<LockOrgRow | null> {
       billingExempt: row.billing_exempt === true,
     };
   }
-  const fallback = await supabaseAdmin
+  const fallback = await db
     .from("organizations")
     .select("name, legal_name, dba_name")
     .eq("id", orgId)
@@ -56,6 +66,22 @@ async function loadLockOrg(orgId: string): Promise<LockOrgRow | null> {
     legalName: row.legal_name,
     dbaName: row.dba_name,
     billingExempt: false,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readLockSub(db: any, orgId: string): Promise<LockSubRow | null> {
+  const { data: sub } = await db
+    .from("org_subscriptions")
+    .select("status, locked_at, stripe_subscription_id")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (!sub) return null;
+  return {
+    status: (sub.status as string | null) ?? null,
+    locked_at: (sub.locked_at as string | null) ?? null,
+    stripe_subscription_id:
+      (sub as { stripe_subscription_id?: string | null }).stripe_subscription_id ?? null,
   };
 }
 
@@ -90,16 +116,22 @@ export const getBillingLockFn = createServerFn({ method: "POST" })
     const membership = ms.find((m) => m.organization_id === orgId) ?? ms[0];
     const isAdmin = membership.role === "admin";
 
-    const org = await loadLockOrg(orgId);
+    let org = await readLockOrg(context.supabase, orgId);
+    let sub = await readLockSub(context.supabase, orgId);
+
+    if ((!org || !sub) && readSupabaseAdminEnv()) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        if (!org) org = await readLockOrg(supabaseAdmin, orgId);
+        if (!sub) sub = await readLockSub(supabaseAdmin, orgId);
+      } catch {
+        /* preview often has VITE_ keys only — session row is enough */
+      }
+    }
+
     if (!org) {
       return { locked: true, isAdmin, orgId, status: null, billingExempt: false };
     }
-
-    const { data: sub } = await supabaseAdmin
-      .from("org_subscriptions")
-      .select("status, locked_at, stripe_subscription_id")
-      .eq("organization_id", orgId)
-      .maybeSingle();
 
     const billingExempt = isBillingExempt({
       billingExempt: org.billingExempt,
@@ -114,21 +146,14 @@ export const getBillingLockFn = createServerFn({ method: "POST" })
       legalName: org.legalName,
       dbaName: org.dbaName,
       organizationId: orgId,
-      subscription: sub
-        ? {
-            status: (sub.status as string | null) ?? null,
-            locked_at: (sub.locked_at as string | null) ?? null,
-            stripe_subscription_id:
-              (sub as { stripe_subscription_id?: string | null }).stripe_subscription_id ?? null,
-          }
-        : null,
+      subscription: sub,
     });
 
     return {
       locked,
       isAdmin,
       orgId,
-      status: (sub?.status as string | null) ?? null,
+      status: sub?.status ?? null,
       billingExempt,
     };
   });

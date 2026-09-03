@@ -16,6 +16,7 @@ import {
   createSubscriptionCheckoutFn,
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
+import { humanizeCheckoutConfirmError, humanizeCheckoutStartError } from "@/lib/signup-checkout-error";
 
 function fmtMoney(cents: number): string {
   return formatUsdFromCents(cents);
@@ -81,9 +82,11 @@ export function HiveSubscriptionPanel() {
           if (!cancelled && (next.billingExempt || !next.accessLocked)) {
             window.location.replace("/dashboard");
           }
+        } else if (r.error) {
+          toast.error(humanizeCheckoutConfirmError(r.error));
         }
       } catch (e) {
-        if (!cancelled) toast.error((e as Error).message);
+        if (!cancelled) toast.error(humanizeCheckoutConfirmError(e));
       }
     })();
     return () => {
@@ -147,13 +150,13 @@ export function HiveSubscriptionPanel() {
         return;
       }
       if (r.error || !r.url) {
-        toast.error(r.error ?? "Could not start checkout.");
+        toast.error(humanizeCheckoutStartError(r.error ?? "Could not start checkout."));
         setBusy(false);
         return;
       }
       window.location.href = r.url;
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(humanizeCheckoutStartError(e));
       setBusy(false);
     }
   };

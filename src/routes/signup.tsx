@@ -67,6 +67,10 @@ import {
   isAlreadyUsedEmailError,
   isMissingLegalAttestationsError,
 } from "@/lib/signup-account-error";
+import {
+  humanizeCheckoutStartError,
+  signupAuthCallbackError,
+} from "@/lib/signup-checkout-error";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -275,12 +279,28 @@ function SignupPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [authCallbackError, setAuthCallbackError] = useState<string | null>(null);
   const checkEmail = useServerFn(checkEmailExists);
   const checkPwnedRange = useServerFn(checkPasswordPwnedRange);
   const ensureWorkspace = useServerFn(ensureSignupWorkspace);
   const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
 
   useEffect(() => {
+    const denied = signupAuthCallbackError(window.location.search, window.location.hash);
+    if (denied) {
+      setAuthCallbackError(denied);
+      toast.error(denied);
+      try {
+        const url = new URL(window.location.href);
+        url.hash = "";
+        url.searchParams.delete("error");
+        url.searchParams.delete("error_code");
+        url.searchParams.delete("error_description");
+        window.history.replaceState(null, "", url.pathname + url.search);
+      } catch {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
     const goIfSession = (session: unknown) => {
       if (signupHasSession(session as { access_token?: string; user?: { id?: string } } | null)) {
         setStep((s) => (s === 0 ? 1 : s));
@@ -328,6 +348,7 @@ function SignupPage() {
                 checkEmail={checkEmail}
                 checkPwnedRange={checkPwnedRange}
                 onNext={() => setStep(1)}
+                authCallbackError={authCallbackError}
               />
             )}
             {step === 1 && (
@@ -379,22 +400,28 @@ function Step1Account({
   checkEmail,
   checkPwnedRange,
   onNext,
+  authCallbackError,
 }: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
   checkEmail: (input: { data: { email: string } }) => Promise<{ exists: boolean }>;
   checkPwnedRange: (input: { data: { sha1Prefix: string } }) => Promise<{ range: string }>;
   onNext: () => void;
+  authCallbackError?: string | null;
 }) {
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [accountErr, setAccountErr] = useState<string | null>(null);
-  const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(null);
+  const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(authCallbackError ?? null);
   const [passwordWeakErr, setPasswordWeakErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const weakCheckGen = useRef(0);
+
+  useEffect(() => {
+    if (authCallbackError) setConfirmEmailMsg(authCallbackError);
+  }, [authCallbackError]);
 
   const lenOk = form.password.length >= 8;
   const numOk = /\d/.test(form.password);
@@ -1301,14 +1328,14 @@ function Step6Payment({
         return;
       }
       if (r.error || !r.url) {
-        toast.error(r.error ?? "Could not start checkout. Stay on this page — do not use a live card.");
+        toast.error(humanizeCheckoutStartError(r.error ?? "Could not start checkout."));
         setBusy(false);
         return;
       }
       window.location.href = r.url;
     } catch (e) {
       setBusy(false);
-      toast.error((e as Error).message);
+      toast.error(humanizeCheckoutStartError(e));
     }
   };
 

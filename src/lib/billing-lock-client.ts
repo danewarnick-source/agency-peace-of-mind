@@ -2,7 +2,7 @@
  * Client-side unpaid-org lock. beforeLoad skips on SSR (no window/session),
  * so DashboardLayout also runs this after hydrate.
  *
- * Lock truth comes from getBillingLockFn (admin-backed org_subscriptions),
+ * Lock truth comes from getBillingLockFn (session-first org_subscriptions),
  * not a browser REST read. RLS only lets org admin/manager SELECT that table,
  * so a client query returns "no row" after a successful pay and fail-closes.
  */

@@ -92,19 +92,24 @@ async function alreadyProcessed(eventId: string): Promise<boolean> {
   return !!data;
 }
 
-export async function activateSubscriptionFromCheckout(opts: {
-  orgId: string;
-  plan: string;
-  customerId: string | null;
-  subscriptionId: string | null;
-  paymentIntentId: string | null;
-  amountCents: number;
-  periodEndIso: string | null;
-  eventId: string | null;
-  staffCount?: number | null;
-  billingInterval?: "monthly" | "annual" | null;
-  monthlyCents?: number | null;
-}): Promise<void> {
+export async function activateSubscriptionFromCheckout(
+  opts: {
+    orgId: string;
+    plan: string;
+    customerId: string | null;
+    subscriptionId: string | null;
+    paymentIntentId: string | null;
+    amountCents: number;
+    periodEndIso: string | null;
+    eventId: string | null;
+    staffCount?: number | null;
+    billingInterval?: "monthly" | "annual" | null;
+    monthlyCents?: number | null;
+  },
+  client?: unknown,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = (client ?? supabaseAdmin) as any;
   const nowIso = new Date().toISOString();
   const plan = opts.plan === "hive_standard" ? "hive_standard" : normalizeTierId(opts.plan);
   const monthly =
@@ -117,7 +122,7 @@ export async function activateSubscriptionFromCheckout(opts: {
     opts.periodEndIso ??
     new Date(Date.now() + (opts.billingInterval === "annual" ? 365 : 30) * 86_400_000).toISOString();
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await db
     .from("org_subscriptions")
     .select("id")
     .eq("organization_id", opts.orgId)
@@ -147,17 +152,24 @@ export async function activateSubscriptionFromCheckout(opts: {
   const cleanPatch = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
 
   if (existing) {
-    const { error } = await supabaseAdmin.from("org_subscriptions").update(cleanPatch).eq("id", existing.id);
+    const { error } = await db.from("org_subscriptions").update(cleanPatch).eq("id", existing.id);
     if (error) throw new Error(error.message);
   } else {
-    const { error } = await supabaseAdmin.from("org_subscriptions").insert({
+    const { error } = await db.from("org_subscriptions").insert({
       organization_id: opts.orgId,
       ...cleanPatch,
     });
     if (error) throw new Error(error.message);
   }
 
-  await recordPaymentSuccess(opts.orgId, opts.amountCents, opts.eventId);
+  try {
+    const { readSupabaseAdminEnv } = await import("@/lib/supabase-public-env");
+    if (readSupabaseAdminEnv()) {
+      await recordPaymentSuccess(opts.orgId, opts.amountCents, opts.eventId);
+    }
+  } catch {
+    console.warn("[checkout] payment event write skipped", { code: "pay_event" });
+  }
 }
 
 export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise<{ ok: true }> {

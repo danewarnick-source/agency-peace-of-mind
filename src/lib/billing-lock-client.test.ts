@@ -14,10 +14,13 @@ describe("billing-lock-client", () => {
     assert.equal(pathBypassesBillingLock("/dashboard", true), false);
   });
 
-  it("dashboard gate uses the admin lock fn, not a browser org_subscriptions read", () => {
+  it("dashboard gate uses the lock fn, not a browser org_subscriptions read", () => {
     const client = read(new URL("./billing-lock-client.ts", import.meta.url));
     assert.match(client, /getBillingLockFn/);
     assert.doesNotMatch(client, /\.from\("org_subscriptions"\)/);
+    const lock = read(new URL("./billing-lock.functions.ts", import.meta.url));
+    assert.match(lock, /readSupabaseAdminEnv/);
+    assert.match(lock, /context\.supabase/);
   });
 
   it("billing-locked confirms Checkout before deciding to stay", () => {

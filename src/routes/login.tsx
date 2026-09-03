@@ -13,6 +13,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { signInWithUsername } from "@/lib/login.functions";
 import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { completePasswordSignIn, GENERIC_LOGIN_ERROR } from "@/lib/login-auth";
+import { trainingOnlyHomeForMeFn } from "@/lib/training-only-access.functions";
 import {
   isCompanyAdminRole,
   persistPortalView,
@@ -51,6 +52,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
+  const trainingHomeFn = useServerFn(trainingOnlyHomeForMeFn);
   const search = Route.useSearch();
   const nextPath = search.next;
   const hadSessionOnArrival = useRef<boolean | null>(null);
@@ -119,12 +121,28 @@ function LoginPage() {
       } catch {
         /* fall back to /dashboard */
       }
+      if (target === "/dashboard") {
+        try {
+          const { data: memberships } = await supabase
+            .from("organization_members")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .eq("active", true)
+            .limit(1);
+          if (!memberships?.length) {
+            const home = await trainingHomeFn();
+            if (home?.hasThirtyDay) target = "/training/course";
+          }
+        } catch {
+          /* stay on dashboard */
+        }
+      }
       if (!cancelled) navigate({ to: target, replace: true });
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, session, navigate, execCheck, nextPath, justSignedIn]);
+  }, [loading, session, navigate, execCheck, nextPath, justSignedIn, trainingHomeFn]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

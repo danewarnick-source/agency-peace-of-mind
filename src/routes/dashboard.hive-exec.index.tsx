@@ -7,6 +7,7 @@ import { getExecKpis, listCompanies, type CompanyRow } from "@/lib/hive-exec.fun
 import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
 import { listRecentTrainingClassAlerts } from "@/lib/training-class.functions";
 import { formatRosterContactLine, trainingClassLabel } from "@/lib/training-class";
+import { listTrainingOnlyOrdersForExec } from "@/lib/training-only-exec.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/")({
   component: CompaniesPage,
@@ -22,10 +23,15 @@ function CompaniesPage() {
   const listFn = useServerFn(listCompanies);
   const pendingFn = useServerFn(getPendingUpgradeRequestCount);
   const classAlertsFn = useServerFn(listRecentTrainingClassAlerts);
+  const publicTrainingFn = useServerFn(listTrainingOnlyOrdersForExec);
   const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn(), refetchInterval: 30_000 });
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn(), refetchInterval: 30_000 });
   const pendingQ = useQuery({ queryKey: ["hive-exec-upgrade-pending-count"], queryFn: () => pendingFn(), refetchInterval: 30_000 });
   const classAlertsQ = useQuery({ queryKey: ["hive-exec-class-alerts"], queryFn: () => classAlertsFn(), refetchInterval: 30_000 });
+  const publicTrainingQ = useQuery({ queryKey: ["hive-exec-training-only"], queryFn: () => publicTrainingFn(), refetchInterval: 30_000 });
+  const publicAwaiting = (publicTrainingQ.data ?? []).filter(
+    (s) => s.paymentStatus === "paid" && s.fulfillmentStatus !== "sent" && s.fulfillmentStatus !== "completed",
+  ).slice(0, 3);
 
 
   const [search, setSearch] = useState("");
@@ -48,6 +54,27 @@ function CompaniesPage() {
 
   return (
     <div className="space-y-4">
+      {publicAwaiting.map((seat) => (
+        <Link
+          key={seat.seatId}
+          to="/dashboard/hive-exec/classes"
+          className="flex items-start justify-between gap-3 rounded-xl border-2 border-[var(--hive-gold)] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm"
+        >
+          <div>
+            <div className="font-display text-base font-bold text-[var(--hive-text)]">
+              Public training · {seat.personName} · {seat.skuLabel}
+            </div>
+            <div className="mt-1 text-xs text-[#9a3412]">
+              Payer {seat.buyerEmail} · {seat.paymentStatus === "paid" ? "Paid" : "Unpaid"}
+              {seat.buyerAgencyName ? ` · ${seat.buyerAgencyName}` : ""}
+            </div>
+          </div>
+          <span className="inline-flex items-center rounded-md bg-[var(--hive-text)] px-3 py-2 text-sm font-semibold text-white">
+            Set up / send
+          </span>
+        </Link>
+      ))}
+
       {(classAlertsQ.data ?? []).slice(0, 3).map((cls) => (
         <Link
           key={cls.id}

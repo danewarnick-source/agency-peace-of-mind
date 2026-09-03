@@ -107,6 +107,31 @@ WHERE table_schema = 'public'
 
 ---
 
+## ACTION — Training-only public orders (do not apply from CI)
+
+**Core:** public `/training` checkout writes `training_only_orders` + `training_only_seats`.
+Hive Executive Training (`/dashboard/hive-exec/classes`) lists every named person after
+Stripe. These people are not agency staff and must not land in True North Employees.
+
+Also extends `handle_new_user` so `created_via = 'training_only'` does **not** create
+a workspace. Same function body as invite-join, plus that skip.
+
+File: `supabase/migrations/20260903040000_training_only_orders.sql`
+
+**Do not apply from this agent.** Dane screenshots Executive Training before merge.
+
+Clear the editor, paste the migration file in full. Confirm:
+
+```sql
+SELECT
+  to_regclass('public.training_only_orders') IS NOT NULL AS orders_ready,
+  to_regclass('public.training_only_seats') IS NOT NULL AS seats_ready;
+```
+
+**What you'll see:** `orders_ready = t`, `seats_ready = t`. Counts only — no emails.
+
+---
+
 ## ACTION — Signup Continue / dead rbac_roles trigger (2026-09-02)
 
 **Run this so new-provider Continue can create a workspace.** Confirmed on

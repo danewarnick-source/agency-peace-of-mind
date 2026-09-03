@@ -25,6 +25,7 @@ import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as ClassesRouteImport } from './routes/classes'
 import { Route as BillingLockedRouteImport } from './routes/billing-locked'
 import { Route as BaaRouteImport } from './routes/baa'
 import { Route as AuditorRouteImport } from './routes/auditor'
@@ -33,6 +34,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
+import { Route as TrainingCourseRouteImport } from './routes/training.course'
+import { Route as TrainingConfirmRouteImport } from './routes/training.confirm'
 import { Route as SignPolicyDocumentIdRouteImport } from './routes/sign-policy.$documentId'
 import { Route as E2eComplianceDeskRouteImport } from './routes/e2e.compliance-desk'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
@@ -303,6 +306,11 @@ const ContactRoute = ContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClassesRoute = ClassesRouteImport.update({
+  id: '/classes',
+  path: '/classes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BillingLockedRoute = BillingLockedRouteImport.update({
   id: '/billing-locked',
   path: '/billing-locked',
@@ -342,6 +350,16 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
   id: '/verify/$code',
   path: '/verify/$code',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingCourseRoute = TrainingCourseRouteImport.update({
+  id: '/course',
+  path: '/course',
+  getParentRoute: () => TrainingRoute,
+} as any)
+const TrainingConfirmRoute = TrainingConfirmRouteImport.update({
+  id: '/confirm',
+  path: '/confirm',
+  getParentRoute: () => TrainingRoute,
 } as any)
 const SignPolicyDocumentIdRoute = SignPolicyDocumentIdRouteImport.update({
   id: '/sign-policy/$documentId',
@@ -1387,6 +1405,7 @@ export interface FileRoutesByFullPath {
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
+  '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
@@ -1401,7 +1420,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
-  '/training': typeof TrainingRoute
+  '/training': typeof TrainingRouteWithChildren
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -1471,6 +1490,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
+  '/training/confirm': typeof TrainingConfirmRoute
+  '/training/course': typeof TrainingCourseRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -1602,6 +1623,7 @@ export interface FileRoutesByTo {
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
+  '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
@@ -1615,7 +1637,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
-  '/training': typeof TrainingRoute
+  '/training': typeof TrainingRouteWithChildren
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -1679,6 +1701,8 @@ export interface FileRoutesByTo {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
+  '/training/confirm': typeof TrainingConfirmRoute
+  '/training/course': typeof TrainingCourseRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -1811,6 +1835,7 @@ export interface FileRoutesById {
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
+  '/classes': typeof ClassesRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/demo': typeof DemoRoute
@@ -1825,7 +1850,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
-  '/training': typeof TrainingRoute
+  '/training': typeof TrainingRouteWithChildren
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -1895,6 +1920,8 @@ export interface FileRoutesById {
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
+  '/training/confirm': typeof TrainingConfirmRoute
+  '/training/course': typeof TrainingCourseRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -2028,6 +2055,7 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/baa'
     | '/billing-locked'
+    | '/classes'
     | '/contact'
     | '/dashboard'
     | '/demo'
@@ -2112,6 +2140,8 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
+    | '/training/confirm'
+    | '/training/course'
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
@@ -2243,6 +2273,7 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/baa'
     | '/billing-locked'
+    | '/classes'
     | '/contact'
     | '/demo'
     | '/employee'
@@ -2320,6 +2351,8 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
+    | '/training/confirm'
+    | '/training/course'
     | '/verify/$code'
     | '/audit-portal'
     | '/dashboard'
@@ -2451,6 +2484,7 @@ export interface FileRouteTypes {
     | '/auditor'
     | '/baa'
     | '/billing-locked'
+    | '/classes'
     | '/contact'
     | '/dashboard'
     | '/demo'
@@ -2535,6 +2569,8 @@ export interface FileRouteTypes {
     | '/dashboard/tracks'
     | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
+    | '/training/confirm'
+    | '/training/course'
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
@@ -2667,6 +2703,7 @@ export interface RootRouteChildren {
   AuditorRoute: typeof AuditorRoute
   BaaRoute: typeof BaaRoute
   BillingLockedRoute: typeof BillingLockedRoute
+  ClassesRoute: typeof ClassesRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DemoRoute: typeof DemoRoute
@@ -2681,7 +2718,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
-  TrainingRoute: typeof TrainingRoute
+  TrainingRoute: typeof TrainingRouteWithChildren
   UnauthorizedRoute: typeof UnauthorizedRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -2825,6 +2862,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/classes': {
+      id: '/classes'
+      path: '/classes'
+      fullPath: '/classes'
+      preLoaderRoute: typeof ClassesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/billing-locked': {
       id: '/billing-locked'
       path: '/billing-locked'
@@ -2880,6 +2924,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/verify/$code'
       preLoaderRoute: typeof VerifyCodeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/training/course': {
+      id: '/training/course'
+      path: '/course'
+      fullPath: '/training/course'
+      preLoaderRoute: typeof TrainingCourseRouteImport
+      parentRoute: typeof TrainingRoute
+    }
+    '/training/confirm': {
+      id: '/training/confirm'
+      path: '/confirm'
+      fullPath: '/training/confirm'
+      preLoaderRoute: typeof TrainingConfirmRouteImport
+      parentRoute: typeof TrainingRoute
     }
     '/sign-policy/$documentId': {
       id: '/sign-policy/$documentId'
@@ -4710,12 +4768,27 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface TrainingRouteChildren {
+  TrainingConfirmRoute: typeof TrainingConfirmRoute
+  TrainingCourseRoute: typeof TrainingCourseRoute
+}
+
+const TrainingRouteChildren: TrainingRouteChildren = {
+  TrainingConfirmRoute: TrainingConfirmRoute,
+  TrainingCourseRoute: TrainingCourseRoute,
+}
+
+const TrainingRouteWithChildren = TrainingRoute._addFileChildren(
+  TrainingRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuditorRoute: AuditorRoute,
   BaaRoute: BaaRoute,
   BillingLockedRoute: BillingLockedRoute,
+  ClassesRoute: ClassesRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DemoRoute: DemoRoute,
@@ -4730,7 +4803,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,
-  TrainingRoute: TrainingRoute,
+  TrainingRoute: TrainingRouteWithChildren,
   UnauthorizedRoute: UnauthorizedRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:

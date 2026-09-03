@@ -944,6 +944,16 @@ function Step5Training({
           ))}
         </div>
 
+        <p className="text-sm">
+          <Link
+            to="/training"
+            className="text-[var(--hive-text-muted)] underline-offset-4 hover:text-[var(--hive-text)] hover:underline"
+            data-testid="signup-training-only-link"
+          >
+            Just need training? Buy classes without the office.
+          </Link>
+        </p>
+
         {people.map((person, index) => (
           <div
             key={person.id}

@@ -91,6 +91,11 @@ Optional overrides (defaults are the sandbox Price IDs above):
 
 Class roster checkout always sends Stripe `price_data` at the locked amounts, so a stale $75 CPR Price ID cannot undercharge.
 
+Public `/training` (training-only, no office) uses the same TEST catalog Price IDs
+(CPR / 30-day / Mandt / Pack). Quantities = people on each SKU. No $69 / $350
+subscription line. Webhook `hive_kind=training_only` marks the order paid and
+lists each person on Hive Executive Training.
+
 If the secret key is missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
 
 ## Webhook

@@ -159,6 +159,38 @@ export const Route = createFileRoute("/dashboard")({
         throw redirect({ to: "/audit-portal" });
       }
 
+      if (!location.pathname.startsWith("/dashboard/hive-exec")) {
+        try {
+          const { data: memberships } = await supabase
+            .from("organization_members")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .eq("active", true)
+            .limit(1);
+          if (!memberships?.length) {
+            const { data: execRow } = await supabase
+              .from("hive_executives")
+              .select("id")
+              .eq("user_id", session.user.id)
+              .eq("active", true)
+              .maybeSingle();
+            if (!execRow) {
+              const { data: seats } = await (supabase as any)
+                .from("training_only_seats")
+                .select("id")
+                .eq("access_user_id", session.user.id)
+                .limit(1);
+              if (seats?.length) {
+                throw redirect({ to: "/training/course", replace: true });
+              }
+            }
+          }
+        } catch (err) {
+          if (isRedirect(err)) throw err;
+          /* table may not be applied yet */
+        }
+      }
+
       let activeOrgId: string | null = null;
       try {
         activeOrgId = window.localStorage.getItem("hive.activeOrgId");

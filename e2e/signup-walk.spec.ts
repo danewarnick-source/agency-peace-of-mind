@@ -313,10 +313,13 @@ test.describe("new-provider signup walk", () => {
 
   test("confirm-email signup stays on Account and does not show the workspace toast", async ({ page }) => {
     await installSignupMocks(page, { signUpNoSession: true });
-    await page.goto("/signup", { waitUntil: "domcontentloaded" });
+    await page.goto("/signup", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("signup-email")).toBeVisible();
     await fillReactInput(page, "signup-email", EMAIL);
     await fillReactInput(page, "signup-password", "Testpass1");
     await fillReactInput(page, "signup-confirm", "Testpass1");
+    await page.getByTestId("signup-email").blur();
+    await expect(page.getByRole("button", { name: /create account/i })).toBeEnabled({ timeout: 15_000 });
     await page.getByRole("button", { name: /create account/i }).click();
     await expect(page.getByTestId("signup-confirm-email")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("signup-confirm-email")).toContainText(/confirm the email we sent/i);

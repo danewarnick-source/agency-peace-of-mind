@@ -8,6 +8,8 @@
  * `window.__HIVE_RUNTIME__` blob (booleans + Cognito region/ids only).
  */
 
+import { readSupabasePublicEnv } from "../supabase-public-env.ts";
+
 export type AuthProvider = "cognito" | "supabase";
 
 export type HiveRuntimeBlob = {
@@ -152,23 +154,10 @@ export function resolveSupabaseClientEnv(): {
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
 } {
-  const url =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_SUPABASE_URL) ||
-    (typeof process !== "undefined"
-      ? process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-      : undefined) ||
-    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined);
-  const key =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as ImportMeta & { env?: Record<string, string> }).env
-        ?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-    (typeof process !== "undefined"
-      ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
-      : undefined) ||
-    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined);
-
-  if (url && key) return { SUPABASE_URL: url, SUPABASE_PUBLISHABLE_KEY: key };
+  const mapped = readSupabasePublicEnv();
+  if (mapped) {
+    return { SUPABASE_URL: mapped.url, SUPABASE_PUBLISHABLE_KEY: mapped.key };
+  }
 
   if (isCognitoAuth() || isAwsDatabaseEnabled() || isS3StorageEnabled()) {
     return {
@@ -177,11 +166,8 @@ export function resolveSupabaseClientEnv(): {
     };
   }
 
-  const missing = [
-    ...(!url ? ["SUPABASE_URL"] : []),
-    ...(!key ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
-  ];
-  const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+  const message =
+    "Missing Supabase environment variable(s): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY. Connect Supabase in Lovable Cloud.";
   console.error(`[Supabase] ${message}`);
   throw new Error(message);
 }

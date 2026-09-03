@@ -10,6 +10,8 @@
 export const SIGNUP_CONFIRM_EMAIL_MESSAGE =
   "Confirm the email we sent, then return here to finish setup.";
 
+export const SIGNUP_CONFIRM_CONTINUE_LABEL = "I've confirmed — continue";
+
 export const SIGNUP_ORG_ACCESS_ERROR_MESSAGE =
   "Couldn't read your workspace (access error). Please try again.";
 
@@ -29,6 +31,16 @@ export function signupHasSession(
   session: { access_token?: string | null; user?: { id?: string | null } | null } | null | undefined,
 ): boolean {
   return Boolean(session?.access_token && session.user?.id);
+}
+
+export function isSignupEmailNotConfirmedError(error: unknown): boolean {
+  if (error == null || typeof error !== "object") {
+    return /email not confirmed/i.test(String(error ?? ""));
+  }
+  const row = error as { code?: unknown; message?: unknown };
+  const code = String(row.code ?? "");
+  const message = String(row.message ?? "");
+  return code === "email_not_confirmed" || /email not confirmed/i.test(message);
 }
 
 export function messageForSignupWorkspaceReason(reason: SignupWorkspaceReason | null | undefined): string {

@@ -126,8 +126,9 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(signup, /fromSignup: true/);
     assert.match(signup, /signup-tos-checkbox/);
     assert.match(signup, /signup-baa-checkbox/);
-    assert.match(signup, /to="\/terms"/);
-    assert.match(signup, /to="\/baa"/);
+    assert.match(signup, /href="\/terms"/);
+    assert.match(signup, /href="\/baa"/);
+    assert.match(signup, /target="_blank"/);
     assert.match(signup, /Add a person/);
     assert.match(signup, /signup-training-add/);
     assert.doesNotMatch(signup, /True North Supports/);

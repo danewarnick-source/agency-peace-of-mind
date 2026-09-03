@@ -4,6 +4,8 @@
  * SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY only.
  */
 
+import { readSupabasePublicEnv } from "./supabase-public-env.ts";
+
 export const GENERIC_PASSWORD_ERROR = "Invalid username or password";
 
 export type PasswordSession = {
@@ -53,10 +55,7 @@ export type PasswordSignInServerDeps = {
 export function readPublishableAuthEnv(
   env: Record<string, string | undefined> = process.env,
 ): { url: string; key: string } | null {
-  const url = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
-  const key = (env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || "").trim();
-  if (!url || !key) return null;
-  return { url, key };
+  return readSupabasePublicEnv(env);
 }
 
 function isEmailIdentifier(identifier: string): boolean {

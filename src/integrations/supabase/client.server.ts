@@ -7,25 +7,22 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { getDatabaseUrl, isCognitoAuth, isS3StorageEnabled } from "@/lib/aws/env";
+import { readSupabaseAdminEnv } from "@/lib/supabase-public-env";
 import { getAwsDataClient } from "@/lib/aws/db-client.server";
 import { getS3StorageAdapter } from "@/lib/aws/s3-storage.server";
 import { createAwsAuthAdmin } from "@/lib/aws/auth-admin.server";
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const mapped = readSupabaseAdminEnv();
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+  if (!mapped) {
+    const message =
+      "Missing Supabase environment variable(s): VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.";
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient<Database>(mapped.url, mapped.serviceRoleKey, {
     auth: {
       storage: undefined,
       persistSession: false,
@@ -39,7 +36,7 @@ type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
 let _liveAdmin: AdminClient | null | undefined;
 function liveAdminOrNull(): AdminClient | null {
   if (_liveAdmin !== undefined) return _liveAdmin;
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!readSupabaseAdminEnv()) {
     _liveAdmin = null;
     return null;
   }
@@ -56,7 +53,7 @@ function requireLive(): AdminClient {
   const live = liveAdminOrNull();
   if (!live) {
     throw new Error(
-      "Missing Supabase environment variable(s): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.",
+      "Missing Supabase environment variable(s): VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.",
     );
   }
   return live;

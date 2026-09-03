@@ -59,8 +59,10 @@ describe("Provider Interface terms draft", () => {
     assert.doesNotMatch(page, /Hive Certify/);
     assert.match(signup, /signup-tos-checkbox/);
     assert.match(signup, /signup-baa-checkbox/);
-    assert.match(signup, /to="\/terms"/);
-    assert.match(signup, /to="\/baa"/);
+    assert.match(signup, /href="\/terms"/);
+    assert.match(signup, /href="\/baa"/);
+    assert.match(signup, /target="_blank"/);
+    assert.match(signup, /rel="noopener noreferrer"/);
     assert.match(footer, /to="\/terms"/);
     assert.match(footer, /to="\/baa"/);
   });

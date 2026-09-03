@@ -17,9 +17,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
 import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.functions";
 import { ensureSignupWorkspace } from "@/lib/signup-workspace.functions";
+import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import {
+  SIGNUP_CONFIRM_CONTINUE_LABEL,
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
-  messageForSignupWorkspaceReason,
+  SIGNUP_PROVISION_FAILED_MESSAGE,
+  isSignupEmailNotConfirmedError,
   signupHasSession,
 } from "@/lib/signup-workspace";
 import {
@@ -30,8 +33,17 @@ import {
   sha1HexUpper,
   weakPasswordCopyFromAuth,
 } from "@/lib/signup-password";
-import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
+import {
+  SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE,
+  SIGNUP_BUSINESS_VERIFY_SELECT,
+  isSignupServerFnFailure,
+  orgIdFromCreatedByRow,
+  orgIdFromEnsureWorkspaceResult,
+  orgIdFromMembershipRow,
+  signupBusinessOrgPatch,
+  signupBusinessWriteOk,
+} from "@/lib/signup-business";
 import {
   createSubscriptionCheckoutFn,
   getSignupPaymentsStatusFn,
@@ -49,6 +61,12 @@ import {
   type TrainingPersonRow,
 } from "@/lib/pi-signup-pricing";
 import { toast } from "sonner";
+import {
+  SIGNUP_EMAIL_IN_USE_MESSAGE,
+  humanizeSignupAccountError,
+  isAlreadyUsedEmailError,
+  isMissingLegalAttestationsError,
+} from "@/lib/signup-account-error";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -183,6 +201,7 @@ function NavButtons({
   nextDisabled,
   loading,
   showBack = true,
+  nextTestId,
 }: {
   onBack?: () => void;
   onNext: () => void;
@@ -192,6 +211,7 @@ function NavButtons({
   nextDisabled?: boolean;
   loading?: boolean;
   showBack?: boolean;
+  nextTestId?: string;
 }) {
   return (
     <div
@@ -203,6 +223,7 @@ function NavButtons({
           type="button"
           onClick={onNext}
           disabled={nextDisabled || loading}
+          data-testid={nextTestId}
           className="group h-11 w-full border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827] sm:w-auto sm:min-w-[160px]"
           style={{ fontFamily: JAKARTA, fontWeight: 700 }}
         >
@@ -257,12 +278,26 @@ function SignupPage() {
   const checkEmail = useServerFn(checkEmailExists);
   const checkPwnedRange = useServerFn(checkPasswordPwnedRange);
   const ensureWorkspace = useServerFn(ensureSignupWorkspace);
+  const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
 
   useEffect(() => {
+    const goIfSession = (session: unknown) => {
+      if (signupHasSession(session as { access_token?: string; user?: { id?: string } } | null)) {
+        setStep((s) => (s === 0 ? 1 : s));
+      }
+    };
     void (async () => {
       const { data } = await (supabase as any).auth.getSession();
-      if (signupHasSession(data.session)) setStep(1);
+      goIfSession(data.session);
     })();
+    const { data: sub } = (supabase as any).auth.onAuthStateChange(
+      (_event: string, session: unknown) => {
+        goIfSession(session);
+      },
+    );
+    return () => {
+      sub?.subscription?.unsubscribe?.();
+    };
   }, []);
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -300,6 +335,7 @@ function SignupPage() {
                 form={form}
                 update={update}
                 ensureWorkspace={ensureWorkspace}
+                setSmsPhoneFn={setSmsPhoneFn}
                 onBack={goBack}
                 onNext={() => setStep(2)}
               />
@@ -322,13 +358,13 @@ function SignupPage() {
           </div>
         </main>
         <p className="mt-8 text-center text-xs text-[#f3efe6]/40">
-          <Link to="/terms" className="hover:text-[#f3efe6]">
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
             Terms
-          </Link>
+          </a>
           {" · "}
-          <Link to="/baa" className="hover:text-[#f3efe6]">
+          <a href="/baa" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
             BAA
-          </Link>
+          </a>
         </p>
       </div>
     </div>
@@ -351,6 +387,7 @@ function Step1Account({
   onNext: () => void;
 }) {
   const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [accountErr, setAccountErr] = useState<string | null>(null);
   const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(null);
   const [passwordWeakErr, setPasswordWeakErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -402,7 +439,7 @@ function Step1Account({
     try {
       const r = await checkEmail({ data: { email: form.email } });
       if (r.exists) {
-        setEmailErr("An account with this email already exists. Sign in instead?");
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
       }
     } catch {
       // soft-fail; we'll re-check on submit
@@ -413,6 +450,7 @@ function Step1Account({
 
   const submit = async () => {
     setEmailErr(null);
+    setAccountErr(null);
     if (!form.acceptedTos) return toast.error("Agree to the Terms to continue.");
     if (!form.acceptedBaa) return toast.error("Agree to the Business Associate Agreement to continue.");
     if (!emailValid) return setEmailErr("Please enter a valid email address.");
@@ -421,9 +459,27 @@ function Step1Account({
     if (await verifyPasswordPwned(form.password)) return;
     setBusy(true);
     try {
-      const r = await checkEmail({ data: { email: form.email } });
-      if (r.exists) {
-        setEmailErr("An account with this email already exists. Sign in instead?");
+      let exists = false;
+      try {
+        const r = await checkEmail({ data: { email: form.email } });
+        exists = r.exists;
+      } catch (e) {
+        if (isAlreadyUsedEmailError(e)) {
+          setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        if (isMissingLegalAttestationsError(e)) {
+          const sentence = humanizeSignupAccountError(e);
+          setAccountErr(sentence);
+          toast.error(sentence);
+          setBusy(false);
+          return;
+        }
+        /* empty / unknown server-fn payload — unique-email still runs on signUp */
+      }
+      if (exists) {
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
         setBusy(false);
         return;
       }
@@ -439,12 +495,14 @@ function Step1Account({
         },
       });
       if (error) {
-        if (/already/i.test(error.message)) {
-          setEmailErr("An account with this email already exists. Sign in instead?");
+        if (isAlreadyUsedEmailError(error) || /already/i.test(error.message ?? "")) {
+          setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
         } else if (isAuthPwnedPasswordMessage(error.message)) {
           setPasswordWeakErr(weakPasswordCopyFromAuth(error.message));
         } else {
-          toast.error(error.message);
+          const sentence = humanizeSignupAccountError(error);
+          setAccountErr(sentence);
+          toast.error(sentence);
         }
         setBusy(false);
         return;
@@ -458,7 +516,54 @@ function Step1Account({
       setBusy(false);
       onNext();
     } catch (e) {
-      toast.error((e as Error).message);
+      if (isAlreadyUsedEmailError(e)) {
+        setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
+      } else {
+        const sentence = humanizeSignupAccountError(e);
+        setAccountErr(sentence);
+        toast.error(sentence);
+      }
+      setBusy(false);
+    }
+  };
+
+  const continueAfterConfirm = async () => {
+    setAccountErr(null);
+    setBusy(true);
+    try {
+      const { data, error } = await (supabase as any).auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      if (error) {
+        if (isSignupEmailNotConfirmedError(error)) {
+          setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+          toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        const sentence = humanizeSignupAccountError(error);
+        setAccountErr(sentence);
+        toast.error(sentence);
+        setBusy(false);
+        return;
+      }
+      if (!signupHasSession(data?.session)) {
+        setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+      onNext();
+    } catch (e) {
+      if (isSignupEmailNotConfirmedError(e)) {
+        setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+      } else {
+        const sentence = humanizeSignupAccountError(e);
+        setAccountErr(sentence);
+        toast.error(sentence);
+      }
       setBusy(false);
     }
   };
@@ -466,6 +571,15 @@ function Step1Account({
   return (
     <>
       <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
+      {accountErr ? (
+        <div
+          role="alert"
+          data-testid="signup-account-error"
+          className="mb-4 rounded-md border border-[var(--hive-danger)]/50 bg-[var(--hive-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--hive-danger-fg)]"
+        >
+          {accountErr}
+        </div>
+      ) : null}
       {confirmEmailMsg ? (
         <div
           role="alert"
@@ -586,13 +700,15 @@ function Step1Account({
         />
         <span>
           I agree to the{" "}
-          <Link
-            to="/terms"
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-tos-link"
           >
             Terms
-          </Link>
+          </a>
           .
         </span>
       </label>
@@ -610,32 +726,37 @@ function Step1Account({
         />
         <span>
           I am authorized to bind this agency. I have read the{" "}
-          <Link
-            to="/baa"
+          <a
+            href="/baa"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-baa-link"
           >
             Business Associate Agreement
-          </Link>{" "}
+          </a>{" "}
           and I agree to it on behalf of this agency.
         </span>
       </label>
 
       <NavButtons
         showBack={false}
-        onNext={submit}
+        onNext={confirmEmailMsg ? continueAfterConfirm : submit}
         loading={busy}
         nextDisabled={
-          !form.acceptedTos ||
-          !form.acceptedBaa ||
-          !emailValid ||
-          !lenOk ||
-          !numOk ||
-          !matchOk ||
-          !!emailErr ||
-          !!passwordWeakErr
+          confirmEmailMsg
+            ? !emailValid || form.password.length < 8
+            : !form.acceptedTos ||
+              !form.acceptedBaa ||
+              !emailValid ||
+              !lenOk ||
+              !numOk ||
+              !matchOk ||
+              !!emailErr ||
+              !!passwordWeakErr
         }
-        nextLabel="Create account"
+        nextLabel={confirmEmailMsg ? SIGNUP_CONFIRM_CONTINUE_LABEL : "Create account"}
+        nextTestId={confirmEmailMsg ? "signup-confirm-continue" : "signup-create-account"}
       />
     </>
   );
@@ -661,21 +782,18 @@ function Step3Business({
   form,
   update,
   ensureWorkspace,
+  setSmsPhoneFn,
   onBack,
   onNext,
 }: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  ensureWorkspace: (input: { data: { agencyName?: string } }) => Promise<{
-    ok: boolean;
-    orgId: string | null;
-    reason: "no_session" | "org_query_error" | "trigger_blocked" | "provision_failed" | null;
-  }>;
+  ensureWorkspace: (input: { data: { agencyName?: string } }) => Promise<unknown>;
+  setSmsPhoneFn: (input: { data: { organizationId: string; phone: string } }) => Promise<unknown>;
   onBack: () => void;
   onNext: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
   const phoneOk = isValidUSPhone(form.phone);
   const canContinue =
     !!form.agencyName.trim() && !!form.contactName.trim() && phoneOk;
@@ -713,46 +831,109 @@ function Step3Business({
         /* non-blocking */
       }
 
-      const ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
-      if (!ensured?.ok || !ensured.orgId) {
-        toast.error(messageForSignupWorkspaceReason(ensured?.reason));
+      let orgId: string | null = null;
+      const { data: member } = await (supabase as any)
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", uid)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      orgId = orgIdFromMembershipRow(member);
+      if (!orgId) {
+        const { data: created } = await (supabase as any)
+          .from("organizations")
+          .select("id")
+          .eq("created_by", uid)
+          .limit(1)
+          .maybeSingle();
+        orgId = orgIdFromCreatedByRow(created);
+      }
+      if (!orgId) {
+        let ensured: unknown;
+        try {
+          ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
+        } catch (e) {
+          console.warn("[signup] ensure workspace failed", e);
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        if (isSignupServerFnFailure(ensured)) {
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        orgId = orgIdFromEnsureWorkspaceResult(ensured);
+      }
+      if (!orgId) {
+        toast.error(SIGNUP_PROVISION_FAILED_MESSAGE);
         setBusy(false);
         return;
       }
-      const orgId = ensured.orgId;
 
       const isTrainingOnly =
         typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("flow") === "training";
-
-      const { error: orgErr } = await (supabase as any)
-        .from("organizations")
-        .update({
-          name: form.agencyName,
-          state_code: "UT",
-          dhhs_provider_id: form.providerNumber || null,
-          account_contact_name: form.contactName || null,
-          account_contact_email: userResp.user?.email ?? null,
-          training_only: isTrainingOnly,
-        })
-        .eq("id", orgId);
-      if (orgErr) {
-        toast.error("Couldn't save your business details — please try again.");
+      const phoneE164 = normalizeUSPhoneToE164(form.phone);
+      if (!phoneE164) {
+        toast.error("Enter a valid US mobile number to continue.");
         setBusy(false);
         return;
       }
 
-      try {
-        await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
-      } catch (e) {
-        console.warn("[signup] sms phone save failed", e);
-        toast.error("Could not save your mobile number. Please try again.");
+      const { data: updated, error: orgErr } = await (supabase as any)
+        .from("organizations")
+        .update(
+          signupBusinessOrgPatch({
+            agencyName: form.agencyName,
+            contactName: form.contactName,
+            contactEmail: userResp.user?.email ?? null,
+            providerNumber: form.providerNumber,
+            phoneE164,
+            trainingOnly: isTrainingOnly,
+          }),
+        )
+        .eq("id", orgId)
+        .select(SIGNUP_BUSINESS_VERIFY_SELECT)
+        .maybeSingle();
+      if (orgErr) {
+        console.warn("[signup] business org update failed", { code: orgErr?.code ?? "no_row" });
+        toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+        setBusy(false);
+        return;
+      }
+
+      let row = updated;
+      if (!signupBusinessWriteOk(row)) {
+        try {
+          const sms = await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
+          if (isSignupServerFnFailure(sms)) {
+            toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+            setBusy(false);
+            return;
+          }
+        } catch (e) {
+          console.warn("[signup] sms phone save failed", e);
+          toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        const { data: reread } = await (supabase as any)
+          .from("organizations")
+          .select(SIGNUP_BUSINESS_VERIFY_SELECT)
+          .eq("id", orgId)
+          .maybeSingle();
+        row = reread;
+      }
+      if (!signupBusinessWriteOk(row)) {
+        toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
         setBusy(false);
         return;
       }
     } catch (e) {
       console.warn("[signup] business save failed", e);
-      toast.error("Couldn't save your business details — please try again.");
+      toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
       setBusy(false);
       return;
     }

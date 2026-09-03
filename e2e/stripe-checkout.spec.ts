@@ -47,12 +47,14 @@ test("b) unpaid org is locked until checkout succeeds", async ({ page }) => {
   // Simulate webhook / confirmCheckoutSession unlocking the org.
   world.locked = false;
   world.status = "active";
-  await page.goto("/dashboard/billing/subscription?checkout=success&session_id=cs_test_e2e", {
+  await page.goto("/dashboard?checkout=success&session_id=cs_test_e2e", {
     waitUntil: "domcontentloaded",
   });
-  await expect(page.getByTestId("hive-subscription-page")).toBeVisible({ timeout: 25_000 });
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-  await expect(page).not.toHaveURL(/billing-locked/);
+  await expect(page).not.toHaveURL(/billing-locked/, { timeout: 25_000 });
+  await page.goto("/billing-locked?checkout=success&session_id=cs_test_e2e", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page).not.toHaveURL(/billing-locked/, { timeout: 25_000 });
 });
 
 test("c) training extra is skipped for exempt and charged for a paying org", async ({ page }) => {

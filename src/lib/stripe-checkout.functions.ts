@@ -572,10 +572,10 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       mode: "subscription",
       customer: customerId,
       client_reference_id: data.organizationId,
-      success_url: `${origin}/dashboard/billing/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: data.fromSignup
         ? `${origin}/signup?checkout=cancelled`
-        : `${origin}/dashboard/billing/subscription?checkout=cancelled`,
+        : `${origin}/billing-locked?checkout=cancelled`,
       line_items: built.lineItems,
       ...(built.discounts ? { discounts: built.discounts } : {}),
       metadata: {
@@ -686,17 +686,23 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
     return { sessionId };
   })
   .handler(async ({ data, context }) => {
-    if (!context.supabase || !context.userId) return { ok: false, error: "Not signed in." };
+    if (!context.supabase || !context.userId) {
+      return { ok: false, error: "Not signed in.", organizationId: null as string | null };
+    }
     const cfg = stripePaymentsConfigured();
-    if (!cfg.ok) return { ok: false, error: cfg.message ?? PAYMENTS_NOT_CONFIGURED };
+    if (!cfg.ok) {
+      return { ok: false, error: cfg.message ?? PAYMENTS_NOT_CONFIGURED, organizationId: null };
+    }
 
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(data.sessionId);
     if (session.payment_status !== "paid" && session.status !== "complete") {
-      return { ok: false, error: "Payment is not complete yet." };
+      return { ok: false, error: "Payment is not complete yet.", organizationId: null };
     }
     const orgId = session.metadata?.organization_id;
-    if (!orgId) return { ok: false, error: "Checkout session is missing the company id." };
+    if (!orgId) {
+      return { ok: false, error: "Checkout session is missing the company id.", organizationId: null };
+    }
     await requireOrgAdmin(context.supabase, context.userId, orgId);
 
     const hiveKind = session.metadata?.hive_kind ?? "subscription";
@@ -711,7 +717,7 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
           amountCents: session.amount_total ?? 0,
         });
       }
-      return { ok: true, error: null as string | null };
+      return { ok: true, error: null as string | null, organizationId: orgId };
     }
     if (hiveKind === "training") {
       if (session.metadata?.hive_order_id && session.metadata?.catalog_id) {
@@ -729,7 +735,7 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
           amountCents: session.amount_total ?? 0,
         });
       }
-      return { ok: true, error: null as string | null };
+      return { ok: true, error: null as string | null, organizationId: orgId };
     }
 
     await activateSubscriptionFromCheckout({
@@ -745,7 +751,7 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
       billingInterval: session.metadata?.interval === "annual" ? "annual" : "monthly",
       monthlyCents: Number(session.metadata?.monthly_cents ?? 0) || null,
     });
-    return { ok: true, error: null };
+    return { ok: true, error: null, organizationId: orgId };
   });
 
 type TrainingCheckoutInput = {

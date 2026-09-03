@@ -10,11 +10,13 @@ import {
   createSubscriptionCheckoutFn,
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
+  validateSearch: parseCheckoutReturnSearch,
   component: BillingLockedPage,
 });
 
@@ -57,27 +59,56 @@ function BillingLockedPage() {
         return;
       }
 
-      const status = await statusFn({
-        data: {
-          organizationId: (() => {
-            try {
-              return window.localStorage.getItem("hive.activeOrgId") ?? undefined;
-            } catch {
-              return undefined;
-            }
-          })(),
-        },
-      });
+      const returned = parseCheckoutReturnSearch(window.location.search);
+      let activeOrgId: string | undefined;
+      try {
+        activeOrgId = window.localStorage.getItem("hive.activeOrgId") ?? undefined;
+      } catch {
+        activeOrgId = undefined;
+      }
+
+      // Confirm the Stripe session BEFORE reading lock state. A prior bounce
+      // from /dashboard used to drop session_id; when it is present, fulfill
+      // first so the next status read sees status=active.
+      if (returned.session_id) {
+        const r = await confirmFn({ data: { sessionId: returned.session_id } }).catch(() => null);
+        if (r?.organizationId) {
+          activeOrgId = r.organizationId;
+          try {
+            window.localStorage.setItem("hive.activeOrgId", r.organizationId);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (r?.ok && !cancelled) {
+          const paid = await statusFn({ data: { organizationId: activeOrgId } });
+          if (paid.billingExempt || !paid.accessLocked) {
+            navigate({ to: "/dashboard", replace: true });
+            return;
+          }
+        }
+      }
+
+      const readStatus = async () =>
+        statusFn({
+          data: { organizationId: activeOrgId },
+        });
+
+      let status = await readStatus();
       if (status.billingExempt || !status.accessLocked) {
-        if (!cancelled) navigate({ to: "/dashboard" });
+        if (!cancelled) navigate({ to: "/dashboard", replace: true });
         return;
       }
 
-      let activeOrgId: string | null = status.organizationId;
-      try {
-        activeOrgId = window.localStorage.getItem("hive.activeOrgId") ?? activeOrgId;
-      } catch {
-        /* ignore */
+      // Webhook can land a beat after confirm. One fresh re-query, no cache.
+      if (returned.session_id) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        if (cancelled) return;
+        status = await readStatus();
+        if (status.billingExempt || !status.accessLocked) {
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
       }
 
       const { data: memberships } = await supabase
@@ -94,17 +125,7 @@ function BillingLockedPage() {
         if (!cancelled) navigate({ to: "/login" });
         return;
       }
-      const m = ms.find((x) => x.organization_id === activeOrgId) ?? ms[0];
-
-      const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get("session_id");
-      if (sessionId) {
-        const r = await confirmFn({ data: { sessionId } }).catch(() => null);
-        if (r?.ok && !cancelled) {
-          navigate({ to: "/dashboard" });
-          return;
-        }
-      }
+      const m = ms.find((x) => x.organization_id === (status.organizationId ?? activeOrgId)) ?? ms[0];
 
       if (cancelled) return;
       setStaffCount(status.staffCount || 4);

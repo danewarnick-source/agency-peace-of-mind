@@ -4,6 +4,9 @@ import {
   isBillingExempt,
   orgAccessIsLocked,
   orgLooksLikeTrueNorth,
+  parseCheckoutReturnSearch,
+  pathBypassesBillingLock,
+  shouldLeaveBillingLockScreen,
   trainingRequiresCharge,
   entitlementsForOrg,
 } from "./billing-access.ts";
@@ -132,6 +135,43 @@ describe("billing-access", () => {
       }),
       false,
     );
+  });
+
+  it("Postgres-active paid row leaves the lock screen; missing row stays locked", () => {
+    const paid = {
+      billingExempt: false,
+      orgName: "Paying Agency",
+      organizationId: "0e590b2c-7843-4a83-a8f3-8c7189497879",
+      subscription: {
+        status: "active",
+        locked_at: null,
+        stripe_subscription_id: "sub_1UBiQzIQWMytpLnbTbuycIJk",
+      },
+    };
+    assert.equal(orgAccessIsLocked(paid), false);
+    assert.equal(shouldLeaveBillingLockScreen(paid), true);
+    const unpaid = {
+      billingExempt: false,
+      orgName: "Test Agency 1",
+      subscription: null,
+    };
+    assert.equal(orgAccessIsLocked(unpaid), true);
+    assert.equal(shouldLeaveBillingLockScreen(unpaid), false);
+  });
+
+  it("lets admins open the subscription page while locked", () => {
+    assert.equal(pathBypassesBillingLock("/dashboard/billing/subscription", true), true);
+    assert.equal(pathBypassesBillingLock("/dashboard/billing/subscription", false), false);
+    assert.equal(pathBypassesBillingLock("/dashboard", true), false);
+  });
+
+  it("keeps Stripe checkout return params so confirm can re-query", () => {
+    assert.deepEqual(
+      parseCheckoutReturnSearch("?checkout=success&session_id=cs_test_abc"),
+      { checkout: "success", session_id: "cs_test_abc" },
+    );
+    assert.deepEqual(parseCheckoutReturnSearch({ focus: "x" }), {});
+    assert.equal(parseCheckoutReturnSearch({ session_id: "not-a-session" }).session_id, undefined);
   });
 
   it("exempt orgs get full Enterprise addons", () => {

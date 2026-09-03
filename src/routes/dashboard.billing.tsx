@@ -5,6 +5,7 @@ import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-r
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/rbac";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 
 
 function BillingError({ error }: { error: Error; reset: () => void }) {
@@ -27,8 +28,10 @@ function BillingError({ error }: { error: Error; reset: () => void }) {
 
 export const Route = createFileRoute("/dashboard/billing")({
   head: () => ({ meta: [{ title: "Billing — Provider Interface" }] }),
-  validateSearch: (s: Record<string, unknown>): { focus?: string } =>
-    typeof s.focus === "string" ? { focus: s.focus } : {},
+  validateSearch: (s: Record<string, unknown>): { focus?: string; checkout?: string; session_id?: string } => ({
+    ...(typeof s.focus === "string" ? { focus: s.focus } : {}),
+    ...parseCheckoutReturnSearch(s),
+  }),
   component: () => (
     <RequireRole roles={["admin", "program_manager", "manager"]}>
       <BillingLayout />

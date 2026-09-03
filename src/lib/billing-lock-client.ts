@@ -1,90 +1,35 @@
 /**
  * Client-side unpaid-org lock. beforeLoad skips on SSR (no window/session),
- * so DashboardLayout also runs this after hydrate. Same rules as orgAccessIsLocked.
+ * so DashboardLayout also runs this after hydrate.
+ *
+ * Lock truth comes from getBillingLockFn (admin-backed org_subscriptions),
+ * not a browser REST read. RLS only lets org admin/manager SELECT that table,
+ * so a client query returns "no row" after a successful pay and fail-closes.
  */
 
-import { supabase } from "@/integrations/supabase/client";
-import { orgAccessIsLocked } from "@/lib/billing-access";
+import { getBillingLockFn } from "@/lib/billing-lock.functions";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 
-export const BILLING_LOCK_ALLOWLIST = [
-  "/dashboard/billing/subscription",
-  "/dashboard/settings/subscription",
-];
+export { BILLING_LOCK_ALLOWLIST, pathBypassesBillingLock } from "@/lib/billing-access";
 
-export function pathBypassesBillingLock(pathname: string, isAdmin: boolean): boolean {
-  if (pathname.startsWith("/dashboard/hive-exec")) return true;
-  if (
-    isAdmin &&
-    BILLING_LOCK_ALLOWLIST.some((p) => pathname === p || pathname.startsWith(p + "/"))
-  ) {
-    return true;
-  }
-  return false;
+export function checkoutReturnFromLocation(search: string): ReturnType<typeof parseCheckoutReturnSearch> {
+  return parseCheckoutReturnSearch(search);
 }
 
 export async function orgDashboardIsLocked(opts: {
   userId: string;
   activeOrgId?: string | null;
 }): Promise<{ locked: boolean; isAdmin: boolean; orgId: string | null }> {
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("organization_id, role")
-    .eq("user_id", opts.userId)
-    .eq("active", true);
-  if (!memberships || memberships.length === 0) {
-    return { locked: false, isAdmin: false, orgId: null };
+  void opts.userId;
+  try {
+    const r = await getBillingLockFn({
+      data: { organizationId: opts.activeOrgId ?? undefined },
+    });
+    return { locked: r.locked, isAdmin: r.isAdmin, orgId: r.orgId };
+  } catch {
+    // Match dashboard beforeLoad: fail open on unexpected errors so a just-paid
+    // org is not trapped if the lock fn cannot run. Unpaid orgs re-lock on the
+    // next successful check.
+    return { locked: false, isAdmin: false, orgId: opts.activeOrgId ?? null };
   }
-
-  const membership =
-    memberships.find((m) => m.organization_id === opts.activeOrgId) ?? memberships[0];
-  const orgId = membership.organization_id;
-  const isAdmin = membership.role === "admin";
-
-  const { data: sub } = await supabase
-    .from("org_subscriptions")
-    .select("locked_at, status, stripe_subscription_id")
-    .eq("organization_id", orgId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let orgRow: {
-    name?: string;
-    legal_name?: string | null;
-    dba_name?: string | null;
-    billing_exempt?: boolean;
-  } | null = null;
-  const orgFull = await supabase
-    .from("organizations")
-    .select("name, legal_name, dba_name, billing_exempt")
-    .eq("id", orgId)
-    .maybeSingle();
-  if (orgFull.error) {
-    const retry = await supabase
-      .from("organizations")
-      .select("name, legal_name, dba_name")
-      .eq("id", orgId)
-      .maybeSingle();
-    orgRow = retry.data;
-  } else {
-    orgRow = orgFull.data;
-  }
-
-  const locked = orgAccessIsLocked({
-    billingExempt: orgRow?.billing_exempt === true,
-    orgName: orgRow?.name ?? null,
-    legalName: orgRow?.legal_name,
-    dbaName: orgRow?.dba_name,
-    organizationId: orgId,
-    subscription: sub
-      ? {
-          status: sub.status,
-          locked_at: sub.locked_at,
-          stripe_subscription_id: (sub as { stripe_subscription_id?: string | null })
-            .stripe_subscription_id,
-        }
-      : null,
-  });
-
-  return { locked, isAdmin, orgId };
 }

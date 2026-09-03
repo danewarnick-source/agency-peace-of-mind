@@ -97,6 +97,8 @@ import { HiveMark, HiveWordmark } from "@/components/brand/hive-mark";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
+import { confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
@@ -137,12 +139,26 @@ function DashboardShellError({ error }: { error: Error; reset: () => void }) {
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Provider Interface" }] }),
-  // Lockout gate — runs on every dashboard navigation. If the user's active
-  // org has org_subscriptions.locked_at set, redirect to /billing-locked.
+  // Lockout gate — runs on every dashboard navigation. Paid+active orgs stay
+  // in the app. Unpaid / missing org_subscriptions rows go to /billing-locked.
   // Admins keep access to the billing/subscription page so they can pay.
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined") return; // SSR has no session
     try {
+      const returned = parseCheckoutReturnSearch(window.location.search);
+      if (returned.session_id) {
+        const confirmed = await confirmCheckoutSessionFn({
+          data: { sessionId: returned.session_id },
+        }).catch(() => null);
+        if (confirmed?.organizationId) {
+          try {
+            window.localStorage.setItem("hive.activeOrgId", confirmed.organizationId);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -204,7 +220,10 @@ export const Route = createFileRoute("/dashboard")({
       });
       if (!locked) return;
       if (pathBypassesBillingLock(location.pathname, isAdmin)) return;
-      throw redirect({ to: "/billing-locked" });
+      throw redirect({
+        to: "/billing-locked",
+        search: returned,
+      });
     } catch (err) {
       if (isRedirect(err)) throw err;
       console.error("dashboard beforeLoad error:", err);
@@ -398,7 +417,11 @@ function DashboardLayout() {
       .then(({ locked, isAdmin }) => {
         if (cancelled || !locked) return;
         if (pathBypassesBillingLock(pathname, isAdmin)) return;
-        navigate({ to: "/billing-locked", replace: true });
+        navigate({
+          to: "/billing-locked",
+          replace: true,
+          search: parseCheckoutReturnSearch(window.location.search),
+        });
       })
       .catch(() => undefined);
     return () => {

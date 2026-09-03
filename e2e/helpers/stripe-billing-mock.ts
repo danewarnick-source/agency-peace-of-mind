@@ -200,6 +200,15 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
     };
   }
   if (hay.includes("getbillingstatus")) return billingStatus(world);
+  if (hay.includes("getbillinglock")) {
+    return {
+      locked: world.locked && !world.billingExempt,
+      isAdmin: true,
+      orgId: ORG_ID,
+      status: world.status,
+      billingExempt: world.billingExempt,
+    };
+  }
   if (hay.includes("createsubscriptioncheckout")) {
     if (world.billingExempt) return { url: null, exempt: true, error: null };
     return { url: "https://checkout.stripe.com/c/pay/cs_test_e2e", exempt: false, error: null };
@@ -222,7 +231,7 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
     world.locked = false;
     world.status = "active";
     world.trainingGranted = true;
-    return { ok: true, error: null };
+    return { ok: true, error: null, organizationId: ORG_ID };
   }
   if (hay.includes("getmyentitlements")) {
     return {

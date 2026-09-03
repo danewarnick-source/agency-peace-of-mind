@@ -68,6 +68,16 @@ describe("readPublishableAuthEnv", () => {
       null,
     );
   });
+
+  it("accepts VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY without SUPABASE_URL", () => {
+    assert.deepEqual(
+      readPublishableAuthEnv({
+        VITE_SUPABASE_URL: "https://preview.supabase.co",
+        VITE_SUPABASE_ANON_KEY: "vite-anon-key",
+      }),
+      { url: "https://preview.supabase.co", key: "vite-anon-key" },
+    );
+  });
 });
 
 describe("login.server publishable-key wiring", () => {

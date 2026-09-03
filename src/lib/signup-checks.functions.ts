@@ -23,6 +23,11 @@ export const checkEmailExists = createServerFn({ method: "POST" })
     // confirmation_token: converting NULL to string is unsupported" (GoTrue
     // bug when any user row has a NULL confirmation_token). Query profiles
     // by email instead; every signup creates a profile row.
+    const { readSupabaseAdminEnv } = await import("@/lib/supabase-public-env");
+    if (!readSupabaseAdminEnv()) {
+      // Create account still proceeds via client signUp (VITE_ URL + anon).
+      return { exists: false };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("profiles")

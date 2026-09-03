@@ -421,8 +421,15 @@ function Step1Account({
     if (await verifyPasswordPwned(form.password)) return;
     setBusy(true);
     try {
-      const r = await checkEmail({ data: { email: form.email } });
-      if (r.exists) {
+      let exists = false;
+      try {
+        const r = await checkEmail({ data: { email: form.email } });
+        exists = r.exists;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (!/Missing Supabase environment variable/i.test(msg)) throw e;
+      }
+      if (exists) {
         setEmailErr("An account with this email already exists. Sign in instead?");
         setBusy(false);
         return;

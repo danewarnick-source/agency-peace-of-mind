@@ -6,9 +6,9 @@ Hive charges companies in **Stripe test / sandbox only**. No real cards are char
 
 This is the walk Dane repeats with Gmail plus-aliases (`danewarnick+pi1@gmail.com`, `+pi2`, …).
 
-- **Plan:** $69 per client / month, **$350 minimum**. Checkout uses the TEST catalog Price IDs (`pi_list_per_client` × client count, **or** `pi_list_minimum` when the floor applies — never both). It does **not** use the old $125 / staff sandbox Price IDs.
+- **Plan:** $69 per client / month, **$350 minimum**. After a roster exists, the platform bills the **high-water** count for the month (`clients.created_at` + `clients.discharge_date`) and sets the Stripe quantity. Signup’s client number is an estimate only. Checkout uses the TEST catalog Price IDs (`pi_list_per_client` × client count, **or** `pi_list_minimum` when the floor applies — never both). It does **not** use the old $125 / staff sandbox Price IDs.
 - **No founding dollars** on the form. New agencies on this walk are list, not $79 / $299.
-- **Training (optional, skip allowed):** CPR / First Aid $100, 30-day $75, Mandt $200, Pack $300 (saves $75 vs all three). One-time line on the same Checkout.
+- **Training (optional, skip allowed):** per-person roster — name + one of CPR / First Aid $100, 30-day $75, Mandt $200, or Pack $300. Pack is exclusive for that person. Stripe quantities are the count of people on each SKU (example: 1× CPR, 3× Pack, 1× thirty-day). Skip sends no training lines. Same Checkout as the plan.
 - **TEST MODE card:** `4242 4242 4242 4242`, any future expiry, any CVC, any ZIP.
 - **Plus-aliases are distinct users.** The unique-email guard still blocks the exact same address. Do not treat `danewarnick@gmail.com` and `danewarnick+pi1@gmail.com` as the same.
 - **True North Supports stays comped.** Do not name the test agency “True North Supports” (that name is billing-exempt).

@@ -21,6 +21,12 @@ export function Footer() {
             <Link to="/signup" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
               Get started
             </Link>
+            <Link to="/terms" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
+              Terms
+            </Link>
+            <Link to="/baa" className="text-[#f3efe6]/60 transition hover:text-[#f3efe6]">
+              BAA
+            </Link>
           </div>
         </div>
         <div className="mt-12 border-t border-white/[0.08] pt-6 text-xs text-[#f3efe6]/40">

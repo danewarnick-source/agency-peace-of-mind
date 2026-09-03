@@ -268,6 +268,21 @@ describe("stripe-config", () => {
       subscriptionLineItemsForPiListQuote(quote, quoteSignupTrainingAddon("pack"), env).lineItems[1]?.price,
       STRIPE_SANDBOX_PRICE_IDS.trainingPack,
     );
+    const roster = subscriptionLineItemsForPiListQuote(
+      quote,
+      [
+        { id: "cpr_first_aid", name: "CPR / First Aid", priceCents: 10_000, quantity: 1 },
+        { id: "thirty_day", name: "30-day", priceCents: 7_500, quantity: 1 },
+        { id: "pack", name: "Pack", priceCents: 30_000, quantity: 3 },
+      ],
+      env,
+    );
+    assert.equal(roster.lineItems[1]?.price, STRIPE_SANDBOX_PRICE_IDS.trainingCpr);
+    assert.equal(roster.lineItems[1]?.quantity, 1);
+    assert.equal(roster.lineItems[2]?.price, STRIPE_SANDBOX_PRICE_IDS.trainingThirtyDay);
+    assert.equal(roster.lineItems[2]?.quantity, 1);
+    assert.equal(roster.lineItems[3]?.price, STRIPE_SANDBOX_PRICE_IDS.trainingPack);
+    assert.equal(roster.lineItems[3]?.quantity, 3);
   });
 
   it("accepts test keys; seat Price IDs default to the Hive sandbox products", () => {

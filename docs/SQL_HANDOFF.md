@@ -6,6 +6,107 @@ it worked before moving on.
 
 ---
 
+## ACTION — Legal attestations (TOS / BAA I-agree) (2026-09-03)
+
+**Run this on Hive-Platform only.** App signup checkboxes work without it.
+Needed so we can store who agreed, when, IP, user agent, and document version.
+No drawn signature. No PHI.
+
+Matches `supabase/migrations/20260903030000_legal_attestations.sql`.
+
+```sql
+CREATE TABLE IF NOT EXISTS public.legal_attestations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations (id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  document_type text NOT NULL CHECK (document_type IN ('tos', 'baa')),
+  document_version text NOT NULL,
+  accepted_at timestamptz NOT NULL DEFAULT now(),
+  ip text,
+  user_agent text
+);
+
+CREATE INDEX IF NOT EXISTS legal_attestations_org_type_idx
+  ON public.legal_attestations (organization_id, document_type, accepted_at DESC);
+
+COMMENT ON TABLE public.legal_attestations IS
+  'TOS and BAA I-agree records. No drawn signature. Not PHI.';
+
+ALTER TABLE public.legal_attestations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "members read org legal attestations" ON public.legal_attestations;
+CREATE POLICY "members read org legal attestations"
+  ON public.legal_attestations FOR SELECT TO authenticated
+  USING (
+    is_org_member(organization_id, auth.uid())
+    OR is_hive_executive(auth.uid())
+  );
+
+DROP POLICY IF EXISTS "members insert own legal attestations" ON public.legal_attestations;
+CREATE POLICY "members insert own legal attestations"
+  ON public.legal_attestations FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND is_org_member(organization_id, auth.uid())
+  );
+
+SELECT string_agg(column_name, ' | ' ORDER BY column_name) AS attestation_cols
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'legal_attestations';
+```
+
+**What you'll see:**
+`accepted_at | document_type | document_version | id | ip | organization_id | user_agent | user_id`
+
+---
+
+## ACTION — PI list high-water billing columns (2026-09-03)
+
+**Run this on Hive-Platform only.** App billing works without it (writes
+tolerate missing columns). Needed so the last billed client count and unused
+prepaid credit persist across cycle days.
+
+Matches `supabase/migrations/20260903020000_org_subscription_billed_clients.sql`.
+
+No new table. No new RLS. Existing `org_subscriptions` policies stay.
+Does not print names, emails, or other PHI.
+
+```sql
+ALTER TABLE public.org_subscriptions
+  ADD COLUMN IF NOT EXISTS billed_client_count integer;
+
+ALTER TABLE public.org_subscriptions
+  ADD COLUMN IF NOT EXISTS billed_period_start date;
+
+ALTER TABLE public.org_subscriptions
+  ADD COLUMN IF NOT EXISTS billed_period_end date;
+
+ALTER TABLE public.org_subscriptions
+  ADD COLUMN IF NOT EXISTS renewal_credit_cents integer NOT NULL DEFAULT 0;
+
+COMMENT ON COLUMN public.org_subscriptions.billed_client_count IS
+  'Last high-water client count applied to Stripe. Not PHI.';
+COMMENT ON COLUMN public.org_subscriptions.renewal_credit_cents IS
+  'Unused prepaid client dollars applied at renewal. No cash refund.';
+
+SELECT string_agg(column_name, ' | ' ORDER BY column_name) AS billing_cols
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'org_subscriptions'
+  AND column_name IN (
+    'billed_client_count',
+    'billed_period_start',
+    'billed_period_end',
+    'renewal_credit_cents'
+  );
+```
+
+**What you'll see:**
+`billed_client_count | billed_period_end | billed_period_start | renewal_credit_cents`
+
+---
+
 ## ACTION — Signup Continue / dead rbac_roles trigger (2026-09-02)
 
 **Run this so new-provider Continue can create a workspace.** Confirmed on

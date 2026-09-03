@@ -17,7 +17,7 @@ import {
   type HiveQuote,
   trainingPriceCentsForSku,
 } from "./hive-pricing.ts";
-import type { PiListQuote, SignupTrainingQuote } from "./pi-signup-pricing.ts";
+import type { PiListQuote, SignupTrainingLine, SignupTrainingQuote } from "./pi-signup-pricing.ts";
 
 /** Hive sandbox (test mode). Not a secret. */
 export const STRIPE_TEST_ACCOUNT_ID = "acct_1Ti6CMIQWmyptLnb";
@@ -351,11 +351,12 @@ export function subscriptionLineItemsForQuote(
  * New-provider signup: $69/client catalog price × quantity, or the $350
  * minimum catalog price — never both (that would double-charge).
  * Never the sandbox $125 / $79 staff Price IDs. Optional one-time training
- * uses the matching TEST catalog Price IDs.
+ * uses the matching TEST catalog Price IDs. A single quote is qty 1; an
+ * array of lines uses per-SKU people counts from the signup roster.
  */
 export function subscriptionLineItemsForPiListQuote(
   quote: PiListQuote,
-  training?: SignupTrainingQuote | null,
+  training?: SignupTrainingQuote | readonly SignupTrainingLine[] | null,
   env: StripePriceEnv = readStripeEnv(),
 ): { lineItems: StripeLineItem[] } {
   const items: StripeLineItem[] = [];
@@ -401,19 +402,28 @@ export function subscriptionLineItemsForPiListQuote(
       },
     });
   }
-  if (training && training.id !== "none" && training.priceCents > 0) {
-    const trainingPriceId = stripePriceIdForTrainingSku(training.id, null, env);
+  const trainingLines: SignupTrainingLine[] = Array.isArray(training)
+    ? training.filter((line) => line.quantity > 0 && line.priceCents > 0)
+    : training && !Array.isArray(training) && training.id !== "none" && training.priceCents > 0
+      ? [{ id: training.id, name: training.name, priceCents: training.priceCents, quantity: 1 }]
+      : [];
+  for (const line of trainingLines) {
+    const trainingPriceId = stripePriceIdForTrainingSku(line.id, null, env);
     if (trainingPriceId) {
-      items.push({ price: trainingPriceId, quantity: 1 });
+      items.push({ price: trainingPriceId, quantity: line.quantity });
     } else {
       items.push({
-        quantity: 1,
+        quantity: line.quantity,
         price_data: {
           currency: "usd",
-          unit_amount: training.priceCents,
+          unit_amount: line.priceCents,
           product_data: {
-            name: `Training · ${training.name}`,
-            metadata: { hive_kind: "signup_training", training_addon: training.id },
+            name: `Training · ${line.name}`,
+            metadata: {
+              hive_kind: "signup_training",
+              training_addon: line.id,
+              training_qty: String(line.quantity),
+            },
           },
         },
       });

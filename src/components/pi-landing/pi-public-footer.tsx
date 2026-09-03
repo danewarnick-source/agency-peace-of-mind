@@ -16,6 +16,12 @@ export function PiPublicFooter() {
           <Link to="/contact" className="hover:text-[#f3efe6]">
             Contact
           </Link>
+          <Link to="/terms" className="hover:text-[#f3efe6]">
+            Terms
+          </Link>
+          <Link to="/baa" className="hover:text-[#f3efe6]">
+            BAA
+          </Link>
         </div>
       </div>
       <div className="mx-auto mt-10 max-w-7xl px-5 text-xs text-[#f3efe6]/40 sm:px-8">

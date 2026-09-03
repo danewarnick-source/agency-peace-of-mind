@@ -37,13 +37,16 @@ import {
   getSignupPaymentsStatusFn,
 } from "@/lib/stripe-checkout.functions";
 import { formatUsdFromCents, type BillingInterval } from "@/lib/hive-pricing";
-import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import {
   SIGNUP_AGENCY_PLACEHOLDER,
   SIGNUP_TRAINING_ADDONS,
+  newTrainingPersonRow,
   quotePiListSubscription,
-  quoteSignupTrainingAddon,
-  type SignupTrainingAddonId,
+  quoteSignupTrainingLines,
+  trainingQuantitiesFromPeople,
+  trainingRosterTotalCents,
+  type TrainingPersonRow,
 } from "@/lib/pi-signup-pricing";
 import { toast } from "sonner";
 
@@ -62,7 +65,6 @@ export const Route = createFileRoute("/signup")({
 const JAKARTA = '"Inter", ui-sans-serif, system-ui, sans-serif';
 const NAVY_BG = "#0b1220";
 const AMBER = "#f3efe6";
-const AMBER_GRAD = "#f3efe6";
 
 const inputStyle: React.CSSProperties = {
   background: "var(--hive-surface)",
@@ -92,7 +94,9 @@ interface FormState {
   staffCount: number;
   clientCount: number;
   interval: BillingInterval;
-  trainingAddon: SignupTrainingAddonId | "none";
+  trainingPeople: TrainingPersonRow[];
+  acceptedTos: boolean;
+  acceptedBaa: boolean;
 }
 
 const initialForm: FormState = {
@@ -106,7 +110,9 @@ const initialForm: FormState = {
   staffCount: 8,
   clientCount: 12,
   interval: "monthly",
-  trainingAddon: "none",
+  trainingPeople: [],
+  acceptedTos: false,
+  acceptedBaa: false,
 };
 
 /* ──────────────────────────── shell ──────────────────────────── */
@@ -117,12 +123,17 @@ function Brand() {
 
 function Stepper({ step }: { step: number }) {
   return (
-    <div className="mb-8">
-      <div className="mb-3 flex items-center justify-between text-xs text-[var(--hive-text-muted)]" style={{ fontFamily: JAKARTA }}>
-        <span>
-          Step <span className="font-semibold text-[var(--hive-text)]">{step + 1}</span> of {STEPS.length}
+    <div className="mb-8" data-testid="signup-stepper">
+      <div
+        className="mb-3 flex items-center justify-between text-sm"
+        style={{ fontFamily: JAKARTA, color: AMBER }}
+      >
+        <span data-testid="signup-step-label">
+          Step <span className="font-semibold">{step + 1}</span> of {STEPS.length}
         </span>
-        <span className="font-medium text-[var(--hive-text)]">{STEPS[step]}</span>
+        <span className="font-semibold" data-testid="signup-step-name">
+          {STEPS[step]}
+        </span>
       </div>
       <div className="flex gap-1.5">
         {STEPS.map((_, i) => (
@@ -166,51 +177,73 @@ function Field({
 function NavButtons({
   onBack,
   onNext,
+  onSkip,
   nextLabel = "Continue",
+  skipLabel = "Skip training",
   nextDisabled,
   loading,
   showBack = true,
 }: {
   onBack?: () => void;
   onNext: () => void;
+  onSkip?: () => void;
   nextLabel?: string;
+  skipLabel?: string;
   nextDisabled?: boolean;
   loading?: boolean;
   showBack?: boolean;
 }) {
   return (
-    <div className="mt-7 flex items-center justify-between gap-3">
+    <div
+      className="mt-7 flex flex-col gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between"
+      data-testid="signup-nav"
+    >
+      <div className="order-1 flex w-full flex-col gap-2 sm:order-2 sm:w-auto sm:flex-row-reverse sm:justify-end">
+        <Button
+          type="button"
+          onClick={onNext}
+          disabled={nextDisabled || loading}
+          className="group h-11 w-full border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827] sm:w-auto sm:min-w-[160px]"
+          style={{ fontFamily: JAKARTA, fontWeight: 700 }}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              {nextLabel}
+              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </>
+          )}
+        </Button>
+        {onSkip ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSkip}
+            disabled={loading}
+            className="h-11 w-full sm:w-auto"
+            data-testid="signup-training-skip"
+            style={{ fontFamily: JAKARTA }}
+          >
+            {skipLabel}
+          </Button>
+        ) : null}
+      </div>
       {showBack && onBack ? (
         <Button
           type="button"
           variant="ghost"
           onClick={onBack}
           disabled={loading}
-          className="h-11"
+          className="order-2 h-11 w-full sm:order-1 sm:w-auto"
           style={{ fontFamily: JAKARTA }}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
         </Button>
       ) : (
-        <span />
+        <span className="order-2 hidden sm:order-1 sm:block" />
       )}
-      <Button
-        type="button"
-        onClick={onNext}
-        disabled={nextDisabled || loading}
-        className="group h-11 min-w-[160px] border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827]"
-        style={{ fontFamily: JAKARTA, fontWeight: 700 }}
-      >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <>
-            {nextLabel}
-            <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </>
-        )}
-      </Button>
     </div>
   );
 }
@@ -288,6 +321,15 @@ function SignupPage() {
             )}
           </div>
         </main>
+        <p className="mt-8 text-center text-xs text-[#f3efe6]/40">
+          <Link to="/terms" className="hover:text-[#f3efe6]">
+            Terms
+          </Link>
+          {" · "}
+          <Link to="/baa" className="hover:text-[#f3efe6]">
+            BAA
+          </Link>
+        </p>
       </div>
     </div>
   );
@@ -371,6 +413,8 @@ function Step1Account({
 
   const submit = async () => {
     setEmailErr(null);
+    if (!form.acceptedTos) return toast.error("Agree to the Terms to continue.");
+    if (!form.acceptedBaa) return toast.error("Agree to the Business Associate Agreement to continue.");
     if (!emailValid) return setEmailErr("Please enter a valid email address.");
     if (!lenOk || !numOk) return toast.error("Password must be at least 8 characters and include a number.");
     if (!matchOk) return toast.error("Passwords don't match.");
@@ -529,11 +573,68 @@ function Step1Account({
         </Field>
       </div>
 
+      <label
+        className="mt-6 flex items-start gap-3 text-sm text-[var(--hive-text)]"
+        data-testid="signup-tos"
+      >
+        <input
+          type="checkbox"
+          checked={form.acceptedTos}
+          onChange={(e) => update("acceptedTos", e.target.checked)}
+          data-testid="signup-tos-checkbox"
+          className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--hive-border)] accent-[#0b1220]"
+        />
+        <span>
+          I agree to the{" "}
+          <Link
+            to="/terms"
+            className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
+            data-testid="signup-tos-link"
+          >
+            Terms
+          </Link>
+          .
+        </span>
+      </label>
+
+      <label
+        className="mt-3 flex items-start gap-3 text-sm text-[var(--hive-text)]"
+        data-testid="signup-baa"
+      >
+        <input
+          type="checkbox"
+          checked={form.acceptedBaa}
+          onChange={(e) => update("acceptedBaa", e.target.checked)}
+          data-testid="signup-baa-checkbox"
+          className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--hive-border)] accent-[#0b1220]"
+        />
+        <span>
+          I am authorized to bind this agency. I have read the{" "}
+          <Link
+            to="/baa"
+            className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
+            data-testid="signup-baa-link"
+          >
+            Business Associate Agreement
+          </Link>{" "}
+          and I agree to it on behalf of this agency.
+        </span>
+      </label>
+
       <NavButtons
         showBack={false}
         onNext={submit}
         loading={busy}
-        nextDisabled={!emailValid || !lenOk || !numOk || !matchOk || !!emailErr || !!passwordWeakErr}
+        nextDisabled={
+          !form.acceptedTos ||
+          !form.acceptedBaa ||
+          !emailValid ||
+          !lenOk ||
+          !numOk ||
+          !matchOk ||
+          !!emailErr ||
+          !!passwordWeakErr
+        }
         nextLabel="Create account"
       />
     </>
@@ -750,24 +851,31 @@ function Step4Pricing({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const quote = quotePiListSubscription({ clientCount: form.clientCount });
   return (
     <>
-      <Header title="Your plan" subtitle={PI_SIGNUP_PRICE_LINE} />
+      <Header
+        title="Your plan"
+        subtitle="You pay $69 for each client who is actually active that month, or $350, whichever is higher. Staff are not billed."
+      />
       <div
         className="mb-5 rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-4"
         data-testid="signup-plan-quote"
       >
         <p className="text-lg font-semibold text-[var(--hive-text)]">
-          {PI_LIST_PRICE_DISPLAY} <span className="text-sm font-normal text-[var(--hive-text-muted)]">{PI_LIST_PRICE_UNIT}</span>
+          {PI_LIST_PRICE_DISPLAY}{" "}
+          <span className="text-sm font-normal text-[var(--hive-text-muted)]">per active client / month</span>
         </p>
         <p className="mt-1 text-sm text-[var(--hive-text-muted)]">{PI_LIST_MINIMUM_LINE}</p>
+        <p className="mt-3 text-sm text-[var(--hive-text)]">This page does not charge you.</p>
         <p className="mt-3 text-sm text-[var(--hive-text)]" data-testid="signup-plan-math">
-          {quote.summaryLine}
+          Example: if 12 clients are active, that month is $828. If fewer than 6 are active, you still pay $350.
         </p>
       </div>
       <div className="grid gap-4">
-        <Field label="About how many clients?" hint="Billing is per client. Staff count does not change the price.">
+        <Field
+          label="About how many clients will you start with?"
+          hint="A starting guess for the workspace. Not your bill. We bill the highest number of clients who were actually active that month. Discharged clients are not billed."
+        >
           <TextInput
             type="number"
             value={String(form.clientCount)}
@@ -798,78 +906,128 @@ function Step5Training({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const people = form.trainingPeople;
+  const quantities = trainingQuantitiesFromPeople(people);
+  const totalCents = trainingRosterTotalCents(people);
+
+  const setPeople = (next: TrainingPersonRow[]) => update("trainingPeople", next);
+  const addPerson = () => setPeople([...people, newTrainingPersonRow()]);
+  const updatePerson = (id: string, patch: Partial<TrainingPersonRow>) =>
+    setPeople(people.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  const removePerson = (id: string) => setPeople(people.filter((row) => row.id !== id));
   const skip = () => {
-    update("trainingAddon", "none");
+    setPeople([]);
     onNext();
   };
+  const continueNext = () => {
+    setPeople(people.filter((row) => row.name.trim().length > 0));
+    onNext();
+  };
+
   return (
     <>
       <Header
         title="Optional training"
-        subtitle="Take one add-on now, or skip. You can buy training later from the office."
+        subtitle="Add who needs training, or skip. You can buy training later from the office."
       />
-      <div className="grid gap-2" data-testid="signup-training-step">
-        {SIGNUP_TRAINING_ADDONS.map((addon) => {
-          const selected = form.trainingAddon === addon.id;
-          return (
-            <button
+      <div className="grid gap-4" data-testid="signup-training-step">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {SIGNUP_TRAINING_ADDONS.map((addon) => (
+            <div
               key={addon.id}
-              type="button"
               data-testid={`signup-training-${addon.id}`}
-              onClick={() => update("trainingAddon", addon.id)}
-              className="flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left"
-              style={{
-                borderColor: selected ? "#0b1220" : "var(--hive-border)",
-                background: selected ? "rgba(11,18,32,0.06)" : "var(--hive-canvas)",
-              }}
+              className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-3 py-2 text-sm"
             >
-              <span>
-                <span className="block font-medium text-[var(--hive-text)]">{addon.name}</span>
-                {addon.savingsHint ? (
-                  <span className="block text-xs text-[var(--hive-text-muted)]">{addon.savingsHint}</span>
-                ) : null}
-              </span>
-              <span className="text-sm font-semibold text-[var(--hive-text)]">
-                {formatUsdFromCents(addon.priceCents)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-7 flex items-center justify-between gap-3">
+              <span className="block font-medium text-[var(--hive-text)]">{addon.name}</span>
+              <span className="text-[var(--hive-text-muted)]">{formatUsdFromCents(addon.priceCents)}</span>
+            </div>
+          ))}
+        </div>
+
+        {people.map((person, index) => (
+          <div
+            key={person.id}
+            data-testid={`signup-training-row-${index}`}
+            className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-3"
+          >
+            <div className="flex items-start gap-2">
+              <input
+                type="text"
+                value={person.name}
+                onChange={(e) => updatePerson(person.id, { name: e.target.value })}
+                placeholder="Name"
+                data-testid={`signup-training-name-${index}`}
+                className="flex h-11 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40"
+                style={inputStyle}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => removePerson(person.id)}
+                className="h-11 shrink-0 px-3"
+                data-testid={`signup-training-remove-${index}`}
+              >
+                Remove
+              </Button>
+            </div>
+            <fieldset className="mt-3 grid grid-cols-2 gap-2">
+              <legend className="sr-only">Training for {person.name || `person ${index + 1}`}</legend>
+              {SIGNUP_TRAINING_ADDONS.map((addon) => {
+                const selected = person.sku === addon.id;
+                return (
+                  <label
+                    key={addon.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                    style={{
+                      borderColor: selected ? "#0b1220" : "var(--hive-border)",
+                      background: selected ? "rgba(11,18,32,0.06)" : "transparent",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`signup-training-sku-${person.id}`}
+                      checked={selected}
+                      onChange={() => updatePerson(person.id, { sku: addon.id })}
+                      data-testid={`signup-training-sku-${index}-${addon.id}`}
+                      className="accent-[#0b1220]"
+                    />
+                    <span className="font-medium text-[var(--hive-text)]">{addon.name}</span>
+                  </label>
+                );
+              })}
+            </fieldset>
+            <p className="mt-2 text-xs text-[var(--hive-text-muted)]">
+              Pack is that person&apos;s training — not also CPR, 30-day, or Mandt.
+            </p>
+          </div>
+        ))}
+
         <Button
           type="button"
-          variant="ghost"
-          onClick={onBack}
-          className="h-11"
+          variant="outline"
+          onClick={addPerson}
+          className="h-11 w-full"
+          data-testid="signup-training-add"
           style={{ fontFamily: JAKARTA }}
         >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
+          Add a person
         </Button>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={skip}
-            className="h-11"
-            data-testid="signup-training-skip"
-            style={{ fontFamily: JAKARTA }}
-          >
-            Skip training
-          </Button>
-          <Button
-            type="button"
-            onClick={onNext}
-            disabled={form.trainingAddon === "none"}
-            className="group h-11 min-w-[140px] border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827]"
-            style={{ fontFamily: JAKARTA, fontWeight: 700 }}
-          >
-            Continue
-            <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Button>
+
+        <div
+          className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-canvas)] p-3 text-sm"
+          data-testid="signup-training-total"
+        >
+          <p className="font-semibold text-[var(--hive-text)]">
+            Training total {formatUsdFromCents(totalCents)}
+          </p>
+          <p className="mt-1 text-[var(--hive-text-muted)]">
+            {quantities.cpr_first_aid}× CPR · {quantities.pack}× Pack · {quantities.thirty_day}× 30-day ·{" "}
+            {quantities.mandt}× Mandt
+          </p>
+          <p className="mt-2 text-[var(--hive-text)]">This page does not charge you.</p>
         </div>
       </div>
+      <NavButtons onBack={onBack} onNext={continueNext} onSkip={skip} skipLabel="Skip training" />
     </>
   );
 }
@@ -893,7 +1051,9 @@ function Step6Payment({
     message: string | null;
   } | null>(null);
   const quote = quotePiListSubscription({ clientCount: form.clientCount });
-  const training = quoteSignupTrainingAddon(form.trainingAddon);
+  const namedPeople = form.trainingPeople.filter((row) => row.name.trim().length > 0);
+  const trainingLines = quoteSignupTrainingLines(trainingQuantitiesFromPeople(namedPeople));
+  const trainingTotalCents = trainingRosterTotalCents(namedPeople);
   const liveBlocked = payStatus?.liveBlocked === true;
   const canPay = !liveBlocked && (payStatus == null || payStatus.paymentsConfigured);
 
@@ -941,7 +1101,7 @@ function Step6Payment({
           interval: "monthly",
           pricingModel: "pi_list",
           fromSignup: true,
-          trainingAddon: form.trainingAddon,
+          trainingPeople: namedPeople.map((row) => ({ name: row.name.trim(), sku: row.sku })),
         },
       });
       if (r.exempt) {
@@ -1014,10 +1174,15 @@ function Step6Payment({
       >
         <p className="font-medium text-[var(--hive-text)]">{PI_SIGNUP_PRICE_LINE}</p>
         <p className="mt-2 text-[var(--hive-text)]">{quote.summaryLine}</p>
-        {training.id !== "none" ? (
-          <p className="mt-1 text-[var(--hive-text)]">
-            Training · {training.name}: {formatUsdFromCents(training.priceCents)} one-time
-          </p>
+        {trainingLines.length > 0 ? (
+          <div className="mt-2 space-y-1 text-[var(--hive-text)]" data-testid="signup-payment-training">
+            {trainingLines.map((line) => (
+              <p key={line.id}>
+                Training · {line.name} × {line.quantity}: {formatUsdFromCents(line.priceCents * line.quantity)} one-time
+              </p>
+            ))}
+            <p className="font-medium">Training total {formatUsdFromCents(trainingTotalCents)}</p>
+          </div>
         ) : (
           <p className="mt-1 text-[var(--hive-text-muted)]">Training skipped.</p>
         )}

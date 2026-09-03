@@ -112,6 +112,33 @@ export type SignupTrainingQuote = {
   priceCents: number;
 };
 
+export type SignupTrainingQuantities = Record<SignupTrainingAddonId, number>;
+
+export type SignupTrainingLine = {
+  id: SignupTrainingAddonId;
+  name: string;
+  priceCents: number;
+  quantity: number;
+};
+
+/** One person on the signup training roster. Pack is exclusive for that person. */
+export type TrainingPersonRow = {
+  id: string;
+  name: string;
+  sku: SignupTrainingAddonId;
+};
+
+let trainingPersonSeq = 0;
+
+export function newTrainingPersonRow(sku: SignupTrainingAddonId = "cpr_first_aid"): TrainingPersonRow {
+  trainingPersonSeq += 1;
+  return { id: `tp-${trainingPersonSeq}`, name: "", sku };
+}
+
+export function emptyTrainingQuantities(): SignupTrainingQuantities {
+  return { cpr_first_aid: 0, thirty_day: 0, mandt: 0, pack: 0 };
+}
+
 export function isSignupTrainingAddonId(value: string | null | undefined): value is SignupTrainingAddonId {
   return SIGNUP_TRAINING_ADDON_IDS.includes(value as SignupTrainingAddonId);
 }
@@ -125,6 +152,53 @@ export function quoteSignupTrainingAddon(
   const row = SIGNUP_TRAINING_ADDONS.find((addon) => addon.id === id);
   if (!row) return { id: "none", name: "None", priceCents: 0 };
   return { id: row.id, name: row.name, priceCents: row.priceCents };
+}
+
+export function trainingQuantitiesFromPeople(
+  people: ReadonlyArray<{ sku: string }>,
+): SignupTrainingQuantities {
+  const quantities = emptyTrainingQuantities();
+  for (const person of people) {
+    if (isSignupTrainingAddonId(person.sku)) quantities[person.sku] += 1;
+  }
+  return quantities;
+}
+
+export function quoteSignupTrainingLines(
+  quantities: Partial<SignupTrainingQuantities> | null | undefined,
+): SignupTrainingLine[] {
+  const lines: SignupTrainingLine[] = [];
+  for (const addon of SIGNUP_TRAINING_ADDONS) {
+    const quantity = Math.max(0, Math.floor(Number(quantities?.[addon.id] ?? 0)));
+    if (quantity <= 0) continue;
+    lines.push({
+      id: addon.id,
+      name: addon.name,
+      priceCents: addon.priceCents,
+      quantity,
+    });
+  }
+  return lines;
+}
+
+export function trainingRosterTotalCents(people: ReadonlyArray<{ sku: string }>): number {
+  return quoteSignupTrainingLines(trainingQuantitiesFromPeople(people)).reduce(
+    (sum, line) => sum + line.priceCents * line.quantity,
+    0,
+  );
+}
+
+export function trainingPeopleForCheckout(
+  people: ReadonlyArray<{ name?: string | null; sku: string }>,
+): Array<{ name: string; sku: SignupTrainingAddonId }> {
+  return people
+    .map((person) => ({
+      name: String(person.name ?? "").trim().slice(0, 80),
+      sku: person.sku,
+    }))
+    .filter((person): person is { name: string; sku: SignupTrainingAddonId } =>
+      isSignupTrainingAddonId(person.sku),
+    );
 }
 
 /** Sanity: marketing copy and locked cents stay on the same four amounts. */

@@ -61,6 +61,7 @@ export const Route = createFileRoute("/api/public/hooks/billing-daily-check")({
           finished_at?: string;
           lock?: { locked: number; org_ids: string[] };
           expiry?: { warned: number; org_ids: string[] };
+          quantity?: { synced: number; skipped: number; errors: number };
           errors: string[];
         } = { started_at: startedAt, errors: [] };
 
@@ -78,6 +79,15 @@ export const Route = createFileRoute("/api/public/hooks/billing-daily-check")({
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[billing-daily-check] expiry step failed", msg);
           result.errors.push(`expiry: ${msg}`);
+        }
+
+        try {
+          const { syncPiListQuantitiesForActiveOrgs } = await import("@/lib/pi-list-billing.server");
+          result.quantity = await syncPiListQuantitiesForActiveOrgs();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("[billing-daily-check] quantity step failed", msg);
+          result.errors.push(`quantity: ${msg}`);
         }
 
         result.finished_at = new Date().toISOString();

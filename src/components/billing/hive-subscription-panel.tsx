@@ -5,8 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { isComplimentaryHiveOrg } from "@/lib/current-org";
 import { formatUsdFromCents } from "@/lib/hive-pricing";
@@ -247,18 +245,12 @@ export function HiveSubscriptionPanel() {
       {!complimentary && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
           <div className="text-sm font-medium">Pay for Provider Interface</div>
-          <div>
-            <Label htmlFor="sub-clients">Active clients</Label>
-            <Input
-              id="sub-clients"
-              type="number"
-              min={0}
-              max={5000}
-              value={clientCount}
-              onChange={(e) => setClientCount(Number(e.target.value) || 0)}
-            />
+          <div data-testid="billed-client-count">
+            <div className="text-sm font-medium">Billable clients this period</div>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{clientCount}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Billing is per client. Staff count does not change the price.
+              High-water count from your roster — anyone active at any point this month. Staff does
+              not change the price. Monthly amount is $69 × this count, or $350, whichever is higher.
             </p>
           </div>
           <p className="text-xs text-muted-foreground">

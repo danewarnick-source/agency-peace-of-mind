@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as TrainingRouteImport } from './routes/training'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -25,6 +26,7 @@ import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BillingLockedRouteImport } from './routes/billing-locked'
+import { Route as BaaRouteImport } from './routes/baa'
 import { Route as AuditorRouteImport } from './routes/auditor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -231,6 +233,11 @@ const TrainingRoute = TrainingRouteImport.update({
   path: '/training',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -299,6 +306,11 @@ const ContactRoute = ContactRouteImport.update({
 const BillingLockedRoute = BillingLockedRouteImport.update({
   id: '/billing-locked',
   path: '/billing-locked',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BaaRoute = BaaRouteImport.update({
+  id: '/baa',
+  path: '/baa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditorRoute = AuditorRouteImport.update({
@@ -1373,6 +1385,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
@@ -1387,6 +1400,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -1586,6 +1600,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/demo': typeof DemoRoute
@@ -1599,6 +1614,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -1793,6 +1809,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
+  '/baa': typeof BaaRoute
   '/billing-locked': typeof BillingLockedRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRouteWithChildren
@@ -1807,6 +1824,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -2008,6 +2026,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/baa'
     | '/billing-locked'
     | '/contact'
     | '/dashboard'
@@ -2022,6 +2041,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/terms'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2221,6 +2241,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/baa'
     | '/billing-locked'
     | '/contact'
     | '/demo'
@@ -2234,6 +2255,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/terms'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2427,6 +2449,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auditor'
+    | '/baa'
     | '/billing-locked'
     | '/contact'
     | '/dashboard'
@@ -2441,6 +2464,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/terms'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2641,6 +2665,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuditorRoute: typeof AuditorRoute
+  BaaRoute: typeof BaaRoute
   BillingLockedRoute: typeof BillingLockedRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRouteWithChildren
@@ -2655,6 +2680,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  TermsRoute: typeof TermsRoute
   TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -2699,6 +2725,13 @@ declare module '@tanstack/react-router' {
       path: '/training'
       fullPath: '/training'
       preLoaderRoute: typeof TrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -2797,6 +2830,13 @@ declare module '@tanstack/react-router' {
       path: '/billing-locked'
       fullPath: '/billing-locked'
       preLoaderRoute: typeof BillingLockedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/baa': {
+      id: '/baa'
+      path: '/baa'
+      fullPath: '/baa'
+      preLoaderRoute: typeof BaaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auditor': {
@@ -4674,6 +4714,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuditorRoute: AuditorRoute,
+  BaaRoute: BaaRoute,
   BillingLockedRoute: BillingLockedRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRouteWithChildren,
@@ -4688,6 +4729,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  TermsRoute: TermsRoute,
   TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,

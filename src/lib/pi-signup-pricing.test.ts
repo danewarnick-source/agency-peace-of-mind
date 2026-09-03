@@ -9,7 +9,10 @@ import {
   SIGNUP_TRAINING_ADDONS,
   quotePiListSubscription,
   quoteSignupTrainingAddon,
+  quoteSignupTrainingLines,
   signupTrainingMatchesPublicCopy,
+  trainingQuantitiesFromPeople,
+  trainingRosterTotalCents,
 } from "./pi-signup-pricing.ts";
 
 describe("quotePiListSubscription", () => {
@@ -71,6 +74,24 @@ describe("signup training add-ons", () => {
     assert.deepEqual(
       PI_TRAINING_ADDONS.map((row) => row.price),
       ["$100", "$75", "$200", "$300"],
+    );
+  });
+
+  it("counts roster people per SKU — 1 CPR, 3 Pack, 1 thirty-day is $1,075", () => {
+    const people = [
+      { sku: "cpr_first_aid" },
+      { sku: "pack" },
+      { sku: "pack" },
+      { sku: "pack" },
+      { sku: "thirty_day" },
+    ];
+    const quantities = trainingQuantitiesFromPeople(people);
+    assert.deepEqual(quantities, { cpr_first_aid: 1, thirty_day: 1, mandt: 0, pack: 3 });
+    assert.equal(trainingRosterTotalCents(people), 10_000 + 3 * 30_000 + 7_500);
+    const lines = quoteSignupTrainingLines(quantities);
+    assert.deepEqual(
+      lines.map((line) => `${line.id}:${line.quantity}:${line.priceCents}`),
+      ["cpr_first_aid:1:10000", "thirty_day:1:7500", "pack:3:30000"],
     );
   });
 

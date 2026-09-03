@@ -12725,6 +12725,9 @@ export type Database = {
       }
       org_subscriptions: {
         Row: {
+          billed_client_count: number | null
+          billed_period_end: string | null
+          billed_period_start: string | null
           billing_interval: string | null
           cancel_at_period_end: boolean
           canceled_at: string | null
@@ -12744,6 +12747,7 @@ export type Database = {
           organization_id: string
           past_due_since: string | null
           plan: Database["public"]["Enums"]["sub_plan"]
+          renewal_credit_cents: number
           renewal_date: string | null
           staff_count: number | null
           started_at: string
@@ -12755,6 +12759,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billed_client_count?: number | null
+          billed_period_end?: string | null
+          billed_period_start?: string | null
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           canceled_at?: string | null
@@ -12774,6 +12781,7 @@ export type Database = {
           organization_id: string
           past_due_since?: string | null
           plan?: Database["public"]["Enums"]["sub_plan"]
+          renewal_credit_cents?: number
           renewal_date?: string | null
           staff_count?: number | null
           started_at?: string
@@ -12785,6 +12793,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billed_client_count?: number | null
+          billed_period_end?: string | null
+          billed_period_start?: string | null
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           canceled_at?: string | null
@@ -12804,6 +12815,7 @@ export type Database = {
           organization_id?: string
           past_due_since?: string | null
           plan?: Database["public"]["Enums"]["sub_plan"]
+          renewal_credit_cents?: number
           renewal_date?: string | null
           staff_count?: number | null
           started_at?: string

@@ -195,6 +195,23 @@ async function installSignupMocks(
   });
 }
 
+async function walkToTraining(page: Page) {
+  await fillReactInput(page, "signup-email", EMAIL);
+  await fillReactInput(page, "signup-password", "Testpass1");
+  await fillReactInput(page, "signup-confirm", "Testpass1");
+  await page.getByTestId("signup-tos-checkbox").check();
+  await page.getByTestId("signup-baa-checkbox").check();
+  await page.getByRole("button", { name: /create account/i }).click();
+  await expect(page.getByText(/tell us about your business/i)).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("signup-agency-name").fill("Sunrise Supports");
+  await page.getByPlaceholder("Jane Doe").fill("Dane Walk");
+  await page.getByPlaceholder("(801) 555-0123").fill("8015550123");
+  await page.getByRole("button", { name: /continue/i }).click();
+  await expect(page.getByTestId("signup-plan-quote")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /continue/i }).click();
+  await expect(page.getByTestId("signup-training-step")).toBeVisible();
+}
+
 async function fillReactInput(page: Page, testId: string, value: string) {
   const loc = page.getByTestId(testId);
   await loc.waitFor({ state: "visible" });
@@ -223,6 +240,14 @@ test.describe("new-provider signup walk", () => {
     await fillReactInput(page, "signup-password", "Testpass1");
     await fillReactInput(page, "signup-confirm", "Testpass1");
     await page.getByTestId("signup-email").blur();
+    await expect(page.getByTestId("signup-tos-checkbox")).toBeVisible();
+    await expect(page.getByTestId("signup-tos-link")).toHaveAttribute("href", "/terms");
+    await expect(page.getByTestId("signup-baa-checkbox")).toBeVisible();
+    await expect(page.getByTestId("signup-baa-link")).toHaveAttribute("href", "/baa");
+    await expect(page.getByRole("button", { name: /create account/i })).toBeDisabled();
+    await page.getByTestId("signup-tos-checkbox").check();
+    await expect(page.getByRole("button", { name: /create account/i })).toBeDisabled();
+    await page.getByTestId("signup-baa-checkbox").check();
     await shot(page, "signup_step_account_plus_alias.png");
     await expect(page.getByRole("button", { name: /create account/i })).toBeEnabled();
 
@@ -317,6 +342,8 @@ test.describe("new-provider signup walk", () => {
     await fillReactInput(page, "signup-email", EMAIL);
     await fillReactInput(page, "signup-password", "Testpass1");
     await fillReactInput(page, "signup-confirm", "Testpass1");
+    await page.getByTestId("signup-tos-checkbox").check();
+    await page.getByTestId("signup-baa-checkbox").check();
     await page.getByRole("button", { name: /create account/i }).click();
     await expect(page.getByTestId("signup-confirm-email")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("signup-confirm-email")).toContainText(/confirm the email we sent/i);
@@ -334,5 +361,63 @@ test.describe("new-provider signup walk", () => {
     await page.getByTestId("signup-email").blur();
     await expect(page.getByText(/already exists/i)).toBeVisible({ timeout: 20_000 });
     await shot(page, "signup_exact_email_blocked.png");
+  });
+
+  test("training roster is per person: 1 CPR, 3 Pack, 1 thirty-day", async ({ page }) => {
+    await installSignupMocks(page);
+    await page.goto("/signup", { waitUntil: "networkidle" });
+    await walkToTraining(page);
+    await expect(page.getByText(/add who needs training, or skip/i)).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/take one add-on/i);
+
+    const rows: Array<{ name: string; sku: "cpr_first_aid" | "pack" | "thirty_day" }> = [
+      { name: "Alex CPR", sku: "cpr_first_aid" },
+      { name: "Blair Pack", sku: "pack" },
+      { name: "Casey Pack", sku: "pack" },
+      { name: "Drew Pack", sku: "pack" },
+      { name: "Evan Thirty", sku: "thirty_day" },
+    ];
+    for (let i = 0; i < rows.length; i++) {
+      await page.getByTestId("signup-training-add").click();
+      await page.getByTestId(`signup-training-name-${i}`).fill(rows[i].name);
+      await page.getByTestId(`signup-training-sku-${i}-${rows[i].sku}`).check();
+    }
+    await expect(page.getByTestId("signup-training-total")).toContainText("$1,075");
+    await expect(page.getByTestId("signup-training-total")).toContainText("1× CPR");
+    await expect(page.getByTestId("signup-training-total")).toContainText("3× Pack");
+    await expect(page.getByTestId("signup-training-total")).toContainText("1× 30-day");
+    await shot(page, "signup_step_training_roster_dane.png");
+
+    await page.getByRole("button", { name: /^continue$/i }).click();
+    await expect(page.getByTestId("signup-payment-training")).toBeVisible();
+    await expect(page.getByTestId("signup-payment-training")).toContainText("CPR / First Aid × 1");
+    await expect(page.getByTestId("signup-payment-training")).toContainText("Pack × 3");
+    await expect(page.getByTestId("signup-payment-training")).toContainText("30-day × 1");
+    await expect(page.getByTestId("signup-payment-training")).toContainText("$1,075");
+    await page.getByRole("button", { name: /^back$/i }).click();
+    await expect(page.getByTestId("signup-training-step")).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("signup-nav")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^continue$/i })).toBeVisible();
+    await expect(page.getByTestId("signup-training-skip")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^back$/i })).toBeVisible();
+    await shot(page, "signup_step_training_mobile_footer.png");
+  });
+
+  test("terms and BAA pages name Provider Interface LLC", async ({ page }) => {
+    await page.goto("/terms", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /^terms$/i })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Provider Interface LLC");
+    await expect(page.getByTestId("terms-contracts")).toContainText("Contracts, funders, and audits");
+    await shot(page, "signup_terms_pi_llc.png");
+
+    await page.goto("/baa", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /business associate agreement/i })).toBeVisible();
+    await expect(page.locator("body")).toContainText("Provider Interface LLC");
+    await expect(page.getByTestId("baa-agree-checkbox")).toBeVisible();
+    await expect(page.getByTestId("baa-agree-copy")).toContainText("authorized to bind this agency");
+    await page.getByTestId("baa-agree-checkbox").check();
+    await shot(page, "signup_baa_i_agree.png");
   });
 });

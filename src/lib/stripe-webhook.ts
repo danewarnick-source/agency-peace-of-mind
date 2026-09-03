@@ -11,6 +11,7 @@ import {
   unlockAccount,
 } from "@/lib/billing-lockout.server";
 import { isBillingExempt, UNPAID_LOCK_REASON } from "@/lib/billing-access";
+import { shouldKeepPrepaidAccess, syncPiListQuantityForOrg } from "@/lib/pi-list-billing.server";
 import { mrrCentsForPlan } from "@/lib/stripe-config";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
 import { fulfillTrainingClass } from "@/lib/training-class-fulfillment.server";
@@ -248,9 +249,16 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
           : null;
       const { data: row } = await supabaseAdmin
         .from("org_subscriptions")
-        .select("id")
+        .select("id, billing_interval, current_period_end")
         .eq("organization_id", orgId)
         .maybeSingle();
+      const keepPrepaid = shouldKeepPrepaidAccess({
+        billing_interval:
+          meta.interval ??
+          asString(obj.metadata && typeof obj.metadata === "object" ? (obj.metadata as { interval?: string }).interval : null) ??
+          (row as { billing_interval?: string | null } | null)?.billing_interval,
+        current_period_end: periodEnd ?? (row as { current_period_end?: string | null } | null)?.current_period_end,
+      });
       if (row) {
         const mapped =
           status === "active" || status === "trialing"
@@ -258,7 +266,9 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
             : status === "past_due"
               ? "past_due"
               : status === "canceled" || status === "unpaid"
-                ? "canceled"
+                ? keepPrepaid
+                  ? "active"
+                  : "canceled"
                 : status === "paused"
                   ? "paused"
                   : undefined;
@@ -271,6 +281,7 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
             ...(periodEnd
               ? { current_period_end: periodEnd, renewal_date: periodEnd.slice(0, 10) }
               : {}),
+            ...(keepPrepaid ? { cancel_at_period_end: true } : {}),
           })
           .eq("id", row.id);
       }
@@ -278,7 +289,7 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
         await recordPaymentSuccess(orgId, 0, eventId);
       } else if (status === "past_due" || status === "unpaid") {
         await recordPaymentFailure(orgId, `Stripe subscription ${status}`, eventId);
-      } else if (status === "canceled") {
+      } else if (status === "canceled" && !keepPrepaid) {
         await lockAccount(orgId, "Subscription cancelled in Stripe");
       }
       break;
@@ -288,7 +299,43 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
       const orgId = meta.organization_id || (await orgIdFromCustomer(customerId));
       if (!orgId) break;
       if (await loadExempt(orgId)) break;
+      const { data: existing } = await supabaseAdmin
+        .from("org_subscriptions")
+        .select("billing_interval, current_period_end")
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      const periodEnd =
+        typeof obj.current_period_end === "number"
+          ? new Date(obj.current_period_end * 1000).toISOString()
+          : (existing as { current_period_end?: string | null } | null)?.current_period_end ?? null;
+      if (
+        shouldKeepPrepaidAccess({
+          billing_interval:
+            meta.interval ?? (existing as { billing_interval?: string | null } | null)?.billing_interval,
+          current_period_end: periodEnd,
+        })
+      ) {
+        if (existing) {
+          await supabaseAdmin
+            .from("org_subscriptions")
+            .update({ cancel_at_period_end: true, status: "active" })
+            .eq("organization_id", orgId);
+        }
+        break;
+      }
       await lockAccount(orgId, "Subscription cancelled in Stripe");
+      break;
+    }
+
+    case "invoice.created": {
+      const orgId = meta.organization_id || (await orgIdFromCustomer(customerId));
+      if (!orgId) break;
+      if (await loadExempt(orgId)) break;
+      const invoiceId = asString(obj.id);
+      await syncPiListQuantityForOrg(orgId, { invoiceId, allowLeftoverInvoice: false }).catch((err) => {
+        const msg = err instanceof Error ? err.message : "sync_failed";
+        console.error("[stripe-webhook] pi list quantity sync failed", { error: msg });
+      });
       break;
     }
 

@@ -26,6 +26,8 @@ const PUBLIC_FILES = [
   new URL("../routes/pricing.tsx", import.meta.url),
   new URL("../routes/signup.tsx", import.meta.url),
   new URL("../routes/training.tsx", import.meta.url),
+  new URL("../routes/terms.tsx", import.meta.url),
+  new URL("../routes/baa.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url),
@@ -95,6 +97,12 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(signup, /4242 4242 4242 4242/);
     assert.match(signup, /pricingModel: "pi_list"/);
     assert.match(signup, /fromSignup: true/);
+    assert.match(signup, /signup-tos-checkbox/);
+    assert.match(signup, /signup-baa-checkbox/);
+    assert.match(signup, /to="\/terms"/);
+    assert.match(signup, /to="\/baa"/);
+    assert.match(signup, /Add a person/);
+    assert.match(signup, /signup-training-add/);
     assert.doesNotMatch(signup, /True North Supports/);
     assert.doesNotMatch(signup, /founding/i);
   });

@@ -29,6 +29,9 @@ import {
   isSignupTrainingAddonId,
   quotePiListSubscription,
   quoteSignupTrainingAddon,
+  quoteSignupTrainingLines,
+  trainingPeopleForCheckout,
+  trainingQuantitiesFromPeople,
   type SignupTrainingAddonId,
 } from "@/lib/pi-signup-pricing";
 import { appOriginFromRequest, getStripe } from "@/lib/stripe.server";
@@ -46,6 +49,7 @@ import {
   type TrainingClassType,
 } from "@/lib/training-class";
 import { countPayingOrgs } from "@/lib/hive-pricing.functions";
+import { highWaterClientCount } from "@/lib/pi-list-billing.server";
 import {
   clampClientCount,
   clampStaffCount,
@@ -180,15 +184,15 @@ function orgIsComped(org: OrgBillingRow): boolean {
 }
 
 async function liveUsageCounts(orgId: string): Promise<{ staff: number; clients: number }> {
-  const [staffRes, clientRes] = await Promise.all([
+  const [staffRes, highWater] = await Promise.all([
     supabaseAdmin
       .from("organization_members")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("active", true),
-    supabaseAdmin.from("clients").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+    highWaterClientCount(orgId),
   ]);
-  return { staff: staffRes.count ?? 0, clients: clientRes.count ?? 0 };
+  return { staff: staffRes.count ?? 0, clients: highWater.count };
 }
 
 async function resolveOrgSchedule(org: OrgBillingRow): Promise<{
@@ -375,7 +379,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
     const staffCount = clampStaffCount(
       (sub as { staff_count?: number | null } | null)?.staff_count || usage.staff || 1,
     );
-    const clientCount = clampClientCount(usage.clients || org.approxClientCount || 0);
+    const clientCount = clampClientCount(usage.clients);
     const quote = quotePiListSubscription({ clientCount, interval: "monthly" });
     let payingOrgCount = 0;
     try {
@@ -424,11 +428,18 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
     interval?: BillingInterval;
     pricingModel?: "pi_list" | "hive_staff";
     trainingAddon?: SignupTrainingAddonId | "none" | null;
+    trainingPeople?: Array<{ name?: string | null; sku?: string | null }> | null;
     fromSignup?: boolean;
   }) => {
     const organizationId = String(input?.organizationId ?? "");
     if (!UUID_RE.test(organizationId)) throw new Error("Invalid organization.");
     const trainingRaw = String(input?.trainingAddon ?? "none");
+    const trainingPeople = trainingPeopleForCheckout(
+      (Array.isArray(input?.trainingPeople) ? input.trainingPeople : []).map((row) => ({
+        name: row?.name,
+        sku: String(row?.sku ?? ""),
+      })),
+    );
     return {
       organizationId,
       staffCount: input?.staffCount != null ? clampStaffCount(input.staffCount) : undefined,
@@ -436,6 +447,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       interval: input?.interval === "annual" ? ("annual" as const) : ("monthly" as const),
       pricingModel: resolveAgencyCheckoutPricingModel(input?.pricingModel),
       trainingAddon: isSignupTrainingAddonId(trainingRaw) ? trainingRaw : ("none" as const),
+      trainingPeople,
       fromSignup: input?.fromSignup === true,
     };
   })
@@ -466,11 +478,20 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       data.staffCount ?? (existingSub as { staff_count?: number | null } | null)?.staff_count ?? usage.staff ?? 1,
     );
     const clientCount = clampClientCount(
-      data.clientCount ?? usage.clients ?? org.approxClientCount ?? 0,
+      usage.clients > 0 ? usage.clients : (data.clientCount ?? org.approxClientCount ?? 0),
     );
     const interval: BillingInterval = data.interval;
     const usePiList = data.pricingModel === "pi_list";
+    const rosterQuantities = trainingQuantitiesFromPeople(data.trainingPeople);
+    const rosterLines = quoteSignupTrainingLines(rosterQuantities);
     const training = quoteSignupTrainingAddon(data.trainingAddon);
+    const trainingForLines = rosterLines.length > 0 ? rosterLines : training;
+    const trainingCents = rosterLines.length > 0
+      ? rosterLines.reduce((sum, line) => sum + line.priceCents * line.quantity, 0)
+      : training.priceCents;
+    const trainingAddonLabel = rosterLines.length > 0
+      ? rosterLines.map((line) => `${line.id}x${line.quantity}`).join(",")
+      : training.id;
 
     let monthlyCents: number;
     let billedCents: number;
@@ -482,7 +503,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       monthlyCents = quote.monthlyCents;
       billedCents = quote.billedCents;
       scheduleLabel = "list";
-      built = subscriptionLineItemsForPiListQuote(quote, training);
+      built = subscriptionLineItemsForPiListQuote(quote, trainingForLines);
       const { error: scheduleErr } = await supabaseAdmin
         .from("organizations")
         .update({
@@ -568,8 +589,36 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
         interval: usePiList ? "monthly" : interval,
         monthly_cents: String(monthlyCents),
         billed_cents: String(billedCents),
-        training_addon: training.id,
-        training_cents: String(training.priceCents),
+        training_addon: trainingAddonLabel.slice(0, 500),
+        training_cents: String(trainingCents),
+        training_cpr_qty: String(rosterQuantities.cpr_first_aid),
+        training_thirty_day_qty: String(rosterQuantities.thirty_day),
+        training_mandt_qty: String(rosterQuantities.mandt),
+        training_pack_qty: String(rosterQuantities.pack),
+        training_cpr_names: data.trainingPeople
+          .filter((p) => p.sku === "cpr_first_aid")
+          .map((p) => p.name)
+          .filter(Boolean)
+          .join(", ")
+          .slice(0, 500),
+        training_thirty_day_names: data.trainingPeople
+          .filter((p) => p.sku === "thirty_day")
+          .map((p) => p.name)
+          .filter(Boolean)
+          .join(", ")
+          .slice(0, 500),
+        training_mandt_names: data.trainingPeople
+          .filter((p) => p.sku === "mandt")
+          .map((p) => p.name)
+          .filter(Boolean)
+          .join(", ")
+          .slice(0, 500),
+        training_pack_names: data.trainingPeople
+          .filter((p) => p.sku === "pack")
+          .map((p) => p.name)
+          .filter(Boolean)
+          .join(", ")
+          .slice(0, 500),
         purchaser_user_id: context.userId,
       },
       subscription_data: {

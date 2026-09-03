@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
 import {
   SIGNUP_CONFIRM_CONTINUE_LABEL,
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
@@ -75,5 +75,35 @@ describe("signup workspace / session", () => {
     const src = readFileSync(new URL("./signup-workspace.functions.ts", import.meta.url), "utf8");
     assert.match(src, /defaultUsernameFromEmail/);
     assert.match(src, /username:\s*defaultUsernameFromEmail/);
+  });
+});
+
+describe("signup Create account env + training link", () => {
+  it("reads Vercel VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY statically", () => {
+    const env = readFileSync(new URL("./supabase-public-env.ts", import.meta.url), "utf8");
+    assert.match(env, /import\.meta\.env\.VITE_SUPABASE_URL/);
+    assert.match(env, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
+    assert.match(env, /VITE_SUPABASE_ANON_KEY/);
+  });
+
+  it("Create account does not require SERVICE_ROLE_KEY", () => {
+    const checks = readFileSync(new URL("./signup-checks.functions.ts", import.meta.url), "utf8");
+    const signup = readFileSync(new URL("../routes/signup.tsx", import.meta.url), "utf8");
+    assert.match(checks, /readSupabaseAdminEnv/);
+    assert.match(checks, /exists: false/);
+    assert.match(signup, /\(supabase as any\)\.auth\.signUp/);
+  });
+
+  it("keeps the quiet training link on Training, not Account", () => {
+    const signup = readFileSync(new URL("../routes/signup.tsx", import.meta.url), "utf8");
+    const account = signup.slice(
+      signup.indexOf("function Step1Account"),
+      signup.indexOf("function Step3Business"),
+    );
+    const training = signup.slice(signup.indexOf("function Step5Training"));
+    assert.doesNotMatch(account, /signup-training-only-link/);
+    assert.match(training, /signup-training-only-link/);
+    assert.match(training, /Just need training\? Buy classes without the office\./);
+    assert.equal(signup.includes('"Training"'), true);
   });
 });

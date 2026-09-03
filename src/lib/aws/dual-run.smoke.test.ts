@@ -34,6 +34,8 @@ function restoreEnv() {
   delete process.env.S3_BUCKET;
   delete process.env.COGNITO_USER_POOL_ID;
   delete process.env.COGNITO_CLIENT_ID;
+  delete process.env.VITE_SUPABASE_ANON_KEY;
+  delete process.env.SUPABASE_ANON_KEY;
 }
 
 afterEach(() => {
@@ -61,6 +63,20 @@ describe("AWS dual-run default (no AWS env)", () => {
     });
     assert.equal(typeof client.auth.signInWithPassword, "function");
     assert.equal(typeof client.from, "function");
+  });
+
+  it("maps the existing Vercel names VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY", () => {
+    restoreEnv();
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.VITE_SUPABASE_URL = "https://dhrrukdcigiiqksibdfb.supabase.co";
+    process.env.VITE_SUPABASE_ANON_KEY = "vite-anon-key";
+    const env = resolveSupabaseClientEnv();
+    assert.equal(env.SUPABASE_URL, "https://dhrrukdcigiiqksibdfb.supabase.co");
+    assert.equal(env.SUPABASE_PUBLISHABLE_KEY, "vite-anon-key");
   });
 });
 

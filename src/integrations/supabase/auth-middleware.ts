@@ -2,7 +2,7 @@ import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { Database } from "./types";
-import { getDatabaseUrl, isCognitoAuth } from "@/lib/aws/env";
+import { getDatabaseUrl, isCognitoAuth, readPublishableSupabaseEnv } from "@/lib/aws/env";
 import { resolveRequestUser } from "@/lib/aws/resolve-user.server";
 import { getAwsDataClient } from "@/lib/aws/db-client.server";
 import { readAwsSessionCookie } from "@/lib/aws/session-cookie.server";
@@ -59,8 +59,9 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       });
     }
 
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const publishable = readPublishableSupabaseEnv();
+    const SUPABASE_URL = publishable?.url;
+    const SUPABASE_PUBLISHABLE_KEY = publishable?.key;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       throw new Error("Missing Supabase environment variables.");

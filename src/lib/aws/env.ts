@@ -23,6 +23,11 @@ declare global {
   interface Window {
     __HIVE_RUNTIME__?: HiveRuntimeBlob;
   }
+  interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL?: string;
+    readonly VITE_SUPABASE_ANON_KEY?: string;
+    readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  }
 }
 
 function readRawAuthProvider(): string {
@@ -142,31 +147,74 @@ export function getPublicRuntimeBlob(): HiveRuntimeBlob {
   };
 }
 
+function trimEnv(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function firstNamedEnv(
+  env: Record<string, string | undefined>,
+  names: readonly string[],
+): string {
+  for (const name of names) {
+    const value = trimEnv(env[name]);
+    if (value) return value;
+  }
+  return "";
+}
+
+/** Existing Vercel / Vite names on Hive-Platform, then Lovable / Next aliases. */
+export const SUPABASE_PUBLISHABLE_URL_NAMES = [
+  "VITE_SUPABASE_URL",
+  "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+] as const;
+
+export const SUPABASE_PUBLISHABLE_KEY_NAMES = [
+  "VITE_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+] as const;
+
+/**
+ * Publishable URL + anon key from a process.env-like record.
+ * Prefers the Vercel names already set on Hive-Platform
+ * (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+ */
+export function readPublishableSupabaseEnv(
+  env: Record<string, string | undefined> = typeof process !== "undefined" ? process.env : {},
+): { url: string; key: string } | null {
+  const url = firstNamedEnv(env, SUPABASE_PUBLISHABLE_URL_NAMES);
+  const key = firstNamedEnv(env, SUPABASE_PUBLISHABLE_KEY_NAMES);
+  if (!url || !key) return null;
+  return { url, key };
+}
+
 /**
  * URL + publishable key for constructing the existing supabase-js client.
  * When AWS is fully gated on and live Supabase keys are absent, returns a
  * dummy pair so `createClient` still succeeds (auth/data/storage are
  * intercepted). Missing keys with AWS unset still throw — same as today.
+ *
+ * Browser bundles only receive `import.meta.env.VITE_*` when those identifiers
+ * are written statically — Vite will not inline a dynamic Record lookup.
  */
 export function resolveSupabaseClientEnv(): {
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
 } {
-  const url =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_SUPABASE_URL) ||
-    (typeof process !== "undefined"
-      ? process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-      : undefined) ||
-    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined);
-  const key =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as ImportMeta & { env?: Record<string, string> }).env
-        ?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-    (typeof process !== "undefined"
-      ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
-      : undefined) ||
-    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined);
+  const viteUrl =
+    typeof import.meta.env !== "undefined" ? trimEnv(import.meta.env.VITE_SUPABASE_URL) : "";
+  const viteAnon =
+    typeof import.meta.env !== "undefined" ? trimEnv(import.meta.env.VITE_SUPABASE_ANON_KEY) : "";
+  const vitePublishable =
+    typeof import.meta.env !== "undefined"
+      ? trimEnv(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
+      : "";
+  const fromProc = typeof process !== "undefined" ? readPublishableSupabaseEnv(process.env) : null;
+  const url = viteUrl || fromProc?.url || "";
+  const key = viteAnon || vitePublishable || fromProc?.key || "";
 
   if (url && key) return { SUPABASE_URL: url, SUPABASE_PUBLISHABLE_KEY: key };
 

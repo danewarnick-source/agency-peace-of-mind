@@ -68,6 +68,19 @@ describe("readPublishableAuthEnv", () => {
       null,
     );
   });
+
+  it("maps Vercel VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY", () => {
+    assert.deepEqual(
+      readPublishableAuthEnv({
+        VITE_SUPABASE_URL: "https://dhrrukdcigiiqksibdfb.supabase.co",
+        VITE_SUPABASE_ANON_KEY: "vite-anon-key",
+      }),
+      {
+        url: "https://dhrrukdcigiiqksibdfb.supabase.co",
+        key: "vite-anon-key",
+      },
+    );
+  });
 });
 
 describe("login.server publishable-key wiring", () => {

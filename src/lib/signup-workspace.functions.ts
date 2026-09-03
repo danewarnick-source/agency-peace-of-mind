@@ -42,9 +42,51 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       return { ok: false, orgId: null, reason: "no_session" };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Session client first — preview often has VITE_ URL/anon but no
+    // SUPABASE_SERVICE_ROLE_KEY. Admin lookup then throws and Business
+    // Continue never PATCHes organizations.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const admin = supabaseAdmin as any;
+    const userClient = context.supabase as any;
+    if (userClient) {
+      try {
+        const { data: member } = await userClient
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", userId)
+          .eq("active", true)
+          .limit(1)
+          .maybeSingle();
+        if (typeof member?.organization_id === "string") {
+          return { ok: true, orgId: member.organization_id, reason: null };
+        }
+        const { data: created } = await userClient
+          .from("organizations")
+          .select("id")
+          .eq("created_by", userId)
+          .limit(1)
+          .maybeSingle();
+        if (typeof created?.id === "string") {
+          return { ok: true, orgId: created.id, reason: null };
+        }
+      } catch {
+        console.warn("[signup] workspace session lookup failed", { code: "org_query_error" });
+      }
+    }
+
+    const { readSupabaseAdminEnv } = await import("@/lib/supabase-public-env");
+    if (!readSupabaseAdminEnv()) {
+      return { ok: false, orgId: null, reason: "provision_failed" };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let admin: any;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      admin = supabaseAdmin as typeof admin;
+    } catch {
+      console.warn("[signup] workspace provision failed", { code: "provision_failed" });
+      return { ok: false, orgId: null, reason: "provision_failed" };
+    }
 
     const findOrg = async (): Promise<{ orgId: string | null; reason: SignupWorkspaceReason | null }> => {
       const { data: org, error } = await admin
@@ -61,7 +103,13 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       return { orgId, reason: null };
     };
 
-    const existing = await findOrg();
+    let existing: { orgId: string | null; reason: SignupWorkspaceReason | null };
+    try {
+      existing = await findOrg();
+    } catch {
+      console.warn("[signup] workspace provision failed", { code: "provision_failed" });
+      return { ok: false, orgId: null, reason: "provision_failed" };
+    }
     if (existing.orgId) return { ok: true, orgId: existing.orgId, reason: null };
     if (existing.reason === "org_query_error") {
       return { ok: false, orgId: null, reason: "org_query_error" };
@@ -76,53 +124,58 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    const profileUpsert = await admin.from("profiles").upsert(
-      {
-        id: userId,
-        email: context.claims?.email ?? null,
-        agency_name: data.agencyName || null,
-      },
-      { onConflict: "id" },
-    );
-    if (profileUpsert?.error) {
-      console.warn("[signup] workspace profile upsert failed", { code: "provision_failed" });
-    }
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const again = await findOrg();
-      if (again.orgId) return { ok: true, orgId: again.orgId, reason: null };
-
-      const { data: created, error: insertErr } = await admin
-        .from("organizations")
-        .insert({
-          name,
-          slug: attempt === 0 ? slugBase : `${slugBase}-${attempt}`,
-          created_by: userId,
-        })
-        .select("id")
-        .maybeSingle();
-
-      if (insertErr) {
-        if (isRbacSeedTriggerError(insertErr.message)) {
-          console.warn("[signup] workspace provision failed", { code: "trigger_blocked" });
-          return { ok: false, orgId: null, reason: "trigger_blocked" };
-        }
-        console.warn("[signup] workspace provision failed", { code: "provision_failed" });
-      } else if (typeof created?.id === "string") {
-        const memberIns = await admin.from("organization_members").insert({
-          organization_id: created.id,
-          user_id: userId,
-          role: "admin",
-        });
-        if (memberIns?.error) {
-          console.warn("[signup] workspace membership insert failed", { code: "provision_failed" });
-        }
-        return { ok: true, orgId: created.id, reason: null };
+    try {
+      const profileUpsert = await admin.from("profiles").upsert(
+        {
+          id: userId,
+          email: context.claims?.email ?? null,
+          agency_name: data.agencyName || null,
+        },
+        { onConflict: "id" },
+      );
+      if (profileUpsert?.error) {
+        console.warn("[signup] workspace profile upsert failed", { code: "provision_failed" });
       }
-      await sleep(350 * (attempt + 1));
-    }
 
-    const last = await findOrg();
-    if (last.orgId) return { ok: true, orgId: last.orgId, reason: null };
-    return { ok: false, orgId: null, reason: last.reason ?? "provision_failed" };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const again = await findOrg();
+        if (again.orgId) return { ok: true, orgId: again.orgId, reason: null };
+
+        const { data: created, error: insertErr } = await admin
+          .from("organizations")
+          .insert({
+            name,
+            slug: attempt === 0 ? slugBase : `${slugBase}-${attempt}`,
+            created_by: userId,
+          })
+          .select("id")
+          .maybeSingle();
+
+        if (insertErr) {
+          if (isRbacSeedTriggerError(insertErr.message)) {
+            console.warn("[signup] workspace provision failed", { code: "trigger_blocked" });
+            return { ok: false, orgId: null, reason: "trigger_blocked" };
+          }
+          console.warn("[signup] workspace provision failed", { code: "provision_failed" });
+        } else if (typeof created?.id === "string") {
+          const memberIns = await admin.from("organization_members").insert({
+            organization_id: created.id,
+            user_id: userId,
+            role: "admin",
+          });
+          if (memberIns?.error) {
+            console.warn("[signup] workspace membership insert failed", { code: "provision_failed" });
+          }
+          return { ok: true, orgId: created.id, reason: null };
+        }
+        await sleep(350 * (attempt + 1));
+      }
+
+      const last = await findOrg();
+      if (last.orgId) return { ok: true, orgId: last.orgId, reason: null };
+      return { ok: false, orgId: null, reason: last.reason ?? "provision_failed" };
+    } catch {
+      console.warn("[signup] workspace provision failed", { code: "provision_failed" });
+      return { ok: false, orgId: null, reason: "provision_failed" };
+    }
   });

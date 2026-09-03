@@ -172,6 +172,14 @@ async function installSignupMocks(
         user_metadata: { full_name: "Dane Walk" },
       });
     }
+    if (/\/rest\/v1\/organization_members/i.test(url)) {
+      return fulfillJson(route, {
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        role: "admin",
+        active: true,
+      });
+    }
     if (/\/rest\/v1\/organizations/i.test(url)) {
       if (method === "GET") {
         return fulfillJson(route, [{ id: ORG_ID, created_by: USER_ID, name: "Sunrise Supports" }]);

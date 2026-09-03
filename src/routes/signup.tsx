@@ -19,7 +19,7 @@ import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.f
 import { ensureSignupWorkspace } from "@/lib/signup-workspace.functions";
 import {
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
-  messageForSignupWorkspaceReason,
+  SIGNUP_PROVISION_FAILED_MESSAGE,
   signupHasSession,
 } from "@/lib/signup-workspace";
 import {
@@ -30,8 +30,13 @@ import {
   sha1HexUpper,
   weakPasswordCopyFromAuth,
 } from "@/lib/signup-password";
-import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
+import {
+  SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE,
+  orgIdFromCreatedByRow,
+  orgIdFromMembershipRow,
+  signupBusinessOrgPatch,
+} from "@/lib/signup-business";
 import {
   createSubscriptionCheckoutFn,
   getSignupPaymentsStatusFn,
@@ -722,7 +727,6 @@ function Step3Business({
   onNext: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
   const phoneOk = isValidUSPhone(form.phone);
   const canContinue =
     !!form.agencyName.trim() && !!form.contactName.trim() && phoneOk;
@@ -760,46 +764,73 @@ function Step3Business({
         /* non-blocking */
       }
 
-      const ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
-      if (!ensured?.ok || !ensured.orgId) {
-        toast.error(messageForSignupWorkspaceReason(ensured?.reason));
+      let orgId: string | null = null;
+      try {
+        const ensured = await ensureWorkspace({ data: { agencyName: form.agencyName.trim() } });
+        if (ensured?.ok) orgId = ensured.orgId;
+      } catch (e) {
+        console.warn("[signup] ensure workspace failed", e);
+      }
+
+      if (!orgId) {
+        const { data: member } = await (supabase as any)
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", uid)
+          .eq("active", true)
+          .limit(1)
+          .maybeSingle();
+        orgId = orgIdFromMembershipRow(member);
+      }
+      if (!orgId) {
+        const { data: created } = await (supabase as any)
+          .from("organizations")
+          .select("id")
+          .eq("created_by", uid)
+          .limit(1)
+          .maybeSingle();
+        orgId = orgIdFromCreatedByRow(created);
+      }
+      if (!orgId) {
+        toast.error(SIGNUP_PROVISION_FAILED_MESSAGE);
         setBusy(false);
         return;
       }
-      const orgId = ensured.orgId;
 
       const isTrainingOnly =
         typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("flow") === "training";
-
-      const { error: orgErr } = await (supabase as any)
-        .from("organizations")
-        .update({
-          name: form.agencyName,
-          state_code: "UT",
-          dhhs_provider_id: form.providerNumber || null,
-          account_contact_name: form.contactName || null,
-          account_contact_email: userResp.user?.email ?? null,
-          training_only: isTrainingOnly,
-        })
-        .eq("id", orgId);
-      if (orgErr) {
-        toast.error("Couldn't save your business details — please try again.");
+      const phoneE164 = normalizeUSPhoneToE164(form.phone);
+      if (!phoneE164) {
+        toast.error("Enter a valid US mobile number to continue.");
         setBusy(false);
         return;
       }
 
-      try {
-        await setSmsPhoneFn({ data: { organizationId: orgId, phone: form.phone } });
-      } catch (e) {
-        console.warn("[signup] sms phone save failed", e);
-        toast.error("Could not save your mobile number. Please try again.");
+      const { data: updated, error: orgErr } = await (supabase as any)
+        .from("organizations")
+        .update(
+          signupBusinessOrgPatch({
+            agencyName: form.agencyName,
+            contactName: form.contactName,
+            contactEmail: userResp.user?.email ?? null,
+            providerNumber: form.providerNumber,
+            phoneE164,
+            trainingOnly: isTrainingOnly,
+          }),
+        )
+        .eq("id", orgId)
+        .select("id")
+        .maybeSingle();
+      if (orgErr || !updated?.id) {
+        console.warn("[signup] business org update failed", { code: orgErr?.code ?? "no_row" });
+        toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
         setBusy(false);
         return;
       }
     } catch (e) {
       console.warn("[signup] business save failed", e);
-      toast.error("Couldn't save your business details — please try again.");
+      toast.error(SIGNUP_BUSINESS_SAVE_ERROR_MESSAGE);
       setBusy(false);
       return;
     }

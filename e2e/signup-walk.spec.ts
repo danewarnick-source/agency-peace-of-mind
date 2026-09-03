@@ -164,6 +164,29 @@ async function installSignupMocks(
         },
       });
     }
+    if (/\/auth\/v1\/token/i.test(url) && method === "POST") {
+      const body = req.postData() ?? "";
+      const passwordGrant =
+        /grant_type=password/i.test(body) || /"grant_type"\s*:\s*"password"/.test(body);
+      if (passwordGrant) {
+        const now = new Date().toISOString();
+        const user = {
+          id: USER_ID,
+          email: EMAIL,
+          email_confirmed_at: now,
+          user_metadata: { full_name: "Dane Walk" },
+        };
+        const access_token = `${b64url({ alg: "none" })}.${b64url({ sub: USER_ID, email: EMAIL })}.e2e`;
+        const session = {
+          access_token,
+          token_type: "bearer",
+          expires_in: 86400,
+          refresh_token: "e2e-refresh",
+          user,
+        };
+        return fulfillJson(route, { ...session, session, user });
+      }
+    }
     if (/\/auth\/v1\/signup/i.test(url) && method === "POST") {
       const now = new Date().toISOString();
       const user = {
@@ -386,6 +409,9 @@ test.describe("new-provider signup walk", () => {
     await expect(page.getByText(/tell us about your business/i)).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText(/workspace isn't ready/i);
     await shot(page, "signup_confirm_email_before_continue.png");
+    await page.getByTestId("signup-confirm-continue").click();
+    await expect(page.getByText(/tell us about your business/i)).toBeVisible({ timeout: 15_000 });
+    await shot(page, "signup_confirm_email_continue_ok.png");
   });
 
   test("exact duplicate email is still blocked; plus-alias is not treated as the base address", async ({

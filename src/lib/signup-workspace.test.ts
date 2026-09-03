@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  SIGNUP_CONFIRM_CONTINUE_LABEL,
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
   isRbacSeedTriggerError,
+  isSignupEmailNotConfirmedError,
   messageForSignupWorkspaceReason,
   signupHasSession,
   workspaceNameFromSignup,
@@ -13,6 +15,13 @@ describe("signup workspace / session", () => {
     assert.equal(signupHasSession(null), false);
     assert.equal(signupHasSession({ access_token: "tok", user: null }), false);
     assert.equal(signupHasSession({ access_token: "tok", user: { id: "u1" } }), true);
+  });
+
+  it("detects email_not_confirmed so Account can stay on the confirm sentence", () => {
+    assert.equal(isSignupEmailNotConfirmedError({ code: "email_not_confirmed" }), true);
+    assert.equal(isSignupEmailNotConfirmedError({ message: "Email not confirmed" }), true);
+    assert.equal(isSignupEmailNotConfirmedError({ code: "invalid_credentials" }), false);
+    assert.match(SIGNUP_CONFIRM_CONTINUE_LABEL, /confirmed/i);
   });
 
   it("splits no-session copy from org / trigger failures", () => {

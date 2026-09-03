@@ -134,5 +134,8 @@ describe("signup Account wiring", () => {
     assert.doesNotMatch(account, /<Link\s+to="\/terms"/);
     assert.doesNotMatch(account, /<Link\s+to="\/baa"/);
     assert.doesNotMatch(account, /Just need training\?/);
+    assert.match(account, /signInWithPassword/);
+    assert.match(account, /signup-confirm-continue/);
+    assert.match(account, /SIGNUP_CONFIRM_CONTINUE_LABEL/);
   });
 });

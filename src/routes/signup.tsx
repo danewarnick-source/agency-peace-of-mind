@@ -19,8 +19,10 @@ import { checkEmailExists, checkPasswordPwnedRange } from "@/lib/signup-checks.f
 import { ensureSignupWorkspace } from "@/lib/signup-workspace.functions";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import {
+  SIGNUP_CONFIRM_CONTINUE_LABEL,
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
   SIGNUP_PROVISION_FAILED_MESSAGE,
+  isSignupEmailNotConfirmedError,
   signupHasSession,
 } from "@/lib/signup-workspace";
 import {
@@ -199,6 +201,7 @@ function NavButtons({
   nextDisabled,
   loading,
   showBack = true,
+  nextTestId,
 }: {
   onBack?: () => void;
   onNext: () => void;
@@ -208,6 +211,7 @@ function NavButtons({
   nextDisabled?: boolean;
   loading?: boolean;
   showBack?: boolean;
+  nextTestId?: string;
 }) {
   return (
     <div
@@ -219,6 +223,7 @@ function NavButtons({
           type="button"
           onClick={onNext}
           disabled={nextDisabled || loading}
+          data-testid={nextTestId}
           className="group h-11 w-full border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827] sm:w-auto sm:min-w-[160px]"
           style={{ fontFamily: JAKARTA, fontWeight: 700 }}
         >
@@ -276,10 +281,23 @@ function SignupPage() {
   const setSmsPhoneFn = useServerFn(setBillingSmsPhoneAtSignup);
 
   useEffect(() => {
+    const goIfSession = (session: unknown) => {
+      if (signupHasSession(session as { access_token?: string; user?: { id?: string } } | null)) {
+        setStep((s) => (s === 0 ? 1 : s));
+      }
+    };
     void (async () => {
       const { data } = await (supabase as any).auth.getSession();
-      if (signupHasSession(data.session)) setStep(1);
+      goIfSession(data.session);
     })();
+    const { data: sub } = (supabase as any).auth.onAuthStateChange(
+      (_event: string, session: unknown) => {
+        goIfSession(session);
+      },
+    );
+    return () => {
+      sub?.subscription?.unsubscribe?.();
+    };
   }, []);
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -509,6 +527,47 @@ function Step1Account({
     }
   };
 
+  const continueAfterConfirm = async () => {
+    setAccountErr(null);
+    setBusy(true);
+    try {
+      const { data, error } = await (supabase as any).auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      if (error) {
+        if (isSignupEmailNotConfirmedError(error)) {
+          setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+          toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        const sentence = humanizeSignupAccountError(error);
+        setAccountErr(sentence);
+        toast.error(sentence);
+        setBusy(false);
+        return;
+      }
+      if (!signupHasSession(data?.session)) {
+        setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+      onNext();
+    } catch (e) {
+      if (isSignupEmailNotConfirmedError(e)) {
+        setConfirmEmailMsg(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+        toast.error(SIGNUP_CONFIRM_EMAIL_MESSAGE);
+      } else {
+        const sentence = humanizeSignupAccountError(e);
+        setAccountErr(sentence);
+        toast.error(sentence);
+      }
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
@@ -682,19 +741,22 @@ function Step1Account({
 
       <NavButtons
         showBack={false}
-        onNext={submit}
+        onNext={confirmEmailMsg ? continueAfterConfirm : submit}
         loading={busy}
         nextDisabled={
-          !form.acceptedTos ||
-          !form.acceptedBaa ||
-          !emailValid ||
-          !lenOk ||
-          !numOk ||
-          !matchOk ||
-          !!emailErr ||
-          !!passwordWeakErr
+          confirmEmailMsg
+            ? !emailValid || form.password.length < 8
+            : !form.acceptedTos ||
+              !form.acceptedBaa ||
+              !emailValid ||
+              !lenOk ||
+              !numOk ||
+              !matchOk ||
+              !!emailErr ||
+              !!passwordWeakErr
         }
-        nextLabel="Create account"
+        nextLabel={confirmEmailMsg ? SIGNUP_CONFIRM_CONTINUE_LABEL : "Create account"}
+        nextTestId={confirmEmailMsg ? "signup-confirm-continue" : "signup-create-account"}
       />
     </>
   );

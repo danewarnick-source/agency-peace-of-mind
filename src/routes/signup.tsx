@@ -357,6 +357,7 @@ function Step1Account({
   onNext: () => void;
 }) {
   const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [accountErr, setAccountErr] = useState<string | null>(null);
   const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(null);
   const [passwordWeakErr, setPasswordWeakErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -419,6 +420,7 @@ function Step1Account({
 
   const submit = async () => {
     setEmailErr(null);
+    setAccountErr(null);
     if (!form.acceptedTos) return toast.error("Agree to the Terms to continue.");
     if (!form.acceptedBaa) return toast.error("Agree to the Business Associate Agreement to continue.");
     if (!emailValid) return setEmailErr("Please enter a valid email address.");
@@ -438,7 +440,9 @@ function Step1Account({
           return;
         }
         if (isMissingLegalAttestationsError(e)) {
-          toast.error(humanizeSignupAccountError(e));
+          const sentence = humanizeSignupAccountError(e);
+          setAccountErr(sentence);
+          toast.error(sentence);
           setBusy(false);
           return;
         }
@@ -466,7 +470,9 @@ function Step1Account({
         } else if (isAuthPwnedPasswordMessage(error.message)) {
           setPasswordWeakErr(weakPasswordCopyFromAuth(error.message));
         } else {
-          toast.error(humanizeSignupAccountError(error));
+          const sentence = humanizeSignupAccountError(error);
+          setAccountErr(sentence);
+          toast.error(sentence);
         }
         setBusy(false);
         return;
@@ -483,7 +489,9 @@ function Step1Account({
       if (isAlreadyUsedEmailError(e)) {
         setEmailErr(SIGNUP_EMAIL_IN_USE_MESSAGE);
       } else {
-        toast.error(humanizeSignupAccountError(e));
+        const sentence = humanizeSignupAccountError(e);
+        setAccountErr(sentence);
+        toast.error(sentence);
       }
       setBusy(false);
     }
@@ -492,6 +500,15 @@ function Step1Account({
   return (
     <>
       <Header title="Create your account" subtitle="Start with a few quick details to get your workspace ready." />
+      {accountErr ? (
+        <div
+          role="alert"
+          data-testid="signup-account-error"
+          className="mb-4 rounded-md border border-[var(--hive-danger)]/50 bg-[var(--hive-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--hive-danger-fg)]"
+        >
+          {accountErr}
+        </div>
+      ) : null}
       {confirmEmailMsg ? (
         <div
           role="alert"

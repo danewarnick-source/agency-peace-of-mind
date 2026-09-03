@@ -4,10 +4,12 @@ import { describe, it } from "node:test";
 import {
   SIGNUP_ACCOUNT_GENERIC_MESSAGE,
   SIGNUP_AGREEMENT_SAVE_FAILED_MESSAGE,
+  SIGNUP_DATABASE_SAVE_MESSAGE,
   SIGNUP_EMAIL_IN_USE_MESSAGE,
   extractSignupErrorText,
   humanizeSignupAccountError,
   isAlreadyUsedEmailError,
+  isDatabaseSavingNewUserError,
 } from "./signup-account-error.ts";
 
 describe("extractSignupErrorText", () => {
@@ -18,6 +20,17 @@ describe("extractSignupErrorText", () => {
     assert.equal(humanizeSignupAccountError({}), SIGNUP_ACCOUNT_GENERIC_MESSAGE);
     assert.equal(humanizeSignupAccountError("{}"), SIGNUP_ACCOUNT_GENERIC_MESSAGE);
     assert.doesNotMatch(humanizeSignupAccountError({}), /^\{\}$/);
+  });
+
+  it("reads GoTrue msg (not only message)", () => {
+    assert.match(
+      extractSignupErrorText({
+        code: 500,
+        error_code: "unexpected_failure",
+        msg: "Database error saving new user",
+      }),
+      /Database error saving new user/,
+    );
   });
 
   it("digs Auth / server-fn nested message and code", () => {
@@ -43,6 +56,45 @@ describe("humanizeSignupAccountError", () => {
     assert.equal(
       humanizeSignupAccountError(new Error("A user with this email already exists")),
       SIGNUP_EMAIL_IN_USE_MESSAGE,
+    );
+  });
+
+  it("maps Auth 422 with an empty body to the unique-email sentence", () => {
+    const emptyAuth = Object.assign(new Error(""), { name: "AuthApiError", status: 422 });
+    assert.equal(isAlreadyUsedEmailError(emptyAuth), true);
+    assert.equal(humanizeSignupAccountError(emptyAuth), SIGNUP_EMAIL_IN_USE_MESSAGE);
+    assert.equal(humanizeSignupAccountError({ status: 422, data: {} }), SIGNUP_EMAIL_IN_USE_MESSAGE);
+    assert.equal(humanizeSignupAccountError({ error: { status: 422, message: "{}" } }), SIGNUP_EMAIL_IN_USE_MESSAGE);
+    assert.doesNotMatch(humanizeSignupAccountError(emptyAuth), /^\{\}$/);
+  });
+
+  it("does not treat a 422 password or invalid-email issue as already-in-use", () => {
+    assert.equal(
+      isAlreadyUsedEmailError({ status: 422, message: "Password is known to be weak and easy to guess" }),
+      false,
+    );
+    assert.equal(
+      isAlreadyUsedEmailError({ status: 422, message: "Unable to validate email address: invalid format" }),
+      false,
+    );
+  });
+
+  it("maps AuthRetryableFetchError 500 with message {} to the database sentence", () => {
+    const swallowed = Object.assign(new Error("{}"), {
+      name: "AuthRetryableFetchError",
+      status: 500,
+    });
+    assert.equal(isDatabaseSavingNewUserError(swallowed), true);
+    assert.equal(isAlreadyUsedEmailError(swallowed), false);
+    assert.equal(humanizeSignupAccountError(swallowed), SIGNUP_DATABASE_SAVE_MESSAGE);
+    assert.doesNotMatch(humanizeSignupAccountError(swallowed), /^\{\}$/);
+    assert.equal(
+      humanizeSignupAccountError({
+        msg: "Database error saving new user",
+        error_code: "unexpected_failure",
+        code: 500,
+      }),
+      SIGNUP_DATABASE_SAVE_MESSAGE,
     );
   });
 
@@ -74,6 +126,7 @@ describe("signup Account wiring", () => {
     );
     assert.match(account, /humanizeSignupAccountError/);
     assert.match(account, /isAlreadyUsedEmailError/);
+    assert.match(account, /signup-account-error/);
     assert.match(account, /href="\/terms"/);
     assert.match(account, /href="\/baa"/);
     assert.match(account, /target="_blank"/);

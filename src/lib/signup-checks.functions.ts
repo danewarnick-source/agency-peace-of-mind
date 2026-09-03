@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { isValidSignupEmail, normalizeSignupEmail } from "@/lib/signup-email";
+import {
+  authAdminUsersHasExactEmail,
+  isValidSignupEmail,
+  normalizeSignupEmail,
+} from "@/lib/signup-email";
 
 /**
  * Public server fn — returns whether an auth user already exists for the given email.
@@ -22,7 +26,7 @@ export const checkEmailExists = createServerFn({ method: "POST" })
     // We avoid auth.admin.listUsers — it can 500 with "Scan error on column
     // confirmation_token: converting NULL to string is unsupported" (GoTrue
     // bug when any user row has a NULL confirmation_token). Query profiles
-    // by email instead; every signup creates a profile row.
+    // first, then Auth admin ?email= (exact mailbox only).
     const { readSupabaseAdminEnv } = await import("@/lib/supabase-public-env");
     if (!readSupabaseAdminEnv()) {
       // Create account still proceeds via client signUp (VITE_ URL + anon).
@@ -35,10 +39,28 @@ export const checkEmailExists = createServerFn({ method: "POST" })
       .ilike("email", data.email)
       .limit(1)
       .maybeSingle();
-    if (error) {
-      throw new Error(error.message || error.code || "Couldn't check that email.");
+    if (!error && row) {
+      return { exists: true };
     }
-    return { exists: !!row };
+
+    // Auth user can exist without a profiles row (failed handle_new_user / rbac).
+    // Do not use listUsers — GoTrue can 500 on NULL confirmation_token.
+    try {
+      const mapped = readSupabaseAdminEnv();
+      if (!mapped) return { exists: false };
+      const endpoint = `${mapped.url.replace(/\/$/, "")}/auth/v1/admin/users?email=${encodeURIComponent(data.email)}`;
+      const res = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${mapped.serviceRoleKey}`,
+          apikey: mapped.serviceRoleKey,
+        },
+      });
+      if (!res.ok) return { exists: false };
+      const body: unknown = await res.json();
+      return { exists: authAdminUsersHasExactEmail(body, data.email) };
+    } catch {
+      return { exists: false };
+    }
   });
 
 /**

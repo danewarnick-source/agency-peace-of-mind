@@ -5,6 +5,8 @@
 
 export const SIGNUP_EMAIL_IN_USE_MESSAGE = "That email is already in use. Sign in instead?";
 export const SIGNUP_AGREEMENT_SAVE_FAILED_MESSAGE = "Couldn't save agreement. Stay on this page.";
+export const SIGNUP_DATABASE_SAVE_MESSAGE =
+  "Couldn't create the account (database error). Stay on this page.";
 export const SIGNUP_ACCOUNT_GENERIC_MESSAGE = "Couldn't create the account. Please try again.";
 
 const EMPTY_TEXT = /^(?:\{\}|\[object Object\]|undefined|null|)$/i;
@@ -68,6 +70,8 @@ export function extractSignupErrorText(raw: unknown): string {
     const rec = asRecord(value);
     if (!rec) return;
     walk(rec.message, depth + 1);
+    walk(rec.msg, depth + 1);
+    walk(rec.error_code, depth + 1);
     walk(rec.error, depth + 1);
     walk(rec.data, depth + 1);
     walk(rec.cause, depth + 1);
@@ -86,9 +90,38 @@ export function extractSignupErrorText(raw: unknown): string {
   return joined;
 }
 
+function readSignupErrorStatus(raw: unknown): number | null {
+  const candidates: unknown[] = [raw];
+  const rec = asRecord(raw);
+  if (rec) {
+    candidates.push(rec.error, rec.data, rec.cause);
+  }
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const obj = candidate as Record<string, unknown>;
+    for (const key of ["status", "statusCode", "status_code"]) {
+      const value = obj[key];
+      if (typeof value === "number" && value >= 100 && value <= 599) return value;
+      if (typeof value === "string" && /^\d{3}$/.test(value)) return Number(value);
+    }
+  }
+  return null;
+}
+
+function isPasswordOrInvalidEmailIssue(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    /\bpassword\b/.test(lower) ||
+    /\bpwned\b/.test(lower) ||
+    /\bweak\b/.test(lower) ||
+    /easy to guess/.test(lower) ||
+    /invalid email/.test(lower) ||
+    /unable to validate email/.test(lower)
+  );
+}
+
 export function isAlreadyUsedEmailError(raw: unknown): boolean {
   const text = extractSignupErrorText(raw).toLowerCase();
-  if (!text) return false;
   if (
     /\balready (?:been )?registered\b/.test(text) ||
     /\balready exists\b/.test(text) ||
@@ -100,6 +133,12 @@ export function isAlreadyUsedEmailError(raw: unknown): boolean {
     return true;
   }
   if (/\bunique\b/.test(text) && /\bemail\b/.test(text)) return true;
+
+  // Auth often returns 422 with an empty body when the email is already registered.
+  const status = readSignupErrorStatus(raw);
+  if (status === 422 && !isPasswordOrInvalidEmailIssue(text)) {
+    return true;
+  }
   return false;
 }
 
@@ -112,9 +151,32 @@ export function isMissingLegalAttestationsError(raw: unknown): boolean {
   );
 }
 
+function readErrorName(raw: unknown): string {
+  if (raw instanceof Error) return raw.name;
+  const rec = asRecord(raw);
+  return typeof rec?.name === "string" ? rec.name : "";
+}
+
+/**
+ * GoTrue 500 "Database error saving new user" (usually handle_new_user /
+ * leftover trigger). supabase-js turns the Response into AuthRetryableFetchError
+ * whose message is JSON.stringify(Response) === "{}".
+ */
+export function isDatabaseSavingNewUserError(raw: unknown): boolean {
+  const text = extractSignupErrorText(raw).toLowerCase();
+  if (/database error saving new user/.test(text)) return true;
+  if (/unexpected_failure/.test(text) && readSignupErrorStatus(raw) === 500) return true;
+  const status = readSignupErrorStatus(raw);
+  const name = readErrorName(raw);
+  if (/authretryablefetcherror/i.test(name) && status === 500) return true;
+  if (status === 500 && (!text || EMPTY_TEXT.test(text))) return true;
+  return false;
+}
+
 export function humanizeSignupAccountError(raw: unknown): string {
   if (isAlreadyUsedEmailError(raw)) return SIGNUP_EMAIL_IN_USE_MESSAGE;
   if (isMissingLegalAttestationsError(raw)) return SIGNUP_AGREEMENT_SAVE_FAILED_MESSAGE;
+  if (isDatabaseSavingNewUserError(raw)) return SIGNUP_DATABASE_SAVE_MESSAGE;
 
   const text = extractSignupErrorText(raw);
   const lower = text.toLowerCase();

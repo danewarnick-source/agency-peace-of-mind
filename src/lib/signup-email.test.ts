@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  authAdminUsersHasExactEmail,
   escapeIlikeExact,
   isValidSignupEmail,
   normalizeSignupEmail,
@@ -41,5 +42,24 @@ describe("signup email uniqueness", () => {
     assert.equal(escapeIlikeExact("danewarnick+pi1@gmail.com"), "danewarnick+pi1@gmail.com");
     assert.equal(escapeIlikeExact("foo_bar@agency.com"), "foo\\_bar@agency.com");
     assert.equal(escapeIlikeExact("100%@agency.com"), "100\\%@agency.com");
+  });
+
+  it("matches an exact mailbox in a GoTrue admin users payload", () => {
+    assert.equal(
+      authAdminUsersHasExactEmail(
+        { users: [{ email: "DaneWarnick+PI1@gmail.com" }] },
+        "danewarnick+pi1@gmail.com",
+      ),
+      true,
+    );
+    assert.equal(
+      authAdminUsersHasExactEmail(
+        { users: [{ email: "danewarnick@gmail.com" }] },
+        "danewarnick+pi1@gmail.com",
+      ),
+      false,
+    );
+    assert.equal(authAdminUsersHasExactEmail({ users: [] }, "danewarnick+pi1@gmail.com"), false);
+    assert.equal(authAdminUsersHasExactEmail({}, "danewarnick+pi1@gmail.com"), false);
   });
 });

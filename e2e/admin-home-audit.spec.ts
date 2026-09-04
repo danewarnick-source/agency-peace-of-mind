@@ -84,6 +84,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
     await expect(page.getByText(/EVV documentation rate/i)).toHaveCount(0);
     await assertNoCrash(page, "admin home");
+    await page.setViewportSize({ width: 1280, height: 1400 });
     await shot(page, "admin-home");
   });
 
@@ -297,6 +298,7 @@ test.describe("Admin Home first-login checklist", () => {
     await expect(page.getByText(/Hi Dana, I'm NECTAR/i)).toHaveCount(0);
     await expect(page.getByText(/Upload your authoritative sources/i)).toHaveCount(0);
     await assertNoCrash(page, "first-login home");
+    await page.setViewportSize({ width: 1280, height: 1400 });
     await shot(page, "admin-home-first-login");
 
     await page.getByRole("link", { name: /Add staff/i }).click();

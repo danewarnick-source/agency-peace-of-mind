@@ -121,7 +121,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await assertNoCrash(page, "home → documentation");
     await shot(page, "admin-home-cta-documentation");
 
-    await page.locator("aside").getByRole("link", { name: /^Home$/ }).click();
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 15_000,

@@ -49,6 +49,8 @@ import {
   type TrainingClassType,
 } from "@/lib/training-class";
 import { countPayingOrgs } from "@/lib/hive-pricing.functions";
+import { resolveCurrentMembership } from "@/lib/current-org";
+import type { Role } from "@/lib/rbac";
 import { highWaterClientCount } from "@/lib/pi-list-billing.server";
 import {
   clampClientCount,
@@ -384,16 +386,33 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
 
     const { data: memberships } = await context.supabase
       .from("organization_members")
-      .select("organization_id, role")
+      .select("organization_id, role, organizations(name, is_demo, display_acronym)")
       .eq("user_id", context.userId)
       .eq("active", true);
-    const ms = memberships ?? [];
+    const ms = (memberships ?? []) as Array<{
+      organization_id: string;
+      role: string;
+      organizations?: {
+        name?: string | null;
+        is_demo?: boolean | null;
+        display_acronym?: string | null;
+      } | null;
+    }>;
     if (ms.length === 0) return empty;
 
-    const orgId =
-      (data.organizationId && ms.some((m) => m.organization_id === data.organizationId)
+    const picks = ms.map((m) => ({
+      organization_id: m.organization_id,
+      is_demo: m.organizations?.is_demo === true,
+      role: m.role as Role,
+      display_acronym: m.organizations?.display_acronym ?? null,
+      organization_name: m.organizations?.name ?? null,
+    }));
+    const requested =
+      data.organizationId && ms.some((m) => m.organization_id === data.organizationId)
         ? data.organizationId
-        : null) ?? ms[0].organization_id;
+        : null;
+    const orgId =
+      requested ?? resolveCurrentMembership(picks, null)?.organization_id ?? ms[0].organization_id;
 
     const org = await loadOrgRow(orgId, context.supabase);
     const exempt = orgIsComped(org);

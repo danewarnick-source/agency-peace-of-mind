@@ -20,6 +20,13 @@ import {
   readStoredPortalView,
   resolvePostLoginLanding,
 } from "@/lib/portal-view-landing";
+import {
+  persistActiveOrgId,
+  readStoredActiveOrgId,
+  resolveCurrentMembership,
+  type MembershipPick,
+} from "@/lib/current-org";
+import type { Role } from "@/lib/rbac";
 import { toast } from "sonner";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { shouldSkipLoginAutoRedirect } from "@/lib/cognito-login-gate";
@@ -34,6 +41,30 @@ export const Route = createFileRoute("/login")({
     isSafeNext(s.next) ? { next: s.next as string } : {},
   component: LoginPage,
 });
+
+function persistPreferredOrgFromRows(
+  rows: Array<{
+    organization_id?: string;
+    role?: string;
+    organizations?: {
+      name?: string | null;
+      is_demo?: boolean | null;
+      display_acronym?: string | null;
+    } | null;
+  }>,
+): void {
+  const picks: MembershipPick[] = rows
+    .filter((m) => typeof m.organization_id === "string" && m.organization_id)
+    .map((m) => ({
+      organization_id: m.organization_id as string,
+      is_demo: m.organizations?.is_demo === true,
+      role: (m.role ?? "employee") as Role,
+      display_acronym: m.organizations?.display_acronym ?? null,
+      organization_name: m.organizations?.name ?? null,
+    }));
+  const preferred = resolveCurrentMembership(picks, readStoredActiveOrgId());
+  if (preferred) persistActiveOrgId(preferred.organization_id);
+}
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return (
@@ -100,7 +131,7 @@ function LoginPage() {
           if (!storedView || storedView === "hive_exec" || storedView === "state_preview") {
             const { data: memberships, error } = await supabase
               .from("organization_members")
-              .select("role")
+              .select("role, organization_id, organizations(name, is_demo, display_acronym)")
               .eq("user_id", session.user.id)
               .eq("active", true);
             if (error) {
@@ -108,6 +139,7 @@ function LoginPage() {
               isCompanyAdmin = true;
             } else {
               isCompanyAdmin = (memberships ?? []).some((m) => isCompanyAdminRole(m.role));
+              persistPreferredOrgFromRows(memberships ?? []);
             }
           }
           const landing = resolvePostLoginLanding({
@@ -125,10 +157,10 @@ function LoginPage() {
         try {
           const { data: memberships } = await supabase
             .from("organization_members")
-            .select("id")
+            .select("id, organization_id, role, organizations(name, is_demo, display_acronym)")
             .eq("user_id", session.user.id)
-            .eq("active", true)
-            .limit(1);
+            .eq("active", true);
+          persistPreferredOrgFromRows(memberships ?? []);
           if (!memberships?.length) {
             const home = await trainingHomeFn();
             if (home?.hasThirtyDay) target = "/training/course";

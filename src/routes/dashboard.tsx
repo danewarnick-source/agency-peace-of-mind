@@ -98,6 +98,7 @@ import { HiveMark } from "@/components/brand/hive-mark";
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
 import { parseCheckoutReturnSearch } from "@/lib/billing-access";
+import { persistActiveOrgId } from "@/lib/current-org";
 import { confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
@@ -163,11 +164,7 @@ export const Route = createFileRoute("/dashboard")({
           data: { sessionId: returned.session_id },
         }).catch(() => null);
         if (confirmed?.organizationId) {
-          try {
-            window.localStorage.setItem("hive.activeOrgId", confirmed.organizationId);
-          } catch {
-            /* ignore */
-          }
+          persistActiveOrgId(confirmed.organizationId);
         }
       }
 
@@ -221,10 +218,11 @@ export const Route = createFileRoute("/dashboard")({
         /* ignore */
       }
 
-      const { locked, isAdmin } = await orgDashboardIsLocked({
+      const { locked, isAdmin, orgId } = await orgDashboardIsLocked({
         userId: session.user.id,
         activeOrgId,
       });
+      if (orgId && orgId !== activeOrgId) persistActiveOrgId(orgId);
       if (!locked) return;
       if (pathBypassesBillingLock(location.pathname, isAdmin)) return;
       throw redirect({
@@ -421,8 +419,10 @@ function DashboardLayout() {
       /* ignore */
     }
     orgDashboardIsLocked({ userId: uid, activeOrgId })
-      .then(({ locked, isAdmin }) => {
-        if (cancelled || !locked) return;
+      .then(({ locked, isAdmin, orgId }) => {
+        if (cancelled) return;
+        if (orgId && orgId !== activeOrgId) persistActiveOrgId(orgId);
+        if (!locked) return;
         if (pathBypassesBillingLock(pathname, isAdmin)) return;
         navigate({
           to: "/billing-locked",

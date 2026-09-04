@@ -16,7 +16,7 @@ describe("isAdminHomePath", () => {
 });
 
 describe("layoutQueriesMayRun", () => {
-  it("runs immediately off Admin Home", () => {
+  it("runs immediately, including on Admin Home", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: false,
@@ -26,9 +26,6 @@ describe("layoutQueriesMayRun", () => {
       }),
       true,
     );
-  });
-
-  it("waits on Admin Home until both home queries settle", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
@@ -36,44 +33,14 @@ describe("layoutQueriesMayRun", () => {
         clientsStatus: undefined,
         gaveUp: false,
       }),
-      false,
-    );
-    assert.equal(
-      layoutQueriesMayRun({
-        onAdminHome: true,
-        instancesStatus: "success",
-        clientsStatus: undefined,
-        gaveUp: false,
-      }),
-      false,
-    );
-    assert.equal(
-      layoutQueriesMayRun({
-        onAdminHome: true,
-        instancesStatus: "success",
-        clientsStatus: "success",
-        gaveUp: false,
-      }),
       true,
     );
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: "error",
-        clientsStatus: "success",
+        instancesStatus: "pending",
+        clientsStatus: "pending",
         gaveUp: false,
-      }),
-      true,
-    );
-  });
-
-  it("gives up if Admin Home never starts its queries", () => {
-    assert.equal(
-      layoutQueriesMayRun({
-        onAdminHome: true,
-        instancesStatus: undefined,
-        clientsStatus: undefined,
-        gaveUp: true,
       }),
       true,
     );

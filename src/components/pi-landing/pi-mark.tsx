@@ -3,8 +3,9 @@ import { cn } from "@/lib/utils";
 import { PI_PRODUCT_NAME, PI_PRODUCT_SHORT, PI_WORDMARK } from "@/lib/pi-landing";
 
 /**
- * Cream straight-bar π. Left leg shorter than the right.
- * Not a squiggly mathematical pi. Not gold. Not a honeycomb.
+ * Cream straight-bar π. Equal-length verticals and a flat top bar
+ * that extends slightly past both legs. Not a squiggly mathematical pi.
+ * Not a honeycomb. Never pair this mark with a NECTAR wordmark in chrome.
  */
 export function PiMark({
   className,
@@ -23,7 +24,7 @@ export function PiMark({
     >
       {title ? <title>{title}</title> : null}
       <path d="M6 10H42" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square" />
-      <path d="M15 10V28" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square" />
+      <path d="M15 10V40" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square" />
       <path d="M33 10V40" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square" />
     </svg>
   );

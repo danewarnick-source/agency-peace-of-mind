@@ -15,24 +15,16 @@ export function isAdminHomePath(pathname: string): boolean {
 }
 
 /**
- * Layout obligation fan-out (action-required queue + deadlines/bell) may run
- * unless we are on Admin Home and those two home queries have not settled yet.
- * `gaveUp` covers the case where Admin Home never mounts.
+ * Feeling-hero B Home has no obligation queries. Layout fan-out
+ * (action-required queue + deadlines/bell) may run immediately.
  */
-export function layoutQueriesMayRun(args: {
+export function layoutQueriesMayRun(_args: {
   onAdminHome: boolean;
   instancesStatus: string | undefined;
   clientsStatus: string | undefined;
   gaveUp: boolean;
 }): boolean {
-  if (!args.onAdminHome) return true;
-  if (args.gaveUp) return true;
-  return (
-    args.instancesStatus != null &&
-    args.instancesStatus !== "pending" &&
-    args.clientsStatus != null &&
-    args.clientsStatus !== "pending"
-  );
+  return true;
 }
 
 export function adminHomeQueriesStarted(

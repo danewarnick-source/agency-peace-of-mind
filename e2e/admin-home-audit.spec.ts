@@ -64,87 +64,66 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await installHiveMocks(page, { role: "admin" });
   });
 
-  test("Admin Home loads obligation cards and True North org", async ({ page }) => {
+  test("Admin Home is feeling-hero B — dusk copy, cards, no Nectar dump", async ({ page }) => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 25_000,
     });
-    await expect(page.getByText(/True North Supports/i).first()).toBeVisible();
-    await expect(page.getByText(/Staff with overdue/i)).toBeVisible();
-    await expect(page.getByText(/Active clients/i).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Staff status/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Due soon/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
+    await expect(page.getByText(/WELCOME TO YOUR HOME BASE/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: /See today's board/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Staff ready/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Clients covered/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Notes done/i })).toBeVisible();
+    await expect(page.getByText(/You.re all set/i)).toBeVisible();
+    await expect(page.getByText(/upload authoritative/i)).toHaveCount(0);
+    await expect(page.getByText(/Staff with overdue/i)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: "Provider Interface" })).toBeVisible();
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
-    await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
-    await expect(page.getByText(/EVV documentation rate/i)).toHaveCount(0);
     await assertNoCrash(page, "admin home");
-    await shot(page, "admin-home");
+    await shot(page, "admin-home-feeling-b");
   });
 
-  test("Admin Home navigates to obligations, compliance desk, schedule, clients, staff", async ({
+  test("Admin Home CTAs open schedule, employees, clients, documentation", async ({
     page,
   }) => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 25_000,
     });
 
-    const nav = page.locator("aside");
-    await nav.getByRole("link", { name: /Compliance/ }).click();
-    await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
-      timeout: 15_000,
-    });
-    await assertNoCrash(page, "nav → compliance");
+    await page.getByRole("link", { name: /See today's board/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/scheduler/, { timeout: 15_000 });
+    await assertNoCrash(page, "home → schedule");
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("link", { name: /View all/i }).first()).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 20_000,
     });
-    await page.getByRole("link", { name: /View all/i }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
-      timeout: 15_000,
-    });
-    await assertNoCrash(page, "home → company obligations");
-    await shot(page, "company-obligations-from-home");
+    await page.getByRole("link", { name: /Staff ready/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/hub\/employees/, { timeout: 15_000 });
+    await assertNoCrash(page, "home → add employee");
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 20_000,
     });
-    const scheduler = page.locator("aside").getByRole("link", { name: /Scheduler/ });
-    const schedulerLocked = page.locator("aside").getByRole("button", { name: /Scheduler/ });
-    if (await scheduler.isVisible().catch(() => false)) {
-      await scheduler.click();
-      await expect(page).toHaveURL(/\/dashboard\/scheduler/, { timeout: 15_000 });
-    } else {
-      await expect(schedulerLocked).toBeVisible();
-    }
-    await assertNoCrash(page, "nav → scheduler");
+    await page.getByRole("link", { name: /Clients covered/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/hub\/clients/, { timeout: 15_000 });
+    await assertNoCrash(page, "home → add client");
 
-    const clients = page.locator("aside").getByRole("link", { name: /^Clients/ });
-    if (await clients.isVisible().catch(() => false)) {
-      await clients.click();
-      await expect(page).toHaveURL(/\/dashboard\/hub\/clients/, { timeout: 15_000 });
-    } else {
-      await expect(page.locator("aside").getByRole("button", { name: /Clients/ })).toBeVisible();
-    }
-    await assertNoCrash(page, "nav → clients");
-
-    const employees = page.locator("aside").getByRole("link", { name: /^Employees/ });
-    if (await employees.isVisible().catch(() => false)) {
-      await employees.click();
-      await expect(page).toHaveURL(/\/dashboard\/hub\/employees/, { timeout: 15_000 });
-    } else {
-      await expect(page.locator("aside").getByRole("button", { name: /Employees/ })).toBeVisible();
-    }
-    await assertNoCrash(page, "nav → employees");
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("link", { name: /Notes done/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/hub\/documentation/, { timeout: 15_000 });
+    await assertNoCrash(page, "home → documentation");
+    await shot(page, "admin-home-cta-documentation");
 
     await page.locator("aside").getByRole("link", { name: /^Home$/ }).click();
     await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 15_000 });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -272,7 +251,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
   test("/admin entry sends True North admin to Admin Home", async ({ page }) => {
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
-    await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toBeVisible({
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
       timeout: 20_000,
     });
     await assertNoCrash(page, "/admin entry");
@@ -287,6 +266,7 @@ test.describe("Permission wall — DSP vs admin", () => {
       timeout: 25_000,
     });
     await expect(page.getByRole("banner").getByRole("heading", { name: /My Caseload/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Compliance$/ })).toHaveCount(0);
     await shot(page, "dsp-home");

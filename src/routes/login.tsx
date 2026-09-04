@@ -20,9 +20,22 @@ import {
   readStoredPortalView,
   resolvePostLoginLanding,
 } from "@/lib/portal-view-landing";
+import {
+  persistActiveOrgId,
+  readStoredActiveOrgId,
+  resolveCurrentMembership,
+  type MembershipPick,
+} from "@/lib/current-org";
+import type { Role } from "@/lib/rbac";
 import { toast } from "sonner";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { shouldSkipLoginAutoRedirect } from "@/lib/cognito-login-gate";
+import {
+  clearExplicitSignOut,
+  completeClientSignOut,
+  hasExplicitSignOut,
+} from "@/lib/client-sign-out";
+import { applyRememberMeOnSuccess, readRememberedLoginEmail } from "@/lib/remember-login";
 
 function isSafeNext(v: unknown): v is string {
   return typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
@@ -34,6 +47,30 @@ export const Route = createFileRoute("/login")({
     isSafeNext(s.next) ? { next: s.next as string } : {},
   component: LoginPage,
 });
+
+function persistPreferredOrgFromRows(
+  rows: Array<{
+    organization_id?: string;
+    role?: string;
+    organizations?: {
+      name?: string | null;
+      is_demo?: boolean | null;
+      display_acronym?: string | null;
+    } | null;
+  }>,
+): void {
+  const picks: MembershipPick[] = rows
+    .filter((m) => typeof m.organization_id === "string" && m.organization_id)
+    .map((m) => ({
+      organization_id: m.organization_id as string,
+      is_demo: m.organizations?.is_demo === true,
+      role: (m.role ?? "employee") as Role,
+      display_acronym: m.organizations?.display_acronym ?? null,
+      organization_name: m.organizations?.name ?? null,
+    }));
+  const preferred = resolveCurrentMembership(picks, readStoredActiveOrgId());
+  if (preferred) persistActiveOrgId(preferred.organization_id);
+}
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return (
@@ -50,6 +87,8 @@ function LoginPage() {
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
   const trainingHomeFn = useServerFn(trainingOnlyHomeForMeFn);
@@ -57,6 +96,16 @@ function LoginPage() {
   const nextPath = search.next;
   const hadSessionOnArrival = useRef<boolean | null>(null);
   const [justSignedIn, setJustSignedIn] = useState(false);
+
+  useEffect(() => {
+    const stored = readRememberedLoginEmail();
+    if (stored) {
+      setIdentifier(stored);
+      setRememberMe(true);
+    }
+    if (!hasExplicitSignOut()) return;
+    void completeClientSignOut(() => supabase.auth.signOut());
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -75,6 +124,7 @@ function LoginPage() {
         isCognito: isCognitoAuth(),
         hadSessionOnArrival: !!hadSessionOnArrival.current,
         justSignedIn,
+        explicitSignOut: hasExplicitSignOut(),
       })
     ) {
       return;
@@ -100,7 +150,7 @@ function LoginPage() {
           if (!storedView || storedView === "hive_exec" || storedView === "state_preview") {
             const { data: memberships, error } = await supabase
               .from("organization_members")
-              .select("role")
+              .select("role, organization_id, organizations(name, is_demo, display_acronym)")
               .eq("user_id", session.user.id)
               .eq("active", true);
             if (error) {
@@ -108,6 +158,7 @@ function LoginPage() {
               isCompanyAdmin = true;
             } else {
               isCompanyAdmin = (memberships ?? []).some((m) => isCompanyAdminRole(m.role));
+              persistPreferredOrgFromRows(memberships ?? []);
             }
           }
           const landing = resolvePostLoginLanding({
@@ -125,10 +176,10 @@ function LoginPage() {
         try {
           const { data: memberships } = await supabase
             .from("organization_members")
-            .select("id")
+            .select("id, organization_id, role, organizations(name, is_demo, display_acronym)")
             .eq("user_id", session.user.id)
-            .eq("active", true)
-            .limit(1);
+            .eq("active", true);
+          persistPreferredOrgFromRows(memberships ?? []);
           if (!memberships?.length) {
             const home = await trainingHomeFn();
             if (home?.hasThirtyDay) target = "/training/course";
@@ -147,11 +198,11 @@ function LoginPage() {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const identifier = String(fd.get("identifier")).trim();
+    const submittedId = String(fd.get("identifier")).trim();
     const password = String(fd.get("password"));
     setBusy(true);
 
-    const result = await completePasswordSignIn(identifier, password, {
+    const result = await completePasswordSignIn(submittedId, password, {
       signInWithEmail: async (email, pw) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
         return {
@@ -175,7 +226,7 @@ function LoginPage() {
         return (prof as any)?.account_status as string | undefined;
       },
       signOut: async () => {
-        await supabase.auth.signOut();
+        await completeClientSignOut(() => supabase.auth.signOut());
       },
     });
     if (!result.ok) {
@@ -183,6 +234,8 @@ function LoginPage() {
       return toast.error(result.message || GENERIC_LOGIN_ERROR);
     }
 
+    applyRememberMeOnSuccess(rememberMe, submittedId);
+    clearExplicitSignOut();
     setJustSignedIn(true);
     setBusy(false);
     toast.success("Signed in");
@@ -228,6 +281,8 @@ function LoginPage() {
                 inputMode="email"
                 required
                 placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className={fieldClass}
               />
             </div>
@@ -261,6 +316,22 @@ function LoginPage() {
                 Forgot password?
               </Link>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-[#f3efe6]/70">
+              <input
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                data-testid="remember-me"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-[#0b1220]"
+              />
+              Remember me
+            </label>
+            <p className="text-xs text-[#f3efe6]/45">
+              Saves your email on this device. You still click Sign in.
+            </p>
 
             <Button
               type="submit"

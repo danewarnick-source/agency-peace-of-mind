@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, LogOut, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { useAuth } from "@/hooks/use-auth";
 import { getAuditorContext, type AuditorContext } from "@/lib/audit-portal.functions";
 import { toast } from "sonner";
@@ -74,7 +75,7 @@ export function AuditPortalShell({ children }: Props) {
             </div>
             <button
               onClick={async () => {
-                await supabase.auth.signOut();
+                await completeClientSignOut(() => supabase.auth.signOut());
                 window.location.href = "/audit-portal";
               }}
               className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -112,7 +113,7 @@ function AuditorLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sign-in failed";
       setError(msg);
-      await supabase.auth.signOut().catch(() => {});
+      await completeClientSignOut(() => supabase.auth.signOut(), { markSignedOut: false }).catch(() => {});
     } finally {
       setSubmitting(false);
     }

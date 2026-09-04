@@ -136,6 +136,15 @@ describe("Cognito leftover session must not skip the login form", () => {
       }),
       false,
     );
+    assert.equal(
+      shouldSkipLoginAutoRedirect({
+        isCognito: false,
+        hadSessionOnArrival: true,
+        justSignedIn: false,
+        explicitSignOut: true,
+      }),
+      true,
+    );
     assert.equal(isAwsBootstrapFailure({ status: 500, error: { message: "HTTPError" } }), true);
     assert.equal(isAwsBootstrapFailure({ status: 200, error: null }), false);
   });

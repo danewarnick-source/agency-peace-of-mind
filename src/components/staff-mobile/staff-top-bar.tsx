@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { PortalViewSwitcher } from "@/components/portal-view-switcher";
 import { supabase } from "@/integrations/supabase/client";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -37,9 +38,9 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     role === "manager";
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await completeClientSignOut(() => supabase.auth.signOut());
     toast.success("Signed out");
-    navigate({ to: "/" });
+    navigate({ to: "/login" });
   };
 
   const displayName =

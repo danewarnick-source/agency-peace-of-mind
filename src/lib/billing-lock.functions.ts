@@ -12,7 +12,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isBillingExempt, orgAccessIsLocked } from "@/lib/billing-access";
+import {
+  isComplimentaryMembership,
+  pickUnlockedMembership,
+  type MembershipPick,
+} from "@/lib/current-org";
 import { readSupabaseAdminEnv } from "@/lib/supabase-public-env";
+import type { Role } from "@/lib/rbac";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -103,18 +109,117 @@ export const getBillingLockFn = createServerFn({ method: "POST" })
 
     const { data: memberships } = await context.supabase
       .from("organization_members")
-      .select("organization_id, role")
+      .select("organization_id, role, organizations(name, is_demo, display_acronym)")
       .eq("user_id", context.userId)
       .eq("active", true);
-    const ms = (memberships ?? []) as Array<{ organization_id: string; role: string }>;
+    const ms = (memberships ?? []) as Array<{
+      organization_id: string;
+      role: string;
+      organizations?: {
+        name?: string | null;
+        is_demo?: boolean | null;
+        display_acronym?: string | null;
+      } | null;
+    }>;
     if (ms.length === 0) return empty;
 
-    const orgId =
-      (data.organizationId && ms.some((m) => m.organization_id === data.organizationId)
-        ? data.organizationId
-        : null) ?? ms[0].organization_id;
+    const picks: MembershipPick[] = ms.map((m) => ({
+      organization_id: m.organization_id,
+      is_demo: m.organizations?.is_demo === true,
+      role: m.role as Role,
+      display_acronym: m.organizations?.display_acronym ?? null,
+      organization_name: m.organizations?.name ?? null,
+    }));
+
+    const lockById = new Map<string, boolean>();
+    for (const p of picks) {
+      if (isComplimentaryMembership(p)) lockById.set(p.organization_id, false);
+    }
+    const needIds = picks.filter((p) => !lockById.has(p.organization_id)).map((p) => p.organization_id);
+    if (needIds.length) {
+      const orgById = new Map<string, LockOrgRow>();
+      const subById = new Map<string, LockSubRow>();
+      const { data: orgRows } = await context.supabase
+        .from("organizations")
+        .select("id, name, legal_name, dba_name, billing_exempt")
+        .in("id", needIds);
+      for (const row of (orgRows ?? []) as Array<{
+        id: string;
+        name: string | null;
+        legal_name: string | null;
+        dba_name: string | null;
+        billing_exempt?: boolean;
+      }>) {
+        orgById.set(row.id, {
+          name: row.name,
+          legalName: row.legal_name,
+          dbaName: row.dba_name,
+          billingExempt: row.billing_exempt === true,
+        });
+      }
+      const { data: subRows } = await context.supabase
+        .from("org_subscriptions")
+        .select("organization_id, status, locked_at, stripe_subscription_id")
+        .in("organization_id", needIds);
+      for (const row of (subRows ?? []) as Array<{
+        organization_id: string;
+        status: string | null;
+        locked_at: string | null;
+        stripe_subscription_id?: string | null;
+      }>) {
+        subById.set(row.organization_id, {
+          status: row.status,
+          locked_at: row.locked_at,
+          stripe_subscription_id: row.stripe_subscription_id ?? null,
+        });
+      }
+      if (readSupabaseAdminEnv()) {
+        const missingOrg = needIds.filter((id) => !orgById.has(id));
+        const missingSub = needIds.filter((id) => !subById.has(id));
+        if (missingOrg.length || missingSub.length) {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            for (const id of missingOrg) {
+              const org = await readLockOrg(supabaseAdmin, id);
+              if (org) orgById.set(id, org);
+            }
+            for (const id of missingSub) {
+              const sub = await readLockSub(supabaseAdmin, id);
+              if (sub) subById.set(id, sub);
+            }
+          } catch {
+            /* preview often has VITE_ keys only */
+          }
+        }
+      }
+      for (const p of picks) {
+        if (lockById.has(p.organization_id)) continue;
+        const orgRow = orgById.get(p.organization_id);
+        const subRow = subById.get(p.organization_id) ?? null;
+        lockById.set(
+          p.organization_id,
+          orgAccessIsLocked({
+            billingExempt: orgRow?.billingExempt ?? false,
+            orgName: orgRow?.name ?? p.organization_name,
+            legalName: orgRow?.legalName,
+            dbaName: orgRow?.dbaName,
+            organizationId: p.organization_id,
+            displayAcronym: p.display_acronym,
+            subscription: subRow,
+          }),
+        );
+      }
+    }
+
+    const chosen = pickUnlockedMembership(
+      picks,
+      (m) => lockById.get(m.organization_id) ?? true,
+      data.organizationId,
+    );
+    const orgId = chosen?.organization_id ?? picks[0]?.organization_id ?? "";
+    if (!orgId) return empty;
     const membership = ms.find((m) => m.organization_id === orgId) ?? ms[0];
-    const isAdmin = membership.role === "admin";
+    const isAdmin = membership?.role === "admin";
 
     let org = await readLockOrg(context.supabase, orgId);
     let sub = await readLockSub(context.supabase, orgId);

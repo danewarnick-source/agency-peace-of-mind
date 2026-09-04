@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // switch — otherwise a stale `hive_exec` view from the previous
       // session races the fresh executive check on next login and the
       // dashboard shell flips between /dashboard and /dashboard/hive-exec
-      // repeatedly. Non-routing prefs (active org, etc.) are left intact.
+      // repeatedly. Last-org prefs are cleared by completeClientSignOut.
       try {
         window.localStorage.removeItem("portal-view");
         window.localStorage.removeItem("portal-view-state-code");

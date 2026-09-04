@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { authRedirectUrl } from "@/lib/auth-redirect";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -82,7 +83,7 @@ function AuditorPortal() {
                 size="sm"
                 variant="ghost"
                 onClick={async () => {
-                  await supabase.auth.signOut();
+                  await completeClientSignOut(() => supabase.auth.signOut());
                   navigate({ to: "/auditor", search: {} });
                 }}
               >

@@ -3,7 +3,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { ROLE_RANK, type Role } from "@/lib/rbac";
-import { resolveCurrentMembership } from "@/lib/current-org";
+import {
+  ACTIVE_ORG_STORAGE_KEY,
+  persistActiveOrgId,
+  readStoredActiveOrgId,
+  resolveCurrentMembership,
+} from "@/lib/current-org";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { isAwsBootstrapFailure } from "@/lib/cognito-login-gate";
 
@@ -21,25 +26,12 @@ export interface CurrentMembership {
   is_demo: boolean;
 }
 
-const ACTIVE_ORG_KEY = "hive.activeOrgId";
-
 function readActiveOrgId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(ACTIVE_ORG_KEY);
-  } catch {
-    return null;
-  }
+  return readStoredActiveOrgId();
 }
 
 function writeActiveOrgId(orgId: string | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (orgId) window.localStorage.setItem(ACTIVE_ORG_KEY, orgId);
-    else window.localStorage.removeItem(ACTIVE_ORG_KEY);
-  } catch {
-    /* ignore */
-  }
+  persistActiveOrgId(orgId);
 }
 
 async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
@@ -124,8 +116,9 @@ export function useMyMemberships() {
 /**
  * Returns the active membership for the signed-in user. Resolution is
  * deterministic:
- *   1. persisted activeOrgId (localStorage), if it still maps to an active membership
- *   2. otherwise a stable non-demo-preferred default (see resolveCurrentMembership)
+ *   1. persisted activeOrgId (localStorage), if it still maps to an active
+ *      membership and is not a leftover test-signup org when True North exists
+ *   2. otherwise complimentary / True North first (see resolveCurrentMembership)
  * A demo org is NEVER selected as an accidental load-time fallback, which
  * kills the demo-banner race on multi-org users.
  *
@@ -145,7 +138,7 @@ export function useCurrentOrg() {
     if (typeof window === "undefined") return;
     setActiveOrgIdState(readActiveOrgId());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === ACTIVE_ORG_KEY) {
+      if (e.key === ACTIVE_ORG_STORAGE_KEY) {
         setActiveOrgIdState(e.newValue);
         void qc.invalidateQueries({ queryKey: ["current-org", user?.id] });
       }
@@ -160,7 +153,12 @@ export function useCurrentOrg() {
     queryFn: async (): Promise<CurrentMembership | null> => {
       const memberships = await fetchMemberships(user!.id);
       // Read storage inside the query so a blank first paint still picks TNS.
-      return resolveCurrentMembership(memberships, readActiveOrgId());
+      // Rewrite leftover test-signup ids so the lock gate cannot re-select them.
+      const picked = resolveCurrentMembership(memberships, readActiveOrgId());
+      if (picked && picked.organization_id !== readActiveOrgId()) {
+        writeActiveOrgId(picked.organization_id);
+      }
+      return picked;
     },
   });
 

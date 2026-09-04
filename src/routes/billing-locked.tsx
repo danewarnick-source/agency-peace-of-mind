@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Loader2, Mail } from "lucide-react";
+import { Building2, CreditCard, Loader2, LogOut, Mail } from "lucide-react";
 import { PiMark } from "@/components/pi-landing/pi-mark";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,17 @@ import {
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
 import { parseCheckoutReturnSearch } from "@/lib/billing-access";
+import {
+  isComplimentaryMembership,
+  persistActiveOrgId,
+  pickUnlockedMembership,
+  readStoredActiveOrgId,
+  type MembershipPick,
+} from "@/lib/current-org";
 import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
+import type { Role } from "@/lib/rbac";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
@@ -39,6 +48,7 @@ function BillingLockedPage() {
     paymentsMessage: string | null;
     lockReason: string | null;
     confirmError: string | null;
+    workspaces: Array<{ organization_id: string; organization_name: string }>;
   }>({
     loading: true,
     authed: false,
@@ -50,6 +60,7 @@ function BillingLockedPage() {
     paymentsMessage: null,
     lockReason: null,
     confirmError: null,
+    workspaces: [],
   });
 
   useEffect(() => {
@@ -62,12 +73,7 @@ function BillingLockedPage() {
       }
 
       const returned = parseCheckoutReturnSearch(window.location.search);
-      let activeOrgId: string | undefined;
-      try {
-        activeOrgId = window.localStorage.getItem("hive.activeOrgId") ?? undefined;
-      } catch {
-        activeOrgId = undefined;
-      }
+      let activeOrgId: string | undefined = readStoredActiveOrgId() ?? undefined;
 
       // Confirm the Stripe session BEFORE reading lock state. A prior bounce
       // from /dashboard used to drop session_id; when it is present, fulfill
@@ -77,11 +83,7 @@ function BillingLockedPage() {
         const r = await confirmFn({ data: { sessionId: returned.session_id } }).catch(() => null);
         if (r?.organizationId) {
           activeOrgId = r.organizationId;
-          try {
-            window.localStorage.setItem("hive.activeOrgId", r.organizationId);
-          } catch {
-            /* ignore */
-          }
+          persistActiveOrgId(r.organizationId);
         }
         if (r?.ok && !cancelled) {
           navigate({ to: "/dashboard", replace: true });
@@ -90,6 +92,38 @@ function BillingLockedPage() {
         if (r && !r.ok && r.error) {
           confirmError = r.error;
         }
+      }
+
+      const { data: memberships } = await supabase
+        .from("organization_members")
+        .select("organization_id, role, organizations(name, is_demo, display_acronym)")
+        .eq("user_id", session.user.id)
+        .eq("active", true);
+      const ms = (memberships ?? []) as Array<{
+        organization_id: string;
+        role: string;
+        organizations: { name: string | null; is_demo?: boolean | null; display_acronym?: string | null } | null;
+      }>;
+      if (ms.length === 0) {
+        if (!cancelled) navigate({ to: "/login" });
+        return;
+      }
+      const picks: MembershipPick[] = ms.map((row) => ({
+        organization_id: row.organization_id,
+        is_demo: row.organizations?.is_demo === true,
+        role: row.role as Role,
+        display_acronym: row.organizations?.display_acronym ?? null,
+        organization_name: row.organizations?.name ?? null,
+      }));
+      const unlocked = pickUnlockedMembership(
+        picks,
+        (row) => !isComplimentaryMembership(row),
+        activeOrgId,
+      );
+      if (unlocked && isComplimentaryMembership(unlocked) && !returned.session_id) {
+        persistActiveOrgId(unlocked.organization_id);
+        if (!cancelled) navigate({ to: "/dashboard", replace: true });
+        return;
       }
 
       const readStatus = async () =>
@@ -114,21 +148,15 @@ function BillingLockedPage() {
         }
       }
 
-      const { data: memberships } = await supabase
-        .from("organization_members")
-        .select("organization_id, role, organizations(name)")
-        .eq("user_id", session.user.id)
-        .eq("active", true);
-      const ms = (memberships ?? []) as Array<{
-        organization_id: string;
-        role: string;
-        organizations: { name: string } | null;
-      }>;
-      if (ms.length === 0) {
+      const m = ms.find((x) => x.organization_id === (status.organizationId ?? activeOrgId)) ?? ms[0];
+      if (!m) {
         if (!cancelled) navigate({ to: "/login" });
         return;
       }
-      const m = ms.find((x) => x.organization_id === (status.organizationId ?? activeOrgId)) ?? ms[0];
+      const workspaces = picks.map((row) => ({
+        organization_id: row.organization_id,
+        organization_name: row.organization_name || "Workspace",
+      }));
 
       if (cancelled) return;
       setStaffCount(status.staffCount || 4);
@@ -144,6 +172,7 @@ function BillingLockedPage() {
         paymentsMessage: status.paymentsMessage,
         lockReason: status.lockReason,
         confirmError,
+        workspaces,
       });
     })();
     return () => {
@@ -155,6 +184,16 @@ function BillingLockedPage() {
     () => quotePiListSubscription({ clientCount, interval: "monthly" }),
     [clientCount],
   );
+
+  const switchWorkspace = (orgId: string) => {
+    persistActiveOrgId(orgId);
+    window.location.assign("/dashboard");
+  };
+
+  const signOut = async () => {
+    await completeClientSignOut(() => supabase.auth.signOut());
+    navigate({ to: "/login", replace: true });
+  };
 
   const pay = async () => {
     if (!state.orgId) return;
@@ -280,6 +319,40 @@ function BillingLockedPage() {
             Please contact your agency administrator to restore access.
           </div>
         )}
+
+        {state.workspaces.length > 1 && (
+          <div className="mt-8 w-full space-y-2 text-left" data-testid="billing-lock-org-switcher">
+            <p className="text-xs uppercase tracking-wider text-white/50">Switch agency</p>
+            {state.workspaces.map((w) => {
+              const isCurrent = w.organization_id === state.orgId;
+              return (
+                <Button
+                  key={w.organization_id}
+                  type="button"
+                  variant="outline"
+                  disabled={isCurrent}
+                  onClick={() => switchWorkspace(w.organization_id)}
+                  className="w-full justify-start border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <Building2 className="mr-2 h-4 w-4 opacity-70" />
+                  <span className="truncate">{w.organization_name}</span>
+                  {isCurrent ? <span className="ml-auto text-xs text-white/50">Current</span> : null}
+                </Button>
+              );
+            })}
+          </div>
+        )}
+
+        <Button
+          type="button"
+          variant="ghost"
+          data-testid="billing-lock-sign-out"
+          onClick={() => void signOut()}
+          className="mt-6 w-full text-white/80 hover:text-white"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign out
+        </Button>
 
         <div className="mt-10 flex items-center gap-2 text-sm text-white/50">
           <Mail className="h-4 w-4" />

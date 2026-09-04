@@ -105,6 +105,17 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_FORBIDDEN_MARKETING.includes("Nectar" as never), false);
   });
 
+  it("keeps the laptop mock in document flow so it cannot cover the difference headline", () => {
+    const desk = read(new URL("../components/pi-landing/dusk-desk-still.tsx", import.meta.url));
+    const landing = read(new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url));
+    assert.match(desk, /DuskPeopleScreen/);
+    assert.doesNotMatch(desk, /absolute inset-x-0 top-\[10%\]/);
+    assert.doesNotMatch(desk, /h-\[min\(42vh,480px\)\]/);
+    assert.match(desk, /relative flex justify-center/);
+    assert.match(landing, /PI_DIFFERENCE_HEADLINE/);
+    assert.match(landing, /DuskDeskStill/);
+  });
+
   it("signup walk posts list price, optional training, and no True North placeholder", () => {
     const signup = read(new URL("../routes/signup.tsx", import.meta.url));
     assert.match(signup, /PI_SIGNUP_PRICE_LINE|PI_LIST_PRICE_DISPLAY/);

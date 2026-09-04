@@ -1,18 +1,24 @@
 import { DuskPeopleScreen } from "@/components/pi-landing/dusk-people-screen";
 
-/** Composed dusk room: photographic desk plate + laptop still. Not an app iframe. */
+/**
+ * Composed dusk room: photographic desk plate + laptop still. Not an app iframe.
+ *
+ * The laptop is in normal document flow so its height reserves space. The desk
+ * photo is a covering backdrop. Absolute-positioning the mock over a short
+ * photo used to let it overflow into the next section and cover the copy.
+ */
 export function DuskDeskStill() {
   return (
     <div className="relative mx-auto w-full max-w-[92rem]">
       <img
         src="/pi-dusk-desk-hero.png"
         alt=""
-        className="block h-[min(42vh,480px)] w-full object-cover object-[center_62%] sm:h-[min(48vh,560px)]"
+        className="absolute inset-0 h-full w-full object-cover object-[center_62%]"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b1220] via-[#0b1220]/15 to-[#0b1220]/70" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#0b1220] to-transparent" />
 
-      <div className="absolute inset-x-0 top-[10%] flex justify-center px-4 sm:top-[12%] sm:px-8">
+      <div className="relative flex justify-center px-4 pb-12 pt-8 sm:px-8 sm:pb-16 sm:pt-12">
         <div
           className="w-full max-w-[920px]"
           style={{

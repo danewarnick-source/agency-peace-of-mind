@@ -62,7 +62,7 @@ export function PiMarketingPage() {
             </div>
           </section>
 
-          <div className="pb-4">
+          <div className="pb-8 sm:pb-10">
             <DuskDeskStill />
           </div>
 

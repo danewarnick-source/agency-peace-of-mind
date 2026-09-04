@@ -46,6 +46,20 @@ describe("feeling-hero B Admin Home", () => {
     assert.match(index, /AdminHomeDashboard/);
   });
 
+  it("lets the shell main scroll — page must not clip at 100% height", () => {
+    const dash = read("../components/admin-home/admin-home-dashboard.tsx");
+    const index = read("../routes/dashboard.index.tsx");
+    const sectionOpen = dash.slice(
+      dash.indexOf('data-testid="admin-home-feeling-b"'),
+      dash.indexOf("<DuskMountainBackdrop"),
+    );
+    assert.match(sectionOpen, /className="relative isolate min-h-full"/);
+    assert.doesNotMatch(sectionOpen, /overflow-hidden/);
+    assert.doesNotMatch(sectionOpen, /["\s]h-full["\s]/);
+    assert.match(index, /showAdmin \? "min-h-full"/);
+    assert.doesNotMatch(index, /showAdmin \? "h-full min-h-full"/);
+  });
+
   it("puts a π-only mark in the sidebar and never a NECTAR wordmark there", () => {
     const shell = read("../routes/dashboard.tsx");
     const markSlot = shell.slice(

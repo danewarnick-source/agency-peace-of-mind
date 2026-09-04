@@ -68,7 +68,7 @@ export function AdminHomeDashboard() {
   return (
     <section
       data-testid="admin-home-feeling-b"
-      className="relative isolate h-full min-h-full overflow-hidden"
+      className="relative isolate min-h-full"
       style={{ background: ADMIN_HOME_DUSK, color: ADMIN_HOME_PALE_GOLD }}
     >
       <DuskMountainBackdrop />

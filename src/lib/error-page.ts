@@ -126,7 +126,7 @@ export function renderErrorPage(): string {
   <body>
     <main class="card" role="alert" aria-live="polite">
       <div class="band">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M6 10H42" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M15 10V28" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M33 10V40" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/></svg></span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M6 10H42" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M15 10V40" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/><path d="M33 10V40" stroke="#F3EFE6" stroke-width="2.2" stroke-linecap="square"/></svg></span>
         <span>Provider Interface preview</span>
         <small>Status: warming up</small>
       </div>

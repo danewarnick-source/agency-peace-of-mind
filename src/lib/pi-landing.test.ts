@@ -161,11 +161,12 @@ describe("Provider Interface marketing homepage", () => {
     }
   });
 
-  it("keeps the π mark geometric: straight bar, shorter left leg", () => {
+  it("keeps the π mark geometric: straight bar, equal verticals", () => {
     const mark = read(new URL("../components/pi-landing/pi-mark.tsx", import.meta.url));
     assert.match(mark, /M6 10H42/);
-    assert.match(mark, /M15 10V28/);
+    assert.match(mark, /M15 10V40/);
     assert.match(mark, /M33 10V40/);
+    assert.doesNotMatch(mark, /M15 10V28/);
     assert.doesNotMatch(mark, /polygon|hexagon|Hexagon/i);
   });
 });

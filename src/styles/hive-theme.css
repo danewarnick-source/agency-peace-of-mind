@@ -6,7 +6,7 @@
  * Product name on screen: Provider Interface (never Hive Certify)
  * AI agent name: Nectar (never Ask Hive, never Compass)
  * Do not print hivecertify.com on marketing or login.
- * Mark: straight-bar π, left leg shorter. Not a honeycomb.
+ * Mark: straight-bar π, equal verticals. Not a honeycomb.
  */
 
 :root {
@@ -168,7 +168,7 @@
     bottom: 6px;
     width: 2px;
     border-radius: 1px;
-    background: var(--hive-chrome-text);
+    background: #f3e5ab;
   }
 
   .hive-status-active {

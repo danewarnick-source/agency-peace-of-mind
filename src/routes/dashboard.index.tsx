@@ -18,7 +18,6 @@ import { StaffClientGrid } from "@/components/staff-client-grid";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
-import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
 import { staffClockOutSearch } from "@/lib/staff-clock-out";
 import { parseCheckoutReturnSearch } from "@/lib/billing-access";
@@ -264,7 +263,6 @@ function StaffCaseloadHome() {
 function Overview() {
   const { data: org } = useCurrentOrg();
   const { view, subView, hasStoredView } = usePortalView();
-  const { welcome } = Route.useSearch();
 
   const isManager =
     org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
@@ -276,13 +274,8 @@ function Overview() {
     isStatePreviewAdmin;
 
   return (
-    <div className="space-y-8">
-      {showAdmin && (
-        <>
-          <NectarOnboardingPanel welcomeFlag={!!welcome} />
-          <AdminHomeDashboard />
-        </>
-      )}
+    <div className={showAdmin ? "h-full min-h-full" : "space-y-8"}>
+      {showAdmin && <AdminHomeDashboard />}
 
       {!showAdmin && <StaffCaseloadHome />}
     </div>

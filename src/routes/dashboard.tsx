@@ -93,7 +93,7 @@ import {
   writeSessionHint,
 } from "@/lib/auth-session-boot";
 import { PortalViewSwitcher } from "@/components/portal-view-switcher";
-import { HiveMark, HiveWordmark } from "@/components/brand/hive-mark";
+import { HiveMark } from "@/components/brand/hive-mark";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -137,8 +137,14 @@ function DashboardShellError({ error }: { error: Error; reset: () => void }) {
   );
 }
 
+const NEWSREADER =
+  "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap";
+
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — Provider Interface" }] }),
+  head: () => ({
+    meta: [{ title: "Dashboard — Provider Interface" }],
+    links: [{ rel: "stylesheet", href: NEWSREADER }],
+  }),
   // Lockout gate — runs on every dashboard navigation. Paid+active orgs stay
   // in the app. Unpaid / missing org_subscriptions rows go to /billing-locked.
   // Admins keep access to the billing/subscription page so they can pay.
@@ -594,9 +600,7 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  // On Admin Home the queue/bell obligation bootstraps wait until the two
-  // home queries settle so they do not starve a phone radio. Other routes
-  // fetch immediately. Badge stays hidden while loading.
+  // Feeling-hero B Home has no obligation queries; layout fan-out runs now.
   const layoutReady = useYieldToAdminHomeQueries(
     org?.organization_id ?? null,
     isAdminCapable && isAdminHomePath(pathname),
@@ -739,6 +743,10 @@ function DashboardLayout() {
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ??
     "Dashboard";
+  const immersiveAdminHome =
+    isAdminHomePath(pathname) &&
+    ((isAdminCapable && effectiveView === "admin") ||
+      (effectiveView === "state_preview" && subView === "admin"));
   const inboxUnread = unreadQ.data?.count ?? 0;
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
@@ -802,6 +810,44 @@ function DashboardLayout() {
             </aside>
 
             <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+              {immersiveAdminHome ? (
+                <header
+                  className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0B1120] px-4 min-h-12 md:hidden"
+                  style={{
+                    paddingTop: "env(safe-area-inset-top)",
+                    paddingLeft: "max(1rem, env(safe-area-inset-left))",
+                    paddingRight: "max(1rem, env(safe-area-inset-right))",
+                  }}
+                >
+                  {!isStaffPhoneChrome && (
+                    <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                      <SheetTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 border border-white/15 bg-white/5 text-[#F3E5AB] hover:bg-white/10"
+                          aria-label="Open menu"
+                        >
+                          <Menu className="h-5 w-5" />
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent
+                        side="left"
+                        className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+                        onPointerDownOutside={preventSheetDismissForPortalViewMenu}
+                        onFocusOutside={preventSheetDismissForPortalViewMenu}
+                        onInteractOutside={preventSheetDismissForPortalViewMenu}
+                      >
+                        <SheetTitle className="sr-only">Navigation</SheetTitle>
+                        <div className="flex h-full flex-col">
+                          <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
+                  <span className="text-sm text-white/70">Home</span>
+                </header>
+              ) : (
               <header
                 className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hive-border)] bg-[var(--hive-canvas)] px-4 md:px-6 min-h-16"
                 style={{
@@ -903,9 +949,10 @@ function DashboardLayout() {
                   </Button>
                 </div>
               </header>
+              )}
               {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
-              {mobileSearchOpen && !isHiveExecView && !isStaffPhoneChrome && (
+              {mobileSearchOpen && !isHiveExecView && !isStaffPhoneChrome && !immersiveAdminHome && (
                 <div className="border-b border-[var(--hive-border)] bg-[var(--hive-sidebar)] px-4 py-2 md:hidden">
                   <NectarSearchBar
                     nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
@@ -920,7 +967,7 @@ function DashboardLayout() {
                 onOpenChange={setTaskCenterOpen}
                 surface={effectiveView === "staff" ? "staff" : "admin"}
               />
-              {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
+              {!isHiveExecView && !isStatePreview && !immersiveAdminHome && <DemoOrgBanner />}
 
               {isStatePreview && (
                 <div className="flex items-center justify-between gap-3 border-b border-[var(--hive-gold)]/30 bg-[var(--hive-gold)]/[0.08] px-4 py-2 text-xs md:px-6">
@@ -947,13 +994,15 @@ function DashboardLayout() {
                 </div>
               )}
 
-              {isAdminCapable && effectiveView === "admin" && org?.organization_id && (
+              {isAdminCapable && effectiveView === "admin" && org?.organization_id && !immersiveAdminHome && (
                 <BillingBanner organizationId={org.organization_id} isAdmin />
               )}
 
               <main
                 className={
-                  isMobilePreview
+                  immersiveAdminHome
+                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#0B1120] p-0"
+                    : isMobilePreview
                     ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)]"
                     : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)] px-4 py-6 md:px-8"
                 }
@@ -1110,7 +1159,9 @@ function SidebarBody({
   return (
     <>
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <HiveWordmark short markClassName="h-8 w-8" wordClassName="text-[13px]" tone="chrome" />
+        <Link to="/dashboard" className="inline-flex items-center" aria-label="Provider Interface">
+          <HiveMark className="h-8 w-8 text-[#F3E5AB]" title="Provider Interface" />
+        </Link>
       </div>
 
       {(isAdminCapable || isExecutive) && (

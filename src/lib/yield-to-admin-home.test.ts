@@ -20,20 +20,18 @@ describe("layoutQueriesMayRun", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: false,
-        instancesStatus: undefined,
-        clientsStatus: undefined,
+        setupStatus: undefined,
         gaveUp: false,
       }),
       true,
     );
   });
 
-  it("waits on Admin Home until both home queries settle", () => {
+  it("waits on Admin Home until the setup query settles", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: undefined,
-        clientsStatus: undefined,
+        setupStatus: undefined,
         gaveUp: false,
       }),
       false,
@@ -41,8 +39,7 @@ describe("layoutQueriesMayRun", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: "success",
-        clientsStatus: undefined,
+        setupStatus: "pending",
         gaveUp: false,
       }),
       false,
@@ -50,8 +47,7 @@ describe("layoutQueriesMayRun", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: "success",
-        clientsStatus: "success",
+        setupStatus: "success",
         gaveUp: false,
       }),
       true,
@@ -59,8 +55,7 @@ describe("layoutQueriesMayRun", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: "error",
-        clientsStatus: "success",
+        setupStatus: "error",
         gaveUp: false,
       }),
       true,
@@ -71,8 +66,7 @@ describe("layoutQueriesMayRun", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
-        instancesStatus: undefined,
-        clientsStatus: undefined,
+        setupStatus: undefined,
         gaveUp: true,
       }),
       true,
@@ -81,9 +75,9 @@ describe("layoutQueriesMayRun", () => {
 });
 
 describe("adminHomeQueriesStarted", () => {
-  it("is true once either query exists in cache", () => {
-    assert.equal(adminHomeQueriesStarted(undefined, undefined), false);
-    assert.equal(adminHomeQueriesStarted("pending", undefined), true);
-    assert.equal(adminHomeQueriesStarted(undefined, "pending"), true);
+  it("is true once the setup query exists in cache", () => {
+    assert.equal(adminHomeQueriesStarted(undefined), false);
+    assert.equal(adminHomeQueriesStarted("pending"), true);
+    assert.equal(adminHomeQueriesStarted("success"), true);
   });
 });

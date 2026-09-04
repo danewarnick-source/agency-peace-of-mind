@@ -594,8 +594,8 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  // On Admin Home the queue/bell obligation bootstraps wait until the two
-  // home queries settle so they do not starve a phone radio. Other routes
+  // On Admin Home the queue/bell obligation bootstraps wait until the
+  // setup query settles so they do not starve a phone radio. Other routes
   // fetch immediately. Badge stays hidden while loading.
   const layoutReady = useYieldToAdminHomeQueries(
     org?.organization_id ?? null,

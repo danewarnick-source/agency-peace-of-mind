@@ -1,20 +1,18 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ADMIN_HOME_CLIENTS_KEY,
-  ADMIN_HOME_INSTANCES_KEY,
-  adminHomeClientsQueryKey,
-  adminHomeInstancesQueryKey,
+  ADMIN_HOME_SETUP_KEY,
   adminHomeQueriesStarted,
+  adminHomeSetupQueryKey,
   layoutQueriesMayRun,
 } from "@/lib/yield-to-admin-home";
 
 const GIVE_UP_MS = 4_000;
 
 /**
- * On Admin Home, hold the layout's obligation fan-out until the two home
- * queries finish so they are not starved on a phone radio. Other routes
- * return true immediately. If Admin Home never starts its queries, give up
+ * On Admin Home, hold the layout's obligation fan-out until the setup
+ * query finishes so it is not starved on a phone radio. Other routes
+ * return true immediately. If Admin Home never starts its query, give up
  * after 4s so the sidebar badge and bell still load.
  */
 export function useYieldToAdminHomeQueries(
@@ -28,19 +26,16 @@ export function useYieldToAdminHomeQueries(
     if (!onAdminHome) return;
     return qc.getQueryCache().subscribe((event) => {
       const key0 = event.query.queryKey[0];
-      if (key0 === ADMIN_HOME_INSTANCES_KEY || key0 === ADMIN_HOME_CLIENTS_KEY) {
+      if (key0 === ADMIN_HOME_SETUP_KEY) {
         setTick((n) => n + 1);
       }
     });
   }, [qc, onAdminHome]);
 
-  const instancesStatus = orgId
-    ? qc.getQueryState(adminHomeInstancesQueryKey(orgId))?.status
+  const setupStatus = orgId
+    ? qc.getQueryState(adminHomeSetupQueryKey(orgId))?.status
     : undefined;
-  const clientsStatus = orgId
-    ? qc.getQueryState(adminHomeClientsQueryKey(orgId))?.status
-    : undefined;
-  const homeStarted = adminHomeQueriesStarted(instancesStatus, clientsStatus);
+  const homeStarted = adminHomeQueriesStarted(setupStatus);
 
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
@@ -58,8 +53,7 @@ export function useYieldToAdminHomeQueries(
 
   return layoutQueriesMayRun({
     onAdminHome,
-    instancesStatus,
-    clientsStatus,
+    setupStatus,
     gaveUp,
   });
 }

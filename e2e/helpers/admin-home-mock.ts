@@ -43,10 +43,13 @@ const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 export type MockPersona = "admin" | "employee";
 
 let mockIsExecutive = false;
+let mockFreshSetup = false;
 
 export type HiveMockOptions = {
   role?: MockPersona;
   isExecutive?: boolean;
+  /** Owner-only org: no extra staff, clients, or shifts. First-login Home. */
+  freshSetup?: boolean;
 };
 
 const isoDaysFromNow = (days: number) =>
@@ -523,15 +526,19 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
       active: true,
       organizations: ORG,
     },
-    {
-      id: `mem-${STAFF_USER_ID}`,
-      user_id: STAFF_USER_ID,
-      organization_id: TNS_ORG_ID,
-      role: "employee",
-      job_title: "DSP",
-      active: true,
-      organizations: ORG,
-    },
+    ...(mockFreshSetup
+      ? []
+      : [
+          {
+            id: `mem-${STAFF_USER_ID}`,
+            user_id: STAFF_USER_ID,
+            organization_id: TNS_ORG_ID,
+            role: "employee",
+            job_title: "DSP",
+            active: true,
+            organizations: ORG,
+          },
+        ]),
   ];
 
   const profiles = [
@@ -547,17 +554,21 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
       // Launchpad (#179) is a clock-in gate, not an Admin Home wall.
       has_passed_launchpad: true,
     },
-    {
-      id: STAFF_USER_ID,
-      first_name: "Jordan",
-      last_name: "Lee",
-      full_name: "Jordan Lee",
-      email: "jordan.lee@truenorth.example",
-      must_change_password: false,
-      staff_type_keys: ["dsp"],
-      bc_role: null,
-      has_passed_launchpad: true,
-    },
+    ...(mockFreshSetup
+      ? []
+      : [
+          {
+            id: STAFF_USER_ID,
+            first_name: "Jordan",
+            last_name: "Lee",
+            full_name: "Jordan Lee",
+            email: "jordan.lee@truenorth.example",
+            must_change_password: false,
+            staff_type_keys: ["dsp"],
+            bc_role: null,
+            has_passed_launchpad: true,
+          },
+        ]),
   ];
 
   const directory = profiles.map((p) => ({
@@ -582,7 +593,9 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
           enabled: permission === "complete_obligations" || permission === "view_own_timesheets",
         }));
 
-  const clients = [
+  const clients = mockFreshSetup
+    ? []
+    : [
     {
       id: CLIENT_ID,
       organization_id: TNS_ORG_ID,
@@ -608,7 +621,9 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
     },
   ];
 
-  const billing = [
+  const billing = mockFreshSetup
+    ? []
+    : [
     {
       client_id: CLIENT_ID,
       organization_id: TNS_ORG_ID,
@@ -723,6 +738,8 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
     daily_logs: [],
     incident_reports: [],
     forms: [],
+    invitations: [],
+    scheduled_shifts: [],
     staff_groups: [],
     staff_group_members: [],
     staff_assignments: [],
@@ -1274,6 +1291,7 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
 export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
   const persona: MockPersona = opts.role ?? "admin";
   mockIsExecutive = opts.isExecutive ?? false;
+  mockFreshSetup = opts.freshSetup ?? false;
   const fx = fixtures();
   const session = sessionRecord(persona);
 

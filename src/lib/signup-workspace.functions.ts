@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   isRbacSeedTriggerError,
+  seedSignupOrgRolePermissions,
   type SignupWorkspaceReason,
   workspaceNameFromSignup,
 } from "@/lib/signup-workspace";
@@ -22,6 +23,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function seedRolePermissions(client: any, orgId: string): Promise<void> {
+  if (!client?.rpc) return;
+  await seedSignupOrgRolePermissions((fn, args) => client.rpc(fn, args), orgId);
+}
+
 /**
  * After a real session exists: find the creator org, or provision profile +
  * org + admin membership (same outcome as handle_new_user).
@@ -29,6 +36,10 @@ function sleep(ms: number): Promise<void> {
  * Live landmine: org INSERT still fires seed_rbac_after_org_insert, which
  * errors because public.rbac_roles was dropped. That swallowed Dane's
  * signup (no profile, no org). SQL handoff drops that leftover trigger.
+ *
+ * role_permissions is a separate seed. Live never attached
+ * seed_role_permissions_after_org_insert, so we call
+ * seed_org_role_permissions here after we have an org id.
  * Never log name / phone / email.
  */
 export const ensureSignupWorkspace = createServerFn({ method: "POST" })
@@ -57,6 +68,7 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
           .limit(1)
           .maybeSingle();
         if (typeof member?.organization_id === "string") {
+          await seedRolePermissions(userClient, member.organization_id);
           return { ok: true, orgId: member.organization_id, reason: null };
         }
         const { data: created } = await userClient
@@ -66,6 +78,7 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
           .limit(1)
           .maybeSingle();
         if (typeof created?.id === "string") {
+          await seedRolePermissions(userClient, created.id);
           return { ok: true, orgId: created.id, reason: null };
         }
       } catch {
@@ -110,7 +123,10 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       console.warn("[signup] workspace provision failed", { code: "provision_failed" });
       return { ok: false, orgId: null, reason: "provision_failed" };
     }
-    if (existing.orgId) return { ok: true, orgId: existing.orgId, reason: null };
+    if (existing.orgId) {
+      await seedRolePermissions(admin, existing.orgId);
+      return { ok: true, orgId: existing.orgId, reason: null };
+    }
     if (existing.reason === "org_query_error") {
       return { ok: false, orgId: null, reason: "org_query_error" };
     }
@@ -139,7 +155,10 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
 
       for (let attempt = 0; attempt < 3; attempt++) {
         const again = await findOrg();
-        if (again.orgId) return { ok: true, orgId: again.orgId, reason: null };
+        if (again.orgId) {
+          await seedRolePermissions(admin, again.orgId);
+          return { ok: true, orgId: again.orgId, reason: null };
+        }
 
         const { data: created, error: insertErr } = await admin
           .from("organizations")
@@ -166,13 +185,17 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
           if (memberIns?.error) {
             console.warn("[signup] workspace membership insert failed", { code: "provision_failed" });
           }
+          await seedRolePermissions(admin, created.id);
           return { ok: true, orgId: created.id, reason: null };
         }
         await sleep(350 * (attempt + 1));
       }
 
       const last = await findOrg();
-      if (last.orgId) return { ok: true, orgId: last.orgId, reason: null };
+      if (last.orgId) {
+        await seedRolePermissions(admin, last.orgId);
+        return { ok: true, orgId: last.orgId, reason: null };
+      }
       return { ok: false, orgId: null, reason: last.reason ?? "provision_failed" };
     } catch {
       console.warn("[signup] workspace provision failed", { code: "provision_failed" });

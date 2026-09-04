@@ -63,6 +63,34 @@ export function isRbacSeedTriggerError(message: string | null | undefined): bool
   return m.includes("rbac_roles") || (m.includes("trg_seed_rbac") && m.includes("does not exist"));
 }
 
+/**
+ * Seed role_permissions for a newly provisioned org. Live Hive-Platform
+ * never attached seed_role_permissions_after_org_insert, so owners hit
+ * Access denied on Add client / Add staff. Idempotent (ON CONFLICT DO
+ * NOTHING). Never logs name / phone / email.
+ */
+export async function seedSignupOrgRolePermissions(
+  rpc: (
+    fn: string,
+    args: { _org: string },
+  ) => Promise<{ error?: { message?: string } | null } | null | undefined>,
+  orgId: string,
+): Promise<boolean> {
+  const id = String(orgId ?? "").trim();
+  if (!id) return false;
+  try {
+    const result = await rpc("seed_org_role_permissions", { _org: id });
+    if (result?.error) {
+      console.warn("[signup] role_permissions seed failed", { code: "seed_failed" });
+      return false;
+    }
+    return true;
+  } catch {
+    console.warn("[signup] role_permissions seed failed", { code: "seed_failed" });
+    return false;
+  }
+}
+
 export function workspaceNameFromSignup(opts: {
   agencyName?: string | null;
   emailLocalPart?: string | null;

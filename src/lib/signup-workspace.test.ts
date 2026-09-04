@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
 import {
   SIGNUP_CONFIRM_CONTINUE_LABEL,
   SIGNUP_CONFIRM_EMAIL_MESSAGE,
   isRbacSeedTriggerError,
   isSignupEmailNotConfirmedError,
   messageForSignupWorkspaceReason,
+  seedSignupOrgRolePermissions,
   signupHasSession,
   workspaceNameFromSignup,
 } from "./signup-workspace.ts";
@@ -43,5 +45,29 @@ describe("signup workspace / session", () => {
     assert.equal(workspaceNameFromSignup({ agencyName: "Sunrise Supports" }), "Sunrise Supports");
     assert.equal(workspaceNameFromSignup({ emailLocalPart: "danewarnick+pi1" }), "danewarnick+pi1's workspace");
     assert.doesNotMatch(workspaceNameFromSignup({ agencyName: "Test agency 1" }), /True North/i);
+  });
+
+  it("seeds role_permissions via RPC and does not throw on failure", async () => {
+    const calls: Array<{ fn: string; org: string }> = [];
+    const ok = await seedSignupOrgRolePermissions(async (fn, args) => {
+      calls.push({ fn, org: args._org });
+      return { error: null };
+    }, "org-1");
+    assert.equal(ok, true);
+    assert.deepEqual(calls, [{ fn: "seed_org_role_permissions", org: "org-1" }]);
+
+    const failed = await seedSignupOrgRolePermissions(async () => {
+      return { error: { message: "function does not exist" } };
+    }, "org-2");
+    assert.equal(failed, false);
+
+    const empty = await seedSignupOrgRolePermissions(async () => ({ error: null }), "  ");
+    assert.equal(empty, false);
+  });
+
+  it("signup workspace provision calls the role_permissions seed", () => {
+    const src = readFileSync(new URL("./signup-workspace.functions.ts", import.meta.url), "utf8");
+    assert.match(src, /seedSignupOrgRolePermissions/);
+    assert.match(src, /seed_org_role_permissions/);
   });
 });

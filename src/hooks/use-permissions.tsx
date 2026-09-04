@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAuth } from "./use-auth";
 import { ALL_PERMISSIONS, PROVIDER_ROLES, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
+import { resolveCan } from "@/lib/permissions-can";
 
 export type PermissionMap = Record<ProviderRole, Record<Permission, boolean>>;
 
@@ -19,9 +20,11 @@ function buildEmpty(): PermissionMap {
 
 /**
  * Org-scoped role permission matrix, read straight from `role_permissions`.
- * No runtime fallback to DEFAULT_MATRIX — every org is seeded with a
- * complete matrix at creation time (see seed_org_role_permissions), so an
- * empty result here means the row genuinely isn't enabled, not "unset".
+ * New orgs are seeded by seed_org_role_permissions (trigger + signup RPC).
+ * usePermissions() still falls back to DEFAULT_MATRIX when this query
+ * returns no enabled grants — live Hive-Platform had 13 unseeded orgs
+ * (Salt Lake Care Co / pi20 among them) and RequirePermission sent
+ * owners to /unauthorized.
  */
 export function useOrgPermissions() {
   const { data: org } = useCurrentOrg();
@@ -72,7 +75,8 @@ export function useUserOverrides() {
 /**
  * Two-layer permission resolver for the current user:
  *   1. individual override (user_permission_overrides) — final answer if present
- *   2. org role configuration (role_permissions) — fallback, no hardcoded defaults
+ *   2. org role_permissions, if that role has any enabled grant
+ *   3. DEFAULT_MATRIX when the org was never seeded (fresh paid signup)
  */
 export function usePermissions() {
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
@@ -81,16 +85,8 @@ export function usePermissions() {
 
   const role = (org?.role ?? null) as Role | null;
 
-  const can = (perm: Permission): boolean => {
-    if (!role) return false;
-
-    const override = (overrides ?? []).find((o) => o.permission === perm);
-    if (override !== undefined) return override.granted;
-
-    if (matrix && role !== "super_admin") return !!matrix[role as ProviderRole]?.[perm];
-
-    return false;
-  };
+  const can = (perm: Permission): boolean =>
+    resolveCan({ role, perm, matrix, overrides });
 
   // Wait for org to load before reporting ready — otherwise role-based guards
   // see role=null and incorrectly redirect to /unauthorized on first paint.

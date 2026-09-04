@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  PAID_SUBSCRIPTION_NEEDS_SERVICE_ROLE,
   SIGNUP_CHECKOUT_CONFIRM_MESSAGE,
   SIGNUP_CHECKOUT_START_MESSAGE,
   SIGNUP_EMAIL_CONFIRM_DENIED_MESSAGE,
@@ -41,19 +42,22 @@ describe("humanizeCheckoutStartError", () => {
 });
 
 describe("humanizeCheckoutConfirmError", () => {
-  it("maps missing-env and RLS to a real paid-row sentence", () => {
-    assert.equal(
+  it("names SUPABASE_SERVICE_ROLE_KEY when the paid write cannot run", () => {
+    assert.match(
       humanizeCheckoutConfirmError(
         new Error("Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY"),
       ),
-      SIGNUP_CHECKOUT_CONFIRM_MESSAGE,
+      /SUPABASE_SERVICE_ROLE_KEY/,
+    );
+    assert.equal(
+      humanizeCheckoutConfirmError(new Error(PAID_SUBSCRIPTION_NEEDS_SERVICE_ROLE)),
+      PAID_SUBSCRIPTION_NEEDS_SERVICE_ROLE,
     );
     assert.equal(
       humanizeCheckoutConfirmError(new Error("new row violates row-level security policy")),
       SIGNUP_CHECKOUT_CONFIRM_MESSAGE,
     );
     assert.doesNotMatch(humanizeCheckoutConfirmError({}), /^\{\}$/);
-    assert.doesNotMatch(SIGNUP_CHECKOUT_CONFIRM_MESSAGE, /SERVICE_ROLE/);
   });
 });
 

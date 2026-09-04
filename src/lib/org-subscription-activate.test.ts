@@ -71,6 +71,16 @@ describe("privileged writer does not invent env names", () => {
       true,
     );
   });
+
+  it("does not treat DATABASE_URL as a substitute for SUPABASE_SERVICE_ROLE_KEY", () => {
+    assert.equal(
+      canWritePaidSubscriptionPrivileged({
+        VITE_SUPABASE_URL: "https://preview.supabase.co",
+        DATABASE_URL: "postgres://example",
+      }),
+      false,
+    );
+  });
 });
 
 describe("confirm and webhook share the upsert", () => {
@@ -92,6 +102,10 @@ describe("confirm and webhook share the upsert", () => {
     assert.match(activate, /\.upsert\(/);
     assert.match(activate, /onConflict: "organization_id"/);
     assert.match(activate, /exempt_org/);
+    assert.match(activate, /requireAdminWriter/);
+    assert.match(activate, /PAID_SUBSCRIPTION_NEEDS_SERVICE_ROLE/);
+    assert.match(activate, /SUPABASE_SERVICE_ROLE_KEY/);
+    assert.doesNotMatch(activate, /writers = \[privileged, fallbackClient\]/);
   });
 
   it("billing-locked leaves on confirm ok without waiting for webhook", () => {

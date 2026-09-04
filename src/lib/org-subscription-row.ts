@@ -94,12 +94,12 @@ export function paidOrgSubscriptionCore(
   };
 }
 
+/** True only when the existing service-role name is set. URL may be VITE_. */
 export function canWritePaidSubscriptionPrivileged(
   env?: Record<string, string | undefined>,
 ): boolean {
   const source = env ?? (typeof process !== "undefined" ? process.env : {});
   const url = source.VITE_SUPABASE_URL || source.SUPABASE_URL;
   const serviceRole = source.SUPABASE_SERVICE_ROLE_KEY;
-  const databaseUrl = source.DATABASE_URL || source.AWS_DATABASE_URL;
-  return !!(databaseUrl || (url && serviceRole));
+  return !!(url && serviceRole);
 }

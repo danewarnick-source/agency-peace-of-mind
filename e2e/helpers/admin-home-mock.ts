@@ -43,10 +43,13 @@ const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 export type MockPersona = "admin" | "employee";
 
 let mockIsExecutive = false;
+let mockFirstLogin = false;
 
 export type HiveMockOptions = {
   role?: MockPersona;
   isExecutive?: boolean;
+  /** Empty office: owner only, no clients, no shifts. First-login Home. */
+  firstLogin?: boolean;
 };
 
 const isoDaysFromNow = (days: number) =>
@@ -513,26 +516,25 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
   const first = persona === "admin" ? "Dana" : "Alex";
   const full = persona === "admin" ? "Dana Admin" : "Alex DSP";
 
-  const members = [
-    {
-      id: `mem-${user.id}`,
-      user_id: user.id,
-      organization_id: TNS_ORG_ID,
-      role,
-      job_title: persona === "admin" ? "Owner" : "DSP",
-      active: true,
-      organizations: ORG,
-    },
-    {
-      id: `mem-${STAFF_USER_ID}`,
-      user_id: STAFF_USER_ID,
-      organization_id: TNS_ORG_ID,
-      role: "employee",
-      job_title: "DSP",
-      active: true,
-      organizations: ORG,
-    },
-  ];
+  const ownerMember = {
+    id: `mem-${user.id}`,
+    user_id: user.id,
+    organization_id: TNS_ORG_ID,
+    role,
+    job_title: persona === "admin" ? "Owner" : "DSP",
+    active: true,
+    organizations: ORG,
+  };
+  const staffMember = {
+    id: `mem-${STAFF_USER_ID}`,
+    user_id: STAFF_USER_ID,
+    organization_id: TNS_ORG_ID,
+    role: "employee",
+    job_title: "DSP",
+    active: true,
+    organizations: ORG,
+  };
+  const members = mockFirstLogin ? [ownerMember] : [ownerMember, staffMember];
 
   const profiles = [
     {
@@ -717,7 +719,7 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
     company_obligation_instances: fx.instances,
     company_obligation_instance_assignees: assignees,
     company_obligation_completions: completions,
-    clients,
+    clients: mockFirstLogin ? [] : clients,
     client_billing_codes: billing,
     evv_timesheets: [],
     daily_logs: [],
@@ -743,6 +745,20 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
     provider_interest_outline: [
       { organization_id: TNS_ORG_ID, codes_held: ["HHS", "SLH", "SLN", "SEI", "DSI"] },
     ],
+    scheduled_shifts: mockFirstLogin
+      ? []
+      : [
+          {
+            id: "e2e00000-0000-4000-a000-000000000050",
+            organization_id: TNS_ORG_ID,
+            client_id: CLIENT_ID,
+            staff_id: STAFF_USER_ID,
+            service_code: "SLH",
+            start_time: new Date().toISOString(),
+            end_time: new Date(Date.now() + 4 * 3_600_000).toISOString(),
+            status: "published",
+          },
+        ],
   };
 }
 
@@ -1274,6 +1290,7 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
 export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
   const persona: MockPersona = opts.role ?? "admin";
   mockIsExecutive = opts.isExecutive ?? false;
+  mockFirstLogin = opts.firstLogin ?? false;
   const fx = fixtures();
   const session = sessionRecord(persona);
 

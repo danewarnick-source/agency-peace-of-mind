@@ -8,7 +8,7 @@ const localBase = process.env.E2E_BASE_URL || "http://127.0.0.1:5173";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /admin-home-audit\.spec\.ts|portal-view-phone\.spec\.ts/,
+  testMatch: /admin-home-audit\.spec\.ts|admin-home-first-login\.spec\.ts|portal-view-phone\.spec\.ts/,
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 15_000 },

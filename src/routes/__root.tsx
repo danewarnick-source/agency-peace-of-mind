@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { isChunkLoadError, tryAutoReloadOnce, clearChunkReloadGuard } from "@/lib/chunk-reload";
@@ -118,7 +119,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       const sessionAge = Date.now() - new Date(issuedAt).getTime();
       const MAX_SESSION_AGE = 24 * 60 * 60 * 1000; // 24 hours
       if (sessionAge > MAX_SESSION_AGE) {
-        await supabase.auth.signOut();
+        await completeClientSignOut(() => supabase.auth.signOut());
         throw redirect({ to: "/login", replace: true });
       }
     }

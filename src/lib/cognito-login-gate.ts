@@ -8,9 +8,12 @@ export function shouldSkipLoginAutoRedirect(opts: {
   isCognito: boolean;
   hadSessionOnArrival: boolean;
   justSignedIn: boolean;
+  /** After an explicit Sign out, never auto-enter a leftover token. */
+  explicitSignOut?: boolean;
 }): boolean {
-  if (!opts.isCognito) return false;
   if (opts.justSignedIn) return false;
+  if (opts.explicitSignOut) return true;
+  if (!opts.isCognito) return false;
   return opts.hadSessionOnArrival;
 }
 

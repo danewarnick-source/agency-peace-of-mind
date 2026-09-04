@@ -99,6 +99,7 @@ import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
 import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 import { persistActiveOrgId } from "@/lib/current-org";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
@@ -615,9 +616,9 @@ function DashboardLayout() {
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  const signOut = async (to: "/" | "/login" = "/") => {
+  const signOut = async (to: "/" | "/login" = "/login") => {
     writeSessionHint(false);
-    await supabase.auth.signOut();
+    await completeClientSignOut(() => supabase.auth.signOut());
     toast.success("Signed out");
     navigate({ to, replace: true });
   };

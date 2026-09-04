@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { supabase } from "@/integrations/supabase/client";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 import { toast } from "sonner";
 import { AuthShell } from "./login";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
@@ -102,7 +103,7 @@ function JoinPage() {
       const { data: existingSession } = await supabase.auth.getSession();
       const signedInEmail = existingSession.session?.user?.email?.toLowerCase() ?? "";
       if (signedInEmail && signedInEmail !== preview.email.toLowerCase()) {
-        await supabase.auth.signOut();
+        await completeClientSignOut(() => supabase.auth.signOut(), { markSignedOut: false });
       }
 
       const prepared = await prepareFn({

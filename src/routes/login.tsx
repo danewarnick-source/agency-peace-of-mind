@@ -30,6 +30,12 @@ import type { Role } from "@/lib/rbac";
 import { toast } from "sonner";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { shouldSkipLoginAutoRedirect } from "@/lib/cognito-login-gate";
+import {
+  clearExplicitSignOut,
+  completeClientSignOut,
+  hasExplicitSignOut,
+} from "@/lib/client-sign-out";
+import { applyRememberMeOnSuccess, readRememberedLoginEmail } from "@/lib/remember-login";
 
 function isSafeNext(v: unknown): v is string {
   return typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
@@ -81,6 +87,8 @@ function LoginPage() {
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
   const trainingHomeFn = useServerFn(trainingOnlyHomeForMeFn);
@@ -88,6 +96,16 @@ function LoginPage() {
   const nextPath = search.next;
   const hadSessionOnArrival = useRef<boolean | null>(null);
   const [justSignedIn, setJustSignedIn] = useState(false);
+
+  useEffect(() => {
+    const stored = readRememberedLoginEmail();
+    if (stored) {
+      setIdentifier(stored);
+      setRememberMe(true);
+    }
+    if (!hasExplicitSignOut()) return;
+    void completeClientSignOut(() => supabase.auth.signOut());
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -106,6 +124,7 @@ function LoginPage() {
         isCognito: isCognitoAuth(),
         hadSessionOnArrival: !!hadSessionOnArrival.current,
         justSignedIn,
+        explicitSignOut: hasExplicitSignOut(),
       })
     ) {
       return;
@@ -179,11 +198,11 @@ function LoginPage() {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const identifier = String(fd.get("identifier")).trim();
+    const submittedId = String(fd.get("identifier")).trim();
     const password = String(fd.get("password"));
     setBusy(true);
 
-    const result = await completePasswordSignIn(identifier, password, {
+    const result = await completePasswordSignIn(submittedId, password, {
       signInWithEmail: async (email, pw) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
         return {
@@ -207,7 +226,7 @@ function LoginPage() {
         return (prof as any)?.account_status as string | undefined;
       },
       signOut: async () => {
-        await supabase.auth.signOut();
+        await completeClientSignOut(() => supabase.auth.signOut());
       },
     });
     if (!result.ok) {
@@ -215,6 +234,8 @@ function LoginPage() {
       return toast.error(result.message || GENERIC_LOGIN_ERROR);
     }
 
+    applyRememberMeOnSuccess(rememberMe, submittedId);
+    clearExplicitSignOut();
     setJustSignedIn(true);
     setBusy(false);
     toast.success("Signed in");
@@ -260,6 +281,8 @@ function LoginPage() {
                 inputMode="email"
                 required
                 placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className={fieldClass}
               />
             </div>
@@ -293,6 +316,22 @@ function LoginPage() {
                 Forgot password?
               </Link>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-[#f3efe6]/70">
+              <input
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                data-testid="remember-me"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-[#0b1220]"
+              />
+              Remember me
+            </label>
+            <p className="text-xs text-[#f3efe6]/45">
+              Saves your email on this device. You still click Sign in.
+            </p>
 
             <Button
               type="submit"

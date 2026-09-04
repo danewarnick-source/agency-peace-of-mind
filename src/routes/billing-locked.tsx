@@ -21,6 +21,7 @@ import {
 import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
 import type { Role } from "@/lib/rbac";
+import { completeClientSignOut } from "@/lib/client-sign-out";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
@@ -190,7 +191,7 @@ function BillingLockedPage() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await completeClientSignOut(() => supabase.auth.signOut());
     navigate({ to: "/login", replace: true });
   };
 

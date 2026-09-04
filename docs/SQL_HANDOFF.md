@@ -6,6 +6,58 @@ it worked before moving on.
 
 ---
 
+## ACTION — Seed role_permissions for fresh paid orgs (2026-09-04)
+
+**Run this on Hive-Platform so Add client / Add staff stop Access-denied.**
+App deploy also falls back to DEFAULT_MATRIX when the matrix is empty, but
+this writes the rows and attaches the new-org trigger.
+
+Confirmed on live Hive-Platform (`dhrrukdcigiiqksibdfb`) 2026-09-04:
+
+1. Salt Lake Care Co (`danewarnick-pi20-s-workspace-567872`) has **1 admin
+   membership** and **0 role_permissions rows**.
+2. 13 of 18 orgs are unseeded. Only trigger on `organizations` is
+   `trg_seed_service_codes_on_org_create`. `seed_role_permissions_after_org_insert`
+   was never applied. `rbac_roles` is gone (do not recreate).
+3. Client `RequirePermission` reads `role_permissions` with no fallback —
+   `view_clients` / `view_staff_records` are false → `/unauthorized`.
+4. Live `has_permission` fallback lists legacy keys only (not those two).
+
+Matches `supabase/migrations/20260904010000_seed_role_permissions_for_new_orgs.sql`.
+
+Do **not** log or select emails, names, or phones. Counts and slugs only.
+Does not touch True North rows that already have a matrix (ON CONFLICT DO NOTHING).
+
+Clear the editor, paste the migration file in full. Confirm:
+
+```sql
+SELECT
+  EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.organizations'::regclass
+      AND tgname = 'seed_role_permissions_after_org_insert'
+  ) AS seed_trigger_on,
+  (
+    SELECT count(*) FROM public.organizations o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.role_permissions rp WHERE rp.organization_id = o.id
+    )
+  ) AS orgs_still_unseeded,
+  (
+    SELECT count(*) FROM public.role_permissions rp
+    JOIN public.organizations o ON o.id = rp.organization_id
+    WHERE o.slug = 'danewarnick-pi20-s-workspace-567872'
+      AND rp.role = 'admin'
+      AND rp.permission IN ('view_clients', 'view_staff_records')
+      AND rp.enabled
+  ) AS pi20_admin_add_perms;
+```
+
+**What you'll see:** `seed_trigger_on = t`, `orgs_still_unseeded = 0`,
+`pi20_admin_add_perms = 2`.
+
+---
+
 ## ACTION — Legal attestations (TOS / BAA I-agree) (2026-09-03)
 
 **Run this on Hive-Platform only.** App signup checkboxes work without it.

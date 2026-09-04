@@ -10,11 +10,13 @@ import {
   createSubscriptionCheckoutFn,
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_LIST_PRICE_UNIT, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
 import { quotePiListSubscription } from "@/lib/pi-signup-pricing";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — Provider Interface" }] }),
+  validateSearch: parseCheckoutReturnSearch,
   component: BillingLockedPage,
 });
 
@@ -36,6 +38,7 @@ function BillingLockedPage() {
     paymentsConfigured: boolean;
     paymentsMessage: string | null;
     lockReason: string | null;
+    confirmError: string | null;
   }>({
     loading: true,
     authed: false,
@@ -46,6 +49,7 @@ function BillingLockedPage() {
     paymentsConfigured: false,
     paymentsMessage: null,
     lockReason: null,
+    confirmError: null,
   });
 
   useEffect(() => {
@@ -57,27 +61,57 @@ function BillingLockedPage() {
         return;
       }
 
-      const status = await statusFn({
-        data: {
-          organizationId: (() => {
-            try {
-              return window.localStorage.getItem("hive.activeOrgId") ?? undefined;
-            } catch {
-              return undefined;
-            }
-          })(),
-        },
-      });
+      const returned = parseCheckoutReturnSearch(window.location.search);
+      let activeOrgId: string | undefined;
+      try {
+        activeOrgId = window.localStorage.getItem("hive.activeOrgId") ?? undefined;
+      } catch {
+        activeOrgId = undefined;
+      }
+
+      // Confirm the Stripe session BEFORE reading lock state. A prior bounce
+      // from /dashboard used to drop session_id; when it is present, fulfill
+      // first so the next status read sees status=active.
+      let confirmError: string | null = null;
+      if (returned.session_id) {
+        const r = await confirmFn({ data: { sessionId: returned.session_id } }).catch(() => null);
+        if (r?.organizationId) {
+          activeOrgId = r.organizationId;
+          try {
+            window.localStorage.setItem("hive.activeOrgId", r.organizationId);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (r?.ok && !cancelled) {
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
+        if (r && !r.ok && r.error) {
+          confirmError = r.error;
+        }
+      }
+
+      const readStatus = async () =>
+        statusFn({
+          data: { organizationId: activeOrgId },
+        });
+
+      let status = await readStatus();
       if (status.billingExempt || !status.accessLocked) {
-        if (!cancelled) navigate({ to: "/dashboard" });
+        if (!cancelled) navigate({ to: "/dashboard", replace: true });
         return;
       }
 
-      let activeOrgId: string | null = status.organizationId;
-      try {
-        activeOrgId = window.localStorage.getItem("hive.activeOrgId") ?? activeOrgId;
-      } catch {
-        /* ignore */
+      // Webhook can land a beat after confirm. One fresh re-query, no cache.
+      if (returned.session_id) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        if (cancelled) return;
+        status = await readStatus();
+        if (status.billingExempt || !status.accessLocked) {
+          navigate({ to: "/dashboard", replace: true });
+          return;
+        }
       }
 
       const { data: memberships } = await supabase
@@ -94,17 +128,7 @@ function BillingLockedPage() {
         if (!cancelled) navigate({ to: "/login" });
         return;
       }
-      const m = ms.find((x) => x.organization_id === activeOrgId) ?? ms[0];
-
-      const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get("session_id");
-      if (sessionId) {
-        const r = await confirmFn({ data: { sessionId } }).catch(() => null);
-        if (r?.ok && !cancelled) {
-          navigate({ to: "/dashboard" });
-          return;
-        }
-      }
+      const m = ms.find((x) => x.organization_id === (status.organizationId ?? activeOrgId)) ?? ms[0];
 
       if (cancelled) return;
       setStaffCount(status.staffCount || 4);
@@ -119,6 +143,7 @@ function BillingLockedPage() {
         paymentsConfigured: status.paymentsConfigured,
         paymentsMessage: status.paymentsMessage,
         lockReason: status.lockReason,
+        confirmError,
       });
     })();
     return () => {
@@ -184,6 +209,16 @@ function BillingLockedPage() {
             ? `${state.agencyName} needs an active Provider Interface subscription before anyone can use the dashboard.`
             : `${state.agencyName}'s account is locked until billing is current.`}
         </p>
+
+        {state.confirmError && (
+          <div
+            role="alert"
+            data-testid="checkout-confirm-error"
+            className="mt-6 w-full rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-left text-sm text-red-200"
+          >
+            {state.confirmError}
+          </div>
+        )}
 
         {state.testMode && (
           <div

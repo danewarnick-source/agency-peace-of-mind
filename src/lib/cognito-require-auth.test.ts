@@ -30,7 +30,7 @@ describe("Cognito requireSupabaseAuth missing user does not throw", () => {
       "utf8",
     );
     const cognitoStart = src.indexOf("if (isCognitoAuth())");
-    const supabaseEnv = src.indexOf("Missing Supabase environment variables");
+    const supabaseEnv = src.indexOf("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
     assert.ok(cognitoStart >= 0);
     assert.ok(supabaseEnv > cognitoStart);
     const cognitoBlock = src.slice(cognitoStart, supabaseEnv);

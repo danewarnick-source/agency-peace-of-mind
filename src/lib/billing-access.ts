@@ -63,6 +63,37 @@ export function orgAccessIsLocked(input: BillingGateInput): boolean {
   return false;
 }
 
+/**
+ * After Checkout return: leave /billing-locked when the live row is paid.
+ * status=active with no lock wins. Missing row stays locked.
+ */
+export function shouldLeaveBillingLockScreen(input: BillingGateInput): boolean {
+  return !orgAccessIsLocked(input);
+}
+
+export type CheckoutReturnSearch = {
+  checkout?: string;
+  session_id?: string;
+};
+
+/** Keep Stripe return params. Router validateSearch must not drop session_id. */
+export function parseCheckoutReturnSearch(
+  s: Record<string, unknown> | string | null | undefined,
+): CheckoutReturnSearch {
+  const src: Record<string, unknown> =
+    typeof s === "string"
+      ? Object.fromEntries(new URLSearchParams(s.startsWith("?") ? s.slice(1) : s))
+      : s && typeof s === "object"
+        ? s
+        : {};
+  const checkout = typeof src.checkout === "string" && src.checkout.trim() ? src.checkout.trim() : undefined;
+  const rawId = typeof src.session_id === "string" ? src.session_id.trim() : "";
+  return {
+    ...(checkout ? { checkout } : {}),
+    ...(rawId.startsWith("cs_") ? { session_id: rawId } : {}),
+  };
+}
+
 export function entitlementsForOrg(opts: {
   billingExempt: boolean;
   plan: string | null | undefined;
@@ -95,3 +126,19 @@ export function trainingRequiresCharge(opts: {
 }
 
 export const UNPAID_LOCK_REASON = "Payment required to use Provider Interface";
+
+export const BILLING_LOCK_ALLOWLIST = [
+  "/dashboard/billing/subscription",
+  "/dashboard/settings/subscription",
+];
+
+export function pathBypassesBillingLock(pathname: string, isAdmin: boolean): boolean {
+  if (pathname.startsWith("/dashboard/hive-exec")) return true;
+  if (
+    isAdmin &&
+    BILLING_LOCK_ALLOWLIST.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
+    return true;
+  }
+  return false;
+}

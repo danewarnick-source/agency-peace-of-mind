@@ -63,7 +63,9 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     const mapped = readSupabasePublicEnv();
 
     if (!mapped) {
-      throw new Error("Missing Supabase environment variables.");
+      throw new Error(
+        "Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Those are the names this host already uses.",
+      );
     }
     const SUPABASE_URL = mapped.url;
     const SUPABASE_PUBLISHABLE_KEY = mapped.key;

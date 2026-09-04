@@ -21,12 +21,16 @@ import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
 import { staffClockOutSearch } from "@/lib/staff-clock-out";
+import { parseCheckoutReturnSearch } from "@/lib/billing-access";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
-  validateSearch: (s: Record<string, unknown>): { welcome?: boolean } => {
+  validateSearch: (s: Record<string, unknown>): { welcome?: boolean; checkout?: string; session_id?: string } => {
     const on = s.welcome === "1" || s.welcome === 1 || s.welcome === true;
-    return on ? { welcome: true } : {};
+    return {
+      ...(on ? { welcome: true } : {}),
+      ...parseCheckoutReturnSearch(s),
+    };
   },
 });
 

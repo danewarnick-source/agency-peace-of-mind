@@ -12,11 +12,12 @@ import {
 } from "@/lib/billing-lockout.server";
 import { isBillingExempt, UNPAID_LOCK_REASON } from "@/lib/billing-access";
 import { shouldKeepPrepaidAccess, syncPiListQuantityForOrg } from "@/lib/pi-list-billing.server";
-import { mrrCentsForPlan } from "@/lib/stripe-config";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
 import { fulfillTrainingClass } from "@/lib/training-class-fulfillment.server";
 import { fulfillTrainingOnlyOrder } from "@/lib/training-only-fulfillment.server";
-import { normalizeTierId } from "@/lib/hive-tiers";
+import { activateSubscriptionFromCheckout } from "@/lib/org-subscription-activate";
+
+export { activateSubscriptionFromCheckout } from "@/lib/org-subscription-activate";
 
 export type StripeLikeEvent = {
   id: string;
@@ -92,73 +93,6 @@ async function alreadyProcessed(eventId: string): Promise<boolean> {
   return !!data;
 }
 
-export async function activateSubscriptionFromCheckout(opts: {
-  orgId: string;
-  plan: string;
-  customerId: string | null;
-  subscriptionId: string | null;
-  paymentIntentId: string | null;
-  amountCents: number;
-  periodEndIso: string | null;
-  eventId: string | null;
-  staffCount?: number | null;
-  billingInterval?: "monthly" | "annual" | null;
-  monthlyCents?: number | null;
-}): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const plan = opts.plan === "hive_standard" ? "hive_standard" : normalizeTierId(opts.plan);
-  const monthly =
-    opts.monthlyCents && opts.monthlyCents > 0
-      ? opts.monthlyCents
-      : opts.billingInterval === "annual" && opts.amountCents > 0
-        ? Math.round(opts.amountCents / 12)
-        : opts.amountCents || mrrCentsForPlan(plan);
-  const periodEnd =
-    opts.periodEndIso ??
-    new Date(Date.now() + (opts.billingInterval === "annual" ? 365 : 30) * 86_400_000).toISOString();
-
-  const { data: existing } = await supabaseAdmin
-    .from("org_subscriptions")
-    .select("id")
-    .eq("organization_id", opts.orgId)
-    .maybeSingle();
-
-  const patch = {
-    plan,
-    status: "active" as const,
-    mrr_cents: monthly,
-    billing_interval: opts.billingInterval ?? "monthly",
-    staff_count: opts.staffCount && opts.staffCount > 0 ? opts.staffCount : undefined,
-    current_period_start: nowIso,
-    current_period_end: periodEnd,
-    renewal_date: periodEnd.slice(0, 10),
-    started_at: nowIso,
-    past_due_since: null,
-    locked_at: null,
-    lock_reason: null,
-    failure_count: 0,
-    last_payment_error: null,
-    last_payment_attempt_at: nowIso,
-    cancel_at_period_end: false,
-    stripe_customer_id: opts.customerId,
-    stripe_subscription_id: opts.subscriptionId,
-  };
-
-  const cleanPatch = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-
-  if (existing) {
-    const { error } = await supabaseAdmin.from("org_subscriptions").update(cleanPatch).eq("id", existing.id);
-    if (error) throw new Error(error.message);
-  } else {
-    const { error } = await supabaseAdmin.from("org_subscriptions").insert({
-      organization_id: opts.orgId,
-      ...cleanPatch,
-    });
-    if (error) throw new Error(error.message);
-  }
-
-  await recordPaymentSuccess(opts.orgId, opts.amountCents, opts.eventId);
-}
 
 export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise<{ ok: true }> {
   const obj = (event.data?.object ?? {}) as Record<string, unknown>;

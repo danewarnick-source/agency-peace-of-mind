@@ -274,7 +274,7 @@ function Overview() {
     isStatePreviewAdmin;
 
   return (
-    <div className={showAdmin ? "h-full min-h-full" : "space-y-8"}>
+    <div className={showAdmin ? "min-h-full" : "space-y-8"}>
       {showAdmin && <AdminHomeDashboard />}
 
       {!showAdmin && <StaffCaseloadHome />}

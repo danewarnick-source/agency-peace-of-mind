@@ -84,6 +84,44 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await shot(page, "admin-home-feeling-b");
   });
 
+  test("Admin Home scrolls — cards and footer are reachable in the shell", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible({
+      timeout: 25_000,
+    });
+
+    const home = page.getByTestId("admin-home-feeling-b");
+    await expect(home).toBeVisible();
+    const overflowY = await home.evaluate((el) => getComputedStyle(el).overflowY);
+    expect(overflowY, "Admin Home must not clip; shell main scrolls").not.toBe("hidden");
+
+    const main = page.locator("main");
+    const scroll = await main.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    expect(scroll.overflowY, "shell main is the scrollport").toMatch(/auto|scroll/);
+    expect(scroll.scrollHeight, "Home content is taller than the shell").toBeGreaterThan(
+      scroll.clientHeight,
+    );
+
+    const footer = page.getByText(/You.re all set/i);
+    await expect(footer).not.toBeInViewport();
+    await main.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(footer).toBeInViewport();
+    await shot(page, "admin-home-scrolled-footer");
+
+    const staffCard = page.getByRole("heading", { name: /Staff ready/i });
+    await staffCard.scrollIntoViewIfNeeded();
+    await expect(staffCard).toBeInViewport();
+    await shot(page, "admin-home-scrolled-cards");
+    await assertNoCrash(page, "admin home scroll");
+  });
+
   test("Admin Home CTAs open schedule, employees, clients, documentation", async ({
     page,
   }) => {

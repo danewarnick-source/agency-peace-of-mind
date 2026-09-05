@@ -831,6 +831,12 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
     if (urlSearch.cc && urlSearch.cc !== tab) setTabState(urlSearch.cc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearch.cc]);
+  useEffect(() => {
+    const id = window.location.hash.replace(/^#/, "");
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ block: "start" });
+  }, []);
   const setTab = (next: Tab) => {
     setTabState(next);
     navigate({
@@ -1167,12 +1173,14 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div id="obligations" className="scroll-mt-4">
         <h1 className="text-2xl font-semibold tracking-tight">🏢 Agency Command Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Daily triage desk — everything that needs your attention, in priority order.
         </p>
       </div>
+      <div id="due" className="scroll-mt-4" />
+      <div id="recommendations" className="scroll-mt-4" />
 
       {/* Tab bar */}
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">

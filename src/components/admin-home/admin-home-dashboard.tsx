@@ -144,6 +144,53 @@ const liftCard: CSSProperties = {
   boxShadow: PI_THEME.shadow1,
 };
 
+function ViewAllLink({
+  to,
+  hash,
+}: {
+  to:
+    | "/dashboard/command-center"
+    | "/dashboard/hub/employees"
+    | "/dashboard/hub/clients"
+    | "/dashboard/compliance-desk";
+  hash?: string;
+}) {
+  return (
+    <Link
+      to={to}
+      hash={hash}
+      className="mt-4 inline-flex cursor-pointer text-sm font-medium hover:underline"
+      style={{ color: PI_THEME.gold }}
+    >
+      View all →
+    </Link>
+  );
+}
+
+function PowerLink({
+  to,
+  children,
+}: {
+  to: "/dashboard/command-center" | "/dashboard/compliance-desk";
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className="transition-colors"
+      style={{ fontSize: 12, color: PI_THEME.c50, fontFamily: PI_THEME.sans }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = PI_THEME.gold;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = PI_THEME.c50;
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function Lift({
   className,
   children,
@@ -205,13 +252,19 @@ function AdminHomeDashboardInner() {
       <PageGlow />
       <Grain />
       <div className="relative z-10 space-y-4 px-5 py-6 sm:px-8 lg:px-10">
-        <div>
-          <div className="text-lg font-semibold" style={{ ...SERIF, color: PI_THEME.cream }}>
-            Good {greetingWord(now)}, {firstName}. Here's what needs your attention.
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-lg font-semibold" style={{ ...SERIF, color: PI_THEME.cream }}>
+              Good {greetingWord(now)}, {firstName}. Here's what needs your attention.
+            </div>
+            <div className="text-sm" style={{ color: PI_THEME.c50 }}>
+              {org ? `${orgName} · ${dateLine}` : dateLine}
+            </div>
           </div>
-          <div className="text-sm" style={{ color: PI_THEME.c50 }}>
-            {org ? `${orgName} · ${dateLine}` : dateLine}
-          </div>
+          <nav aria-label="Desk shortcuts" className="flex shrink-0 items-center gap-3 pt-1">
+            <PowerLink to="/dashboard/command-center">Command center</PowerLink>
+            <PowerLink to="/dashboard/compliance-desk">Compliance desk</PowerLink>
+          </nav>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -220,6 +273,7 @@ function AdminHomeDashboardInner() {
           ) : instancesFailed ? (
             <Lift className="p-5">
               <LoadError>Could not load overdue items.</LoadError>
+              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
             </Lift>
           ) : derived.overdue.length === 0 ? (
             <Lift
@@ -241,6 +295,7 @@ function AdminHomeDashboardInner() {
               <p className="mt-1 text-sm" style={{ color: PI_THEME.c50 }}>
                 No overdue obligation instances.
               </p>
+              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
             </Lift>
           ) : (
             <Lift className="p-5" style={{ background: PI_THEME.heroTileBg }}>
@@ -273,13 +328,7 @@ function AdminHomeDashboardInner() {
                   </li>
                 ))}
               </ul>
-              <Link
-                to="/dashboard/company-obligations"
-                className="mt-4 inline-flex cursor-pointer text-sm font-medium hover:underline"
-                style={{ color: PI_THEME.gold }}
-              >
-                View all →
-              </Link>
+              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
             </Lift>
           )}
 
@@ -398,6 +447,7 @@ function AdminHomeDashboardInner() {
                 )}
               </ul>
             )}
+            <ViewAllLink to="/dashboard/hub/employees" />
           </Lift>
 
           <Lift className="p-5">
@@ -452,6 +502,7 @@ function AdminHomeDashboardInner() {
                 )}
               </ul>
             )}
+            <ViewAllLink to="/dashboard/command-center" hash="due" />
           </Lift>
 
           <Lift className="p-5">
@@ -476,6 +527,7 @@ function AdminHomeDashboardInner() {
                 No recommendations right now.
               </p>
             )}
+            <ViewAllLink to="/dashboard/command-center" hash="recommendations" />
           </Lift>
         </div>
 
@@ -513,6 +565,7 @@ function AdminHomeDashboardInner() {
                 )}
               </div>
             )}
+            <ViewAllLink to="/dashboard/compliance-desk" />
           </Lift>
 
           <Lift className="p-5">
@@ -559,6 +612,7 @@ function AdminHomeDashboardInner() {
                 )}
               </ul>
             )}
+            <ViewAllLink to="/dashboard/hub/clients" />
             <div
               className="mt-3 pt-3"
               style={{ borderTop: `1px solid ${PI_THEME.hairlines.faint}` }}

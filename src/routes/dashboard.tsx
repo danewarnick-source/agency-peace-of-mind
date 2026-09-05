@@ -272,6 +272,10 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/ask-nectar", label: "Nectar", icon: Sparkles, feature: "nectar" },
 ];
 
+// Command Center and Compliance Desk stay mounted at
+// /dashboard/command-center and /dashboard/compliance-desk. They are
+// deliberately omitted from this list — Admin Home greeting + View all
+// links are the one-click path for power users.
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },

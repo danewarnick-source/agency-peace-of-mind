@@ -3,25 +3,28 @@
 export const PI_PRODUCT_NAME = "Provider Interface";
 export const PI_PRODUCT_SHORT = "PI";
 export const PI_WORDMARK = "PROVIDER INTERFACE";
-export const PI_HEADLINE = "The day got smaller.";
-export const PI_SUBHEAD = "Go home. It stays standing.";
+export const PI_HEADLINE = "Run the agency.";
+export const PI_HEADLINE_EMPHASIS = "Stop chasing it.";
+export const PI_SUBHEAD =
+  "PI keeps your contract requirements, staff credentials, shift notes, and billing in one place — already set up the day you sign in.";
 /** One supporting line under the headline. Not a feature list. */
 export const PI_HERO_SUPPORT = PI_SUBHEAD;
 
-export const PI_NAVY = "#0b1220";
+export const PI_NAVY = "#0a1120";
 export const PI_NAVY_RAISED = "#111827";
 export const PI_CREAM = "#f3efe6";
 export const PI_CREAM_MUTED = "rgba(243, 239, 230, 0.62)";
 export const PI_GOLD = "#c9a227";
 export const PI_ACTION = "#1e3a5f";
 
-export const PI_PAGE_TITLE = "Provider Interface — Go home. It stays standing.";
+export const PI_PAGE_TITLE = "Provider Interface — Run the agency. Stop chasing it.";
 export const PI_PAGE_DESCRIPTION =
-  "Provider Interface. One number. The whole office. $69 per client / month. $350 minimum. Nectar included. The day stays done.";
+  "PI keeps your DSPD contract requirements, staff credentials, shift notes, and billing in one place — already set up the day you sign in.";
 
 export const PI_SIGN_IN = "Sign in";
 export const PI_TALK_TO_US = "Talk to us";
-export const PI_CTA = "Sign in";
+export const PI_GET_STARTED = "Get started with PI";
+export const PI_CTA = PI_GET_STARTED;
 
 /** Locked public list price. Post these numbers, nothing else. */
 export const PI_LIST_PER_CLIENT_DOLLARS = 69;
@@ -35,12 +38,117 @@ export const PI_LIST_PRICE_INCLUDED =
   "One number. The whole office. People, the schedule, notes already written, trainings in the room, the shop — and Nectar — are in that number. Nothing extra to unlock the rest.";
 export const PI_TRAINING_QUIET = "Training is the only add-on.";
 export const PI_TRAINING_QUIET_LINK = "See pricing.";
-export const PI_FOUNDING_QUIET = "First five agencies, talk to us.";
+export const PI_FOUNDING_QUIET = "First five agencies — talk to us before you sign up.";
 export const PI_SIGNUP_PRICE_LINE = "Plans start at $69 per client / month ($350 minimum).";
 export const PI_ENTERPRISE_LINE = "Custom work. No public dollar amount.";
 export const PI_PRICING_PAGE_TITLE = "Pricing — Provider Interface";
 export const PI_PRICING_PAGE_DESCRIPTION =
   "Provider Interface is $69 per client / month, $350 / month minimum. No setup fee. No add-ons for Nectar. Training optional.";
+
+export const PI_KICKER = "PI · Built for Utah Medicaid disability providers";
+export const PI_HERO_FINE = "$69 per client / month · No setup fee · Nectar included";
+export const PI_PRICE_MIN_AND_TRAINING = "$350 / month minimum · Training is the only add-on";
+
+export const PI_NAV_WHY = "Why PI";
+export const PI_NAV_PRICING = "Pricing";
+export const PI_NAV_TRAINING = "Training";
+export const PI_NAV_CONTACT = "Contact";
+export const PI_NAV_TERMS = "Terms";
+export const PI_NAV_BAA = "BAA";
+
+export const PI_NAV_LINKS = [
+  { href: "/#why", label: PI_NAV_WHY },
+  { href: "/#pricing", label: PI_NAV_PRICING },
+  { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
+] as const;
+
+export const PI_FOOTER_LINKS = [
+  { href: "/#why", label: PI_NAV_WHY },
+  { href: "/#pricing", label: PI_NAV_PRICING },
+  { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
+  { href: "/contact", label: PI_NAV_CONTACT, to: "/contact" as const },
+  { href: "/terms", label: PI_NAV_TERMS, to: "/terms" as const },
+  { href: "/baa", label: PI_NAV_BAA, to: "/baa" as const },
+] as const;
+
+export const PI_COPYRIGHT = "© 2026 Provider Interface";
+
+export const PI_CONTRACT_OBLIGATION_COUNT = 41;
+
+export const PI_HERO_STATS = [
+  { value: "41", label: "contract obligations pre-loaded" },
+  { value: "1", label: "price for everything, no add-ons" },
+  { value: "0", label: "configuration before you start" },
+] as const;
+
+export const PI_WHAT_IS_KICKER = "What PI is";
+export const PI_WHAT_IS_MARK = "PI";
+export const PI_WHAT_IS_LEAD = "Provider Interface.";
+export const PI_WHAT_IS_BODY =
+  "Everyone calls it PI. It's the layer between your agency and the 110-page contract — an operations tool built for owners and administrators, with everything staff need to do the job right. Not a care platform. The thing that runs the office.";
+
+export const PI_WHAT_DOES_KICKER = "What PI does";
+export const PI_WHAT_DOES_HEADLINE = "Three things that used to live in your head.";
+
+export const PI_CELL_ICON_BARS = "≡";
+export const PI_CELL_ICON_DOLLAR = "$";
+
+export const PI_WHAT_PI_DOES = [
+  {
+    icon: "check",
+    title: "Compliance",
+    body: "Every DSPD contract requirement, loaded and tracked automatically.",
+    items: [
+      "Credential deadlines start from hire date",
+      "Flagged 30 days out, every day until resolved",
+      "New hire triggers their own checklist",
+    ],
+  },
+  {
+    icon: "bars",
+    title: "Documentation",
+    body: "Nectar reviews every shift note before staff clock out.",
+    items: [
+      "Checks support given and the person's response",
+      "Knows what each service code requires",
+      "Staff fix it on the spot — not you, later",
+    ],
+  },
+  {
+    icon: "dollar",
+    title: "Billing",
+    body: "See where the month stands before it closes.",
+    items: [
+      "Projected revenue by client and code",
+      "Authorization remaining, per person",
+      "Unbillable shifts the day they happen",
+    ],
+  },
+] as const;
+
+export const PI_NECTAR_KICKER = "Nectar, included in PI";
+export const PI_NECTAR_HEADLINE = "A second set of eyes on every shift.";
+export const PI_NECTAR_SUB = "Not an add-on. Not a tier. Nectar is in the price and runs on every note.";
+export const PI_NECTAR_LABEL = "Nectar";
+export const PI_NECTAR_BEFORE_TAG = "Before";
+export const PI_NECTAR_AFTER_TAG = "After";
+export const PI_NECTAR_BEFORE_QUOTE =
+  "Supported client with daily living goals and assisted with medication.";
+export const PI_NECTAR_BEFORE_NOTE =
+  "Name the goals worked on and how Justin responded. Add whether evening medications were given.";
+export const PI_NECTAR_AFTER_QUOTE =
+  "Supported Justin with meal preparation (Goal 2). He made lunch with one prompt and stayed on task. Evening medications given as prescribed.";
+export const PI_NECTAR_AFTER_NOTE = "Complete. Ready to submit.";
+
+export const PI_PRICING_KICKER = "Pricing";
+
+export const PI_LANDING_INCLUDED = [
+  { title: "Contract obligation tracking", body: "41 DSPD requirements, pre-loaded" },
+  { title: "Nectar", body: "Shift note review, contract search" },
+  { title: "Scheduling and time clock", body: "EVV where required" },
+  { title: "Billing visibility", body: "Revenue, authorizations, unbillable shifts" },
+  { title: "Staff tools", body: "Clock in, notes, training, schedule" },
+] as const;
 
 export const PI_INCLUDED_IN_PRICE = [
   { title: "No setup fee", body: "No onboarding charge to open the office." },
@@ -66,9 +174,7 @@ export const PI_FORBIDDEN_MARKETING = [
   "Connecteam",
   "Relias",
   "Compass",
-  "EVV",
   "timeclock",
-  "DSPD",
   "Scope of Work",
   "GIV",
   "givhealthcare",
@@ -167,5 +273,5 @@ export const PI_PRODUCT_SHOTS = [
 
 export const PI_PRICING_INTRO = PI_LIST_PRICE_INCLUDED;
 
-export const PI_CTA_HEADLINE = "The office stays standing.";
-export const PI_CTA_BODY = "Sign in when you are ready. The day can get smaller.";
+export const PI_CTA_HEADLINE = "Open PI Monday. It's already standing.";
+export const PI_CTA_BODY = PI_FOUNDING_QUIET;

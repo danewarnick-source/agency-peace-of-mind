@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import "./styles/hive-theme.css";
+@import "./components/pi-landing/pi-landing.css";
 
 @custom-variant dark (&:is(.dark *));
 

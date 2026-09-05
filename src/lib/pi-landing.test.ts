@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  PI_CONTRACT_OBLIGATION_COUNT,
+  PI_CTA_HEADLINE,
   PI_FORBIDDEN_MARKETING,
   PI_FORBIDDEN_PUBLIC_PRICES,
   PI_FOUNDING_QUIET,
-  PI_DIFFERENCE_BODY,
-  PI_DIFFERENCE_HEADLINE,
+  PI_GET_STARTED,
   PI_HEADLINE,
+  PI_HEADLINE_EMPHASIS,
   PI_HERO_SUPPORT,
   PI_LIST_MINIMUM_DOLLARS,
   PI_LIST_MINIMUM_LINE,
@@ -15,11 +17,14 @@ import {
   PI_LIST_PRICE_CONTRAST,
   PI_LIST_PRICE_DISPLAY,
   PI_LIST_PRICE_LEAD,
+  PI_NAV_WHY,
+  PI_NECTAR_SUB,
   PI_PAGE_DESCRIPTION,
   PI_PAGE_TITLE,
   PI_SIGNUP_PRICE_LINE,
   PI_SUBHEAD,
   PI_TRAINING_ADDONS,
+  PI_WHAT_IS_LEAD,
   PI_WORDMARK,
 } from "./pi-landing.ts";
 
@@ -42,20 +47,26 @@ function read(url: URL) {
 }
 
 describe("Provider Interface marketing homepage", () => {
-  it("locks the dusk copy and names Nectar", () => {
+  it("locks Dane's PI landing copy and names Nectar", () => {
     assert.equal(PI_WORDMARK, "PROVIDER INTERFACE");
-    assert.equal(PI_HEADLINE, "The day got smaller.");
-    assert.equal(PI_SUBHEAD, "Go home. It stays standing.");
+    assert.equal(PI_HEADLINE, "Run the agency.");
+    assert.equal(PI_HEADLINE_EMPHASIS, "Stop chasing it.");
+    assert.match(PI_SUBHEAD, /already set up the day you sign in/);
     assert.equal(PI_HERO_SUPPORT, PI_SUBHEAD);
-    assert.match(PI_DIFFERENCE_BODY, /Nectar/);
-    assert.equal(PI_DIFFERENCE_HEADLINE, "One number. The whole office.");
+    assert.equal(PI_NAV_WHY, "Why PI");
+    assert.equal(PI_WHAT_IS_LEAD, "Provider Interface.");
+    assert.match(PI_NECTAR_SUB, /Nectar is in the price/);
+    assert.equal(PI_GET_STARTED, "Get started with PI");
+    assert.equal(PI_CTA_HEADLINE, "Open PI Monday. It's already standing.");
     assert.match(PI_PAGE_TITLE, /Provider Interface/);
-    assert.match(PI_PAGE_DESCRIPTION, /Nectar/);
+    assert.match(PI_PAGE_TITLE, /Stop chasing it/);
+    assert.match(PI_PAGE_DESCRIPTION, /DSPD contract requirements/);
   });
 
   it("posts only the locked list price", () => {
     assert.equal(PI_LIST_PER_CLIENT_DOLLARS, 69);
     assert.equal(PI_LIST_MINIMUM_DOLLARS, 350);
+    assert.equal(PI_CONTRACT_OBLIGATION_COUNT, 41);
     assert.equal(PI_LIST_PRICE_DISPLAY, "$69");
     assert.equal(PI_LIST_MINIMUM_LINE, "$350 / month minimum");
     assert.equal(PI_LIST_PRICE_LEAD, "The list price is the price.");
@@ -75,20 +86,28 @@ describe("Provider Interface marketing homepage", () => {
     const pricing = read(new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url));
     const shots = read(new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url));
     const header = read(new URL("../components/pi-landing/pi-public-header.tsx", import.meta.url));
+    const root = read(new URL("../routes/__root.tsx", import.meta.url));
+    assert.match(root, /family=Newsreader/);
+    assert.match(root, /0,6\.\.72,300/);
     assert.match(page, /PiMarketingPage/);
     assert.doesNotMatch(landing, /what-you-get/);
     assert.doesNotMatch(landing, /PiProductShots/);
     assert.doesNotMatch(landing, /PI_WHAT_YOU_GET/);
+    assert.doesNotMatch(landing, /DuskDeskStill|PiPricingSection/);
     assert.match(landing, /id="why"/);
-    assert.match(landing, /PiPricingSection/);
-    assert.match(landing, /compact/);
-    assert.match(landing, /to="\/login"/);
+    assert.match(landing, /id="pricing"/);
+    assert.match(landing, /to="\/signup"/);
     assert.match(landing, /to="\/contact"/);
+    assert.match(landing, /PI_LIST_PRICE_DISPLAY/);
+    assert.match(landing, /PI_LANDING_INCLUDED/);
     assert.doesNotMatch(header, /What you get/);
     assert.doesNotMatch(header, /The office/);
-    assert.match(header, /\/#why/);
-    assert.match(header, /\/training/);
-    assert.match(header, /Training/);
+    assert.match(header, /PI_NAV_LINKS/);
+    assert.match(header, /to="\/login"/);
+    const copy = read(new URL("./pi-landing.ts", import.meta.url));
+    assert.match(copy, /\/#why/);
+    assert.match(copy, /\/#pricing/);
+    assert.match(copy, /to: "\/training"/);
     assert.match(shots, /Nectar/);
     assert.match(pricing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(pricing, /PI_TRAINING_ADDONS/);
@@ -105,15 +124,11 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_FORBIDDEN_MARKETING.includes("Nectar" as never), false);
   });
 
-  it("keeps the laptop mock in document flow so it cannot cover the difference headline", () => {
-    const desk = read(new URL("../components/pi-landing/dusk-desk-still.tsx", import.meta.url));
+  it("does not mount the old dusk laptop mock on the public landing", () => {
     const landing = read(new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url));
-    assert.match(desk, /DuskPeopleScreen/);
-    assert.doesNotMatch(desk, /absolute inset-x-0 top-\[10%\]/);
-    assert.doesNotMatch(desk, /h-\[min\(42vh,480px\)\]/);
-    assert.match(desk, /relative flex justify-center/);
-    assert.match(landing, /PI_DIFFERENCE_HEADLINE/);
-    assert.match(landing, /DuskDeskStill/);
+    assert.doesNotMatch(landing, /DuskDeskStill|DuskPeopleScreen|PI_DIFFERENCE_HEADLINE/);
+    assert.match(landing, /PI_WHAT_IS_LEAD/);
+    assert.match(landing, /PI_NECTAR_BEFORE_QUOTE/);
   });
 
   it("signup walk posts list price, optional training, and no True North placeholder", () => {
@@ -172,12 +187,18 @@ describe("Provider Interface marketing homepage", () => {
     }
   });
 
-  it("keeps the π mark geometric: straight bar, equal verticals", () => {
+  it("keeps the π mark geometric: three squared rects in a 36 viewBox", () => {
     const mark = read(new URL("../components/pi-landing/pi-mark.tsx", import.meta.url));
-    assert.match(mark, /M6 10H42/);
-    assert.match(mark, /M15 10V40/);
-    assert.match(mark, /M33 10V40/);
-    assert.doesNotMatch(mark, /M15 10V28/);
+    assert.match(mark, /viewBox="0 0 36 36"/);
+    assert.match(mark, /x="4"/);
+    assert.match(mark, /y="4"/);
+    assert.match(mark, /width="28"/);
+    assert.match(mark, /height="5"/);
+    assert.match(mark, /x="9"/);
+    assert.match(mark, /height="23"/);
+    assert.match(mark, /x="22"/);
+    assert.match(mark, /variant === "hero"/);
+    assert.doesNotMatch(mark, /M6 10H42/);
     assert.doesNotMatch(mark, /polygon|hexagon|Hexagon/i);
   });
 });

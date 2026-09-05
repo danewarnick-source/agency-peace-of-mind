@@ -1,102 +1,217 @@
+import { useLayoutEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
 import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
-import { PiPricingSection } from "@/components/pi-landing/pi-pricing";
-import { DuskDeskStill } from "@/components/pi-landing/dusk-desk-still";
+import { PiMark } from "@/components/pi-landing/pi-mark";
 import {
-  PI_DIFFERENCE_BODY,
-  PI_DIFFERENCE_HEADLINE,
+  PI_CTA_BODY,
+  PI_CTA_HEADLINE,
+  PI_GET_STARTED,
   PI_HEADLINE,
-  PI_PROBLEM_BODY,
-  PI_PROBLEM_HEADLINE,
-  PI_PROBLEM_KICKER,
-  PI_SIGN_IN,
+  PI_HEADLINE_EMPHASIS,
+  PI_HERO_FINE,
+  PI_HERO_STATS,
+  PI_KICKER,
+  PI_LANDING_INCLUDED,
+  PI_LIST_PRICE_DISPLAY,
+  PI_LIST_PRICE_LEAD,
+  PI_LIST_PRICE_UNIT,
+  PI_NECTAR_AFTER_NOTE,
+  PI_NECTAR_AFTER_QUOTE,
+  PI_NECTAR_AFTER_TAG,
+  PI_NECTAR_BEFORE_NOTE,
+  PI_NECTAR_BEFORE_QUOTE,
+  PI_NECTAR_BEFORE_TAG,
+  PI_NECTAR_HEADLINE,
+  PI_NECTAR_KICKER,
+  PI_NECTAR_LABEL,
+  PI_NECTAR_SUB,
+  PI_PRICE_MIN_AND_TRAINING,
+  PI_PRICING_KICKER,
   PI_SUBHEAD,
   PI_TALK_TO_US,
+  PI_WHAT_DOES_HEADLINE,
+  PI_WHAT_DOES_KICKER,
+  PI_WHAT_IS_BODY,
+  PI_WHAT_IS_KICKER,
+  PI_WHAT_IS_LEAD,
+  PI_WHAT_IS_MARK,
+  PI_WHAT_PI_DOES,
+  PI_CELL_ICON_BARS,
+  PI_CELL_ICON_DOLLAR,
 } from "@/lib/pi-landing";
 
-const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as const;
+function CellIcon({ icon }: { icon: (typeof PI_WHAT_PI_DOES)[number]["icon"] }) {
+  if (icon === "check") {
+    return (
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+        <path
+          d="M3.2 8.6 6.6 12 13.8 4.6"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  if (icon === "bars") return PI_CELL_ICON_BARS;
+  return PI_CELL_ICON_DOLLAR;
+}
+
+function InclCheck() {
+  return (
+    <svg className="pi-check" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <path
+        d="M2.2 7.2 5.4 10.3 11.8 3.6"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function PiMarketingPage() {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("pi-html-landing");
+    return () => root.classList.remove("pi-html-landing");
+  }, []);
+
   return (
-    <div className="relative min-h-screen bg-[#0b1220] text-[#f3efe6]">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative z-10">
-        <PiPublicHeader />
-
-        <main>
-          <section className="px-5 pb-8 pt-10 sm:px-8 sm:pt-14 md:pt-16">
-            <h1
-              className="mx-auto max-w-4xl text-center text-[2.35rem] font-medium leading-[1.08] tracking-[-0.02em] text-[#f3efe6] sm:text-6xl md:text-[4.15rem]"
-              style={NEWSREADER}
-            >
-              {PI_HEADLINE}
-            </h1>
-            <p
-              className="mt-3 text-center text-lg font-normal text-[#f3efe6]/68 sm:mt-4 sm:text-xl"
-              style={NEWSREADER}
-            >
-              {PI_SUBHEAD}
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                to="/login"
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#f3efe6] px-6 text-sm font-medium text-[#0b1220] hover:bg-[#f3efe6]/90"
-              >
-                {PI_SIGN_IN}
-              </Link>
-              <Link
-                to="/contact"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#f3efe6]/25 px-6 text-sm font-medium text-[#f3efe6] hover:bg-white/[0.06]"
-              >
-                {PI_TALK_TO_US}
-              </Link>
-            </div>
-          </section>
-
-          <div className="pb-8 sm:pb-10">
-            <DuskDeskStill />
+    <div className="pi-landing-root">
+      <div className="grain" aria-hidden />
+      <PiPublicHeader />
+      <header className="wrap hero">
+        <PiMark variant="hero" width={60} height={60} className="hero-mark" />
+        <div className="kick">
+          <i aria-hidden />
+          {PI_KICKER}
+        </div>
+        <h1>
+          {PI_HEADLINE} <em>{PI_HEADLINE_EMPHASIS}</em>
+        </h1>
+        <p className="lede">{PI_SUBHEAD}</p>
+        <div className="ctas">
+          <Link className="btn p" to="/signup">
+            {PI_GET_STARTED}
+          </Link>
+          <Link className="btn s" to="/contact">
+            {PI_TALK_TO_US}
+          </Link>
+        </div>
+        <div className="fine">{PI_HERO_FINE}</div>
+      </header>
+      <div className="wrap strip">
+        {PI_HERO_STATS.map((stat) => (
+          <div className="st" key={stat.label}>
+            <b>{stat.value}</b>
+            <span>{stat.label}</span>
           </div>
-
-          <section id="why" className="scroll-mt-24 px-5 py-16 sm:px-8 md:py-20">
-            <div className="mx-auto max-w-3xl">
-              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#f3efe6]/45">
-                {PI_PROBLEM_KICKER}
-              </p>
-              <h2
-                className="mt-3 text-3xl font-medium leading-[1.12] tracking-[-0.02em] sm:text-5xl"
-                style={NEWSREADER}
-              >
-                {PI_PROBLEM_HEADLINE}
-              </h2>
-              <p className="mt-5 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
-                {PI_PROBLEM_BODY}
-              </p>
-              <h3
-                className="mt-12 text-2xl font-medium leading-[1.15] tracking-[-0.02em] sm:text-4xl"
-                style={NEWSREADER}
-              >
-                {PI_DIFFERENCE_HEADLINE}
-              </h3>
-              <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#f3efe6]/62 sm:text-lg">
-                {PI_DIFFERENCE_BODY}
-              </p>
-            </div>
-          </section>
-
-          <PiPricingSection heading="The number" compact />
-        </main>
-
-        <PiPublicFooter />
+        ))}
       </div>
+      <section id="why">
+        <div className="wrap">
+          <div className="sk">{PI_WHAT_IS_KICKER}</div>
+          <div className="pi">
+            <div className="pi-big">{PI_WHAT_IS_MARK}</div>
+            <p>
+              <b>{PI_WHAT_IS_LEAD}</b> {PI_WHAT_IS_BODY}
+            </p>
+          </div>
+        </div>
+      </section>
+      <section className="alt">
+        <div className="wrap">
+          <div className="sk">{PI_WHAT_DOES_KICKER}</div>
+          <h2>{PI_WHAT_DOES_HEADLINE}</h2>
+          <div className="three">
+            {PI_WHAT_PI_DOES.map((cell) => (
+              <div className="cell" key={cell.title}>
+                <div className="ico">
+                  <CellIcon icon={cell.icon} />
+                </div>
+                <h3>{cell.title}</h3>
+                <p>{cell.body}</p>
+                <ul>
+                  {cell.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section>
+        <div className="wrap">
+          <div className="sk">{PI_NECTAR_KICKER}</div>
+          <h2>{PI_NECTAR_HEADLINE}</h2>
+          <p className="sub">{PI_NECTAR_SUB}</p>
+          <div className="ex">
+            <div className="card">
+              <div className="tag no">{PI_NECTAR_BEFORE_TAG}</div>
+              <q>{PI_NECTAR_BEFORE_QUOTE}</q>
+              <div className="note">
+                <b>{PI_NECTAR_LABEL}</b>
+                {PI_NECTAR_BEFORE_NOTE}
+              </div>
+            </div>
+            <div className="card yes">
+              <div className="tag yes">{PI_NECTAR_AFTER_TAG}</div>
+              <q>{PI_NECTAR_AFTER_QUOTE}</q>
+              <div className="note">
+                <b>{PI_NECTAR_LABEL}</b>
+                {PI_NECTAR_AFTER_NOTE}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="alt" id="pricing">
+        <div className="wrap">
+          <div className="sk">{PI_PRICING_KICKER}</div>
+          <h2>{PI_LIST_PRICE_LEAD}</h2>
+          <div className="pricebox">
+            <div>
+              <div className="big">{PI_LIST_PRICE_DISPLAY}</div>
+              <div className="per">{PI_LIST_PRICE_UNIT}</div>
+              <div className="min">{PI_PRICE_MIN_AND_TRAINING}</div>
+              <div className="ctas">
+                <Link className="btn p" to="/signup">
+                  {PI_GET_STARTED}
+                </Link>
+                <Link className="btn s" to="/contact">
+                  {PI_TALK_TO_US}
+                </Link>
+              </div>
+            </div>
+            <ul className="incl">
+              {PI_LANDING_INCLUDED.map((row) => (
+                <li key={row.title}>
+                  <InclCheck />
+                  <div>
+                    {row.title}
+                    <small>{row.body}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section className="cta">
+        <div className="wrap">
+          <h2>{PI_CTA_HEADLINE}</h2>
+          <p className="sub">{PI_CTA_BODY}</p>
+          <Link className="btn p" to="/signup">
+            {PI_GET_STARTED}
+          </Link>
+        </div>
+      </section>
+      <PiPublicFooter />
     </div>
   );
 }

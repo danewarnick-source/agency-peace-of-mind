@@ -1,34 +1,26 @@
 import { Link } from "@tanstack/react-router";
-import { PiWordmark } from "@/components/pi-landing/pi-mark";
+import { PiBrandLockup } from "@/components/pi-landing/pi-mark";
+import { PI_COPYRIGHT, PI_FOOTER_LINKS } from "@/lib/pi-landing";
 
 export function PiPublicFooter() {
   return (
-    <footer className="border-t border-white/[0.08] bg-[#0b1220] py-12 text-[#f3efe6]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 sm:px-8 md:flex-row md:items-start md:justify-between">
-        <PiWordmark to="/" compact />
-        <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-[#f3efe6]/70">
-          <Link to="/pricing" className="hover:text-[#f3efe6]">
-            Pricing
-          </Link>
-          <Link to="/training" className="hover:text-[#f3efe6]">
-            Training
-          </Link>
-          <Link to="/login" className="hover:text-[#f3efe6]">
-            Sign in
-          </Link>
-          <Link to="/contact" className="hover:text-[#f3efe6]">
-            Contact
-          </Link>
-          <Link to="/terms" className="hover:text-[#f3efe6]">
-            Terms
-          </Link>
-          <Link to="/baa" className="hover:text-[#f3efe6]">
-            BAA
-          </Link>
+    <footer className="pi-pub-foot">
+      <div className="wrap foot">
+        <PiBrandLockup markSize={18} />
+        <div className="links">
+          {PI_FOOTER_LINKS.map((item) =>
+            "to" in item && item.to ? (
+              <Link key={item.label} to={item.to}>
+                {item.label}
+              </Link>
+            ) : (
+              <a key={item.label} href={item.href}>
+                {item.label}
+              </a>
+            ),
+          )}
         </div>
-      </div>
-      <div className="mx-auto mt-10 max-w-7xl px-5 text-xs text-[#f3efe6]/40 sm:px-8">
-        © {new Date().getFullYear()} Provider Interface. All rights reserved.
+        <div>{PI_COPYRIGHT}</div>
       </div>
     </footer>
   );

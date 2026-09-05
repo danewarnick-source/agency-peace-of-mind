@@ -85,9 +85,30 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
     await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: "Provider Interface" })).toBeVisible();
+    await expect(page.getByTestId("admin-home-welcome")).toHaveCount(0);
     await assertNoCrash(page, "admin home");
     await shot(page, "admin-home");
   });
+
+  test("welcome=1 shows the Home banner above the greeting; Skip hides it", async ({ page }) => {
+    await page.goto("/dashboard?welcome=1", { waitUntil: "domcontentloaded" });
+    const banner = page.getByTestId("admin-home-welcome");
+    await expect(banner).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible();
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible();
+    await expect(banner.getByRole("button", { name: /Skip — take me to my dashboard/i })).toBeVisible();
+    await expect(banner.getByText(/You're set up\. This banner will close itself\./i)).toBeVisible();
+    await expect(banner.getByRole("button", { name: /Go to my dashboard/i })).toBeVisible();
+    const box = await banner.boundingBox();
+    expect(box?.height ?? 999, "desktop banner stays near 280px").toBeLessThanOrEqual(300);
+    await shot(page, "admin-home-welcome-banner");
+
+    await banner.getByRole("button", { name: /Skip — take me to my dashboard/i }).click();
+    await expect(banner).toHaveCount(0);
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible();
+    await assertNoCrash(page, "admin home after skip welcome");
+  });
+
 
   test("Admin Home scrolls — cards are reachable in the shell", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 560 });
@@ -278,6 +299,27 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
       timeout: 20_000,
     });
     await assertNoCrash(page, "/admin entry");
+  });
+});
+
+test.describe("Admin Home welcome — incomplete setup", () => {
+  test.beforeEach(async ({ page }) => {
+    await installHiveMocks(page, { role: "admin", welcomeIncomplete: true });
+  });
+
+  test("welcome banner cards collapse to pills on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    const banner = page.getByTestId("admin-home-welcome");
+    await expect(banner).toBeVisible({ timeout: 25_000 });
+    await expect(banner.getByRole("link", { name: /Add employee/i })).toBeVisible();
+    await expect(banner.getByRole("link", { name: /Add client/i })).toBeVisible();
+    await expect(banner.getByRole("link", { name: /Documentation/i })).toBeVisible();
+    await expect(banner.getByTestId("welcome-chip-Invite staff")).toBeVisible();
+    await expect(banner.getByTestId("welcome-chip-Add a client")).toBeVisible();
+    await expect(banner.getByTestId("welcome-chip-Document a shift")).toBeVisible();
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible();
+    await shot(page, "admin-home-welcome-mobile");
   });
 });
 

@@ -36,16 +36,18 @@ describe("feeling-hero B (parked for Step 3)", () => {
     );
   });
 
-  it("keeps feeling-hero JSX in admin-home-welcome and unused by Home", () => {
+  it("keeps feeling-hero copy locked and the schedule tablet unused by Home", () => {
     const welcome = read("../components/admin-home/admin-home-welcome.tsx");
     const dash = read("../components/admin-home/admin-home-dashboard.tsx");
-    const index = read("../routes/dashboard.index.tsx");
+    const tablet = read("../components/admin-home/admin-home-schedule-tablet.tsx");
     assert.match(welcome, /ADMIN_HOME_HEADLINE/);
-    assert.match(welcome, /AdminHomeScheduleTablet/);
     assert.match(welcome, /export function AdminHomeWelcome/);
-    assert.doesNotMatch(dash, /AdminHomeWelcome|ADMIN_HOME_HEADLINE|AdminHomeScheduleTablet/);
-    assert.doesNotMatch(index, /AdminHomeWelcome/);
-    assert.match(index, /AdminHomeDashboard/);
+    assert.match(tablet, /AdminHomeScheduleTablet/);
+    assert.doesNotMatch(welcome, /AdminHomeScheduleTablet/);
+    assert.doesNotMatch(dash, /ADMIN_HOME_HEADLINE|AdminHomeScheduleTablet/);
+    assert.doesNotMatch(welcome, /#F3E5AB|ADMIN_HOME_PALE_GOLD/);
+    assert.match(welcome, /PI_THEME\.cream/);
+    assert.match(welcome, /PI_THEME\.buttons\.primaryBg/);
   });
 
   it("lets the shell main scroll — page must not clip at 100% height", () => {
@@ -114,7 +116,50 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(dash, /fontSize: 12/);
     assert.match(dash, /PI_THEME\.c50/);
     assert.match(dash, /PI_THEME\.gold/);
-    assert.doesNotMatch(dash, /welcome_dismissed_at/);
-    assert.doesNotMatch(dash, /AdminHomeWelcome/);
+    assert.match(dash, /AdminHomeWelcome/);
+  });
+});
+
+describe("Admin Home Step 3 — welcome banner", () => {
+  it("mounts AdminHomeWelcome above the greeting and passes welcomeFlag", () => {
+    const dash = read("../components/admin-home/admin-home-dashboard.tsx");
+    const index = read("../routes/dashboard.index.tsx");
+    const welcome = read("../components/admin-home/admin-home-welcome.tsx");
+    assert.match(index, /welcomeFlag=\{!!search\.welcome\}/);
+    assert.match(dash, /<AdminHomeWelcome welcomeFlag=\{welcomeFlag\} \/>/);
+    assert.match(dash, /<Suspense fallback=\{null\}>/);
+    const greetingIdx = dash.indexOf("Good {greetingWord");
+    const bannerIdx = dash.indexOf("<AdminHomeWelcome");
+    assert.ok(bannerIdx >= 0 && greetingIdx > bannerIdx, "banner above greeting");
+    assert.match(welcome, /lg:max-h-\[280px\]/);
+    assert.match(welcome, /Skip — take me to my dashboard/);
+    assert.match(welcome, /Go to my dashboard/);
+    assert.match(welcome, /You&apos;re set up\. This banner will close itself\./);
+    assert.match(welcome, /Invite staff/);
+    assert.match(welcome, /Add a client/);
+    assert.match(welcome, /Document a shift/);
+    assert.match(welcome, /dismissAdminWelcome/);
+    assert.doesNotMatch(welcome, /[\u{1F300}-\u{1FAFF}]/u);
+  });
+
+  it("counts attested EVV narratives plus daily logs for documentedShiftCount", () => {
+    const hook = read("../components/admin-home/use-admin-home-welcome.ts");
+    assert.match(hook, /evv_timesheets/);
+    assert.match(hook, /attested_accurate\.eq\.true,attested_at\.not\.is\.null/);
+    assert.match(hook, /daily_logs/);
+    assert.match(hook, /documentedShiftCount: \(timesheetsRes\.count \?\? 0\) \+ \(logsRes\.count \?\? 0\)/);
+  });
+
+  it("drops localStorage welcome dismissal so nectar and Home share welcome_dismissed_at", () => {
+    const panel = read("../components/onboarding/nectar-onboarding-panel.tsx");
+    const hook = read("../hooks/use-onboarding-progress.tsx");
+    const fn = read("./admin-home-welcome.functions.ts");
+    assert.doesNotMatch(panel, /hive_onboarding_\$\{orgId\}_dismissed|lsKey\(orgId, "dismissed"\)/);
+    assert.match(panel, /dismissAdminWelcome/);
+    assert.match(hook, /welcome_dismissed_at/);
+    assert.match(fn, /requireSupabaseAuth/);
+    assert.match(fn, /requireOrgMembership/);
+    assert.match(fn, /welcome_dismissed_at/);
+    assert.match(fn, /"admin"/);
   });
 });

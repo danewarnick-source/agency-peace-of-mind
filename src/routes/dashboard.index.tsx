@@ -263,6 +263,7 @@ function StaffCaseloadHome() {
 function Overview() {
   const { data: org } = useCurrentOrg();
   const { view, subView, hasStoredView } = usePortalView();
+  const search = Route.useSearch();
 
   const isManager =
     org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
@@ -275,7 +276,7 @@ function Overview() {
 
   return (
     <div className={showAdmin ? "min-h-full" : "space-y-8"}>
-      {showAdmin && <AdminHomeDashboard />}
+      {showAdmin && <AdminHomeDashboard welcomeFlag={!!search.welcome} />}
 
       {!showAdmin && <StaffCaseloadHome />}
     </div>

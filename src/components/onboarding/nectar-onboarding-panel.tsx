@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   CheckCircle2,
   Lock,
@@ -29,6 +31,7 @@ import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-sourc
 import { AttestationBanner } from "@/components/nectar/attestation-banner";
 import { OnboardingPipelineCard } from "@/components/company-overview/onboarding-pipeline-card";
 import { useOnboardingProgress } from "@/hooks/use-onboarding-progress";
+import { dismissAdminWelcome } from "@/lib/admin-home-welcome.functions";
 import { cn } from "@/lib/utils";
 
 const SERVICE_OPTIONS = ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS"] as const;
@@ -80,6 +83,8 @@ export function NectarOnboardingPanel({
 }) {
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const dismissWelcome = useServerFn(dismissAdminWelcome);
   const orgId = org?.organization_id;
   const orgName = org?.organization_name ?? "your agency";
   const userMeta = (user?.user_metadata ?? {}) as { first_name?: string; full_name?: string };
@@ -90,7 +95,7 @@ export function NectarOnboardingPanel({
     "there";
 
   // --- Persistent local state -----------------------------------------------
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissedNow, setDismissedNow] = useState(false);
   const [profileSavedLocal, setProfileSavedLocal] = useState(false);
   const [servicesVisited, setServicesVisited] = useState(false);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(EMPTY_PROFILE);
@@ -98,14 +103,14 @@ export function NectarOnboardingPanel({
 
   useEffect(() => {
     if (!orgId) return;
-    setDismissed(readLS(lsKey(orgId, "dismissed"), false));
     setProfileSavedLocal(readLS(lsKey(orgId, "profile_saved"), false));
     setServicesVisited(readLS(lsKey(orgId, "services_visited"), false));
     setProfileDraft(readLS<ProfileDraft>(lsKey(orgId, "profile"), EMPTY_PROFILE));
   }, [orgId]);
 
   // --- Detection queries (shared hook — single source of truth) -------------
-  const { counts: c, refetch: refetchCounts } = useOnboardingProgress();
+  const { counts: c, dismissed: dismissedFromOrg, refetch: refetchCounts } = useOnboardingProgress();
+  const dismissed = dismissedNow || dismissedFromOrg;
 
   // --- Step completion ------------------------------------------------------
   const step1Complete = c.sowCount > 0 && c.attestationCount > 0;
@@ -154,8 +159,15 @@ export function NectarOnboardingPanel({
   if (!shouldShow || !orgId) return null;
 
   const dismiss = () => {
-    writeLS(lsKey(orgId, "dismissed"), true);
-    setDismissed(true);
+    setDismissedNow(true);
+    if (!orgId) return;
+    void dismissWelcome({ data: { organizationId: orgId } })
+      .then(() =>
+        queryClient.invalidateQueries({ queryKey: ["nectar-onboarding-progress", orgId] }),
+      )
+      .catch(() => {
+        /* banner already hidden */
+      });
   };
 
   const saveProfile = async () => {

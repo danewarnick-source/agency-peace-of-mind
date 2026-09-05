@@ -57,6 +57,7 @@ export function useOnboardingProgress() {
       serviceCodesCount: number;
       docsCount: number;
       profileSaved: boolean;
+      welcomeDismissedAt: string | null;
     }> => {
       const [authDocs, attestations, members, clients, codes, allDocs, activeCodes, orgProfile] =
         await Promise.all([
@@ -93,7 +94,7 @@ export function useOnboardingProgress() {
             .eq("is_active", true),
           supabase
             .from("organizations")
-            .select("nectar_profile_saved_at")
+            .select("nectar_profile_saved_at, welcome_dismissed_at")
             .eq("id", orgId!)
             .maybeSingle(),
         ]);
@@ -109,6 +110,7 @@ export function useOnboardingProgress() {
         serviceCodesCount: activeCodes.count ?? 0,
         docsCount: allDocs.count ?? 0,
         profileSaved: !!(orgProfile.data as any)?.nectar_profile_saved_at,
+        welcomeDismissedAt: ((orgProfile.data as any)?.welcome_dismissed_at as string | null) ?? null,
       };
     },
     refetchOnWindowFocus: true,
@@ -125,6 +127,7 @@ export function useOnboardingProgress() {
     serviceCodesCount: 0,
     docsCount: 0,
     profileSaved: false,
+    welcomeDismissedAt: null,
   };
 
   const step1 = c.sowCount > 0 && c.attestationCount > 0;
@@ -142,7 +145,7 @@ export function useOnboardingProgress() {
   const completedCount = Object.values(steps).filter(Boolean).length;
   const totalSteps = 6;
   const allComplete = completedCount === totalSteps;
-  const dismissed = !!orgId && readLS<boolean>(lsKey(orgId, "dismissed"), false);
+  const dismissed = !!c.welcomeDismissedAt;
 
   return {
     orgId,

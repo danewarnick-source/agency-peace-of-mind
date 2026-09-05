@@ -46,10 +46,13 @@ const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 export type MockPersona = "admin" | "employee";
 
 let mockIsExecutive = false;
+let mockWelcomeIncomplete = false;
 
 export type HiveMockOptions = {
   role?: MockPersona;
   isExecutive?: boolean;
+  /** Young org with no documented shifts — banner chips stay incomplete. */
+  welcomeIncomplete?: boolean;
 };
 
 const isoDaysFromNow = (days: number) =>
@@ -62,6 +65,8 @@ const ORG = {
   dba_name: "True North Supports",
   display_acronym: "TNS",
   services_offered: ["HHS", "SLH", "SLN", "SEI", "DSI"],
+  created_at: "2025-01-15T00:00:00.000Z",
+  welcome_dismissed_at: null as string | null,
 };
 
 const EMPTY_AUDIT_EVIDENCE = {
@@ -698,7 +703,17 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
 
   return {
     organization_members: members,
-    organizations: [{ id: TNS_ORG_ID, nectar_profile_saved_at: null, ...ORG }],
+    organizations: [
+      {
+        id: TNS_ORG_ID,
+        nectar_profile_saved_at: null,
+        ...ORG,
+        created_at: mockWelcomeIncomplete
+          ? new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+          : ORG.created_at,
+        welcome_dismissed_at: null,
+      },
+    ],
     profiles,
     org_member_directory: directory,
     role_permissions: rolePermissions,
@@ -722,8 +737,33 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
     company_obligation_completions: completions,
     clients,
     client_billing_codes: billing,
-    evv_timesheets: [],
-    daily_logs: [],
+    evv_timesheets: mockWelcomeIncomplete
+      ? []
+      : [
+          {
+            id: "e2e00000-0000-4000-a000-000000000050",
+            organization_id: TNS_ORG_ID,
+            client_id: CLIENT_ID,
+            staff_id: STAFF_USER_ID,
+            attested_accurate: true,
+            attested_at: "2026-08-01T18:00:00.000Z",
+            shift_note_text: "Supported grocery shopping and practiced money skills.",
+            status: "Completed",
+          },
+        ],
+    daily_logs: mockWelcomeIncomplete
+      ? []
+      : [
+          {
+            id: "e2e00000-0000-4000-a000-000000000051",
+            organization_id: TNS_ORG_ID,
+            client_id: CLIENT_ID,
+            user_id: STAFF_USER_ID,
+            narrative: "Supported grocery shopping.",
+            log_date: "2026-08-01",
+            status: "approved",
+          },
+        ],
     incident_reports: [],
     forms: [],
     staff_groups: [],
@@ -810,6 +850,7 @@ function serverFnName(url: string, postText: string): string | null {
     "getPendingUpgradeRequestCount",
     "getActiveDraftJobs",
     "listMyPendingPolicies",
+    "dismissAdminWelcome",
     "ensureCurrentSummaryPeriods",
     "listOpenSummaries",
     "checkAndMarkOverdue",
@@ -1103,6 +1144,8 @@ function serverFnResult(
       return [];
     case "listMyPendingPolicies":
       return { pending: [], gating: [] };
+    case "dismissAdminWelcome":
+      return { ok: true };
     case "ensureCurrentSummaryPeriods":
       return { ok: true };
     case "listOpenSummaries":
@@ -1277,6 +1320,7 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
 export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
   const persona: MockPersona = opts.role ?? "admin";
   mockIsExecutive = opts.isExecutive ?? false;
+  mockWelcomeIncomplete = opts.welcomeIncomplete ?? false;
   const fx = fixtures();
   const session = sessionRecord(persona);
 

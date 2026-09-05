@@ -1,133 +1,257 @@
 /**
- * Feeling-hero B — moved aside for Step 3 (welcome banner).
- * Not mounted in Admin Home this PR.
+ * Admin Home welcome banner — mountain backdrop, setup chips, destination pills.
+ * Max ~280px on desktop. Sits above the Home greeting, not its own page.
  */
-import { Link } from "@tanstack/react-router";
-import { ClipboardList, User } from "lucide-react";
-import { AdminHomeScheduleTablet } from "@/components/admin-home/admin-home-schedule-tablet";
+import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { PI_THEME } from "@/lib/pi-theme";
 import {
-  ADMIN_HOME_BOARD_CTA,
-  ADMIN_HOME_BOARD_TO,
   ADMIN_HOME_CARDS,
-  ADMIN_HOME_DUSK,
   ADMIN_HOME_EYEBROW,
-  ADMIN_HOME_FOOTER,
   ADMIN_HOME_HEADLINE,
-  ADMIN_HOME_PALE_GOLD,
   ADMIN_HOME_SUBHEAD,
-  type AdminHomeCard,
 } from "@/lib/admin-home-feeling";
+import { dismissAdminWelcome } from "@/lib/admin-home-welcome.functions";
+import { shouldShowWelcome, welcomeSetupProgress } from "@/lib/admin-home-welcome-rule";
+import {
+  adminHomeWelcomeQueryKey,
+  useAdminHomeWelcomeCounts,
+} from "@/components/admin-home/use-admin-home-welcome";
 
-const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as const;
+const SERIF = { fontFamily: PI_THEME.serif } as const;
+const SANS = { fontFamily: PI_THEME.sans } as const;
 
-function DuskMountainBackdrop() {
+function MountainBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "linear-gradient(180deg, #1a2744 0%, #10192c 38%, #0B1120 72%, #070b14 100%)",
+          background: `linear-gradient(180deg, ${PI_THEME.n3} 0%, ${PI_THEME.n2} 38%, ${PI_THEME.navy} 72%, ${PI_THEME.navy} 100%)`,
         }}
       />
       <svg
-        className="absolute inset-x-0 bottom-0 h-[68%] w-full"
+        className="absolute inset-x-0 bottom-0 h-[78%] w-full"
         viewBox="0 0 1440 640"
         preserveAspectRatio="xMidYMax slice"
         fill="none"
       >
         <path
-          fill="#1b2b44"
+          fill={PI_THEME.n2}
           d="M0 392C168 318 318 354 478 286C638 218 786 304 954 248C1122 192 1272 258 1440 228V640H0V392Z"
         />
         <path
-          fill="#121d30"
+          fill={PI_THEME.n1}
           d="M0 448C196 372 352 424 520 368C700 304 868 412 1054 356C1220 310 1328 396 1440 368V640H0V448Z"
         />
         <path
-          fill="#0a101c"
+          fill={PI_THEME.navy}
           d="M0 528C214 470 392 554 620 500C848 446 1096 560 1440 486V640H0V528Z"
         />
       </svg>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-[#0B1120]/45" />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `linear-gradient(to top, ${PI_THEME.navy}, transparent 55%, ${PI_THEME.navy}66)`,
+        }}
+      />
     </div>
   );
 }
 
-function CardIcon({ cardKey }: { cardKey: AdminHomeCard["key"] }) {
-  const Icon = cardKey === "notes" ? ClipboardList : User;
+function CheckMark({ className }: { className?: string }) {
   return (
-    <span className="grid h-10 w-10 place-items-center rounded-full border border-white/70 text-white">
-      <Icon className="h-4 w-4" strokeWidth={1.5} />
+    <svg
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      className={className}
+      aria-hidden
+      fill="none"
+    >
+      <path
+        d="M3.2 8.3 6.1 11.2 12.8 4.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ProgressChip({ done, label }: { done: boolean; label: string }) {
+  return (
+    <span
+      data-testid={`welcome-chip-${label}`}
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+      style={{
+        background: done ? "rgba(95, 174, 127, 0.16)" : PI_THEME.c08,
+        color: done ? PI_THEME.ok : PI_THEME.c50,
+        border: `1px solid ${done ? "rgba(95, 174, 127, 0.35)" : PI_THEME.hairlines.faint}`,
+      }}
+    >
+      {done ? <CheckMark /> : (
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: PI_THEME.c30 }}
+          aria-hidden
+        />
+      )}
+      {label}
     </span>
   );
 }
 
-export function AdminHomeWelcome() {
+export function AdminHomeWelcome({ welcomeFlag = false }: { welcomeFlag?: boolean }) {
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id ?? null;
+  const countsQ = useAdminHomeWelcomeCounts(orgId);
+  const dismissFn = useServerFn(dismissAdminWelcome);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [hiddenNow, setHiddenNow] = useState(false);
+
+  if (!orgId) return null;
+  if (hiddenNow) return null;
+  if (!countsQ.data) return null;
+
+  const counts = countsQ.data;
+  const show = shouldShowWelcome({
+    orgCreatedAt: counts.orgCreatedAt,
+    now: new Date(),
+    welcomeDismissedAt: counts.welcomeDismissedAt,
+    memberCount: counts.memberCount,
+    clientCount: counts.clientCount,
+    documentedShiftCount: counts.documentedShiftCount,
+    welcomeFlag,
+  });
+  if (!show) return null;
+
+  const progress = welcomeSetupProgress(counts);
+
+  const hideBanner = async () => {
+    setHiddenNow(true);
+    try {
+      await dismissFn({ data: { organizationId: orgId } });
+      await queryClient.invalidateQueries({ queryKey: adminHomeWelcomeQueryKey(orgId) });
+    } catch {
+      /* banner already hidden; persist can retry on next visit */
+    }
+    void navigate({ to: "/dashboard", search: {} });
+  };
+
   return (
     <section
-      data-testid="admin-home-feeling-b"
-      className="relative isolate min-h-full"
-      style={{ background: ADMIN_HOME_DUSK, color: ADMIN_HOME_PALE_GOLD }}
+      data-testid="admin-home-welcome"
+      aria-label="Welcome"
+      className="relative isolate overflow-hidden rounded-2xl lg:max-h-[280px]"
+      style={{ ...SANS, color: PI_THEME.cream, boxShadow: PI_THEME.shadow1 }}
     >
-      <DuskMountainBackdrop />
-      <div className="relative z-10 flex min-h-full flex-col px-5 pb-10 pt-4 sm:px-8 lg:px-10">
-        <div className="flex items-center justify-between gap-4 text-[13px] font-normal tracking-tight text-white/70">
-          <span>Home</span>
-          <span>Welcome to Provider Interface</span>
-        </div>
-
-        <div className="mt-10 grid flex-1 items-center gap-10 lg:mt-14 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] lg:gap-12">
-          <div className="max-w-xl">
+      <MountainBackdrop />
+      <div className="relative z-10 flex h-full flex-col justify-between gap-3 px-5 py-4 sm:px-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p
-              className="text-[11px] font-medium uppercase tracking-[0.22em]"
-              style={{ color: ADMIN_HOME_PALE_GOLD }}
+              className="text-[10px] font-medium uppercase tracking-[0.22em]"
+              style={{ color: PI_THEME.cream }}
             >
               {ADMIN_HOME_EYEBROW}
             </p>
-            <h1
-              className="mt-4 text-[2.35rem] leading-[1.12] tracking-tight sm:text-5xl lg:text-[3.35rem]"
-              style={{ ...NEWSREADER, color: ADMIN_HOME_PALE_GOLD }}
+            <h2
+              className="mt-1 text-[1.65rem] leading-[1.12] tracking-tight sm:text-[1.85rem]"
+              style={{ ...SERIF, color: PI_THEME.cream }}
             >
               {ADMIN_HOME_HEADLINE}
-            </h1>
-            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/72 sm:text-base">
+            </h2>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed" style={{ color: PI_THEME.c70 }}>
               {ADMIN_HOME_SUBHEAD}
             </p>
-            <Link
-              to={ADMIN_HOME_BOARD_TO}
-              className="mt-8 inline-flex items-center rounded-xl px-6 py-3 text-[15px] font-medium tracking-tight transition hover:brightness-105"
-              style={{ background: ADMIN_HOME_PALE_GOLD, color: ADMIN_HOME_DUSK }}
-            >
-              {ADMIN_HOME_BOARD_CTA}
-            </Link>
           </div>
-          <AdminHomeScheduleTablet />
+          <button
+            type="button"
+            onClick={() => void hideBanner()}
+            className="shrink-0 text-right text-[12px] underline-offset-2 hover:underline"
+            style={{ color: PI_THEME.c70 }}
+          >
+            Skip — take me to my dashboard
+          </button>
         </div>
 
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {ADMIN_HOME_CARDS.map((card) => (
-            <Link
-              key={card.key}
-              to={card.to}
-              aria-label={`${card.title} — ${card.cta}`}
-              className="rounded-2xl border border-white/12 bg-[#0B1120]/55 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md transition hover:border-white/20 hover:bg-[#0B1120]/70"
+        {progress.allDone ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[13px]" style={{ color: PI_THEME.cream }}>
+              You&apos;re set up. This banner will close itself.
+            </p>
+            <button
+              type="button"
+              onClick={() => void hideBanner()}
+              className="inline-flex items-center rounded-xl px-5 py-2 text-[13px] font-medium tracking-tight"
+              style={{
+                background: PI_THEME.buttons.primaryBg,
+                color: PI_THEME.buttons.primaryFg,
+                boxShadow: PI_THEME.buttons.primaryShadow,
+              }}
             >
-              <CardIcon cardKey={card.key} />
-              <h2 className="mt-4 text-[17px] font-medium" style={{ color: ADMIN_HOME_PALE_GOLD }}>
-                {card.title}
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/68">{card.body}</p>
-            </Link>
-          ))}
-        </div>
-
-        <p
-          className="mt-12 text-center text-lg tracking-tight sm:text-xl"
-          style={{ ...NEWSREADER, color: ADMIN_HOME_PALE_GOLD }}
-        >
-          {ADMIN_HOME_FOOTER}
-        </p>
+              Go to my dashboard
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              <ProgressChip done={progress.inviteStaff} label="Invite staff" />
+              <ProgressChip done={progress.addClient} label="Add a client" />
+              <ProgressChip done={progress.documentShift} label="Document a shift" />
+            </div>
+            <div className="hidden gap-2 md:grid md:grid-cols-3">
+              {ADMIN_HOME_CARDS.map((card) => (
+                <Link
+                  key={card.key}
+                  to={card.to}
+                  aria-label={`${card.title} — ${card.cta}`}
+                  className="rounded-xl border px-3 py-2.5 transition hover:brightness-110"
+                  style={{
+                    borderColor: PI_THEME.hairlines.soft,
+                    background: PI_THEME.c04,
+                    color: PI_THEME.cream,
+                  }}
+                >
+                  <div className="text-[13px] font-medium" style={{ color: PI_THEME.cream }}>
+                    {card.title}
+                  </div>
+                  <div className="mt-0.5 text-[12px]" style={{ color: PI_THEME.c70 }}>
+                    {card.cta}
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:hidden">
+              {ADMIN_HOME_CARDS.map((card, i) => (
+                <span key={card.key} className="inline-flex items-center gap-2">
+                  {i > 0 ? (
+                    <span aria-hidden style={{ color: PI_THEME.c30 }}>
+                      ·
+                    </span>
+                  ) : null}
+                  <Link
+                    to={card.to}
+                    className="inline-flex rounded-full px-3 py-1 text-[12px] font-medium"
+                    style={{
+                      background: PI_THEME.c08,
+                      color: PI_THEME.cream,
+                      border: `1px solid ${PI_THEME.hairlines.soft}`,
+                    }}
+                  >
+                    {card.cta}
+                  </Link>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

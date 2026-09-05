@@ -15,7 +15,7 @@ function read(rel: string) {
   return readFileSync(new URL(rel, import.meta.url), "utf8");
 }
 
-describe("feeling-hero B Admin Home", () => {
+describe("feeling-hero B (parked for Step 3)", () => {
   it("locks the hero, cards, footer, and CTA map", () => {
     assert.equal(ADMIN_HOME_EYEBROW, "WELCOME TO YOUR HOME BASE");
     assert.equal(ADMIN_HOME_HEADLINE, "The day just got smaller");
@@ -36,13 +36,15 @@ describe("feeling-hero B Admin Home", () => {
     );
   });
 
-  it("wires the dashboard Home to feeling-hero B and not the obligation dump", () => {
+  it("keeps feeling-hero JSX in admin-home-welcome and unused by Home", () => {
+    const welcome = read("../components/admin-home/admin-home-welcome.tsx");
     const dash = read("../components/admin-home/admin-home-dashboard.tsx");
     const index = read("../routes/dashboard.index.tsx");
-    assert.match(dash, /ADMIN_HOME_HEADLINE/);
-    assert.match(dash, /AdminHomeScheduleTablet/);
-    assert.doesNotMatch(dash, /NectarRail|company_obligation_instances|Staff with overdue/);
-    assert.doesNotMatch(index, /NectarOnboardingPanel/);
+    assert.match(welcome, /ADMIN_HOME_HEADLINE/);
+    assert.match(welcome, /AdminHomeScheduleTablet/);
+    assert.match(welcome, /export function AdminHomeWelcome/);
+    assert.doesNotMatch(dash, /AdminHomeWelcome|ADMIN_HOME_HEADLINE|AdminHomeScheduleTablet/);
+    assert.doesNotMatch(index, /AdminHomeWelcome/);
     assert.match(index, /AdminHomeDashboard/);
   });
 
@@ -50,8 +52,8 @@ describe("feeling-hero B Admin Home", () => {
     const dash = read("../components/admin-home/admin-home-dashboard.tsx");
     const index = read("../routes/dashboard.index.tsx");
     const sectionOpen = dash.slice(
-      dash.indexOf('data-testid="admin-home-feeling-b"'),
-      dash.indexOf("<DuskMountainBackdrop"),
+      dash.indexOf('data-testid="admin-home-dashboard"'),
+      dash.indexOf("<PageGlow"),
     );
     assert.match(sectionOpen, /className="relative isolate min-h-full"/);
     assert.doesNotMatch(sectionOpen, /overflow-hidden/);
@@ -63,7 +65,7 @@ describe("feeling-hero B Admin Home", () => {
   it("puts a π-only mark in the sidebar and never a NECTAR wordmark there", () => {
     const shell = read("../routes/dashboard.tsx");
     const markSlot = shell.slice(
-      shell.indexOf('<div className="flex h-16 items-center border-b'),
+      shell.indexOf("aria-label=\"Provider Interface\""),
       shell.indexOf("{(isAdminCapable || isExecutive) &&"),
     );
     assert.match(markSlot, /HiveMark/);

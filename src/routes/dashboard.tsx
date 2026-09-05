@@ -94,6 +94,7 @@ import {
 } from "@/lib/auth-session-boot";
 import { PortalViewSwitcher } from "@/components/portal-view-switcher";
 import { HiveMark } from "@/components/brand/hive-mark";
+import { PI_THEME } from "@/lib/pi-theme";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -601,7 +602,7 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  // Feeling-hero B Home has no obligation queries; layout fan-out runs now.
+  // Admin Home owns the two obligation/client queries; layout fan-out waits.
   const layoutReady = useYieldToAdminHomeQueries(
     org?.organization_id ?? null,
     isAdminCapable && isAdminHomePath(pathname),
@@ -806,55 +807,29 @@ function DashboardLayout() {
                 : "grid min-h-0 min-w-0 w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)]"
             }
           >
-            <aside className="hidden h-full flex-col overflow-y-auto bg-sidebar text-sidebar-foreground md:flex">
+            <aside
+              className="hidden h-full flex-col overflow-y-auto text-sidebar-foreground md:flex"
+              style={{
+                background: `linear-gradient(180deg, ${PI_THEME.sideTop}, ${PI_THEME.sideBot})`,
+                color: PI_THEME.cream,
+              }}
+            >
               <SidebarBody {...sidebarProps} />
             </aside>
 
             <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-              {immersiveAdminHome ? (
-                <header
-                  className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0B1120] px-4 min-h-12 md:hidden"
-                  style={{
-                    paddingTop: "env(safe-area-inset-top)",
-                    paddingLeft: "max(1rem, env(safe-area-inset-left))",
-                    paddingRight: "max(1rem, env(safe-area-inset-right))",
-                  }}
-                >
-                  {!isStaffPhoneChrome && (
-                    <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                      <SheetTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 border border-white/15 bg-white/5 text-[#F3E5AB] hover:bg-white/10"
-                          aria-label="Open menu"
-                        >
-                          <Menu className="h-5 w-5" />
-                        </Button>
-                      </SheetTrigger>
-                      <SheetContent
-                        side="left"
-                        className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
-                        onPointerDownOutside={preventSheetDismissForPortalViewMenu}
-                        onFocusOutside={preventSheetDismissForPortalViewMenu}
-                        onInteractOutside={preventSheetDismissForPortalViewMenu}
-                      >
-                        <SheetTitle className="sr-only">Navigation</SheetTitle>
-                        <div className="flex h-full flex-col">
-                          <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
-                        </div>
-                      </SheetContent>
-                    </Sheet>
-                  )}
-                  <span className="text-sm text-white/70">Home</span>
-                </header>
-              ) : (
               <header
-                className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hive-border)] bg-[var(--hive-canvas)] px-4 md:px-6 min-h-16"
+                className="flex shrink-0 items-center justify-between gap-2 px-4 md:px-6 min-h-16"
                 style={{
                   paddingTop: "env(safe-area-inset-top)",
                   paddingLeft: "max(1rem, env(safe-area-inset-left))",
                   paddingRight: "max(1rem, env(safe-area-inset-right))",
+                  background: `linear-gradient(to bottom, rgba(10, 17, 32, 0.92), rgba(10, 17, 32, 0.78))`,
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  borderBottom: `1px solid ${PI_THEME.c08}`,
+                  boxShadow: "0 1px 0 rgba(255, 255, 255, 0.03) inset",
+                  color: PI_THEME.cream,
                 }}
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -866,15 +841,24 @@ function DashboardLayout() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="md:hidden shrink-0 border border-border bg-background"
+                          className="md:hidden shrink-0 hover:bg-white/10"
                           aria-label="Open menu"
+                          style={{
+                            border: `1px solid ${PI_THEME.c14}`,
+                            background: PI_THEME.c08,
+                            color: PI_THEME.cream,
+                          }}
                         >
                           <Menu className="h-5 w-5" />
                         </Button>
                       </SheetTrigger>
                       <SheetContent
                         side="left"
-                        className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+                        className="w-[280px] p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+                        style={{
+                          background: `linear-gradient(180deg, ${PI_THEME.sideTop}, ${PI_THEME.sideBot})`,
+                          color: PI_THEME.cream,
+                        }}
                         onPointerDownOutside={preventSheetDismissForPortalViewMenu}
                         onFocusOutside={preventSheetDismissForPortalViewMenu}
                         onInteractOutside={preventSheetDismissForPortalViewMenu}
@@ -887,8 +871,10 @@ function DashboardLayout() {
                     </Sheet>
                   )}
                   <div className="min-w-0">
-                    <h1 className="truncate text-lg font-semibold tracking-tight">{pageTitle}</h1>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <h1 className="truncate text-lg font-semibold tracking-tight" style={{ color: PI_THEME.cream }}>
+                      {pageTitle}
+                    </h1>
+                    <p className="truncate text-xs" style={{ color: PI_THEME.c50 }}>
                       {isHiveExecView ? (
                         "Provider Interface · Exec"
                       ) : isStatePreview ? (
@@ -926,7 +912,12 @@ function DashboardLayout() {
                       aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
                       aria-expanded={mobileSearchOpen}
                       onClick={() => setMobileSearchOpen((v) => !v)}
-                      className="grid h-11 w-11 place-items-center rounded-md border border-[var(--hive-border)] bg-[var(--hive-surface)] text-[var(--hive-text)] hover:bg-[var(--hive-bg)] md:hidden"
+                      className="grid h-11 w-11 place-items-center rounded-md md:hidden"
+                      style={{
+                        border: `1px solid ${PI_THEME.c14}`,
+                        background: PI_THEME.c08,
+                        color: PI_THEME.cream,
+                      }}
                     >
                       <Search className="h-4 w-4" />
                     </button>
@@ -935,8 +926,14 @@ function DashboardLayout() {
                     type="button"
                     onClick={() => setTaskCenterOpen(true)}
                     data-tour="nav.help"
-                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[var(--hive-ink)] bg-[var(--hive-ink)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#35475a]"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
                     title="Open Nectar"
+                    style={{
+                      background: PI_THEME.buttons.primaryBg,
+                      color: PI_THEME.buttons.primaryFg,
+                      boxShadow: PI_THEME.buttons.primaryShadow,
+                      border: "none",
+                    }}
                   >
                     <ListChecks className="h-3.5 w-3.5" />{" "}
                     <span className="hidden md:inline">Nectar</span>
@@ -950,7 +947,6 @@ function DashboardLayout() {
                   </Button>
                 </div>
               </header>
-              )}
               {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
               {mobileSearchOpen && !isHiveExecView && !isStaffPhoneChrome && !immersiveAdminHome && (
@@ -1002,11 +998,12 @@ function DashboardLayout() {
               <main
                 className={
                   immersiveAdminHome
-                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#0B1120] p-0"
+                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-0"
                     : isMobilePreview
                     ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)]"
                     : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)] px-4 py-6 md:px-8"
                 }
+                style={immersiveAdminHome ? { background: PI_THEME.navy } : undefined}
               >
                 {isStatePreview && !stateCode ? (
                   <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
@@ -1159,9 +1156,17 @@ function SidebarBody({
   }, [activeExecDomain]);
   return (
     <>
-      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <Link to="/dashboard" className="inline-flex items-center" aria-label="Provider Interface">
-          <HiveMark className="h-8 w-8 text-[#F3E5AB]" title="Provider Interface" />
+      <div
+        className="flex h-16 items-center px-5"
+        style={{ borderBottom: `1px solid ${PI_THEME.c08}` }}
+      >
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center"
+          aria-label="Provider Interface"
+          style={{ color: PI_THEME.cream }}
+        >
+          <HiveMark className="h-8 w-8" title="Provider Interface" />
         </Link>
       </div>
 

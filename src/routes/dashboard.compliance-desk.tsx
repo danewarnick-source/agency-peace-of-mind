@@ -780,7 +780,7 @@ export function ComplianceDeskPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div id="compliance-desk" className="space-y-4">
       <NectarFocusBanner />
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>

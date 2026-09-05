@@ -76,6 +76,11 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("heading", { name: /Due soon/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Recommendations/i }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Command center$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Compliance desk$/i })).toBeVisible();
+    await expect(page.locator("aside").getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /Agency Command Center/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
     await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
@@ -126,11 +131,11 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     const viewAll = page.getByRole("link", { name: /View all/i }).first();
     if (await viewAll.isVisible().catch(() => false)) {
       await viewAll.click();
-      await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-      await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
+      await expect(page).toHaveURL(/\/dashboard\/command-center#obligations/, { timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: /Agency Command Center/i })).toBeVisible({
         timeout: 15_000,
       });
-      await assertNoCrash(page, "home → company obligations");
+      await assertNoCrash(page, "home → command center obligations");
     }
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });

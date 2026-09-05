@@ -72,3 +72,49 @@ describe("feeling-hero B (parked for Step 3)", () => {
     assert.doesNotMatch(markSlot, /HiveWordmark|NECTAR|PiWordmark/);
   });
 });
+
+describe("Admin Home Step 2 — demote command-center and compliance-desk", () => {
+  it("keeps ADMIN_HOME_BOARD_TO on the scheduler", () => {
+    assert.equal(ADMIN_HOME_BOARD_TO, "/dashboard/scheduler");
+  });
+
+  it("omits command-center and compliance-desk from ADMIN_NAV", () => {
+    const shell = read("../routes/dashboard.tsx");
+    const start = shell.indexOf("const ADMIN_NAV: NavItem[] = [");
+    const end = shell.indexOf("];", start);
+    assert.ok(start >= 0 && end > start, "ADMIN_NAV block");
+    const block = shell.slice(start, end);
+    assert.doesNotMatch(block, /command-center/);
+    assert.doesNotMatch(block, /compliance-desk/);
+    assert.match(block, /\/dashboard\/scheduler/);
+  });
+
+  it("keeps both desk routes mounted with matching hash anchors", () => {
+    const cc = read("../routes/dashboard.command-center.tsx");
+    const desk = read("../routes/dashboard.compliance-desk.tsx");
+    assert.match(cc, /createFileRoute\("\/dashboard\/command-center"\)/);
+    assert.match(desk, /createFileRoute\("\/dashboard\/compliance-desk"\)/);
+    assert.match(cc, /id="obligations"/);
+    assert.match(cc, /id="due"/);
+    assert.match(cc, /id="recommendations"/);
+    assert.match(desk, /id="compliance-desk"/);
+  });
+
+  it("points Home View all and greeting power links at the demoted desks", () => {
+    const dash = read("../components/admin-home/admin-home-dashboard.tsx");
+    assert.match(dash, /to="\/dashboard\/command-center"/);
+    assert.match(dash, /hash="obligations"/);
+    assert.match(dash, /hash="due"/);
+    assert.match(dash, /hash="recommendations"/);
+    assert.match(dash, /to="\/dashboard\/hub\/employees"/);
+    assert.match(dash, /to="\/dashboard\/hub\/clients"/);
+    assert.match(dash, /to="\/dashboard\/compliance-desk"/);
+    assert.match(dash, /Command center/);
+    assert.match(dash, /Compliance desk/);
+    assert.match(dash, /fontSize: 12/);
+    assert.match(dash, /PI_THEME\.c50/);
+    assert.match(dash, /PI_THEME\.gold/);
+    assert.doesNotMatch(dash, /welcome_dismissed_at/);
+    assert.doesNotMatch(dash, /AdminHomeWelcome/);
+  });
+});

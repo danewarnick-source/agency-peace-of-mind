@@ -1,6 +1,6 @@
 /**
  * Admin Home — data-driven (0a8f11df derivation) painted with PI tokens.
- * Feeling-hero JSX lives unused in admin-home-welcome.tsx for Step 3.
+ * Welcome banner (AdminHomeWelcome) sits above the greeting.
  */
 import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
@@ -14,6 +14,7 @@ import {
   nextBillingWindowLabel,
   useAdminHomeData,
 } from "@/components/admin-home/use-admin-home-data";
+import { AdminHomeWelcome } from "@/components/admin-home/admin-home-welcome";
 
 const SERIF = { fontFamily: PI_THEME.serif } as const;
 const SANS = { fontFamily: PI_THEME.sans } as const;
@@ -219,7 +220,7 @@ function Lift({
   );
 }
 
-function AdminHomeDashboardInner() {
+function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolean }) {
   const data = useAdminHomeData();
   const {
     org,
@@ -252,6 +253,9 @@ function AdminHomeDashboardInner() {
       <PageGlow />
       <Grain />
       <div className="relative z-10 space-y-4 px-5 py-6 sm:px-8 lg:px-10">
+        <Suspense fallback={null}>
+          <AdminHomeWelcome welcomeFlag={welcomeFlag} />
+        </Suspense>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-lg font-semibold" style={{ ...SERIF, color: PI_THEME.cream }}>
@@ -629,7 +633,7 @@ function AdminHomeDashboardInner() {
   );
 }
 
-export function AdminHomeDashboard() {
+export function AdminHomeDashboard({ welcomeFlag = false }: { welcomeFlag?: boolean }) {
   return (
     <Suspense
       fallback={
@@ -659,7 +663,7 @@ export function AdminHomeDashboard() {
         </section>
       }
     >
-      <AdminHomeDashboardInner />
+      <AdminHomeDashboardInner welcomeFlag={welcomeFlag} />
     </Suspense>
   );
 }

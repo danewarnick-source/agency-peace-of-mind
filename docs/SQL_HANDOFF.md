@@ -6,6 +6,40 @@ it worked before moving on.
 
 ---
 
+## ACTION — Admin Home welcome dismissal column (2026-09-05)
+
+**Run this on Hive-Platform.** Additive only. App reads
+`organizations.welcome_dismissed_at` so Skip on the Home welcome banner
+persists across devices. Does not write True North rows.
+
+Matches `supabase/migrations/20260905010000_org_welcome_dismissed_at.sql`.
+
+Clear the editor, paste:
+
+```sql
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS welcome_dismissed_at timestamptz NULL;
+
+SELECT
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'organizations'
+      AND column_name = 'welcome_dismissed_at'
+  ) AS welcome_col_on,
+  (
+    SELECT count(*)
+    FROM public.organizations
+    WHERE welcome_dismissed_at IS NOT NULL
+  ) AS orgs_already_dismissed;
+```
+
+**What you'll see:** `welcome_col_on = t`, `orgs_already_dismissed` is a count
+(likely `0` until someone clicks Skip). No True North writes.
+
+---
+
 ## ACTION — Seed role_permissions for fresh paid orgs (2026-09-04)
 
 **Run this on Hive-Platform so Add client / Add staff stop Access-denied.**

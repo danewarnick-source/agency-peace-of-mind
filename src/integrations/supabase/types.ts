@@ -13168,6 +13168,7 @@ export type Database = {
           state_code: string | null
           training_only: boolean
           updated_at: string
+          welcome_dismissed_at: string | null
         }
         Insert: {
           account_contact_email?: string | null
@@ -13200,6 +13201,7 @@ export type Database = {
           state_code?: string | null
           training_only?: boolean
           updated_at?: string
+          welcome_dismissed_at?: string | null
         }
         Update: {
           account_contact_email?: string | null
@@ -13232,6 +13234,7 @@ export type Database = {
           state_code?: string | null
           training_only?: boolean
           updated_at?: string
+          welcome_dismissed_at?: string | null
         }
         Relationships: [
           {

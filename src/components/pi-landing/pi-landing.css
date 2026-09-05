@@ -1,6 +1,13 @@
 /* Dane's PI landing — scoped port of pi-landing-page.html. Do not reuse these
    class names outside .pi-landing-root / .pi-pub-nav / .pi-pub-foot. */
 
+html.pi-html-landing,
+html.pi-html-landing body {
+  background: #0a1120 !important;
+  background-image: none !important;
+  color: #f3efe6;
+}
+
 .pi-landing-root,
 .pi-pub-nav,
 .pi-pub-foot {
@@ -234,6 +241,13 @@
   background: var(--gold);
   box-shadow: 0 0 10px var(--gold);
   font-style: normal;
+}
+
+.pi-landing-root h1,
+.pi-landing-root h2,
+.pi-landing-root h3 {
+  font-family: var(--nr);
+  font-synthesis: none;
 }
 
 .pi-landing-root h1 {

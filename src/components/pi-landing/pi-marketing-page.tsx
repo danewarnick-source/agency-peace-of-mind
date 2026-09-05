@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
 import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
@@ -73,6 +74,12 @@ function InclCheck() {
 }
 
 export function PiMarketingPage() {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("pi-html-landing");
+    return () => root.classList.remove("pi-html-landing");
+  }, []);
+
   return (
     <div className="pi-landing-root">
       <div className="grain" aria-hidden />

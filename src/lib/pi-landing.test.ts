@@ -89,6 +89,8 @@ describe("Provider Interface marketing homepage", () => {
     const root = read(new URL("../routes/__root.tsx", import.meta.url));
     assert.match(root, /family=Newsreader/);
     assert.match(root, /0,6\.\.72,300/);
+    assert.match(page, /family=Newsreader/);
+    assert.match(page, /0,6\.\.72,300/);
     assert.match(page, /PiMarketingPage/);
     assert.doesNotMatch(landing, /what-you-get/);
     assert.doesNotMatch(landing, /PiProductShots/);

@@ -253,7 +253,9 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
       <PageGlow />
       <Grain />
       <div className="relative z-10 space-y-4 px-5 py-6 sm:px-8 lg:px-10">
-        <AdminHomeWelcome welcomeFlag={welcomeFlag} />
+        <Suspense fallback={null}>
+          <AdminHomeWelcome welcomeFlag={welcomeFlag} />
+        </Suspense>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-lg font-semibold" style={{ ...SERIF, color: PI_THEME.cream }}>

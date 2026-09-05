@@ -10,7 +10,7 @@
  */
 
 :root {
-  --hive-sidebar: #0b1220;
+  --hive-sidebar: #0a1120;
   --hive-chrome-text: #f3efe6;
   --hive-canvas: #f4f6f8;
   --hive-bg: #f4f6f8;
@@ -154,7 +154,7 @@
     background-color: #eef1f4;
   }
 
-  /* Thin cream left bar — active nav. Never a gold fill box. */
+  /* Thin gold left bar — active nav. Never a gold fill box. */
   .hive-nav-active {
     position: relative;
     color: var(--hive-chrome-text);
@@ -168,7 +168,7 @@
     bottom: 6px;
     width: 2px;
     border-radius: 1px;
-    background: #f3e5ab;
+    background: #c9a227;
   }
 
   .hive-status-active {

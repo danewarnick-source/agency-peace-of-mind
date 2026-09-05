@@ -4,6 +4,9 @@
  * Injects a fake Supabase session for True North Supports and intercepts
  * browser traffic to Supabase + TanStack Start server functions so the
  * suite never reads or writes live obligation rows.
+ *
+ * TNS_ORG_ID matches the production True North Supports LLC UUID. This
+ * file is mock-only — do not flip flags or run experimental writes there.
  */
 import type { Page, Route } from "@playwright/test";
 import { ALL_PERMISSIONS } from "../../src/lib/rbac";

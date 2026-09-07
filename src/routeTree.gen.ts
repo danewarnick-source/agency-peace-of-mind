@@ -15,6 +15,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as NectarRouteImport } from './routes/nectar'
 import { Route as MfaSetupRouteImport } from './routes/mfa-setup'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ManagerRouteImport } from './routes/manager'
@@ -30,6 +31,7 @@ import { Route as BillingLockedRouteImport } from './routes/billing-locked'
 import { Route as BaaRouteImport } from './routes/baa'
 import { Route as AuditorRouteImport } from './routes/auditor'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
@@ -256,6 +258,11 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NectarRoute = NectarRouteImport.update({
+  id: '/nectar',
+  path: '/nectar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MfaSetupRoute = MfaSetupRouteImport.update({
   id: '/mfa-setup',
   path: '/mfa-setup',
@@ -329,6 +336,11 @@ const AuditorRoute = AuditorRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -1401,6 +1413,7 @@ const ApiPublicOauthGmailCallbackRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
@@ -1416,6 +1429,7 @@ export interface FileRoutesByFullPath {
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
   '/mfa-setup': typeof MfaSetupRoute
+  '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -1619,6 +1633,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
@@ -1633,6 +1648,7 @@ export interface FileRoutesByTo {
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
   '/mfa-setup': typeof MfaSetupRoute
+  '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -1831,6 +1847,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/auditor': typeof AuditorRoute
   '/baa': typeof BaaRoute
@@ -1846,6 +1863,7 @@ export interface FileRoutesById {
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
   '/mfa-setup': typeof MfaSetupRoute
+  '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -2051,6 +2069,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/admin'
     | '/auditor'
     | '/baa'
@@ -2066,6 +2085,7 @@ export interface FileRouteTypes {
     | '/manager'
     | '/mcp'
     | '/mfa-setup'
+    | '/nectar'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2269,6 +2289,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/admin'
     | '/auditor'
     | '/baa'
@@ -2283,6 +2304,7 @@ export interface FileRouteTypes {
     | '/manager'
     | '/mcp'
     | '/mfa-setup'
+    | '/nectar'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2480,6 +2502,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/admin'
     | '/auditor'
     | '/baa'
@@ -2495,6 +2518,7 @@ export interface FileRouteTypes {
     | '/manager'
     | '/mcp'
     | '/mfa-setup'
+    | '/nectar'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2699,6 +2723,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
   AuditorRoute: typeof AuditorRoute
   BaaRoute: typeof BaaRoute
@@ -2714,6 +2739,7 @@ export interface RootRouteChildren {
   ManagerRoute: typeof ManagerRoute
   McpRoute: typeof McpRoute
   MfaSetupRoute: typeof MfaSetupRoute
+  NectarRoute: typeof NectarRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
@@ -2790,6 +2816,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nectar': {
+      id: '/nectar'
+      path: '/nectar'
+      fullPath: '/nectar'
+      preLoaderRoute: typeof NectarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mfa-setup': {
@@ -2895,6 +2928,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -4784,6 +4824,7 @@ const TrainingRouteWithChildren = TrainingRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
   AuditorRoute: AuditorRoute,
   BaaRoute: BaaRoute,
@@ -4799,6 +4840,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManagerRoute: ManagerRoute,
   McpRoute: McpRoute,
   MfaSetupRoute: MfaSetupRoute,
+  NectarRoute: NectarRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,

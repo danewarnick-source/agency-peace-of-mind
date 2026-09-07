@@ -40,7 +40,8 @@ html.pi-html-landing body {
   font-family: var(--ui);
   -webkit-font-smoothing: antialiased;
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   min-height: 100vh;
 }
 
@@ -83,10 +84,27 @@ html.pi-html-landing body {
   text-decoration: none;
 }
 
+.pi-landing-root .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .pi-pub-nav {
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 50;
+  isolation: isolate;
+  pointer-events: auto;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   background: linear-gradient(to bottom, rgba(10, 17, 32, 0.92), rgba(10, 17, 32, 0.78));
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--c08);
@@ -152,6 +170,26 @@ html.pi-html-landing body {
   font-weight: 500;
 }
 
+.pi-pub-nav .nav-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pi-pub-nav .pi-mobile-menu {
+  border-top: 1px solid var(--c08);
+  background: var(--navy);
+  padding: 8px 24px 16px;
+}
+
+.pi-pub-nav .pi-mobile-menu a {
+  display: block;
+  padding: 12px 4px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--cream);
+}
+
 .pi-landing-root .btn,
 .pi-pub-nav .btn {
   display: inline-flex;
@@ -208,8 +246,9 @@ html.pi-html-landing body {
 }
 
 .pi-landing-root .hero {
-  padding: 68px 0 52px;
+  padding: calc(68px + env(safe-area-inset-top, 0px)) 0 52px;
   text-align: center;
+  overflow: visible;
   display: grid;
   grid-template-columns: 1fr;
   gap: 28px;
@@ -224,6 +263,9 @@ html.pi-html-landing body {
 .pi-landing-root .hero-mark {
   margin: 0 auto 28px;
   display: block;
+  overflow: visible;
+  padding: 12px;
+  box-sizing: content-box;
   filter: drop-shadow(0 6px 18px rgba(201, 162, 39, 0.25));
 }
 
@@ -551,7 +593,7 @@ html.pi-html-landing body {
   grid-template-columns: auto 1fr;
   gap: 44px;
   align-items: center;
-  padding: 40px 36px;
+  padding: 52px 36px 40px;
   border-radius: 18px;
   background: linear-gradient(135deg, var(--n2), var(--n1) 60%, #0c1425);
   border: 1px solid var(--c08);
@@ -572,12 +614,32 @@ html.pi-html-landing body {
   pointer-events: none;
 }
 
+.pi-landing-root .pi-mark-well {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 18px 6px 10px;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+
+.pi-landing-root .pi-card-mark {
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
 .pi-landing-root .pi-big {
   font-family: var(--nr);
   font-weight: 300;
   font-size: 132px;
-  line-height: 0.85;
+  line-height: 1.08;
   letter-spacing: -0.06em;
+  padding-top: 0.16em;
+  padding-bottom: 0.08em;
+  overflow: visible;
   background: linear-gradient(180deg, #f3efe6 30%, rgba(243, 239, 230, 0.35));
   -webkit-background-clip: text;
   background-clip: text;
@@ -790,6 +852,9 @@ html.pi-html-landing body {
   position: relative;
   overflow: hidden;
   margin-top: 36px;
+  margin-left: auto;
+  margin-right: auto;
+  transform: none;
 }
 
 .pi-landing-root .pricebox::before {
@@ -890,6 +955,171 @@ html.pi-html-landing body {
   margin: 0 auto 30px;
 }
 
+.pi-landing-root .learn {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+
+.pi-landing-root .learn:hover {
+  color: var(--cream);
+}
+
+.pi-landing-root .pi-highlights-sec {
+  padding: 72px 0 40px;
+}
+
+.pi-landing-root .pi-highlights {
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: max(24px, calc((100% - min(78vw, 320px)) / 2));
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.pi-landing-root .pi-highlights::-webkit-scrollbar {
+  display: none;
+}
+
+.pi-landing-root .pi-highlights-track {
+  display: flex;
+  gap: 14px;
+  width: max-content;
+  margin: 28px auto 0;
+  padding: 8px max(24px, calc((100vw - min(78vw, 320px)) / 2)) 28px;
+  transform: none;
+}
+
+.pi-landing-root .pi-hl-card {
+  flex: 0 0 min(78vw, 320px);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  margin: 0;
+  padding: 26px 24px 22px;
+  border-radius: 16px;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  background: linear-gradient(180deg, rgba(18, 29, 51, 0.78), rgba(14, 23, 41, 0.58));
+  box-shadow: var(--sh-1);
+  backdrop-filter: blur(16px);
+  position: relative;
+  transform: none;
+  left: auto;
+  right: auto;
+  overflow: visible;
+}
+
+.pi-landing-root .pi-hl-card.price {
+  text-align: center;
+}
+
+.pi-landing-root .pi-hl-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+}
+
+.pi-landing-root .pi-hl-card h3 {
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 10px;
+}
+
+.pi-landing-root .pi-hl-card.price h3 {
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin: 8px 0 6px;
+}
+
+.pi-landing-root .pi-hl-card p {
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--c70);
+  margin: 0;
+}
+
+.pi-landing-root .pi-hl-checks {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.pi-landing-root .pi-hl-checks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+.pi-landing-root .pi-hl-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pi-landing-root .pi-hl-dot.done::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 5px;
+  height: 8px;
+  border: solid var(--gold);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.pi-landing-root .page {
+  padding: 56px 0 96px;
+  text-align: left;
+}
+
+.pi-landing-root .page h1 {
+  max-width: 16ch;
+  margin-left: 0;
+  font-size: clamp(36px, 6vw, 64px);
+}
+
+.pi-landing-root .page .lede {
+  margin-left: 0;
+  text-align: left;
+}
+
+.pi-landing-root .page-copy {
+  display: grid;
+  gap: 16px;
+  max-width: 36em;
+  margin-top: 28px;
+}
+
+.pi-landing-root .page-copy p {
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--c70);
+  margin: 0;
+}
+
 .pi-pub-foot {
   border-top: 1px solid var(--c08);
   padding: 28px 0;
@@ -984,7 +1214,7 @@ html.pi-html-landing body {
   }
 
   .pi-landing-root .hero {
-    padding: 68px 0 52px;
+    padding: calc(56px + env(safe-area-inset-top, 0px)) 0 52px;
   }
 
   .pi-landing-root .strip {
@@ -996,21 +1226,55 @@ html.pi-html-landing body {
   .pi-landing-root .ex,
   .pi-landing-root .pricebox {
     grid-template-columns: 1fr;
+    justify-items: stretch;
   }
 
   .pi-landing-root .pi {
     grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 28px 22px;
+    gap: 16px;
+    padding: 36px 22px 28px;
+  }
+
+  .pi-landing-root .pi-mark-well {
+    align-items: center;
+    width: 100%;
+    padding: 22px 8px 12px;
   }
 
   .pi-landing-root .pi-big {
     font-size: 92px;
+    line-height: 1.1;
+    padding-top: 0.2em;
   }
 
   .pi-landing-root .pricebox {
     gap: 28px;
     padding: 30px 22px;
+    justify-items: center;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 100%;
+    transform: none;
+  }
+
+  .pi-landing-root .pricebox > :first-child {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .pi-landing-root .pricebox .ctas {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .pi-landing-root .incl {
+    width: 100%;
+    text-align: left;
   }
 
   .pi-landing-root .big {
@@ -1027,6 +1291,10 @@ html.pi-html-landing body {
 
   .pi-landing-root .ctas .btn {
     flex: 1 1 100%;
+  }
+
+  .pi-landing-root .pi-hl-card {
+    flex-basis: min(82vw, 320px);
   }
 
   .pi-pub-foot .foot {

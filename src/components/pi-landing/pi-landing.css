@@ -102,7 +102,7 @@ html.pi-html-landing body {
   z-index: 50;
   isolation: isolate;
   pointer-events: auto;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(10px, env(safe-area-inset-top, 0px));
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   background: linear-gradient(to bottom, rgba(10, 17, 32, 0.92), rgba(10, 17, 32, 0.78));
@@ -1272,6 +1272,13 @@ html.pi-html-landing body {
     flex-direction: column;
     align-items: center;
     text-align: center;
+  }
+
+  .pi-landing-root .pricebox .big,
+  .pi-landing-root .pricebox .per,
+  .pi-landing-root .pricebox .min {
+    text-align: center;
+    width: 100%;
   }
 
   .pi-landing-root .pricebox .ctas {

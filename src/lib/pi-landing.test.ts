@@ -14,6 +14,7 @@ import {
   PI_LIST_MINIMUM_DOLLARS,
   PI_LIST_MINIMUM_LINE,
   PI_LIST_PER_CLIENT_DOLLARS,
+  PI_HERO_STATS,
   PI_LIST_PRICE_CONTRAST,
   PI_LIST_PRICE_DISPLAY,
   PI_LIST_PRICE_LEAD,
@@ -21,9 +22,13 @@ import {
   PI_NECTAR_SUB,
   PI_PAGE_DESCRIPTION,
   PI_PAGE_TITLE,
+  PI_PRICE_MIN_AND_TRAINING,
   PI_SIGNUP_PRICE_LINE,
   PI_SUBHEAD,
   PI_TRAINING_ADDONS,
+  PI_TRAINING_QUIET,
+  PI_TRAINING_SECTION_BODY,
+  PI_TRAINING_SECTION_HEADLINE,
   PI_WHAT_IS_LEAD,
   PI_WORDMARK,
 } from "./pi-landing.ts";
@@ -70,7 +75,15 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_LIST_PRICE_DISPLAY, "$69");
     assert.equal(PI_LIST_MINIMUM_LINE, "$350 / month minimum");
     assert.equal(PI_LIST_PRICE_LEAD, "The list price is the price.");
-    assert.equal(PI_LIST_PRICE_CONTRAST, "No setup fee. No add-ons for Nectar. Training optional.");
+    assert.equal(PI_LIST_PRICE_CONTRAST, "No setup fee. No feature tiers. Training classes optional.");
+    assert.equal(
+      PI_PRICE_MIN_AND_TRAINING,
+      "$350 / month minimum · Optional training classes sold separately",
+    );
+    assert.equal(PI_TRAINING_QUIET, "Optional training classes sold separately.");
+    assert.equal(PI_TRAINING_SECTION_HEADLINE, "Classes, sold separately.");
+    assert.match(PI_TRAINING_SECTION_BODY, /no feature tiers/i);
+    assert.equal(PI_HERO_STATS[1]?.label, "price. no feature tiers, nothing to unlock");
     assert.match(PI_SIGNUP_PRICE_LINE, /\$69 per client \/ month \(\$350 minimum\)/);
     assert.match(PI_FOUNDING_QUIET, /[Ff]irst five agencies/);
     assert.doesNotMatch(PI_FOUNDING_QUIET, /\$/);
@@ -114,7 +127,11 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(pricing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(pricing, /PI_TRAINING_ADDONS/);
     assert.match(pricing, /PI_TRAINING_QUIET/);
+    assert.match(pricing, /PI_TRAINING_SECTION_HEADLINE/);
     assert.match(pricing, /PI_LIST_PRICE_CONTRAST/);
+    assert.doesNotMatch(pricing, /The only add-on/);
+    assert.doesNotMatch(copy, /Training is the only add-on/);
+    assert.doesNotMatch(copy, /price for everything, no add-ons/);
     assert.match(pricing, /compact/);
     assert.doesNotMatch(pricing, /FOUNDING_PER_STAFF_CENTS|LIST_VOLUME_TIERS|ANNUAL_DISCOUNT/);
     assert.doesNotMatch(landing, /PublicLandingHeader|HexBackdrop|HeroPhone|HiveWordmark|Honeycomb|hivecertify/);

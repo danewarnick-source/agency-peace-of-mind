@@ -147,7 +147,8 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(css, /hero-art/);
     assert.match(css, /hero-glass/);
     assert.match(css, /backdrop-filter/);
-    assert.match(css, /position: relative/);
+    assert.match(css, /min-width: 900px/);
+    assert.match(css, /flex-direction: column/);
     assert.doesNotMatch(glass, /Request a demo/);
     assert.doesNotMatch(glass, /per case/i);
     assert.doesNotMatch(glass, /insurer/i);

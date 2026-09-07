@@ -14,6 +14,8 @@ import {
   PI_TRAINING_ADDONS,
   PI_TRAINING_QUIET,
   PI_TRAINING_QUIET_LINK,
+  PI_TRAINING_SECTION_BODY,
+  PI_TRAINING_SECTION_HEADLINE,
 } from "@/lib/pi-landing";
 
 const NEWSREADER = { fontFamily: '"Newsreader", "Times New Roman", serif' } as const;
@@ -89,10 +91,10 @@ export function PiPricingSection({
                 className="mt-3 text-2xl font-medium tracking-[-0.02em] text-[#f3efe6] sm:text-3xl"
                 style={NEWSREADER}
               >
-                The only add-on.
+                {PI_TRAINING_SECTION_HEADLINE}
               </h3>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#f3efe6]/62">
-                Everything else is in the list price. Training is optional, and priced in the open.
+                {PI_TRAINING_SECTION_BODY}
               </p>
               <ul className="mt-8 divide-y divide-white/[0.08] border-y border-white/[0.08]">
                 {PI_TRAINING_ADDONS.map((row) => (

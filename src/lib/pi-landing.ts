@@ -38,21 +38,24 @@ export const PI_LIST_PRICE_DISPLAY = "$69";
 export const PI_LIST_PRICE_UNIT = "per client / month";
 export const PI_LIST_MINIMUM_LINE = "$350 / month minimum";
 export const PI_LIST_PRICE_LEAD = "The list price is the price.";
-export const PI_LIST_PRICE_CONTRAST = "No setup fee. No add-ons for Nectar. Training optional.";
+export const PI_LIST_PRICE_CONTRAST = "No setup fee. No feature tiers. Training classes optional.";
 export const PI_LIST_PRICE_INCLUDED =
   "One number. The whole office. People, the schedule, notes already written, trainings in the room, the shop — and Nectar — are in that number. Nothing extra to unlock the rest.";
-export const PI_TRAINING_QUIET = "Training is the only add-on.";
+export const PI_TRAINING_QUIET = "Optional training classes sold separately.";
 export const PI_TRAINING_QUIET_LINK = "See pricing.";
+export const PI_TRAINING_SECTION_HEADLINE = "Classes, sold separately.";
+export const PI_TRAINING_SECTION_BODY =
+  "The platform has no feature tiers. Training classes are optional, and priced in the open.";
 export const PI_FOUNDING_QUIET = "First five agencies — talk to us before you sign up.";
 export const PI_SIGNUP_PRICE_LINE = "Plans start at $69 per client / month ($350 minimum).";
 export const PI_ENTERPRISE_LINE = "Custom work. No public dollar amount.";
 export const PI_PRICING_PAGE_TITLE = "Pricing — Provider Interface";
 export const PI_PRICING_PAGE_DESCRIPTION =
-  "Provider Interface is $69 per client / month, $350 / month minimum. No setup fee. No add-ons for Nectar. Training optional.";
+  "Provider Interface is $69 per client / month, $350 / month minimum. No setup fee. No feature tiers. Training classes optional.";
 
 export const PI_KICKER = "PI · Built for Utah Medicaid disability providers";
 export const PI_HERO_FINE = "$69 per client / month · No setup fee · Nectar included";
-export const PI_PRICE_MIN_AND_TRAINING = "$350 / month minimum · Training is the only add-on";
+export const PI_PRICE_MIN_AND_TRAINING = "$350 / month minimum · Optional training classes sold separately";
 
 export const PI_NAV_WHY = "Why PI";
 export const PI_NAV_PRICING = "Pricing";
@@ -82,7 +85,7 @@ export const PI_CONTRACT_OBLIGATION_COUNT = 41;
 
 export const PI_HERO_STATS = [
   { value: "41", label: "contract obligations pre-loaded" },
-  { value: "1", label: "price for everything, no add-ons" },
+  { value: "1", label: "price. no feature tiers, nothing to unlock" },
   { value: "0", label: "configuration before you start" },
 ] as const;
 

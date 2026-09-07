@@ -2,6 +2,7 @@ import { useLayoutEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
 import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
+import { PiHeroGlass } from "@/components/pi-landing/pi-hero-glass";
 import { PiMark } from "@/components/pi-landing/pi-mark";
 import {
   PI_CTA_BODY,
@@ -37,26 +38,50 @@ import {
   PI_WHAT_IS_LEAD,
   PI_WHAT_IS_MARK,
   PI_WHAT_PI_DOES,
-  PI_CELL_ICON_BARS,
-  PI_CELL_ICON_DOLLAR,
 } from "@/lib/pi-landing";
 
 function CellIcon({ icon }: { icon: (typeof PI_WHAT_PI_DOES)[number]["icon"] }) {
   if (icon === "check") {
     return (
-      <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
-          d="M3.2 8.6 6.6 12 13.8 4.6"
+          d="M8 2.4 13.2 4.6v5.2L8 13.6 2.8 9.8V4.6L8 2.4Z"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M5.6 8.1 7.4 9.8 10.6 6.4"
+          stroke="currentColor"
+          strokeWidth="1.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
     );
   }
-  if (icon === "bars") return PI_CELL_ICON_BARS;
-  return PI_CELL_ICON_DOLLAR;
+  if (icon === "bars") {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <rect x="2.25" y="2.25" width="4.2" height="4.2" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="9.55" y="2.25" width="4.2" height="4.2" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="2.25" y="9.55" width="4.2" height="4.2" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="9.55" y="9.55" width="4.2" height="4.2" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r="5.6" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M8.7 4.8c-1.7 0-2.5.8-2.5 1.7 0 .9.7 1.3 2.2 1.6 1.6.3 2.4.8 2.4 1.8 0 1-.9 1.8-2.6 1.8-1.4 0-2.4-.5-2.7-1.4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <path d="M8 4.2v7.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function InclCheck() {
@@ -85,24 +110,27 @@ export function PiMarketingPage() {
       <div className="grain" aria-hidden />
       <PiPublicHeader />
       <header className="wrap hero">
-        <PiMark variant="hero" width={60} height={60} className="hero-mark" />
-        <div className="kick">
-          <i aria-hidden />
-          {PI_KICKER}
+        <div className="hero-copy">
+          <PiMark variant="hero" width={60} height={60} className="hero-mark" />
+          <div className="kick">
+            <i aria-hidden />
+            {PI_KICKER}
+          </div>
+          <h1>
+            {PI_HEADLINE} <em>{PI_HEADLINE_EMPHASIS}</em>
+          </h1>
+          <p className="lede">{PI_SUBHEAD}</p>
+          <div className="ctas">
+            <Link className="btn p" to="/signup">
+              {PI_GET_STARTED}
+            </Link>
+            <Link className="btn s" to="/contact">
+              {PI_TALK_TO_US}
+            </Link>
+          </div>
+          <div className="fine">{PI_HERO_FINE}</div>
         </div>
-        <h1>
-          {PI_HEADLINE} <em>{PI_HEADLINE_EMPHASIS}</em>
-        </h1>
-        <p className="lede">{PI_SUBHEAD}</p>
-        <div className="ctas">
-          <Link className="btn p" to="/signup">
-            {PI_GET_STARTED}
-          </Link>
-          <Link className="btn s" to="/contact">
-            {PI_TALK_TO_US}
-          </Link>
-        </div>
-        <div className="fine">{PI_HERO_FINE}</div>
+        <PiHeroGlass />
       </header>
       <div className="wrap strip">
         {PI_HERO_STATS.map((stat) => (

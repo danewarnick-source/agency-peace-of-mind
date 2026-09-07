@@ -41,6 +41,7 @@ const PUBLIC_FILES = [
   new URL("../routes/terms.tsx", import.meta.url),
   new URL("../routes/baa.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url),
+  new URL("../components/pi-landing/pi-hero-glass.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-public-header.tsx", import.meta.url),
@@ -115,6 +116,7 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(landing, /to="\/contact"/);
     assert.match(landing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(landing, /PI_LANDING_INCLUDED/);
+    assert.match(landing, /PiHeroGlass/);
     assert.doesNotMatch(header, /What you get/);
     assert.doesNotMatch(header, /The office/);
     assert.match(header, /PI_NAV_LINKS/);
@@ -148,6 +150,27 @@ describe("Provider Interface marketing homepage", () => {
     assert.doesNotMatch(landing, /DuskDeskStill|DuskPeopleScreen|PI_DIFFERENCE_HEADLINE/);
     assert.match(landing, /PI_WHAT_IS_LEAD/);
     assert.match(landing, /PI_NECTAR_BEFORE_QUOTE/);
+    assert.match(landing, /PiHeroGlass/);
+  });
+
+  it("uses Demo B glass hero chrome without the mock's wrong copy", () => {
+    const glass = read(new URL("../components/pi-landing/pi-hero-glass.tsx", import.meta.url));
+    const css = read(new URL("../components/pi-landing/pi-landing.css", import.meta.url));
+    assert.match(glass, /aria-hidden/);
+    assert.match(glass, /PI_LIST_PRICE_DISPLAY/);
+    assert.match(glass, /PI_LIST_PRICE_UNIT/);
+    assert.match(glass, /PI_NECTAR_BEFORE_QUOTE/);
+    assert.match(glass, /PI_NECTAR_AFTER_QUOTE/);
+    assert.match(css, /hero-art/);
+    assert.match(css, /hero-glass/);
+    assert.match(css, /backdrop-filter/);
+    assert.match(css, /position: relative/);
+    assert.doesNotMatch(glass, /Request a demo/);
+    assert.doesNotMatch(glass, /per case/i);
+    assert.doesNotMatch(glass, /insurer/i);
+    assert.doesNotMatch(glass, /COMPLIANCE CHECKLIST/);
+    assert.doesNotMatch(glass, /Hive Certify/);
+    assert.doesNotMatch(css, /DuskDeskStill/);
   });
 
   it("signup walk posts list price, optional training, and no True North placeholder", () => {

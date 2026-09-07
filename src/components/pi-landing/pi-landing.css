@@ -208,14 +208,183 @@ html.pi-html-landing body {
 }
 
 .pi-landing-root .hero {
-  padding: 104px 0 80px;
-  text-align: center;
+  padding: 88px 0 72px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 1fr);
+  gap: 28px 40px;
+  align-items: center;
+  max-width: 1140px;
+}
+
+.pi-landing-root .hero-copy {
+  min-width: 0;
 }
 
 .pi-landing-root .hero-mark {
-  margin: 0 auto 28px;
+  margin: 0 0 28px;
   display: block;
   filter: drop-shadow(0 6px 18px rgba(201, 162, 39, 0.25));
+}
+
+.pi-landing-root .hero-art {
+  position: relative;
+  isolation: isolate;
+  min-height: 440px;
+  overflow: hidden;
+}
+
+.pi-landing-root .hero-glow {
+  position: absolute;
+  left: 14%;
+  top: 12%;
+  width: 74%;
+  height: 74%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(201, 162, 39, 0.18), transparent 68%);
+}
+
+.pi-landing-root .hero-geo {
+  position: absolute;
+  inset: -6% -8%;
+  width: 116%;
+  height: 112%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pi-landing-root .hero-glass {
+  position: absolute;
+  z-index: 1;
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(18, 29, 51, 0.58), rgba(14, 23, 41, 0.4));
+  border: 1px solid rgba(243, 239, 230, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 18px 40px -16px rgba(0, 0, 0, 0.7),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.pi-landing-root .hero-glass-day {
+  top: 6%;
+  left: 2%;
+  width: 58%;
+  z-index: 2;
+}
+
+.pi-landing-root .hero-glass-nectar {
+  top: 30%;
+  right: 1%;
+  width: 64%;
+  z-index: 3;
+}
+
+.pi-landing-root .hero-glass-price {
+  right: 7%;
+  bottom: 3%;
+  width: 40%;
+  z-index: 4;
+  padding: 14px 16px 16px;
+}
+
+.pi-landing-root .hero-glass-kicker {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.pi-landing-root .hero-day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.pi-landing-root .hero-day-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--c70);
+  line-height: 1.35;
+}
+
+.pi-landing-root .hero-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--navy);
+}
+
+.pi-landing-root .hero-check.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 8px rgba(201, 162, 39, 0.35);
+}
+
+.pi-landing-root .hero-ba + .hero-ba {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--c08);
+}
+
+.pi-landing-root .hero-ba-tag {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 6px;
+}
+
+.pi-landing-root .hero-ba-tag.yes {
+  color: var(--ok);
+}
+
+.pi-landing-root .hero-ba p {
+  margin: 0;
+  font-family: var(--nr);
+  font-weight: 300;
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--c70);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.pi-landing-root .hero-glass-price strong {
+  display: block;
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 42px;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(201, 162, 39, 0.2);
+}
+
+.pi-landing-root .hero-glass-price span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--c50);
 }
 
 .pi-landing-root .kick {
@@ -256,7 +425,7 @@ html.pi-html-landing body {
   font-size: clamp(42px, 7.2vw, 74px);
   line-height: 0.98;
   letter-spacing: -0.025em;
-  margin: 0 auto 22px;
+  margin: 0 0 22px;
   max-width: 13ch;
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
 }
@@ -277,13 +446,13 @@ html.pi-html-landing body {
   line-height: 1.55;
   color: var(--c70);
   max-width: 34em;
-  margin: 0 auto 34px;
+  margin: 0 0 34px;
 }
 
 .pi-landing-root .ctas {
   display: flex;
   gap: 12px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   margin-bottom: 24px;
 }
@@ -476,18 +645,17 @@ html.pi-html-landing body {
 }
 
 .pi-landing-root .cell .ico {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 18px;
-  background: linear-gradient(180deg, var(--gold-s), rgba(201, 162, 39, 0.06));
-  border: 1px solid rgba(201, 162, 39, 0.25);
+  background: rgba(201, 162, 39, 0.05);
+  border: 1px solid rgba(201, 162, 39, 0.42);
   color: var(--gold);
   font-size: 17px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
 }
 
 .pi-landing-root .cell h3 {
@@ -644,6 +812,19 @@ html.pi-html-landing body {
   background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.6), transparent);
 }
 
+.pi-landing-root .pricebox::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -50px;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  border: 1px solid rgba(201, 162, 39, 0.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 28px rgba(201, 162, 39, 0.05);
+}
+
 .pi-landing-root .big {
   font-family: var(--nr);
   font-weight: 300;
@@ -746,6 +927,58 @@ html.pi-html-landing body {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .pi-landing-root .hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 72px 0 56px;
+    gap: 28px;
+  }
+
+  .pi-landing-root .hero-mark {
+    margin: 0 auto 28px;
+  }
+
+  .pi-landing-root h1,
+  .pi-landing-root .lede {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .pi-landing-root .hero .ctas {
+    justify-content: center;
+  }
+
+  .pi-landing-root .hero-art {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 0;
+  }
+
+  .pi-landing-root .hero-geo {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.55;
+  }
+
+  .pi-landing-root .hero-glass {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+  }
+
+  .pi-landing-root .hero-glass-price {
+    width: min(100%, 240px);
+    align-self: flex-end;
+  }
 }
 
 @media (max-width: 760px) {

@@ -261,10 +261,10 @@ html.pi-html-landing body {
 }
 
 .pi-landing-root .hero-mark {
-  margin: 0 auto 28px;
+  margin: 12px auto 28px;
   display: block;
   overflow: visible;
-  padding: 12px;
+  padding: 16px;
   box-sizing: content-box;
   filter: drop-shadow(0 6px 18px rgba(201, 162, 39, 0.25));
 }
@@ -971,11 +971,16 @@ html.pi-html-landing body {
 
 .pi-landing-root .pi-highlights-sec {
   padding: 72px 0 40px;
+  overflow: visible;
 }
 
 .pi-landing-root .pi-highlights {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scroll-padding-inline: max(24px, calc((100% - min(78vw, 320px)) / 2));
   -webkit-overflow-scrolling: touch;
@@ -989,9 +994,11 @@ html.pi-html-landing body {
 
 .pi-landing-root .pi-highlights-track {
   display: flex;
+  flex-wrap: nowrap;
   gap: 14px;
   width: max-content;
-  margin: 28px auto 0;
+  max-width: none;
+  margin: 28px 0 0;
   padding: 8px max(24px, calc((100vw - min(78vw, 320px)) / 2)) 28px;
   transform: none;
 }
@@ -1214,7 +1221,7 @@ html.pi-html-landing body {
   }
 
   .pi-landing-root .hero {
-    padding: calc(56px + env(safe-area-inset-top, 0px)) 0 52px;
+    padding: calc(72px + env(safe-area-inset-top, 0px)) 0 52px;
   }
 
   .pi-landing-root .strip {

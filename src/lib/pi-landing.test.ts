@@ -307,6 +307,8 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(css, /\.pricebox[\s\S]*margin-right:\s*auto/);
     assert.match(css, /justify-items:\s*center/);
     assert.match(css, /scroll-snap-align:\s*center/);
+    assert.match(css, /\.pi-highlights[\s\S]*width:\s*100%/);
+    assert.match(css, /flex-wrap:\s*nowrap/);
     assert.match(css, /env\(safe-area-inset-top/);
     assert.doesNotMatch(css, /overflow-x:\s*hidden/);
   });

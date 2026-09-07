@@ -60,6 +60,11 @@ import {
   trainingRosterTotalCents,
   type TrainingPersonRow,
 } from "@/lib/pi-signup-pricing";
+import {
+  parseSignupClientCount,
+  parseSignupStaffCount,
+  signupCountDraftFromInput,
+} from "@/lib/signup-count-input";
 import { toast } from "sonner";
 import {
   SIGNUP_EMAIL_IN_USE_MESSAGE,
@@ -1020,24 +1025,30 @@ function Step3Business({
 function TextInput({
   value,
   onChange,
+  onBlur,
   placeholder,
   type = "text",
+  inputMode,
   disabled,
   testId,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   disabled?: boolean;
   testId?: string;
 }) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       placeholder={placeholder}
       data-testid={testId}
       className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[var(--hive-gold)]/60 focus:ring-2 focus:ring-[var(--hive-gold)]/40 disabled:opacity-60"
@@ -1059,6 +1070,41 @@ function Step4Pricing({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const [clientDraft, setClientDraft] = useState(String(form.clientCount));
+  const [staffDraft, setStaffDraft] = useState(String(form.staffCount));
+  const [clientErr, setClientErr] = useState<string | null>(null);
+  const [staffErr, setStaffErr] = useState<string | null>(null);
+
+  const commitClient = (): boolean => {
+    const parsed = parseSignupClientCount(clientDraft);
+    if (!parsed.ok) {
+      setClientErr(parsed.error);
+      return false;
+    }
+    setClientErr(null);
+    setClientDraft(String(parsed.value));
+    update("clientCount", parsed.value);
+    return true;
+  };
+
+  const commitStaff = (): boolean => {
+    const parsed = parseSignupStaffCount(staffDraft);
+    if (!parsed.ok) {
+      setStaffErr(parsed.error);
+      return false;
+    }
+    setStaffErr(null);
+    setStaffDraft(String(parsed.value));
+    update("staffCount", parsed.value);
+    return true;
+  };
+
+  const continueNext = () => {
+    const clientOk = commitClient();
+    const staffOk = commitStaff();
+    if (clientOk && staffOk) onNext();
+  };
+
   return (
     <>
       <Header
@@ -1083,22 +1129,41 @@ function Step4Pricing({
         <Field
           label="About how many clients will you start with?"
           hint="A starting guess for the workspace. Not your bill. We bill the highest number of clients who were actually active that month. Discharged clients are not billed."
+          error={clientErr}
         >
           <TextInput
-            type="number"
-            value={String(form.clientCount)}
-            onChange={(v) => update("clientCount", Math.max(0, Number(v) || 0))}
+            inputMode="numeric"
+            testId="signup-client-count"
+            value={clientDraft}
+            onChange={(v) => {
+              setClientDraft(signupCountDraftFromInput(v));
+              setClientErr(null);
+            }}
+            onBlur={() => {
+              void commitClient();
+            }}
           />
         </Field>
-        <Field label="How many active staff?" hint="For your workspace only — not billed.">
+        <Field
+          label="How many active staff?"
+          hint="For your workspace only — not billed."
+          error={staffErr}
+        >
           <TextInput
-            type="number"
-            value={String(form.staffCount)}
-            onChange={(v) => update("staffCount", Math.max(1, Number(v) || 1))}
+            inputMode="numeric"
+            testId="signup-staff-count"
+            value={staffDraft}
+            onChange={(v) => {
+              setStaffDraft(signupCountDraftFromInput(v));
+              setStaffErr(null);
+            }}
+            onBlur={() => {
+              void commitStaff();
+            }}
           />
         </Field>
       </div>
-      <NavButtons onBack={onBack} onNext={onNext} />
+      <NavButtons onBack={onBack} onNext={continueNext} />
     </>
   );
 }

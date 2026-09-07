@@ -54,25 +54,29 @@ export const PI_PRICING_PAGE_DESCRIPTION =
   "Provider Interface is $69 per client / month, $350 / month minimum. No setup fee. No feature tiers. Training classes optional.";
 
 export const PI_KICKER = "PI · Built for Utah Medicaid disability providers";
-export const PI_HERO_FINE = "$69 per client / month · No setup fee · Nectar included";
+export const PI_HERO_FINE = "$69 per client / month · $350 / month minimum · Nectar included";
 export const PI_PRICE_MIN_AND_TRAINING = "$350 / month minimum · Optional training classes sold separately";
+export const PI_LEARN_MORE = "Learn more";
 
 export const PI_NAV_WHY = "Why PI";
 export const PI_NAV_PRICING = "Pricing";
+export const PI_NAV_NECTAR = "Nectar";
+export const PI_NAV_ABOUT = "About";
 export const PI_NAV_TRAINING = "Training";
 export const PI_NAV_CONTACT = "Contact";
 export const PI_NAV_TERMS = "Terms";
 export const PI_NAV_BAA = "BAA";
 
 export const PI_NAV_LINKS = [
-  { href: "/#why", label: PI_NAV_WHY },
-  { href: "/#pricing", label: PI_NAV_PRICING },
-  { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
+  { href: "/pricing", label: PI_NAV_PRICING, to: "/pricing" as const },
+  { href: "/nectar", label: PI_NAV_NECTAR, to: "/nectar" as const },
+  { href: "/about", label: PI_NAV_ABOUT, to: "/about" as const },
 ] as const;
 
 export const PI_FOOTER_LINKS = [
-  { href: "/#why", label: PI_NAV_WHY },
-  { href: "/#pricing", label: PI_NAV_PRICING },
+  { href: "/pricing", label: PI_NAV_PRICING, to: "/pricing" as const },
+  { href: "/nectar", label: PI_NAV_NECTAR, to: "/nectar" as const },
+  { href: "/about", label: PI_NAV_ABOUT, to: "/about" as const },
   { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
   { href: "/contact", label: PI_NAV_CONTACT, to: "/contact" as const },
   { href: "/terms", label: PI_NAV_TERMS, to: "/terms" as const },
@@ -283,3 +287,93 @@ export const PI_PRICING_INTRO = PI_LIST_PRICE_INCLUDED;
 
 export const PI_CTA_HEADLINE = "Open PI Monday. It's already standing.";
 export const PI_CTA_BODY = PI_FOUNDING_QUIET;
+
+export const PI_HIGHLIGHTS_KICKER = "In the room";
+export const PI_HIGHLIGHTS_HEADLINE = "The day, already smaller.";
+
+export const PI_FEATURE_HIGHLIGHTS = [
+  {
+    id: "day",
+    kicker: "The day",
+    title: "The week is already standing.",
+    body: "Notes already written. The day stays done.",
+    to: "/about" as const,
+    price: false,
+    checks: [
+      { done: true, label: "The week is standing" },
+      { done: true, label: "Notes already written" },
+      { done: false, label: "You can leave" },
+    ],
+  },
+  {
+    id: "nectar",
+    kicker: "Nectar",
+    title: "Notes that write themselves.",
+    body: "A sentence lands while the day is still happening. You stay in charge.",
+    to: "/nectar" as const,
+    price: false,
+    checks: [] as ReadonlyArray<{ done: boolean; label: string }>,
+  },
+  {
+    id: "price",
+    kicker: "List price",
+    title: PI_LIST_PRICE_DISPLAY,
+    body: `${PI_LIST_PRICE_UNIT}. ${PI_LIST_MINIMUM_LINE}.`,
+    to: "/pricing" as const,
+    price: true,
+    checks: [] as ReadonlyArray<{ done: boolean; label: string }>,
+  },
+  {
+    id: "office",
+    kicker: "The office",
+    title: "One room. Already open.",
+    body: "People, the schedule, notes, trainings — not a second storefront.",
+    to: "/about" as const,
+    price: false,
+    checks: [] as ReadonlyArray<{ done: boolean; label: string }>,
+  },
+  {
+    id: "quiet",
+    kicker: "For owners",
+    title: "The day got smaller.",
+    body: "Quiet control. Not another clerk tool to learn on Sunday night.",
+    to: "/about" as const,
+    price: false,
+    checks: [] as ReadonlyArray<{ done: boolean; label: string }>,
+  },
+  {
+    id: "ready",
+    kicker: "Day one",
+    title: "Already standing.",
+    body: "Zero configuration before you start. Open PI Monday.",
+    to: "/pricing" as const,
+    price: false,
+    checks: [] as ReadonlyArray<{ done: boolean; label: string }>,
+  },
+] as const;
+
+export const PI_NECTAR_PAGE_TITLE = "Nectar — Provider Interface";
+export const PI_NECTAR_PAGE_DESCRIPTION =
+  "Nectar sits with the day so notes write themselves. You read the sentence. You keep it, or you change it.";
+export const PI_NECTAR_PAGE_KICKER = "More about Nectar";
+export const PI_NECTAR_PAGE_HEADLINE = "Notes that write themselves.";
+export const PI_NECTAR_PAGE_LEAD =
+  "The day is still happening. A sentence is already on the page. You read it. You keep it, or you change it. Nothing publishes itself.";
+export const PI_NECTAR_PAGE_BODY = [
+  "Before, the note is a blur — a client, some goals, medication mentioned in passing.",
+  "After, it names the person, the work, and how they responded. The evening is already on the record.",
+  "Nectar sits with the day. It does not take the pen. Drafts stay drafts until you say they are done.",
+] as const;
+
+export const PI_ABOUT_PAGE_TITLE = "About — Provider Interface";
+export const PI_ABOUT_PAGE_DESCRIPTION =
+  "Provider Interface is the office for agency owners who want the day to get smaller. The company is Provider Interface LLC.";
+export const PI_ABOUT_PAGE_KICKER = "About us";
+export const PI_ABOUT_PAGE_HEADLINE = "The office, already standing.";
+export const PI_ABOUT_PAGE_LEAD =
+  "Provider Interface is for owners who want the day to get smaller — not another system to chase.";
+export const PI_ABOUT_PAGE_BODY = [
+  "Everyone calls it PI. We built it so a newer agency can open Monday and the week is already standing.",
+  "People, the schedule, notes already written, trainings in the room. Quiet control. You can leave.",
+  "The company is Provider Interface LLC.",
+] as const;

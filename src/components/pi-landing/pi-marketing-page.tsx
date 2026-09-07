@@ -1,7 +1,6 @@
-import { useLayoutEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { PiPublicHeader } from "@/components/pi-landing/pi-public-header";
-import { PiPublicFooter } from "@/components/pi-landing/pi-public-footer";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
+import { PiFeatureScroll } from "@/components/pi-landing/pi-feature-scroll";
 import { PiHeroGlass } from "@/components/pi-landing/pi-hero-glass";
 import { PiMark } from "@/components/pi-landing/pi-mark";
 import {
@@ -14,6 +13,7 @@ import {
   PI_HERO_STATS,
   PI_KICKER,
   PI_LANDING_INCLUDED,
+  PI_LEARN_MORE,
   PI_LIST_PRICE_DISPLAY,
   PI_LIST_PRICE_LEAD,
   PI_LIST_PRICE_UNIT,
@@ -99,16 +99,8 @@ function InclCheck() {
 }
 
 export function PiMarketingPage() {
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    root.classList.add("pi-html-landing");
-    return () => root.classList.remove("pi-html-landing");
-  }, []);
-
   return (
-    <div className="pi-landing-root">
-      <div className="grain" aria-hidden />
-      <PiPublicHeader />
+    <PiPublicPage>
       <header className="wrap hero">
         <div className="hero-copy">
           <PiMark variant="hero" width={60} height={60} className="hero-mark" />
@@ -140,14 +132,23 @@ export function PiMarketingPage() {
           </div>
         ))}
       </div>
+      <PiFeatureScroll />
       <section id="why">
         <div className="wrap">
           <div className="sk">{PI_WHAT_IS_KICKER}</div>
           <div className="pi">
-            <div className="pi-big">{PI_WHAT_IS_MARK}</div>
-            <p>
-              <b>{PI_WHAT_IS_LEAD}</b> {PI_WHAT_IS_BODY}
-            </p>
+            <div className="pi-mark-well">
+              <PiMark variant="cream" width={88} height={88} className="pi-card-mark" />
+              <div className="pi-big">{PI_WHAT_IS_MARK}</div>
+            </div>
+            <div>
+              <p>
+                <b>{PI_WHAT_IS_LEAD}</b> {PI_WHAT_IS_BODY}
+              </p>
+              <Link className="learn" to="/about">
+                {PI_LEARN_MORE}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -168,12 +169,15 @@ export function PiMarketingPage() {
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
+                <Link className="learn" to="/about">
+                  {PI_LEARN_MORE}
+                </Link>
               </div>
             ))}
           </div>
         </div>
       </section>
-      <section>
+      <section id="nectar">
         <div className="wrap">
           <div className="sk">{PI_NECTAR_KICKER}</div>
           <h2>{PI_NECTAR_HEADLINE}</h2>
@@ -196,6 +200,9 @@ export function PiMarketingPage() {
               </div>
             </div>
           </div>
+          <Link className="learn" to="/nectar">
+            {PI_LEARN_MORE}
+          </Link>
         </div>
       </section>
       <section className="alt" id="pricing">
@@ -211,8 +218,8 @@ export function PiMarketingPage() {
                 <Link className="btn p" to="/signup">
                   {PI_GET_STARTED}
                 </Link>
-                <Link className="btn s" to="/contact">
-                  {PI_TALK_TO_US}
+                <Link className="btn s" to="/pricing">
+                  {PI_LEARN_MORE}
                 </Link>
               </div>
             </div>
@@ -239,7 +246,6 @@ export function PiMarketingPage() {
           </Link>
         </div>
       </section>
-      <PiPublicFooter />
-    </div>
+    </PiPublicPage>
   );
 }

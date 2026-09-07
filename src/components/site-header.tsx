@@ -13,11 +13,12 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   const links = [
-    { to: "/", label: "Home" },
-    { to: "/pricing", label: "Pricing" },
-    { to: "/training", label: "Training" },
-    { to: "/contact", label: "Contact" },
-  ] as const;
+    { to: "/pricing" as const, label: "Pricing" },
+    { to: "/nectar" as const, label: "Nectar" },
+    { to: "/about" as const, label: "About" },
+    { to: "/training" as const, label: "Training" },
+    { to: "/contact" as const, label: "Contact" },
+  ];
 
   return (
     <header className={`${PUBLIC_MARKETING_NAV_CLASS} w-full`} style={PUBLIC_MARKETING_NAV_SAFE_AREA_STYLE}>

@@ -14,12 +14,20 @@ import {
   PI_LIST_MINIMUM_DOLLARS,
   PI_LIST_MINIMUM_LINE,
   PI_LIST_PER_CLIENT_DOLLARS,
+  PI_FEATURE_HIGHLIGHTS,
   PI_HERO_STATS,
+  PI_LEARN_MORE,
   PI_LIST_PRICE_CONTRAST,
   PI_LIST_PRICE_DISPLAY,
   PI_LIST_PRICE_LEAD,
+  PI_NAV_ABOUT,
+  PI_NAV_LINKS,
+  PI_NAV_NECTAR,
+  PI_NAV_PRICING,
   PI_NAV_WHY,
+  PI_NECTAR_PAGE_HEADLINE,
   PI_NECTAR_SUB,
+  PI_ABOUT_PAGE_HEADLINE,
   PI_PAGE_DESCRIPTION,
   PI_PAGE_TITLE,
   PI_PRICE_MIN_AND_TRAINING,
@@ -36,6 +44,8 @@ import {
 const PUBLIC_FILES = [
   new URL("../routes/index.tsx", import.meta.url),
   new URL("../routes/pricing.tsx", import.meta.url),
+  new URL("../routes/nectar.tsx", import.meta.url),
+  new URL("../routes/about.tsx", import.meta.url),
   new URL("../routes/signup.tsx", import.meta.url),
   new URL("../routes/training.tsx", import.meta.url),
   new URL("../routes/terms.tsx", import.meta.url),
@@ -46,6 +56,9 @@ const PUBLIC_FILES = [
   new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-public-header.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-public-footer.tsx", import.meta.url),
+  new URL("../components/pi-landing/pi-feature-scroll.tsx", import.meta.url),
+  new URL("../components/pi-landing/pi-nectar-page.tsx", import.meta.url),
+  new URL("../components/pi-landing/pi-about-page.tsx", import.meta.url),
 ];
 
 function read(url: URL) {
@@ -85,6 +98,7 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_TRAINING_SECTION_HEADLINE, "Classes, sold separately.");
     assert.match(PI_TRAINING_SECTION_BODY, /no feature tiers/i);
     assert.equal(PI_HERO_STATS[1]?.label, "price. no feature tiers, nothing to unlock");
+    assert.doesNotMatch(PI_LIST_PRICE_CONTRAST, /no add-ons/i);
     assert.match(PI_SIGNUP_PRICE_LINE, /\$69 per client \/ month \(\$350 minimum\)/);
     assert.match(PI_FOUNDING_QUIET, /[Ff]irst five agencies/);
     assert.doesNotMatch(PI_FOUNDING_QUIET, /\$/);
@@ -112,18 +126,27 @@ describe("Provider Interface marketing homepage", () => {
     assert.doesNotMatch(landing, /DuskDeskStill|PiPricingSection/);
     assert.match(landing, /id="why"/);
     assert.match(landing, /id="pricing"/);
+    assert.match(landing, /id="nectar"/);
+    assert.match(landing, /PiFeatureScroll/);
+    assert.match(landing, /PI_LEARN_MORE/);
     assert.match(landing, /to="\/signup"/);
     assert.match(landing, /to="\/contact"/);
+    assert.match(landing, /to="\/pricing"/);
+    assert.match(landing, /to="\/nectar"/);
+    assert.match(landing, /to="\/about"/);
     assert.match(landing, /PI_LIST_PRICE_DISPLAY/);
     assert.match(landing, /PI_LANDING_INCLUDED/);
     assert.match(landing, /PiHeroGlass/);
+    assert.match(landing, /pi-mark-well/);
     assert.doesNotMatch(header, /What you get/);
     assert.doesNotMatch(header, /The office/);
     assert.match(header, /PI_NAV_LINKS/);
     assert.match(header, /to="\/login"/);
+    assert.match(header, /LANDING_MOBILE_NAV_ID/);
     const copy = read(new URL("./pi-landing.ts", import.meta.url));
-    assert.match(copy, /\/#why/);
-    assert.match(copy, /\/#pricing/);
+    assert.match(copy, /to: "\/pricing"/);
+    assert.match(copy, /to: "\/nectar"/);
+    assert.match(copy, /to: "\/about"/);
     assert.match(copy, /to: "\/training"/);
     assert.match(shots, /Nectar/);
     assert.match(pricing, /PI_LIST_PRICE_DISPLAY/);
@@ -243,5 +266,50 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(mark, /variant === "hero"/);
     assert.doesNotMatch(mark, /M6 10H42/);
     assert.doesNotMatch(mark, /polygon|hexagon|Hexagon/i);
+  });
+
+  it("exposes Pricing, Nectar, and About as real public routes", () => {
+    assert.equal(PI_NAV_PRICING, "Pricing");
+    assert.equal(PI_NAV_NECTAR, "Nectar");
+    assert.equal(PI_NAV_ABOUT, "About");
+    assert.equal(PI_LEARN_MORE, "Learn more");
+    assert.equal(PI_NECTAR_PAGE_HEADLINE, "Notes that write themselves.");
+    assert.equal(PI_ABOUT_PAGE_HEADLINE, "The office, already standing.");
+    assert.deepEqual(
+      PI_NAV_LINKS.map((item) => item.to),
+      ["/pricing", "/nectar", "/about"],
+    );
+    assert.equal(PI_FEATURE_HIGHLIGHTS.length >= 3, true);
+    assert.equal(PI_FEATURE_HIGHLIGHTS.length <= 6, true);
+    const nectar = read(new URL("../routes/nectar.tsx", import.meta.url));
+    const about = read(new URL("../routes/about.tsx", import.meta.url));
+    const scroll = read(new URL("../components/pi-landing/pi-feature-scroll.tsx", import.meta.url));
+    assert.match(nectar, /createFileRoute\("\/nectar"\)/);
+    assert.match(about, /createFileRoute\("\/about"\)/);
+    assert.match(scroll, /pi-highlights/);
+    assert.match(scroll, /PI_LEARN_MORE/);
+    assert.doesNotMatch(nectar, /Hive Certify/);
+    assert.doesNotMatch(about, /Hive Certify/);
+    const nectarPage = read(new URL("../components/pi-landing/pi-nectar-page.tsx", import.meta.url));
+    const aboutPage = read(new URL("../components/pi-landing/pi-about-page.tsx", import.meta.url));
+    assert.doesNotMatch(nectarPage, /DSPD|compliance|audit/i);
+    assert.doesNotMatch(aboutPage, /Hive Certify/);
+    assert.match(aboutPage, /PI_ABOUT_PAGE_BODY/);
+  });
+
+  it("keeps the PI mark and list-price card from clipping or drifting on mobile", () => {
+    const css = read(new URL("../components/pi-landing/pi-landing.css", import.meta.url));
+    assert.match(css, /overflow-x:\s*clip/);
+    assert.match(css, /\.pi-mark-well/);
+    assert.match(css, /\.pi-big[\s\S]*line-height:\s*1\.08/);
+    assert.match(css, /\.pi-big[\s\S]*padding-top:\s*0\.16em/);
+    assert.match(css, /\.pricebox[\s\S]*margin-left:\s*auto/);
+    assert.match(css, /\.pricebox[\s\S]*margin-right:\s*auto/);
+    assert.match(css, /justify-items:\s*center/);
+    assert.match(css, /scroll-snap-align:\s*center/);
+    assert.match(css, /\.pi-highlights[\s\S]*width:\s*100%/);
+    assert.match(css, /flex-wrap:\s*nowrap/);
+    assert.match(css, /env\(safe-area-inset-top/);
+    assert.doesNotMatch(css, /overflow-x:\s*hidden/);
   });
 });

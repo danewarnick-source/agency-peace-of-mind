@@ -7,15 +7,14 @@
 //   3. Invokes the `send-email` edge function (Resend, RESEND_API_KEY).
 //
 // Two modes exist in org_email_settings.send_mode:
-//   - 'hive_managed' (default, active): sends from HIVE_MANAGED_FROM_ADDRESS
+//   - 'hive_managed' (default, active): sends from managedFromAddress()
+//     (RESEND_FROM / EMAIL_FROM, else noreply@providerinterface.com)
 //     with the org's display name and org-configured reply-to. Zero DNS setup.
 //   - 'own_domain' (deferred, not built yet): would send from the org's own
 //     verified domain. updateOrgEmailSettings rejects this mode for now.
 //
-// SWAP-POINT: change HIVE_MANAGED_FROM_ADDRESS to
-// `notifications@mail.hivehcbs.com` (or the chosen HIVE subdomain) once that
-// domain is verified in Resend. Nothing else needs to change — every rail
-// (loan email, billing, notifications) reads From/reply-to via resolveOrgSender.
+// Override the mailbox with RESEND_FROM or EMAIL_FROM. Display name stays
+// the org's from_name / org name / "Provider Interface".
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -23,13 +22,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requirePermission } from "@/lib/require-permission";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import {
+  DEFAULT_MANAGED_FROM_NAME,
+  formatFromHeader,
+  managedFromAddress,
+} from "@/lib/managed-from";
+
+export { HIVE_MANAGED_FROM_ADDRESS, managedFromAddress } from "@/lib/managed-from";
 
 const ORG_ID = z.string().uuid();
-
-/** HIVE managed sending address. Bootstrap value = Resend's shared onboarding
- *  domain so email works immediately today. Swap to notifications@<verified
- *  HIVE subdomain> in Resend, then update this single constant. */
-export const HIVE_MANAGED_FROM_ADDRESS = "onboarding@resend.dev";
 
 export type ResolvedSender = {
   from: string; // "Display Name <address>"
@@ -40,9 +41,9 @@ export type ResolvedSender = {
 /** Server-only helper. Loads org email settings + org name, composes the From
  *  header, and returns the reply-to address. Throws with a UI-friendly message
  *  when reply-to is missing (Mode 1 requires it so recipient replies actually
- *  reach the provider, not the shared HIVE sending domain). Any server fn /
+ *  reach the provider, not the shared sending domain). Any server fn /
  *  .server helper that sends email MUST go through this so all rails stay
- *  consistent when the HIVE domain is swapped. */
+ *  consistent when the From mailbox is swapped via RESEND_FROM. */
 export async function resolveOrgSender(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -68,7 +69,7 @@ export async function resolveOrgSender(
   // than blocking sends, so no org is silently broken.
 
   const displayName =
-    String(settings?.from_name || "").trim() || orgName || "HIVE Notifications";
+    String(settings?.from_name || "").trim() || orgName || DEFAULT_MANAGED_FROM_NAME;
   const replyTo = String(settings?.reply_to || "").trim();
   if (!replyTo) {
     throw new Error(
@@ -77,7 +78,7 @@ export async function resolveOrgSender(
   }
 
   return {
-    from: `${displayName} <${HIVE_MANAGED_FROM_ADDRESS}>`,
+    from: formatFromHeader(displayName),
     reply_to: replyTo,
     send_mode: "hive_managed",
   };
@@ -93,7 +94,7 @@ export const getOrgEmailSettings = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) {
-      return { settings: null, hive_managed_from_address: HIVE_MANAGED_FROM_ADDRESS };
+      return { settings: null, hive_managed_from_address: managedFromAddress() };
     }
     await requireOrgMembership(
       supabase as unknown as SupabaseClient,
@@ -112,7 +113,7 @@ export const getOrgEmailSettings = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return {
       settings: row ?? null,
-      hive_managed_from_address: HIVE_MANAGED_FROM_ADDRESS,
+      hive_managed_from_address: managedFromAddress(),
     };
   });
 
@@ -158,7 +159,7 @@ export const updateOrgEmailSettings = createServerFn({ method: "POST" })
           organization_id: data.organization_id,
           send_mode: "hive_managed",
           from_name: (data.from_name ?? "").trim() || null,
-          from_address: null, // Mode 1 uses HIVE_MANAGED_FROM_ADDRESS
+          from_address: null, // Mode 1 uses managedFromAddress()
           reply_to: data.reply_to,
           verified: true, // Mode 1 is trusted (shared HIVE sender)
           updated_by: userId,
@@ -235,7 +236,7 @@ export const sendEmail = createServerFn({ method: "POST" })
           bcc: data.bcc,
           // Per-call reply_to wins over org-level; org-level is always
           // present (resolveOrgSender enforces it) so recipients can always
-          // reply back to a real inbox — never into onboarding@resend.dev.
+          // reply back to a real inbox — never into the shared From mailbox.
           reply_to: data.reply_to ?? sender.reply_to,
         },
       },

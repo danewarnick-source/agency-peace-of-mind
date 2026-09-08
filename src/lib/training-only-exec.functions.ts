@@ -7,7 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { HIVE_MANAGED_FROM_ADDRESS } from "@/lib/email.functions";
+import { DEFAULT_TRAINING_FROM_NAME, formatFromHeader } from "@/lib/managed-from";
 import { authRedirectUrl } from "@/lib/auth-redirect";
 import { quoteSignupTrainingAddon } from "@/lib/pi-signup-pricing";
 import {
@@ -306,7 +306,7 @@ async function sendSeatEmail(to: string, subject: string, text: string, html: st
   const admin = supabaseAdmin as AnySupabase;
   const { data: invoke, error } = await admin.functions.invoke("send-email", {
     body: {
-      from: `Provider Interface Training <${HIVE_MANAGED_FROM_ADDRESS}>`,
+      from: formatFromHeader(DEFAULT_TRAINING_FROM_NAME),
       to,
       subject,
       text,

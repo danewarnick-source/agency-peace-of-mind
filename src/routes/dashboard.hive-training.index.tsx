@@ -965,7 +965,7 @@ function Storefront({
       {
         type: "thirty_day" as const,
         title: "30-day orientation",
-        blurb: "In-platform course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
+        blurb: "In-platform Essential Training from My Obligations. A purchased 30-day or pack seat unlocks the course for that staff. True North Supports is never charged. Not an external class.",
       },
     ] as const
   ).map((card) => {

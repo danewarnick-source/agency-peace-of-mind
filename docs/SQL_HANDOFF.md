@@ -4797,3 +4797,21 @@ WHERE s.client_id = f.client_id
   AND s.finalized_at IS NULL
   AND s.completed_at IS NULL;
 ```
+
+---
+
+## NO SQL — 30-Day Essential Training in-app (2026-09-08)
+
+**Do not run SQL for this feature.** No migration, no RLS change, no new tables.
+
+The in-Hive 30-day course reuses existing:
+
+- `training_topic_progress` / `training_completions` (progress + exam; extra SAS topics use a new UUID namespace so A–W refs stay stable)
+- `training_classes` / `training_class_roster` (paid/waived `thirty_day` or `package` seat)
+- `training_only_seats` / `training_only_orders` (public training-only path)
+- `company_obligation_instances` via existing `recordCompletion` (`evidence_type_used = in_hive_course`)
+- `organizations.billing_exempt` plus True North name / id / `TNS` acronym (`isBillingExempt`)
+
+Certificate is rendered from topic progress + exam — it does **not** write `hive_training_certificates` (that table is leftover LMS).
+
+If a later change needs schema, add an idempotent migration and a new ACTION block here. Do not apply destructive SQL.

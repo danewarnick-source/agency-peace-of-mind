@@ -83,6 +83,7 @@ function TrainingOnlyCoursePage() {
                   alreadyComplete={false}
                   examResetAfterIso={null}
                   skipObligation
+                  organizationName="Training-only seat"
                 />
               </div>
             )}

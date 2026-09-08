@@ -15,18 +15,23 @@ import {
   EXAM_MAX_ATTEMPTS,
   EXAM_PASS_RATIO,
   IN_HIVE_COURSE_EVIDENCE,
+  allRequiredTopicsComplete,
   buildExamAnswerRecords,
+  buildThirtyDayCertificate,
+  canIssueThirtyDayCertificate,
   courseTitle,
   examLocked,
   examUnlocked,
   formatExamExportCsv,
   remainingExamAttempts,
   scoreExam,
+  shuffleCopy,
   topicUnlocked,
   type ExamAttemptSnapshot,
   type ExamQuestion,
   type InHiveCourseId,
 } from "@/lib/in-hive-training";
+import { InHiveCertificate } from "@/components/training/in-hive-certificate";
 import {
   insertInHiveExamAttempt,
   loadInHiveExamAttempts,
@@ -52,6 +57,7 @@ type Props = {
   examResetAfterIso: string | null;
   /** Public training-only seats have no office obligation to close. */
   skipObligation?: boolean;
+  organizationName?: string;
 };
 
 function topicsForCourse(courseId: InHiveCourseId): Topic[] {
@@ -69,6 +75,7 @@ export function InHiveCoursePlayer({
   alreadyComplete,
   examResetAfterIso,
   skipObligation = false,
+  organizationName = "Provider agency",
 }: Props) {
   const qc = useQueryClient();
   const recordFn = useServerFn(recordCompletion);
@@ -127,6 +134,7 @@ export function InHiveCoursePlayer({
 
   const markObligation = useCallback(async () => {
     if (skipObligation || !organizationId) return;
+    if (!allRequiredTopicsComplete(topicCodes, completedCodes)) return;
     await recordFn({
       data: {
         organizationId,
@@ -136,7 +144,15 @@ export function InHiveCoursePlayer({
         attestationTextSnapshot: `${obligationTitle} completed in Provider Interface.`,
       },
     });
-  }, [recordFn, organizationId, instanceId, obligationTitle, skipObligation]);
+  }, [
+    recordFn,
+    organizationId,
+    instanceId,
+    obligationTitle,
+    skipObligation,
+    topicCodes,
+    completedCodes,
+  ]);
 
   const finishCourse = useMutation({
     mutationFn: markObligation,
@@ -361,6 +377,29 @@ export function InHiveCoursePlayer({
             finishPending={finishCourse.isPending}
             onMarkObligation={() => finishCourse.mutate()}
             hideObligation={skipObligation}
+            certificate={
+              courseId === "thirty-day"
+                ? buildThirtyDayCertificate({
+                    staffName: signedName,
+                    organizationName,
+                    completedAt:
+                      [...attempts].reverse().find((a) => a.passed)?.completedAt ??
+                      new Date().toISOString(),
+                    completedCodes,
+                    examPassed: passed,
+                    examScorePct: [...attempts].reverse().find((a) => a.passed)?.scorePct ?? null,
+                    topicTitles: topics.map((t) => ({ code: t.code, title: t.title })),
+                  })
+                : null
+            }
+            certificateIssued={
+              courseId === "thirty-day" &&
+              canIssueThirtyDayCertificate({
+                topicCodes,
+                completedCodes,
+                examPassed: passed,
+              })
+            }
           />
         )}
       </div>
@@ -381,6 +420,8 @@ function ExamPane({
   finishPending,
   onMarkObligation,
   hideObligation = false,
+  certificate,
+  certificateIssued,
 }: {
   title: string;
   questions: ExamQuestion[];
@@ -394,8 +435,17 @@ function ExamPane({
   finishPending: boolean;
   onMarkObligation: () => void;
   hideObligation?: boolean;
+  certificate: ReturnType<typeof buildThirtyDayCertificate> | null;
+  certificateIssued: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [shuffled, setShuffled] = useState(() =>
+    questions.map((q) => ({ ...q, options: shuffleCopy(q.options) })),
+  );
+  useEffect(() => {
+    setShuffled(questions.map((q) => ({ ...q, options: shuffleCopy(q.options) })));
+    setAnswers({});
+  }, [attempts.length, questions]);
   const last = attempts[attempts.length - 1];
   const failedCount = attempts.filter((a) => !a.passed).length;
   const triesLeft = remainingExamAttempts(failedCount, passed);
@@ -431,14 +481,21 @@ function ExamPane({
         <CardContent className="space-y-3 text-sm">
           <p>
             Score {last?.scorePct ?? "—"}%.
-            {hideObligation ? " Course complete." : " This obligation is complete when the course is recorded."}
+            {hideObligation
+              ? " Course complete."
+              : certificateIssued
+                ? " This obligation is complete when the course is recorded."
+                : " Finish every topic on the checklist, then record the obligation."}
           </p>
+          {certificate && (
+            <InHiveCertificate record={certificate} issued={certificateIssued} />
+          )}
           <div className="flex flex-wrap gap-2">
             <Button onClick={onDownload}>
               <Download className="h-4 w-4 mr-2" />
               Download auditor export
             </Button>
-            {!alreadyComplete && !hideObligation && (
+            {!alreadyComplete && !hideObligation && certificateIssued && (
               <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
                 Record on My Obligations
               </Button>
@@ -463,13 +520,15 @@ function ExamPane({
           {Math.round(EXAM_PASS_RATIO * 100)}% to pass. {triesLeft}{" "}
           {triesLeft === 1 ? "try" : "tries"} left. No notes during the test.
         </p>
-        {questions.map((q, i) => (
+        {shuffled.map((q, i) => (
           <fieldset key={q.id} className="space-y-2">
             <legend className="text-sm font-medium">
               {i + 1}. {q.stem}
             </legend>
             <div className="space-y-1.5">
-              {q.options.map((c) => (
+              {q.options.map((c, oi) => {
+                const label = String.fromCharCode(65 + oi);
+                return (
                 <label
                   key={c.k}
                   className={cn(
@@ -485,16 +544,17 @@ function ExamPane({
                     onChange={() => setAnswers((prev) => ({ ...prev, [q.id]: c.k }))}
                   />
                   <span>
-                    <span className="font-medium">{c.k}.</span> {c.t}
+                    <span className="font-medium">{label}.</span> {c.t}
                   </span>
                 </label>
-              ))}
+                );
+              })}
             </div>
           </fieldset>
         ))}
         <Button
           className="w-full sm:w-auto"
-          disabled={submitting || Object.keys(answers).length < questions.length}
+          disabled={submitting || Object.keys(answers).length < shuffled.length}
           onClick={() => onSubmit(answers)}
         >
           {submitting ? "Scoring…" : "Submit exam"}

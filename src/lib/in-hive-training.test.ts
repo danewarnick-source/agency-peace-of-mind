@@ -3,8 +3,14 @@ import { describe, it } from "node:test";
 import {
   ABI_OBLIGATION_TITLE,
   EXAM_MAX_ATTEMPTS,
+  THIRTY_DAY_EXTRA_CODES,
   THIRTY_DAY_OBLIGATION_TITLE,
+  THIRTY_DAY_SOW_LETTERS,
+  THIRTY_DAY_TOPIC_CODES,
+  allRequiredTopicsComplete,
   buildExamAnswerRecords,
+  buildThirtyDayCertificate,
+  canIssueThirtyDayCertificate,
   examLocked,
   examUnlocked,
   firstIncompleteTopicIndex,
@@ -17,6 +23,7 @@ import {
   lastExamResetAt,
   remainingExamAttempts,
   scoreExam,
+  shuffleCopy,
   topicUnlocked,
   type ExamQuestion,
 } from "./in-hive-training.ts";
@@ -54,6 +61,17 @@ describe("inHiveCourseIdForTitle", () => {
   });
 });
 
+describe("30-day topic codes", () => {
+  it("keeps SOW A–W plus separately scored SAS extras", () => {
+    assert.equal(THIRTY_DAY_SOW_LETTERS.length, 23);
+    assert.equal(THIRTY_DAY_EXTRA_CODES.length, 7);
+    assert.equal(THIRTY_DAY_TOPIC_CODES.length, 30);
+    assert.equal(THIRTY_DAY_TOPIC_CODES[0], "A");
+    assert.equal(THIRTY_DAY_TOPIC_CODES[22], "W");
+    assert.deepEqual(THIRTY_DAY_TOPIC_CODES.slice(23), ["PG", "PO", "EV", "MD", "PB", "CB", "DC"]);
+  });
+});
+
 describe("progress refs", () => {
   it("namespaces topic and exam rows so they do not collide with topic UUIDs", () => {
     assert.equal(inHiveProgressRef("thirty-day", "A"), "inhive:thirty-day:A");
@@ -61,6 +79,8 @@ describe("progress refs", () => {
     assert.equal(inHiveRefUuid("thirty-day", "A"), "a11ce000-1e8f-4000-8000-000000000141");
     assert.equal(inHiveRefUuid("abi", "__exam__"), "a11ce000-1e8f-4000-8000-0000000002ff");
     assert.notEqual(inHiveRefUuid("thirty-day", "A"), inHiveRefUuid("abi", "A"));
+    assert.equal(inHiveRefUuid("thirty-day", "PG"), "a11ce000-1e8f-4000-8000-000000010101");
+    assert.notEqual(inHiveRefUuid("thirty-day", "PG"), inHiveRefUuid("thirty-day", "A"));
   });
 });
 
@@ -78,15 +98,72 @@ describe("exam coverage", () => {
     const thirty = examQuestionsFor("thirty-day");
     const abi = examQuestionsFor("abi");
     const thirtyLetters = new Set(thirty.map((q) => q.topicCode));
-    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVW") {
+    for (const letter of THIRTY_DAY_SOW_LETTERS) {
       assert.ok(thirtyLetters.has(letter), `missing 30-day exam item for ${letter}`);
+    }
+    for (const extra of THIRTY_DAY_EXTRA_CODES) {
+      assert.ok(thirtyLetters.has(extra), `missing 30-day exam item for ${extra}`);
     }
     const abiLetters = new Set(abi.map((q) => q.topicCode));
     for (const letter of "ABCDEF") {
       assert.ok(abiLetters.has(letter), `missing ABI exam item for ${letter}`);
     }
-    assert.ok(thirty.every((q) => q.sowCite.startsWith("1.8(4)")));
+    assert.ok(
+      thirty.every((q) => q.sowCite.startsWith("1.8(4)") || q.sowCite.startsWith("SAS")),
+    );
     assert.ok(abi.every((q) => q.sowCite.startsWith("1.8(8)")));
+  });
+});
+
+describe("shuffleCopy", () => {
+  it("keeps the same items and can move the first item off index 0", () => {
+    const src = [1, 2, 3, 4, 5, 6, 7, 8];
+    let n = 0;
+    const rng = () => {
+      n += 0.17;
+      return n % 1;
+    };
+    const out = shuffleCopy(src, rng);
+    assert.deepEqual([...out].sort((a, b) => a - b), src);
+    assert.notEqual(out[0], 1);
+  });
+});
+
+describe("30-day certificate checklist", () => {
+  it("requires every topic plus a passing exam before issue", () => {
+    const titles = THIRTY_DAY_TOPIC_CODES.map((code) => ({ code, title: code }));
+    const done = new Set(THIRTY_DAY_TOPIC_CODES);
+    assert.equal(allRequiredTopicsComplete(THIRTY_DAY_TOPIC_CODES, done), true);
+    assert.equal(
+      canIssueThirtyDayCertificate({
+        topicCodes: THIRTY_DAY_TOPIC_CODES,
+        completedCodes: done,
+        examPassed: true,
+      }),
+      true,
+    );
+    const missing = new Set(THIRTY_DAY_TOPIC_CODES.slice(0, -1));
+    assert.equal(
+      canIssueThirtyDayCertificate({
+        topicCodes: THIRTY_DAY_TOPIC_CODES,
+        completedCodes: missing,
+        examPassed: true,
+      }),
+      false,
+    );
+    const cert = buildThirtyDayCertificate({
+      staffName: "Jordan Rivera",
+      organizationName: "Example Supports",
+      completedAt: "2026-09-08T12:00:00.000Z",
+      completedCodes: done,
+      examPassed: true,
+      examScorePct: 88,
+      topicTitles: titles,
+    });
+    assert.equal(cert.topics.length, THIRTY_DAY_TOPIC_CODES.length);
+    assert.ok(cert.topics.every((t) => t.passed));
+    assert.match(cert.topics[0]?.sowCite ?? "", /1\.8\(4\)\(A\)/);
+    assert.match(cert.courseName, /30-Day Essential Training/);
   });
 });
 

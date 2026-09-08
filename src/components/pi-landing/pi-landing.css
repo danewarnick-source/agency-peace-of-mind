@@ -1127,6 +1127,216 @@ html.pi-html-landing body {
   margin: 0;
 }
 
+/* /pricing — one centered column. Do not reuse .page (it left-aligns h1/lede). */
+.pi-landing-root .wrap.pi-pricing-page {
+  max-width: 800px;
+  text-align: center;
+  padding-top: 56px;
+  padding-bottom: 96px;
+}
+
+.pi-landing-root .pi-pricing-page .sk,
+.pi-landing-root .pi-pricing-section .sk {
+  justify-content: center;
+}
+
+.pi-landing-root .pi-pricing-page h1 {
+  max-width: 16ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pi-landing-root .pi-pricing-page .lede {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.pi-landing-root .pi-pricing-page .ctas {
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.pi-landing-root .pi-pricing-section {
+  padding: 40px 0 0;
+  text-align: center;
+}
+
+.pi-landing-root .pi-pricing-section.compact {
+  padding: 24px 0 0;
+}
+
+.pi-landing-root .pi-price-card {
+  margin: 28px auto 0;
+  padding: 40px 36px 36px;
+  border-radius: 20px;
+  text-align: center;
+  background: linear-gradient(135deg, var(--n3), var(--n1) 70%);
+  border: 1px solid var(--c08);
+  box-shadow: var(--sh-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.pi-landing-root .pi-price-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.6), transparent);
+}
+
+.pi-landing-root .pi-price-card h2 {
+  max-width: none;
+  margin: 0 auto 18px;
+  font-size: clamp(26px, 3.4vw, 34px);
+}
+
+.pi-landing-root .pi-price-amount {
+  margin: 0;
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: clamp(72px, 12vw, 104px);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  color: var(--cream);
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.05),
+    0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.pi-landing-root .pi-price-card .per {
+  margin: 14px 0 4px;
+}
+
+.pi-landing-root .pi-price-card .min {
+  margin: 0 0 22px;
+  color: var(--gold);
+}
+
+.pi-landing-root .pi-price-contrast {
+  margin: 0 0 12px;
+  font-family: var(--nr);
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--cream);
+}
+
+.pi-landing-root .pi-price-included {
+  margin: 0 auto;
+  max-width: 36em;
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--c70);
+}
+
+.pi-landing-root .pi-price-included a {
+  color: var(--cream);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--c30);
+}
+
+.pi-landing-root .pi-pricing-block {
+  margin-top: 56px;
+  text-align: left;
+}
+
+.pi-landing-root .pi-pricing-block .sk {
+  justify-content: flex-start;
+}
+
+.pi-landing-root .pi-pricing-block h3 {
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: clamp(26px, 3.2vw, 34px);
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+
+.pi-landing-root .pi-pricing-body {
+  margin: 0 0 8px;
+  font-family: var(--nr);
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--c70);
+  max-width: 36em;
+}
+
+.pi-landing-root .pi-pricing-rows {
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--c08);
+  border-bottom: 1px solid var(--c08);
+  text-align: left;
+}
+
+.pi-landing-root .pi-pricing-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: 16px 32px;
+  align-items: baseline;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--c08);
+}
+
+.pi-landing-root .pi-pricing-row:last-child {
+  border-bottom: 0;
+}
+
+.pi-landing-root .pi-pricing-row dt,
+.pi-landing-root .pi-pricing-train span:first-child {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream);
+}
+
+.pi-landing-root .pi-pricing-row dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--c70);
+}
+
+.pi-landing-root .pi-pricing-train {
+  grid-template-columns: 1fr auto;
+}
+
+.pi-landing-root .pi-pricing-figure {
+  font-variant-numeric: tabular-nums;
+  color: var(--c70);
+}
+
+.pi-landing-root .pi-pricing-enterprise {
+  padding-top: 40px;
+  border-top: 1px solid var(--c08);
+}
+
+.pi-landing-root .pi-pricing-enterprise .btn {
+  margin-top: 20px;
+}
+
+.pi-landing-root .pi-pricing-quiet {
+  margin: 48px 0 0;
+  font-size: 14px;
+  color: var(--c50);
+}
+
+.pi-landing-root .pi-pricing-close {
+  margin-top: 28px;
+  margin-bottom: 0;
+}
+
+/* Cream fill must keep navy type — .pi-landing-root a { color: inherit } would blank it. */
+.pi-landing-root a.btn.p {
+  color: var(--navy);
+}
+
 .pi-pub-foot {
   border-top: 1px solid var(--c08);
   padding: 28px 0;
@@ -1305,6 +1515,20 @@ html.pi-html-landing body {
 
   .pi-landing-root .ctas .btn {
     flex: 1 1 100%;
+  }
+
+  .pi-landing-root .pi-price-card {
+    padding: 30px 22px;
+  }
+
+  .pi-landing-root .pi-pricing-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .pi-landing-root .pi-pricing-train {
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
   }
 
   .pi-landing-root .pi-hl-card {

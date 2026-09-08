@@ -2,6 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { PiPricingSection } from "@/components/pi-landing/pi-pricing";
 import {
+  PI_DIFFERENCE_HEADLINE,
+  PI_PRICING_HERO_LEDE,
+  PI_PRICING_KICKER,
   PI_PRICING_PAGE_DESCRIPTION,
   PI_PRICING_PAGE_TITLE,
   PI_SIGN_IN,
@@ -26,14 +29,12 @@ export const Route = createFileRoute("/pricing")({
 function PricingPage() {
   return (
     <PiPublicPage>
-      <main>
-        <div className="wrap page" style={{ paddingBottom: 12, textAlign: "center" }}>
-          <p className="sk" style={{ justifyContent: "center" }}>
-            Pricing
-          </p>
-          <h1 style={{ marginLeft: "auto", marginRight: "auto" }}>One number. The whole office.</h1>
-          <p className="lede">The list price is the price. Sign in when you are ready.</p>
-          <Link className="btn p sm" to="/login" style={{ marginTop: 24 }}>
+      <main className="wrap pi-pricing-page">
+        <p className="sk">{PI_PRICING_KICKER}</p>
+        <h1>{PI_DIFFERENCE_HEADLINE}</h1>
+        <p className="lede">{PI_PRICING_HERO_LEDE}</p>
+        <div className="ctas">
+          <Link className="btn p" to="/login">
             {PI_SIGN_IN}
           </Link>
         </div>

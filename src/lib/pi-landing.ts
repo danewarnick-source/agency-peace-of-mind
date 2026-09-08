@@ -156,6 +156,7 @@ export const PI_NECTAR_AFTER_QUOTE =
 export const PI_NECTAR_AFTER_NOTE = "Complete. Ready to submit.";
 
 export const PI_PRICING_KICKER = "Pricing";
+export const PI_PRICING_HERO_LEDE = "The list price is the price. Sign in when you are ready.";
 
 export const PI_LANDING_INCLUDED = [
   { title: "Contract obligation tracking", body: "41 DSPD requirements, pre-loaded" },

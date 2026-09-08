@@ -30,6 +30,7 @@ import {
   PI_ABOUT_PAGE_HEADLINE,
   PI_PAGE_DESCRIPTION,
   PI_PAGE_TITLE,
+  PI_PRICING_HERO_LEDE,
   PI_PRICE_MIN_AND_TRAINING,
   PI_SIGNUP_PRICE_LINE,
   PI_SUBHEAD,
@@ -160,6 +161,9 @@ describe("Provider Interface marketing homepage", () => {
     assert.doesNotMatch(copy, /Training is the only add-on/);
     assert.doesNotMatch(copy, /price for everything, no add-ons/);
     assert.match(pricing, /compact/);
+    assert.match(pricing, /className="btn p"/);
+    assert.match(pricing, /className="btn s"/);
+    assert.doesNotMatch(pricing, /text-\[#0b1220\]/);
     assert.doesNotMatch(pricing, /FOUNDING_PER_STAFF_CENTS|LIST_VOLUME_TIERS|ANNUAL_DISCOUNT/);
     assert.doesNotMatch(landing, /PublicLandingHeader|HexBackdrop|HiveWordmark|Honeycomb|hivecertify/);
     assert.doesNotMatch(landing, /landing\/hero-phone/);
@@ -324,5 +328,23 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(css, /flex-wrap:\s*nowrap/);
     assert.match(css, /env\(safe-area-inset-top/);
     assert.doesNotMatch(css, /overflow-x:\s*hidden/);
+  });
+
+  it("keeps /pricing on one centered column with a readable Sign in", () => {
+    const page = read(new URL("../routes/pricing.tsx", import.meta.url));
+    const section = read(new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url));
+    const css = read(new URL("../components/pi-landing/pi-landing.css", import.meta.url));
+    assert.match(page, /pi-pricing-page/);
+    assert.match(page, /PI_DIFFERENCE_HEADLINE/);
+    assert.match(page, /PI_PRICING_HERO_LEDE/);
+    assert.match(page, /className="btn p"/);
+    assert.doesNotMatch(page, /className="wrap page"/);
+    assert.doesNotMatch(page, /textAlign:\s*["']center["']/);
+    assert.match(section, /pi-price-card/);
+    assert.match(section, /pi-pricing-close/);
+    assert.match(css, /\.wrap\.pi-pricing-page/);
+    assert.match(css, /max-width:\s*800px/);
+    assert.match(css, /\.pi-landing-root a\.btn\.p \{\n  color: var\(--navy\);\n\}/);
+    assert.equal(PI_PRICING_HERO_LEDE, "The list price is the price. Sign in when you are ready.");
   });
 });

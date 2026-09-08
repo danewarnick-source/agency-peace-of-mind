@@ -10,8 +10,10 @@ import {
   inHiveCourseIdForTitle,
   lastExamResetAt,
 } from "@/lib/in-hive-training";
+import { thirtyDayCourseAccessFn } from "@/lib/in-hive-training-access.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/dashboard/my-obligations_/course/$instanceId")({
   head: () => ({ meta: [{ title: "Staff training — Provider Interface" }] }),
@@ -21,9 +23,10 @@ export const Route = createFileRoute("/dashboard/my-obligations_/course/$instanc
 function InHiveCoursePage() {
   const { instanceId } = Route.useParams();
   const { user } = useAuth();
-  const { data: org } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const orgId = org?.organization_id;
   const fetchCtx = useServerFn(getObligationInstanceContext);
+  const accessFn = useServerFn(thirtyDayCourseAccessFn);
 
   const ctxQ = useQuery({
     queryKey: ["obligation-instance-context", orgId, instanceId],
@@ -45,8 +48,24 @@ function InHiveCoursePage() {
     },
   });
 
-  if (!orgId || !user) {
+  const courseIdPreview = ctxQ.data?.obligation
+    ? inHiveCourseIdForTitle(ctxQ.data.obligation.title)
+    : null;
+
+  const accessQ = useQuery({
+    queryKey: ["thirty-day-course-access", orgId, user?.id],
+    enabled: !!orgId && !!user && courseIdPreview === "thirty-day",
+    queryFn: () => accessFn({ data: { organizationId: orgId! } }),
+  });
+
+  if (!user) {
     return <p className="text-sm text-muted-foreground p-4">Sign in to open this course.</p>;
+  }
+  if (orgLoading) {
+    return <p className="text-sm text-muted-foreground p-4">Loading organization…</p>;
+  }
+  if (!org || !orgId) {
+    return <p className="text-sm text-muted-foreground p-4">No organization is selected.</p>;
   }
 
   if (ctxQ.isLoading) {
@@ -78,6 +97,10 @@ function InHiveCoursePage() {
   const alreadyComplete =
     instance.status === "completed" || instance.status === "waived";
   const examResetAfterIso = lastExamResetAt(instance.admin_notes, user.id);
+  const needsSeat = courseId === "thirty-day";
+  const accessBlocked =
+    needsSeat &&
+    (accessQ.isError || (accessQ.isSuccess && accessQ.data && !accessQ.data.allowed));
 
   return (
     <div className="w-full space-y-4">
@@ -87,17 +110,45 @@ function InHiveCoursePage() {
         title={obligation.title}
         subtitle="Complete each topic, then the competency exam. You can leave and pick up where you left off."
       />
-      <InHiveCoursePlayer
-        organizationId={orgId}
-        userId={user.id}
-        signedName={String(signedName)}
-        signerEmail={profileQ.data?.email ?? user.email ?? null}
-        courseId={courseId}
-        instanceId={instanceId}
-        obligationTitle={obligation.title}
-        alreadyComplete={alreadyComplete}
-        examResetAfterIso={examResetAfterIso}
-      />
+      {needsSeat && accessQ.isLoading ? (
+        <p className="text-sm text-muted-foreground p-4">Checking training access…</p>
+      ) : accessBlocked ? (
+        <div className="rounded-xl border bg-card p-5 text-sm space-y-3">
+          <p className="font-medium">
+            {accessQ.isError
+              ? "Could not confirm a 30-day training seat"
+              : "A 30-day training seat is required"}
+          </p>
+          <p className="text-muted-foreground">
+            {accessQ.isError
+              ? "Refresh and try again. If this continues, ask an admin to confirm your seat."
+              : "Paid agencies purchase the 30-day course ($75 per person) or the pack from Training. An admin assigns your name on the roster after checkout. True North Supports is never charged and does not need a purchased seat."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link to="/dashboard/hive-training">Open Training</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/dashboard/my-obligations">Back to My Obligations</Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <InHiveCoursePlayer
+          organizationId={orgId}
+          userId={user.id}
+          signedName={String(signedName)}
+          signerEmail={profileQ.data?.email ?? user.email ?? null}
+          courseId={courseId}
+          instanceId={instanceId}
+          obligationTitle={obligation.title}
+          alreadyComplete={alreadyComplete}
+          examResetAfterIso={examResetAfterIso}
+          organizationName={
+            accessQ.data?.organizationName || org.organization_name || "Provider agency"
+          }
+        />
+      )}
     </div>
   );
 }

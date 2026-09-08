@@ -3,6 +3,12 @@
 
 import { useEffect, useState } from "react";
 import { O_STEPS, P_STEPS } from "@/lib/in-hive-training-thirty-day-extra";
+import {
+  SCENARIO_STEPS_BY_CODE,
+  THIRTY_DAY_SAS_TOPICS,
+} from "@/lib/in-hive-training-thirty-day-sas";
+import { PI_THEME } from "@/lib/pi-theme";
+import { shuffleCopy } from "@/lib/in-hive-training";
 import { TrainingDiagram, type DiagramId } from "@/components/training/in-hive-diagrams";
 import {
   useTrainingSpeech,
@@ -10,6 +16,7 @@ import {
   setSessionAutoRead,
   buildLessonSpeech,
   buildCheckSpeech,
+  buildScenarioSpeech,
 } from "./use-training-speech";
 
 /* ───────────────────────── Types ───────────────────────── */
@@ -32,7 +39,18 @@ type CheckStep = {
   stem: string;
   options: { k: string; t: string; correct: boolean; fb: string }[];
 };
-type Step = LessonStep | CheckStep;
+type ScenarioBeat = {
+  fact: string;
+  options: { k: string; t: string; correct: boolean; fb: string }[];
+};
+type ScenarioStep = {
+  type: "scenario";
+  kicker: string;
+  title: string;
+  setup?: string;
+  beats: ScenarioBeat[];
+};
+type Step = LessonStep | CheckStep | ScenarioStep;
 type Topic = {
   code: string;
   title: string;
@@ -45,7 +63,10 @@ type Topic = {
 };
 
 /* ───────────────────────── Brand ───────────────────────── */
-const NAVY = "var(--hive-text)", GOLD = "var(--hive-gold)", TEAL = "var(--hive-ink)", INK = "var(--hive-text)";
+const NAVY = PI_THEME.navy;
+const GOLD = PI_THEME.gold;
+const TEAL = PI_THEME.n2;
+const INK = PI_THEME.navy;
 
 /* ───────────────────────── Content: Seizures (worked example) ───────────────────────── */
 const SEIZURE_STEPS: Step[] = [
@@ -1762,16 +1783,23 @@ export const TRAINING_TOPICS: Topic[] = [
     attest: "I attest that I have completed this training, understand the person-specific facts I must know before working alone, and that I will review the current record rather than guess." },
 ];
 
-/** SOW letter order A–W for the in-Hive 30-day course. */
+/** SOW letter order A–W, then separately scored SAS essential topics. */
 export function thirtyDayTopicsInSowOrder(): Topic[] {
   const by = new Map(TRAINING_TOPICS.map((t) => [t.code, t]));
-  return "ABCDEFGHIJKLMNOPQRSTUVW".split("").map((code) => {
+  const sow = "ABCDEFGHIJKLMNOPQRSTUVW".split("").map((code) => {
     const t = by.get(code);
     if (!t || t.status !== "ready" || !t.steps?.length) {
       throw new Error(`30-day topic ${code} is not ready`);
     }
-    return t;
+    const extra = SCENARIO_STEPS_BY_CODE[code];
+    return extra?.length ? { ...t, steps: [...(t.steps ?? []), ...extra] } : t;
   });
+  for (const t of THIRTY_DAY_SAS_TOPICS) {
+    if (t.status !== "ready" || !t.steps?.length) {
+      throw new Error(`30-day topic ${t.code} is not ready`);
+    }
+  }
+  return [...sow, ...THIRTY_DAY_SAS_TOPICS];
 }
 
 /* ───────────────────────── UI bits ───────────────────────── */
@@ -1825,7 +1853,8 @@ function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClic
 function Check({ step, onPass, speaking, onSpeak, onStop }: { step: CheckStep; onPass: () => void; speaking: boolean; onSpeak: () => void; onStop: () => void }) {
   const [done, setDone] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
-  const chosen = step.options.find(o => o.k === picked);
+  const [options] = useState(() => shuffleCopy(step.options));
+  const chosen = options.find(o => o.k === picked);
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -1833,14 +1862,15 @@ function Check({ step, onPass, speaking, onSpeak, onStop }: { step: CheckStep; o
         <SpeakerButton speaking={speaking} onClick={speaking ? onStop : onSpeak} label="Read this slide aloud" />
       </div>
       <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{step.stem}</div>
-      {step.options.map(o => {
+      {options.map((o, i) => {
+        const label = String.fromCharCode(65 + i);
         const isPicked = picked === o.k;
         const border = isPicked ? (o.correct ? "#1D9E75" : "#e29a9a") : "#e4e7ef";
         const bg = isPicked ? (o.correct ? "#e1f5ee" : "#fdeded") : "#fff";
         return (
           <button key={o.k} disabled={done} onClick={() => { setPicked(o.k); if (o.correct) setDone(true); }}
             style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13.5, padding: "12px 13px", border: `1px solid ${border}`, borderRadius: 12, background: bg, cursor: done ? "default" : "pointer", color: "#2a3040", marginBottom: 9, display: "flex", gap: 10, lineHeight: 1.45, opacity: done && !o.correct ? .5 : 1 }}>
-            <b style={{ color: "#6b7180" }}>{o.k}.</b><span>{o.t}</span>
+            <b style={{ color: "#6b7180" }}>{label}.</b><span>{o.t}</span>
           </button>
         );
       })}
@@ -1913,6 +1943,7 @@ export function TrainingModule({
       : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
   const checks = baseSteps.filter(s => s.type === "check").length;
   const lessons = baseSteps.filter(s => s.type === "lesson").length;
+  const scenarios = baseSteps.filter(s => s.type === "scenario").length;
   const [i, setI] = useState(() => Math.min(Math.max(0, initialStep), Math.max(0, flow.length - 1)));
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
@@ -1963,6 +1994,9 @@ export function TrainingModule({
       if (text) speak(text);
     } else if (step?.type === "check") {
       const text = buildCheckSpeech(step);
+      if (text) speak(text);
+    } else if (step?.type === "scenario") {
+      const text = buildScenarioSpeech(step, 0);
       if (text) speak(text);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2061,7 +2095,7 @@ export function TrainingModule({
           <>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>Code {topic.code}</div>
             <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{topic.title}</div>
-            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} scenarios{readOnly || skipAttest ? "" : ", then you sign"}</div>
+            <div style={{ fontSize: 12, color: "#8a8f9e", marginBottom: 14 }}>About {topic.estMin} minutes · {lessons} lessons, {checks} knowledge checks{scenarios ? `, ${scenarios} decision chains` : ""}{readOnly || skipAttest ? "" : ", then you sign"}</div>
             <div style={{ background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", fontSize: 13.5, lineHeight: 1.6 }}>{topic.intro}</div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}>
               {!hideAllTopics && <button style={btn("out")} onClick={onExit}>All topics</button>}
@@ -2111,6 +2145,19 @@ export function TrainingModule({
 
         {step.type === "check" && <Check step={step as CheckStep} onPass={next} speaking={speaking} onSpeak={speakCurrentCheck} onStop={stop} />}
 
+        {step.type === "scenario" && (
+          <Scenario
+            step={step as ScenarioStep}
+            onPass={next}
+            speaking={speaking}
+            onSpeak={(beatIndex) => {
+              const text = buildScenarioSpeech(step, beatIndex);
+              if (text) speak(text);
+            }}
+            onStop={stop}
+          />
+        )}
+
         {step.type === "attest" && (
           <>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#4e1f81" }}>Attestation · Electronic signature</div>
@@ -2155,7 +2202,7 @@ export function TrainingModule({
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              {[[`${checks}/${checks}`, "knowledge checks", "#0f6e56"], [topic.code, "topic", "var(--hive-ink)"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
+              {[[`${checks + scenarios}/${checks + scenarios}`, checks && scenarios ? "checks and chains" : "knowledge checks", "#0f6e56"], [topic.code, "topic", "var(--hive-ink)"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
                 <div key={k} style={{ flex: 1, background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 11, padding: 11, textAlign: "center" }}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: c as string }}>{n}</div><div style={{ fontSize: 11, color: "#8a8f9e" }}>{l}</div>
                 </div>
@@ -2170,6 +2217,110 @@ export function TrainingModule({
   );
 }
 
-export type { Topic, Step, LessonStep, CheckStep, Callout, Fact };
+function Scenario({
+  step,
+  onPass,
+  speaking,
+  onSpeak,
+  onStop,
+}: {
+  step: ScenarioStep;
+  onPass: () => void;
+  speaking: boolean;
+  onSpeak: (beatIndex: number) => void;
+  onStop: () => void;
+}) {
+  const [beatI, setBeatI] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const beat = step.beats[beatI];
+  const [options, setOptions] = useState(() => shuffleCopy(beat?.options ?? []));
+  useEffect(() => {
+    setPicked(null);
+    setDone(false);
+    setOptions(shuffleCopy(step.beats[beatI]?.options ?? []));
+  }, [beatI, step.beats]);
+  if (!beat) return null;
+  const chosen = options.find((o) => o.k === picked);
+  const last = beatI >= step.beats.length - 1;
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>
+          {step.kicker} · beat {beatI + 1} of {step.beats.length}
+        </div>
+        <SpeakerButton speaking={speaking} onClick={speaking ? onStop : () => onSpeak(beatI)} label="Read this slide aloud" />
+      </div>
+      <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{step.title}</div>
+      {step.setup && beatI === 0 && (
+        <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>{step.setup}</div>
+      )}
+      <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{beat.fact}</div>
+      {options.map((o, i) => {
+        const label = String.fromCharCode(65 + i);
+        const isPicked = picked === o.k;
+        const border = isPicked ? (o.correct ? "#1D9E75" : "#e29a9a") : "#e4e7ef";
+        const bg = isPicked ? (o.correct ? "#e1f5ee" : "#fdeded") : "#fff";
+        return (
+          <button
+            key={o.k}
+            disabled={done}
+            onClick={() => {
+              setPicked(o.k);
+              if (o.correct) setDone(true);
+            }}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              font: "inherit",
+              fontSize: 13.5,
+              padding: "12px 13px",
+              border: `1px solid ${border}`,
+              borderRadius: 12,
+              background: bg,
+              cursor: done ? "default" : "pointer",
+              color: "#2a3040",
+              marginBottom: 9,
+              display: "flex",
+              gap: 10,
+              lineHeight: 1.45,
+              opacity: done && !o.correct ? 0.5 : 1,
+            }}
+          >
+            <b style={{ color: "#6b7180" }}>{label}.</b>
+            <span>{o.t}</span>
+          </button>
+        );
+      })}
+      {chosen && !chosen.correct && (
+        <div style={{ fontSize: 12.5, color: "#854f0b", background: "#faeeda", border: "1px solid #fac775", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Try again</div>
+          {chosen.fb}
+        </div>
+      )}
+      {chosen && chosen.correct && (
+        <>
+          <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>That is right</div>
+            {chosen.fb}
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+            <button
+              style={btn("pri")}
+              onClick={() => {
+                if (last) onPass();
+                else setBeatI((n) => n + 1);
+              }}
+            >
+              {last ? "Continue" : "Next fact"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export type { Topic, Step, LessonStep, CheckStep, ScenarioStep, ScenarioBeat, Callout, Fact };
 
 

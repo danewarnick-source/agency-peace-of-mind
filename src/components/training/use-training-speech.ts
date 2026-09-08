@@ -89,3 +89,18 @@ export function buildCheckSpeech(step: any): string {
   }
   return parts.join(" ");
 }
+
+export function buildScenarioSpeech(step: any, beatIndex: number): string {
+  if (!step || step.type !== "scenario") return "";
+  const parts: string[] = [];
+  if (step.title) parts.push(step.title + ".");
+  if (step.setup && beatIndex === 0) parts.push(stripHtml(step.setup));
+  const beat = Array.isArray(step.beats) ? step.beats[beatIndex] : null;
+  if (beat?.fact) parts.push(stripHtml(beat.fact));
+  if (beat && Array.isArray(beat.options)) {
+    for (const o of beat.options) {
+      parts.push(stripHtml(o.t));
+    }
+  }
+  return parts.join(" ");
+}

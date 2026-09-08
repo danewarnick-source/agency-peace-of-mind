@@ -310,6 +310,83 @@ const thirtyDayExam: ExamQuestion[] = [
     ],
     sowCite: "1.8(4)(W)",
   },
+  {
+    id: "td-pg1",
+    topicCode: "PG",
+    stem: "The written plan says to notify the listed guardian the same day for any injury. Client Noor has a small scrape you cleaned and covered. What do you do?",
+    options: [
+      { k: "A", t: "Skip the call — it is only a scrape.", correct: false },
+      { k: "B", t: "Notify the guardian listed in the record, give facts, and document the call.", correct: true },
+      { k: "C", t: "Text a neighborhood group chat so someone tells the family.", correct: false },
+    ],
+    sowCite: "SAS · parent/guardian notification",
+  },
+  {
+    id: "td-po1",
+    topicCode: "PO",
+    stem: "Client Devon is awake and breathing normally after tasting a household cleaner. What is the right specialist call?",
+    options: [
+      { k: "A", t: "Make them vomit, then wait.", correct: false },
+      { k: "B", t: "Call Poison Control at 1-800-222-1222 with the product name and what you saw, unless 911 signs appear.", correct: true },
+      { k: "C", t: "Give milk and go back to the shift.", correct: false },
+    ],
+    sowCite: "SAS · poison control",
+  },
+  {
+    id: "td-ev1",
+    topicCode: "EV",
+    stem: "You smell smoke and see haze in the hallway. Clients are in bedrooms. What is the first priority?",
+    options: [
+      { k: "A", t: "Find the source and throw water on it yourself.", correct: false },
+      { k: "B", t: "Alert everyone, help them out along the planned route, go to the meeting place, and call 911.", correct: true },
+      { k: "C", t: "Open all windows and stay inside to air it out.", correct: false },
+    ],
+    sowCite: "SAS · emergency evacuation",
+  },
+  {
+    id: "td-md1",
+    topicCode: "MD",
+    stem: "You are not signed off to administer medications at this agency. The regular med-pass staff called out. What do you do?",
+    options: [
+      { k: "A", t: "Pass the morning pills anyway so no one is late.", correct: false },
+      { k: "B", t: "Tell your supervisor immediately that you are not credentialed and do not pass medications.", correct: true },
+      { k: "C", t: "Have a client hand the pills to the others while you watch.", correct: false },
+    ],
+    sowCite: "SAS · medications / allergies / diet",
+  },
+  {
+    id: "td-pb1",
+    topicCode: "PB",
+    stem: "A coworker wants to lock the snack cabinet tonight because it is easier. There is no approved restriction. What is correct?",
+    options: [
+      { k: "A", t: "Lock it — staff convenience is a valid reason.", correct: false },
+      { k: "B", t: "Do not lock it. Follow what is written. Report a real nutrition concern through the proper process.", correct: true },
+      { k: "C", t: "Lock it and write a note tomorrow.", correct: false },
+    ],
+    sowCite: "SAS · prohibited methods (Rule R539)",
+  },
+  {
+    id: "td-cb1",
+    topicCode: "CB",
+    stem: "You already had a near-miss medication error this morning because you are exhausted. The supervisor asks you to stay another eight hours. What is responsible?",
+    options: [
+      { k: "A", t: "Stay anyway and hope you do not make another error.", correct: false },
+      { k: "B", t: "Say you are not safe to stay over after the near miss, and ask them to find other coverage.", correct: true },
+      { k: "C", t: "Stay and skip documenting so you can rest on the clock.", correct: false },
+    ],
+    sowCite: "SAS · caregiver burnout",
+  },
+  {
+    id: "td-dc1",
+    topicCode: "DC",
+    stem: "A client’s parent offers you $100 cash to take extra shifts off the books. What do you do?",
+    options: [
+      { k: "A", t: "Take it — extra help is good.", correct: false },
+      { k: "B", t: "Decline, explain that staff cannot take side payment, and report the offer through the agency process.", correct: true },
+      { k: "C", t: "Take it if you split it with your supervisor.", correct: false },
+    ],
+    sowCite: "SAS · DHHS Code of Conduct",
+  },
 ];
 
 const abiExam: ExamQuestion[] = [

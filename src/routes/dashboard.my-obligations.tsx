@@ -21,7 +21,11 @@ import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
 import { toDisplayNameCase } from "@/lib/person-name";
 import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
-import { IN_HIVE_COURSE_EVIDENCE, inHiveCourseIdForTitle } from "@/lib/in-hive-training";
+import {
+  IN_HIVE_COURSE_EVIDENCE,
+  THIRTY_DAY_TOPIC_CODES,
+  inHiveCourseIdForTitle,
+} from "@/lib/in-hive-training";
 import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
 import {
   CLIENT_FORM_LABEL,
@@ -35,9 +39,7 @@ import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
-  return courseId === "thirty-day"
-    ? "ABCDEFGHIJKLMNOPQRSTUVW".split("")
-    : "ABCDEF".split("");
+  return courseId === "thirty-day" ? [...THIRTY_DAY_TOPIC_CODES] : "ABCDEF".split("");
 }
 
 export const Route = createFileRoute("/dashboard/my-obligations")({

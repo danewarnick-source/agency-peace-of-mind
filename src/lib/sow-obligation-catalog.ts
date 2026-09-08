@@ -89,7 +89,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Staff open this from My Obligations and complete the in-Hive 30-day course (all 23 SOW topics plus a competency exam). Completing the exam greens the obligation. One-time hire requirement — annual hours are a separate obligation.",
+      "Staff open this from My Obligations and complete the in-Hive 30-day course (SOW §1.8(4)(A)–(W) plus separately scored SAS essential topics, then a competency exam). Completing every topic and the exam greens the obligation and issues a checklist certificate. Paid agencies need a purchased 30-day or pack seat; True North Supports is always free. One-time hire requirement — annual hours are a separate obligation.",
     due_rule: { kind: "days_after_hire", days: 30 },
     owner: "staff",
     service_codes: [],

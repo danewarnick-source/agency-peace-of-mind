@@ -39,20 +39,110 @@ export function isInHiveProgressRef(refId: string): boolean {
   return refId.startsWith("inhive:");
 }
 
+/** Official DHHS91172 SOW §1.8(4) letters — do not reorder; progress UUIDs depend on them. */
+export const THIRTY_DAY_SOW_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVW".split("");
+
+/**
+ * Extra SAS 30-day essential topics that are separately completable.
+ * Not SOW letters — UUID namespace is `00000001{course}{index}` so A–W stays stable.
+ */
+export const THIRTY_DAY_EXTRA_CODES = ["PG", "PO", "EV", "MD", "PB", "CB", "DC"] as const;
+export type ThirtyDayExtraCode = (typeof THIRTY_DAY_EXTRA_CODES)[number];
+
+export const THIRTY_DAY_EXTRA_UUID_INDEX: Record<ThirtyDayExtraCode, string> = {
+  PG: "01",
+  PO: "02",
+  EV: "03",
+  MD: "04",
+  PB: "05",
+  CB: "06",
+  DC: "07",
+};
+
+export const THIRTY_DAY_TOPIC_CODES = [...THIRTY_DAY_SOW_LETTERS, ...THIRTY_DAY_EXTRA_CODES];
+
+export const THIRTY_DAY_TOPIC_CITE: Record<string, string> = {
+  A: "DHHS91172 SOW §1.8(4)(A) — When to call 911",
+  B: "DHHS91172 SOW §1.8(4)(B) — When to call a medical professional",
+  C: "DHHS91172 SOW §1.8(4)(C) — When to call a mental health professional",
+  D: "DHHS91172 SOW §1.8(4)(D) — Incident reporting",
+  E: "DHHS91172 SOW §1.8(4)(E) — Seizure management orientation",
+  F: "DHHS91172 SOW §1.8(4)(F) — Whereabouts unknown",
+  G: "DHHS91172 SOW §1.8(4)(G) — Choking rescue (not a CPR certificate)",
+  H: "DHHS91172 SOW §1.8(4)(H) — Choking and swallowing prevention",
+  I: "DHHS91172 SOW §1.8(4)(I) — Positive behavior supports",
+  J: "DHHS91172 SOW §1.8(4)(J) — Legal rights and the Americans with Disabilities Act",
+  K: "DHHS91172 SOW §1.8(4)(K) — Abuse, neglect, exploitation, and mandatory reporting",
+  L: "DHHS91172 SOW §1.8(4)(L) — Confidentiality and the Health Insurance Portability and Accountability Act",
+  M: "DHHS91172 SOW §1.8(4)(M) — Orientation to intellectual disability / related conditions and acquired brain injury",
+  N: "DHHS91172 SOW §1.8(4)(N) — Communicable disease prevention",
+  O: "DHHS91172 SOW §1.8(4)(O) — Person-specific / person-centered support plan awareness",
+  P: "DHHS91172 SOW §1.8(4)(P) — Agency policies",
+  Q: "DHHS91172 SOW §1.8(4)(Q) — Division of Services for People with Disabilities philosophy",
+  R: "DHHS91172 SOW §1.8(4)(R) — Medicaid 101",
+  S: "DHHS91172 SOW §1.8(4)(S) — Fraud, waste, and abuse (Utah Office of Inspector General)",
+  T: "DHHS91172 SOW §1.8(4)(T) — Home and Community-Based Services Settings Rule",
+  U: "DHHS91172 SOW §1.8(4)(U) — Crisis de-escalation",
+  V: "DHHS91172 SOW §1.8(4)(V) — Trauma-informed care",
+  W: "DHHS91172 SOW §1.8(4)(W) — Suicide prevention",
+  PG: "SAS 30-day essential — When to call a parent or guardian",
+  PO: "SAS 30-day essential — When to call poison control",
+  EV: "SAS 30-day essential — Emergency evacuation, fire, and disaster",
+  MD: "SAS 30-day essential — Medications, allergies, and dietary orientation",
+  PB: "SAS 30-day essential — Prohibited behavior methods (Utah Administrative Code Rule R539)",
+  CB: "SAS 30-day essential — Caregiver burnout and staff wellness",
+  DC: "SAS 30-day essential — Department of Health and Human Services Code of Conduct and critical incident policy",
+};
+
 /**
  * Live `training_topic_progress.ref_id` / `training_completions.ref_id` are
  * uuid columns. Encode the in-Hive ref as a stable UUID so we do not need a
  * migration. Pattern: a11ce000-1e8f-4000-8000-00000000{course}{topic}.
+ * Extra SAS topics use 00000001{course}{index} so A–W UUIDs never change.
  */
 export function inHiveRefUuid(courseId: InHiveCourseId, topicCode: string): string {
   const courseByte = courseId === "thirty-day" ? "01" : "02";
-  const topicByte =
-    topicCode === "__exam__"
-      ? "ff"
-      : topicCode.length === 1
-        ? topicCode.charCodeAt(0).toString(16).padStart(2, "0")
-        : "00";
-  return `a11ce000-1e8f-4000-8000-00000000${courseByte}${topicByte}`;
+  if (topicCode === "__exam__") {
+    return `a11ce000-1e8f-4000-8000-00000000${courseByte}ff`;
+  }
+  if (topicCode.length === 1) {
+    const topicByte = topicCode.charCodeAt(0).toString(16).padStart(2, "0");
+    return `a11ce000-1e8f-4000-8000-00000000${courseByte}${topicByte}`;
+  }
+  const extraIdx = THIRTY_DAY_EXTRA_UUID_INDEX[topicCode as ThirtyDayExtraCode];
+  if (extraIdx) {
+    return `a11ce000-1e8f-4000-8000-00000001${courseByte}${extraIdx}`;
+  }
+  return `a11ce000-1e8f-4000-8000-00000000${courseByte}00`;
+}
+
+/** Fisher–Yates copy. Inject `rng` in tests. */
+export function shuffleCopy<T>(items: readonly T[], rng: () => number = Math.random): T[] {
+  const a = items.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const atI = a[i];
+    const atJ = a[j];
+    if (atI === undefined || atJ === undefined) continue;
+    a[i] = atJ;
+    a[j] = atI;
+  }
+  return a;
+}
+
+export function allRequiredTopicsComplete(
+  topicCodes: readonly string[],
+  completed: ReadonlySet<string>,
+): boolean {
+  return topicCodes.every((c) => completed.has(c));
+}
+
+export function canIssueThirtyDayCertificate(args: {
+  topicCodes: readonly string[];
+  completedCodes: ReadonlySet<string>;
+  examPassed: boolean;
+}): boolean {
+  return args.examPassed && allRequiredTopicsComplete(args.topicCodes, args.completedCodes);
 }
 
 export const EXAM_RESET_PREFIX = "inhive-exam-reset:";
@@ -245,10 +335,56 @@ function csvCell(value: string): string {
 
 export function courseTitle(courseId: InHiveCourseId): string {
   return courseId === "thirty-day"
-    ? "30-day staff orientation"
+    ? "30-Day Essential Training"
     : "ABI training — before working alone";
 }
 
 export function courseCitation(courseId: InHiveCourseId): string {
-  return courseId === "thirty-day" ? "DHHS91172 SOW §1.8(4)(A)–(W)" : "DHHS91172 SOW §1.8(8)(A)–(F)";
+  return courseId === "thirty-day"
+    ? "DHHS91172 SOW §1.8(4)(A)–(W) plus SAS 30-day essential topics"
+    : "DHHS91172 SOW §1.8(8)(A)–(F)";
+}
+
+export type CertificateTopicLine = {
+  code: string;
+  title: string;
+  sowCite: string;
+  passed: boolean;
+};
+
+export type ThirtyDayCertificateRecord = {
+  courseName: string;
+  citation: string;
+  staffName: string;
+  organizationName: string;
+  completedAt: string;
+  examPassed: boolean;
+  examScorePct: number | null;
+  topics: CertificateTopicLine[];
+};
+
+export function buildThirtyDayCertificate(args: {
+  staffName: string;
+  organizationName: string;
+  completedAt: string;
+  completedCodes: ReadonlySet<string>;
+  examPassed: boolean;
+  examScorePct?: number | null;
+  topicTitles: ReadonlyArray<{ code: string; title: string }>;
+}): ThirtyDayCertificateRecord {
+  return {
+    courseName: courseTitle("thirty-day"),
+    citation: courseCitation("thirty-day"),
+    staffName: args.staffName.trim() || "Staff",
+    organizationName: args.organizationName.trim() || "Provider agency",
+    completedAt: args.completedAt,
+    examPassed: args.examPassed,
+    examScorePct: args.examScorePct ?? null,
+    topics: args.topicTitles.map((t) => ({
+      code: t.code,
+      title: t.title,
+      sowCite: THIRTY_DAY_TOPIC_CITE[t.code] ?? `Topic ${t.code}`,
+      passed: args.completedCodes.has(t.code),
+    })),
+  };
 }

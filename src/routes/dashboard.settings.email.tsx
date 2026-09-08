@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getOrgEmailSettings, updateOrgEmailSettings, sendEmail } from "@/lib/email.functions";
+import { DEFAULT_MANAGED_FROM_ADDRESS, DEFAULT_MANAGED_FROM_NAME } from "@/lib/managed-from";
 
 export const Route = createFileRoute("/dashboard/settings/email")({
   component: EmailSettingsPage,
@@ -50,7 +51,7 @@ function EmailSettingsPage() {
   }, [org, getFn]);
 
   const previewDisplayName =
-    fromName.trim() || org?.organization_name || "HIVE Notifications";
+    fromName.trim() || org?.organization_name || DEFAULT_MANAGED_FROM_NAME;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +190,7 @@ function EmailSettingsPage() {
               Inbox preview
             </div>
             <div className="mt-1 font-mono text-sm">
-              {previewDisplayName} &lt;{hiveFromAddress || "onboarding@resend.dev"}&gt;
+              {previewDisplayName} &lt;{hiveFromAddress || DEFAULT_MANAGED_FROM_ADDRESS}&gt;
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               Reply-to: <span className="font-mono">{replyTo.trim() || "(none set)"}</span>

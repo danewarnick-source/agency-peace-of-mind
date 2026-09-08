@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getAuditPackageData, type AuditPackagePayload } from "@/lib/audit-package-data";
 import { assertOrgAdmin, assertPackageAccess, assertPackageAccessViaChild } from "@/lib/audit-package-access";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
+import { DEFAULT_AUDIT_FROM_NAME, formatFromHeader } from "@/lib/managed-from";
 
 // ============================================================
 // Types
@@ -1007,7 +1008,7 @@ async function sendAuditorPackageInvite(args: {
 
   const { error: sendErr } = await supabase.functions.invoke("send-email", {
     body: {
-      from: "HIVE State Audit <onboarding@resend.dev>",
+      from: formatFromHeader(DEFAULT_AUDIT_FROM_NAME),
       to: aud.email,
       subject,
       html,

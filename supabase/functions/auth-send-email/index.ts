@@ -26,11 +26,29 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/** Same bootstrap sender used by src/lib/email.functions.ts::HIVE_MANAGED_FROM_ADDRESS.
- *  Keep these two in sync — both move to notifications@<verified HIVE subdomain>
- *  together once that domain is verified in Resend. */
-const HIVE_MANAGED_FROM_ADDRESS = "onboarding@resend.dev";
-const FROM = `HIVE Notifications <${HIVE_MANAGED_FROM_ADDRESS}>`;
+/** Same mailbox as src/lib/managed-from.ts. Prefer RESEND_FROM / EMAIL_FROM;
+ *  never fall back to Resend sandbox. */
+const DEFAULT_MANAGED_FROM_ADDRESS = "noreply@providerinterface.com";
+const DEFAULT_MANAGED_FROM_NAME = "Provider Interface";
+
+function extractEmailAddress(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const angled = trimmed.match(/<([^>]+)>/);
+  const candidate = (angled?.[1] ?? trimmed).trim();
+  if (!candidate.includes("@") || candidate.includes(" ")) return undefined;
+  if (candidate.toLowerCase().endsWith("@resend.dev")) return undefined;
+  return candidate;
+}
+
+function managedFromAddress(): string {
+  const raw = (Deno.env.get("RESEND_FROM") ?? Deno.env.get("EMAIL_FROM") ?? "").trim();
+  return extractEmailAddress(raw) ?? DEFAULT_MANAGED_FROM_ADDRESS;
+}
+
+function managedFromHeader(): string {
+  return `${DEFAULT_MANAGED_FROM_NAME} <${managedFromAddress()}>`;
+}
 
 type EmailActionType = "signup" | "recovery" | "invite" | "magiclink" | "email_change" | "reauthentication";
 
@@ -236,7 +254,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: FROM,
+        from: managedFromHeader(),
         to: [payload.user.email],
         subject,
         html,

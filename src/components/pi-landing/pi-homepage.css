@@ -31,6 +31,8 @@ html.pi-html-landing:has(.pi-home) body {
   --c50: var(--ink3);
   --nr: var(--serif);
   --ui: var(--sans);
+  --home-inset: max(24px, env(safe-area-inset-left, 0px));
+  --home-inset-end: max(24px, env(safe-area-inset-right, 0px));
   background: radial-gradient(900px 600px at 50% 0%, #132038 0%, #0a0f1c 60%);
   color: var(--ink);
   font-family: var(--sans);
@@ -40,10 +42,18 @@ html.pi-html-landing:has(.pi-home) body {
   min-height: 100vh;
 }
 
+.pi-landing-root.pi-home,
+.pi-pub-nav.pi-home-nav,
+.pi-pub-foot.pi-home-foot {
+  --gold: #c4a35a;
+  --gold2: #d9c284;
+}
+
 .pi-home .wrap {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding-left: var(--home-inset);
+  padding-right: var(--home-inset-end);
   position: relative;
   z-index: 1;
 }
@@ -120,9 +130,9 @@ html.pi-html-landing:has(.pi-home) body {
 }
 
 .pi-home-btn.gold {
-  background: linear-gradient(180deg, #d4b56a, #c4a35a);
+  background: linear-gradient(180deg, var(--gold2), var(--gold));
   color: #0a0f1c;
-  box-shadow: 0 8px 22px -10px rgba(196, 163, 90, 0.7);
+  box-shadow: 0 8px 22px -10px rgba(196, 163, 90, 0.38);
 }
 
 .pi-home-btn.ghost {
@@ -257,12 +267,18 @@ html.pi-html-landing:has(.pi-home) body {
 .pi-home-hero,
 .pi-home-mission,
 .pi-home-feature,
-.pi-home-pricing {
+.pi-home-pricing,
+.pi-home.pi-landing-root .pi-home-hero,
+.pi-home.pi-landing-root .pi-home-mission,
+.pi-home.pi-landing-root .pi-home-feature,
+.pi-home.pi-landing-root .pi-home-pricing {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding-left: var(--home-inset);
+  padding-right: var(--home-inset-end);
 }
 
 .pi-home-hero {
@@ -280,7 +296,7 @@ html.pi-html-landing:has(.pi-home) body {
   font-weight: 400;
   font-style: italic;
   font-size: 16px;
-  color: var(--gold2);
+  color: var(--gold);
 }
 
 .pi-home h1,
@@ -291,21 +307,35 @@ html.pi-html-landing:has(.pi-home) body {
   color: var(--ink);
 }
 
-.pi-home-hero h1 {
+.pi-home-hero h1,
+.pi-home.pi-landing-root .pi-home-hero h1 {
   margin: 0 0 20px;
+  max-width: none;
   font-size: clamp(36px, 5.4vw, 64px);
   line-height: 1.08;
   letter-spacing: -0.02em;
+  text-shadow: none;
 }
 
-.pi-home-em {
+.pi-home-em,
+.pi-home.pi-landing-root h1 em,
+.pi-home.pi-landing-root h1 .pi-home-em {
   font-style: italic;
   font-weight: 400;
-  color: var(--gold2);
-  background-image: linear-gradient(90deg, rgba(196, 163, 90, 0.2), rgba(217, 194, 132, 0.85), rgba(196, 163, 90, 0.2));
+  color: var(--gold);
+  -webkit-text-fill-color: var(--gold);
+  background: none;
+  background-image: linear-gradient(
+    90deg,
+    rgba(196, 163, 90, 0.12),
+    rgba(196, 163, 90, 0.4),
+    rgba(196, 163, 90, 0.12)
+  );
   background-repeat: no-repeat;
   background-size: 100% 2px;
   background-position: 0 92%;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
 }
 
 .pi-home-lede {
@@ -465,7 +495,7 @@ html.pi-html-landing:has(.pi-home) body {
   border-radius: 999px;
   border: 1px solid var(--line);
   background: rgba(15, 24, 43, 0.88);
-  color: var(--gold2);
+  color: var(--gold);
   font-size: 12px;
   font-weight: 600;
   animation: pi-home-bob 5.5s ease-in-out infinite;
@@ -500,7 +530,8 @@ html.pi-html-landing:has(.pi-home) body {
 
 .pi-home-mission {
   text-align: center;
-  padding: 56px 24px 72px;
+  padding-top: 56px;
+  padding-bottom: 72px;
 }
 
 .pi-home-mission h2 {
@@ -522,7 +553,8 @@ html.pi-html-landing:has(.pi-home) body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 28px;
-  padding: 56px 24px;
+  padding-top: 56px;
+  padding-bottom: 56px;
   align-items: center;
 }
 
@@ -531,12 +563,15 @@ html.pi-html-landing:has(.pi-home) body {
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--gold2);
+  color: var(--gold);
 }
 
 .pi-home-feature h2,
-.pi-home-pricing h2 {
+.pi-home-pricing h2,
+.pi-home.pi-landing-root .pi-home-feature h2,
+.pi-home.pi-landing-root .pi-home-pricing h2 {
   margin: 0 0 14px;
+  max-width: none;
   font-size: clamp(28px, 4vw, 42px);
   line-height: 1.12;
 }
@@ -601,7 +636,7 @@ html.pi-html-landing:has(.pi-home) body {
 .pi-home-note-card b {
   display: block;
   margin-bottom: 4px;
-  color: var(--gold2);
+  color: var(--gold);
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -628,7 +663,8 @@ html.pi-html-landing:has(.pi-home) body {
 
 .pi-home-pricing {
   text-align: center;
-  padding: 72px 24px 96px;
+  padding-top: 72px;
+  padding-bottom: 96px;
 }
 
 .pi-home-pricing .pi-home-kicker {
@@ -721,7 +757,8 @@ html.pi-html-landing:has(.pi-home) body {
   .pi-home-feature {
     grid-template-columns: 1fr 1fr;
     gap: 48px;
-    padding: 72px 24px;
+    padding-top: 72px;
+    padding-bottom: 72px;
   }
 
   .pi-home-feature.reverse .pi-home-feature-copy {
@@ -741,6 +778,14 @@ html.pi-html-landing:has(.pi-home) body {
 }
 
 @media (max-width: 819px) {
+  .pi-home.pi-landing-root .pi-home-hero,
+  .pi-home.pi-landing-root .pi-home-mission,
+  .pi-home.pi-landing-root .pi-home-feature,
+  .pi-home.pi-landing-root .pi-home-pricing {
+    padding-left: var(--home-inset);
+    padding-right: var(--home-inset-end);
+  }
+
   .pi-home-nav .nlinks {
     display: none;
   }

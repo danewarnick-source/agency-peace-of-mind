@@ -10,6 +10,7 @@ import {
   PI_HOME_FOOTER_LINKS,
   PI_HOME_GOLD,
   PI_HOME_GOLD2,
+  PI_HOME_GUTTER_PX,
   PI_HOME_H1_FOR,
   PI_HOME_H1_TO,
   PI_HOME_HERO_FINE,
@@ -40,6 +41,7 @@ describe("public homepage tokens stay off the in-app cream theme", () => {
     assert.equal(PI_HOME_MAX_WIDTH, 1120);
     assert.equal(PI_HOME_BTN_RADIUS, 14);
     assert.equal(PI_HOME_NAV_BREAKPOINT, 820);
+    assert.equal(PI_HOME_GUTTER_PX, 24);
     assert.match(PI_HOME_SERIF, /Iowan Old Style/);
     assert.match(PI_HOME_SERIF, /Palatino Linotype/);
     assert.match(PI_HOME_BODY_BG, /#132038/);
@@ -90,6 +92,7 @@ describe("public homepage tokens stay off the in-app cream theme", () => {
     assert.doesNotMatch(footer, /href="#"/);
     assert.doesNotMatch(landing, /PI_HERO_STATS|className="strip"/);
     assert.match(css, /#c4a35a/);
+    assert.match(css, /#d9c284/);
     assert.match(css, /max-width: 1120px/);
     assert.match(css, /border-radius: 14px/);
     assert.match(css, /border-radius: 34px/);
@@ -99,5 +102,22 @@ describe("public homepage tokens stay off the in-app cream theme", () => {
     assert.match(css, /Iowan Old Style/);
     assert.doesNotMatch(theme, /#0a0f1c/);
     assert.doesNotMatch(theme, /#c4a35a/);
+  });
+
+  it("softens gold CTAs and keeps mid-page sections inset on mobile", () => {
+    const css = read("../components/pi-landing/pi-homepage.css");
+    const landing = read("../components/pi-landing/pi-landing.css");
+    assert.match(css, /--home-inset: max\(24px/);
+    assert.match(css, /\.pi-home\.pi-landing-root \.pi-home-feature/);
+    assert.match(css, /padding-left: var\(--home-inset\)/);
+    assert.match(css, /padding-right: var\(--home-inset-end\)/);
+    assert.match(css, /\.pi-home-btn\.gold[\s\S]*var\(--gold2\), var\(--gold\)/);
+    assert.match(css, /\.pi-home\.pi-landing-root h1 em/);
+    assert.match(css, /-webkit-text-fill-color: var\(--gold\)/);
+    assert.doesNotMatch(css, /#d4b56a/);
+    assert.doesNotMatch(css, /#c9a227/);
+    assert.doesNotMatch(css, /#d9c98e/);
+    assert.match(landing, /\.pi-landing-root:not\(\.pi-home\) section/);
+    assert.doesNotMatch(landing, /^\.pi-landing-root section \{$/m);
   });
 });

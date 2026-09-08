@@ -32,6 +32,8 @@ export const PI_HOME_BODY_BG =
 export const PI_HOME_MAX_WIDTH = 1120;
 export const PI_HOME_BTN_RADIUS = 14;
 export const PI_HOME_NAV_BREAKPOINT = 820;
+/** Mobile / hero side inset. Shared landing `section { padding: 0 }` must not win. */
+export const PI_HOME_GUTTER_PX = 24;
 
 export const PI_HOME_EYEBROW = "Already standing the day you sign in.";
 export const PI_HOME_H1_LEAD = "The interface";

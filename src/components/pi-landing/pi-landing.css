@@ -539,7 +539,7 @@ html.pi-html-landing body {
   margin: 0 auto;
 }
 
-.pi-landing-root section {
+.pi-landing-root:not(.pi-home) section {
   padding: 80px 0;
   position: relative;
   z-index: 1;
@@ -1505,7 +1505,7 @@ html.pi-html-landing body {
     font-size: 80px;
   }
 
-  .pi-landing-root section {
+  .pi-landing-root:not(.pi-home) section {
     padding: 60px 0;
   }
 

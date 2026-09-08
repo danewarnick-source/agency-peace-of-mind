@@ -14,6 +14,7 @@ import { Route as TrainingRouteImport } from './routes/training'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as NectarRouteImport } from './routes/nectar'
 import { Route as MfaSetupRouteImport } from './routes/mfa-setup'
@@ -251,6 +252,11 @@ const SignupRoute = SignupRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -1431,6 +1437,7 @@ export interface FileRoutesByFullPath {
   '/mfa-setup': typeof MfaSetupRoute
   '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
@@ -1650,6 +1657,7 @@ export interface FileRoutesByTo {
   '/mfa-setup': typeof MfaSetupRoute
   '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
@@ -1865,6 +1873,7 @@ export interface FileRoutesById {
   '/mfa-setup': typeof MfaSetupRoute
   '/nectar': typeof NectarRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
@@ -2087,6 +2096,7 @@ export interface FileRouteTypes {
     | '/mfa-setup'
     | '/nectar'
     | '/pricing'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/terms'
@@ -2306,6 +2316,7 @@ export interface FileRouteTypes {
     | '/mfa-setup'
     | '/nectar'
     | '/pricing'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/terms'
@@ -2520,6 +2531,7 @@ export interface FileRouteTypes {
     | '/mfa-setup'
     | '/nectar'
     | '/pricing'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/terms'
@@ -2741,6 +2753,7 @@ export interface RootRouteChildren {
   MfaSetupRoute: typeof MfaSetupRoute
   NectarRoute: typeof NectarRoute
   PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
@@ -2809,6 +2822,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -4842,6 +4862,7 @@ const rootRouteChildren: RootRouteChildren = {
   MfaSetupRoute: MfaSetupRoute,
   NectarRoute: NectarRoute,
   PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,

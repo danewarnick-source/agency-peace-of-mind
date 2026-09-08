@@ -54,6 +54,64 @@ export function PiMark({
   );
 }
 
+/**
+ * Public homepage π only. 30×30 viewBox, antique-gold gradient.
+ * Do not use this mark in Admin / staff chrome — those keep PiMark (36×36).
+ */
+export function PiHomepageMark({
+  className,
+  title,
+  size = 30,
+}: {
+  className?: string;
+  title?: string;
+  size?: number;
+}) {
+  const rawId = useId();
+  const gid = `pi-home-g-${rawId.replace(/:/g, "")}`;
+
+  return (
+    <svg
+      viewBox="0 0 30 30"
+      width={size}
+      height={size}
+      fill="none"
+      aria-hidden={title ? undefined : true}
+      role={title ? "img" : undefined}
+      className={cn("shrink-0", className)}
+    >
+      {title ? <title>{title}</title> : null}
+      <defs>
+        <linearGradient id={gid} x1="15" y1="3" x2="15" y2="27.5">
+          <stop offset="0" stopColor="#e8d5a0" />
+          <stop offset="1" stopColor="#b8985a" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="3" width="26" height="5.5" rx="1" fill={`url(#${gid})`} />
+      <rect x="6.5" y="8.5" width="5.5" height="19" rx="1" fill={`url(#${gid})`} />
+      <rect x="18" y="8.5" width="5.5" height="19" rx="1" fill={`url(#${gid})`} />
+    </svg>
+  );
+}
+
+export function PiHomeLockup({
+  to = "/",
+  markSize = 30,
+}: {
+  to?: "/";
+  markSize?: number;
+}) {
+  return (
+    <Link to={to} className="pi-home-logo" aria-label={PI_PRODUCT_NAME}>
+      <PiHomepageMark size={markSize} className="pi-home-logo-mark" />
+      <span className="pi-home-logo-name">
+        <span className="pi-home-logo-pi">{PI_PRODUCT_SHORT}</span>
+        <span className="pi-home-logo-word">{PI_WORDMARK}</span>
+      </span>
+    </Link>
+  );
+}
+
 export function PiBrandLockup({
   to = "/",
   markSize = 26,

@@ -10,14 +10,20 @@ export function usePiLandingHtmlClass() {
   }, []);
 }
 
-export function PiPublicPage({ children }: { children: ReactNode }) {
+export function PiPublicPage({
+  children,
+  home = false,
+}: {
+  children: ReactNode;
+  home?: boolean;
+}) {
   usePiLandingHtmlClass();
   return (
-    <div className="pi-landing-root">
-      <div className="grain" aria-hidden />
-      <PiPublicHeader />
+    <div className={home ? "pi-landing-root pi-home" : "pi-landing-root"}>
+      {home ? null : <div className="grain" aria-hidden />}
+      <PiPublicHeader home={home} />
       {children}
-      <PiPublicFooter />
+      <PiPublicFooter home={home} />
     </div>
   );
 }

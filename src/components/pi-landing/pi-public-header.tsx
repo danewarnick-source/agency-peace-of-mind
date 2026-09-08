@@ -1,26 +1,34 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { PiBrandLockup } from "@/components/pi-landing/pi-mark";
+import { PiBrandLockup, PiHomeLockup } from "@/components/pi-landing/pi-mark";
 import { PublicMobileMenuButton } from "@/components/landing/public-mobile-menu-button";
+import { PI_HOME_NAV } from "@/lib/pi-homepage";
 import { PI_NAV_LINKS, PI_SIGN_IN } from "@/lib/pi-landing";
 import { LANDING_MOBILE_NAV_ID } from "@/lib/public-landing-nav";
 
-export function PiPublicHeader() {
+export function PiPublicHeader({ home = false }: { home?: boolean }) {
   const [open, setOpen] = useState(false);
+  const links = home ? PI_HOME_NAV : PI_NAV_LINKS;
 
   return (
-    <nav className="pi-pub-nav">
+    <nav className={home ? "pi-pub-nav pi-home-nav" : "pi-pub-nav"}>
       <div className="wrap nav">
-        <PiBrandLockup markSize={26} />
+        {home ? <PiHomeLockup markSize={30} /> : <PiBrandLockup markSize={26} />}
         <div className="nlinks">
-          {PI_NAV_LINKS.map((item) => (
-            <Link key={item.label} to={item.to}>
-              {item.label}
-            </Link>
-          ))}
+          {links.map((item) =>
+            "hash" in item && item.hash ? (
+              <Link key={item.label} to={item.to} hash={item.hash}>
+                {item.label}
+              </Link>
+            ) : (
+              <Link key={item.label} to={item.to}>
+                {item.label}
+              </Link>
+            ),
+          )}
         </div>
         <div className="nav-end">
-          <Link className="btn p sm" to="/login">
+          <Link className={home ? "pi-home-btn cream sm" : "btn p sm"} to="/login">
             {PI_SIGN_IN}
           </Link>
           <PublicMobileMenuButton
@@ -32,13 +40,24 @@ export function PiPublicHeader() {
       </div>
       {open ? (
         <div id={LANDING_MOBILE_NAV_ID} className="pi-mobile-menu">
-          {PI_NAV_LINKS.map((item) => (
-            <Link key={item.label} to={item.to} onClick={() => setOpen(false)}>
-              {item.label}
-            </Link>
-          ))}
-          <Link to="/signup" onClick={() => setOpen(false)}>
-            Get started
+          {links.map((item) =>
+            "hash" in item && item.hash ? (
+              <Link
+                key={item.label}
+                to={item.to}
+                hash={item.hash}
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <Link key={item.label} to={item.to} onClick={() => setOpen(false)}>
+                {item.label}
+              </Link>
+            ),
+          )}
+          <Link to="/login" onClick={() => setOpen(false)}>
+            {PI_SIGN_IN}
           </Link>
         </div>
       ) : null}

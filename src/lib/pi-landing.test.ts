@@ -50,7 +50,9 @@ const PUBLIC_FILES = [
   new URL("../routes/training.tsx", import.meta.url),
   new URL("../routes/terms.tsx", import.meta.url),
   new URL("../routes/baa.tsx", import.meta.url),
+  new URL("../routes/privacy.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url),
+  new URL("../lib/pi-homepage.ts", import.meta.url),
   new URL("../components/pi-landing/pi-hero-glass.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-pricing.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-product-shots.tsx", import.meta.url),
@@ -117,32 +119,32 @@ describe("Provider Interface marketing homepage", () => {
     const root = read(new URL("../routes/__root.tsx", import.meta.url));
     assert.match(root, /family=Newsreader/);
     assert.match(root, /0,6\.\.72,300/);
-    assert.match(page, /family=Newsreader/);
-    assert.match(page, /0,6\.\.72,300/);
+    assert.match(page, /family=Inter/);
+    assert.doesNotMatch(page, /family=Newsreader/);
     assert.match(page, /PiMarketingPage/);
     assert.doesNotMatch(landing, /what-you-get/);
     assert.doesNotMatch(landing, /PiProductShots/);
     assert.doesNotMatch(landing, /PI_WHAT_YOU_GET/);
-    assert.doesNotMatch(landing, /DuskDeskStill|PiPricingSection/);
-    assert.match(landing, /id="why"/);
+    assert.doesNotMatch(landing, /DuskDeskStill|PiPricingSection|PiFeatureScroll|PiHeroGlass/);
+    assert.doesNotMatch(landing, /id="why"/);
+    assert.doesNotMatch(landing, /PI_HERO_STATS|className="strip"|className="st"/);
     assert.match(landing, /id="pricing"/);
-    assert.match(landing, /id="nectar"/);
-    assert.match(landing, /PiFeatureScroll/);
-    assert.match(landing, /PI_LEARN_MORE/);
+    assert.match(landing, /id=\{feature.id\}/);
+    assert.match(landing, /hash="nectar"/);
+    assert.match(landing, /PI_HOME_FEATURES/);
     assert.match(landing, /to="\/signup"/);
     assert.match(landing, /to="\/contact"/);
-    assert.match(landing, /to="\/pricing"/);
-    assert.match(landing, /to="\/nectar"/);
-    assert.match(landing, /to="\/about"/);
     assert.match(landing, /PI_LIST_PRICE_DISPLAY/);
-    assert.match(landing, /PI_LANDING_INCLUDED/);
-    assert.match(landing, /PiHeroGlass/);
-    assert.match(landing, /pi-mark-well/);
+    assert.match(landing, /PI_HOME_SEE_IT/);
+    assert.match(landing, /PI_HOME_START_SIGNUP/);
+    assert.match(landing, /PI_HOME_UTAH_LINE/);
     assert.doesNotMatch(header, /What you get/);
     assert.doesNotMatch(header, /The office/);
-    assert.match(header, /PI_NAV_LINKS/);
+    assert.match(header, /PI_HOME_NAV/);
     assert.match(header, /to="\/login"/);
     assert.match(header, /LANDING_MOBILE_NAV_ID/);
+    assert.doesNotMatch(landing, /href="#"/);
+    assert.doesNotMatch(header, /href="#"/);
     const copy = read(new URL("./pi-landing.ts", import.meta.url));
     assert.match(copy, /to: "\/pricing"/);
     assert.match(copy, /to: "\/nectar"/);
@@ -159,7 +161,8 @@ describe("Provider Interface marketing homepage", () => {
     assert.doesNotMatch(copy, /price for everything, no add-ons/);
     assert.match(pricing, /compact/);
     assert.doesNotMatch(pricing, /FOUNDING_PER_STAFF_CENTS|LIST_VOLUME_TIERS|ANNUAL_DISCOUNT/);
-    assert.doesNotMatch(landing, /PublicLandingHeader|HexBackdrop|HeroPhone|HiveWordmark|Honeycomb|hivecertify/);
+    assert.doesNotMatch(landing, /PublicLandingHeader|HexBackdrop|HiveWordmark|Honeycomb|hivecertify/);
+    assert.doesNotMatch(landing, /landing\/hero-phone/);
     for (const word of PI_FORBIDDEN_MARKETING) {
       assert.equal(landing.includes(word), false, `homepage must not mention ${word}`);
       assert.equal(pricing.includes(word), false, `pricing must not mention ${word}`);
@@ -171,9 +174,8 @@ describe("Provider Interface marketing homepage", () => {
   it("does not mount the old dusk laptop mock on the public landing", () => {
     const landing = read(new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url));
     assert.doesNotMatch(landing, /DuskDeskStill|DuskPeopleScreen|PI_DIFFERENCE_HEADLINE/);
-    assert.match(landing, /PI_WHAT_IS_LEAD/);
     assert.match(landing, /PI_NECTAR_BEFORE_QUOTE/);
-    assert.match(landing, /PiHeroGlass/);
+    assert.match(landing, /PiHeroPhone/);
   });
 
   it("uses Demo B glass hero chrome without the mock's wrong copy", () => {
@@ -266,6 +268,17 @@ describe("Provider Interface marketing homepage", () => {
     assert.match(mark, /variant === "hero"/);
     assert.doesNotMatch(mark, /M6 10H42/);
     assert.doesNotMatch(mark, /polygon|hexagon|Hexagon/i);
+    assert.match(mark, /viewBox="0 0 30 30"/);
+    assert.match(mark, /x="2"/);
+    assert.match(mark, /y="3"/);
+    assert.match(mark, /width="26"/);
+    assert.match(mark, /height="5.5"/);
+    assert.match(mark, /x="6.5"/);
+    assert.match(mark, /x="18"/);
+    assert.match(mark, /#e8d5a0/);
+    assert.match(mark, /#b8985a/);
+    const homeMark = mark.slice(mark.indexOf("export function PiHomepageMark"));
+    assert.doesNotMatch(homeMark, /\\u03c0/);
   });
 
   it("exposes Pricing, Nectar, and About as real public routes", () => {

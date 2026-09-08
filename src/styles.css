@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @import "./styles/hive-theme.css";
 @import "./components/pi-landing/pi-landing.css";
+@import "./components/pi-landing/pi-homepage.css";
 
 @custom-variant dark (&:is(.dark *));
 

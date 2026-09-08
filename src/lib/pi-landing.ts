@@ -73,12 +73,15 @@ export const PI_NAV_LINKS = [
   { href: "/about", label: PI_NAV_ABOUT, to: "/about" as const },
 ] as const;
 
+export const PI_NAV_PRIVACY = "Privacy";
+
 export const PI_FOOTER_LINKS = [
   { href: "/pricing", label: PI_NAV_PRICING, to: "/pricing" as const },
   { href: "/nectar", label: PI_NAV_NECTAR, to: "/nectar" as const },
   { href: "/about", label: PI_NAV_ABOUT, to: "/about" as const },
   { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
   { href: "/contact", label: PI_NAV_CONTACT, to: "/contact" as const },
+  { href: "/privacy", label: PI_NAV_PRIVACY, to: "/privacy" as const },
   { href: "/terms", label: PI_NAV_TERMS, to: "/terms" as const },
   { href: "/baa", label: PI_NAV_BAA, to: "/baa" as const },
 ] as const;

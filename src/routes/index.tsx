@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PiMarketingPage } from "@/components/pi-landing/pi-marketing-page";
 import { PI_PAGE_DESCRIPTION, PI_PAGE_TITLE } from "@/lib/pi-landing";
 
-const NEWSREADER =
-  "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Inter:wght@400;500;600&display=swap";
+const INTER =
+  "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:title", content: PI_PAGE_TITLE },
       { name: "twitter:description", content: PI_PAGE_DESCRIPTION },
     ],
-    links: [{ rel: "stylesheet", href: NEWSREADER }],
+    links: [{ rel: "stylesheet", href: INTER }],
   }),
   component: ProviderInterfaceLanding,
 });

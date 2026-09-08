@@ -141,7 +141,8 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 |-----|------------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Login username lookup, create-employee, many server fns |
 | `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, daily-log coach |
-| `RESEND_API_KEY` on `send-email` edge fn | Invite / notification email |
+| `RESEND_API_KEY` on `send-email` / `auth-send-email` | Invite / notification / auth email |
+| `RESEND_FROM` or `EMAIL_FROM` (optional) | From mailbox. Default `noreply@providerinterface.com`. Do not use `onboarding@resend.dev`. |
 | `STRIPE_SECRET_KEY` / training webhook secret | HIVE Training checkout |
 | `NECTAR_CRON_SECRET` / `CRON_SHARED_SECRET` | Scheduled NECTAR jobs |
 | `PUBLIC_APP_URL` / `SITE_URL` | Invite links, emails |

@@ -778,10 +778,10 @@ function Step1Account({
 
 function PwRule({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
-    <li className="flex items-center gap-2" style={{ color: ok ? "#1e3a30" : "#3a4553" }}>
+    <li className="flex items-center gap-2 text-xs font-medium" style={{ color: ok ? "#1e3a30" : "#243040" }}>
       <span
         className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px]"
-        style={{ background: ok ? "rgba(127, 209, 168, 0.28)" : "rgba(10, 15, 28, 0.08)" }}
+        style={{ background: ok ? "rgba(127, 209, 168, 0.35)" : "rgba(10, 15, 28, 0.12)", color: ok ? "#1e3a30" : "#243040" }}
       >
         {ok ? <Check className="h-3 w-3" /> : "•"}
       </span>

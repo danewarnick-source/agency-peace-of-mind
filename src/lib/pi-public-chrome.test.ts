@@ -65,7 +65,7 @@ describe("public pages share homepage marketing chrome", () => {
     assert.doesNotMatch(landingCss, /--gold: #c9a227/);
     assert.doesNotMatch(homeCss, /#c9a227/);
     const signup = read("../routes/signup.tsx");
-    assert.match(signup, /#3a4553/);
+    assert.match(signup, /#243040/);
     assert.doesNotMatch(signup, /rgba\(255,255,255,0\.5\)/);
     const contact = read("../components/landing/contact.tsx");
     assert.doesNotMatch(contact, /bg-\[color:var\(--surface-2\)\]/);

@@ -142,7 +142,7 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 | `SUPABASE_SERVICE_ROLE_KEY` | Login username lookup, create-employee, many server fns |
 | `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, daily-log coach |
 | `RESEND_API_KEY` on `send-email` / `auth-send-email` | Invite / notification / auth email |
-| `RESEND_FROM` or `EMAIL_FROM` (optional) | From mailbox. Default `noreply@providerinterface.com`. Do not use `onboarding@resend.dev`. |
+| `RESEND_FROM` or `EMAIL_FROM` (optional) | From mailbox. Default `noreply@providerinterface.com`. Do not use `onboarding@resend.dev`. **Must also be set as a Supabase Edge Function secret** — see [Invite email ops](#invite-email-ops-hive-platform). |
 | `STRIPE_SECRET_KEY` / training webhook secret | HIVE Training checkout |
 | `NECTAR_CRON_SECRET` / `CRON_SHARED_SECRET` | Scheduled NECTAR jobs |
 | `PUBLIC_APP_URL` / `SITE_URL` | Invite links, emails |
@@ -153,6 +153,30 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 **MFA:** disabled on purpose (`src/routes/__root.tsx`, `src/routes/mfa-setup.tsx`). Do not re-enable for this test.
 
 **`must_change_password`:** enforced at **router root** (`__root.tsx`), not only inside the dashboard. June finding **fixed**. New manual staff **will** hit `/reset-password` on first login. That is correct.
+
+### Invite email ops (Hive-Platform)
+
+Invite-by-email writes the pending invite first, then calls `supabase.functions.invoke("send-email")`. There is **no** `send-invite` function. Live Hive-Platform (`dhrrukdcigiiqksibdfb`) returned **HTTP 404** on `/functions/v1/send-email` on 2026-09-09 — the function source is in this repo but was never deployed. Until Core does the steps below, **Copy link** from the pending list still works and is the supported workaround. Do not paste API keys into chat or git.
+
+1. **Resend → verify the sending domain.** Dashboard → Domains → add `providerinterface.com` → add the DNS records Resend shows → wait until status is **Verified**. Confirm a mailbox `noreply@providerinterface.com` is allowed. Do **not** use `onboarding@resend.dev` (PR #261 removed it; sandbox only delivers to the Resend account owner).
+2. **Supabase → deploy from this repo** (CLI logged into Hive-Platform). Source lives at `supabase/functions/send-email` and `supabase/functions/auth-send-email`. There is no CI job that deploys functions.
+
+```bash
+supabase functions deploy send-email --project-ref dhrrukdcigiiqksibdfb
+# Auth mail (password reset / magic link). Also set SEND_EMAIL_HOOK_SECRET
+# and point Authentication → Hooks → Send Email at auth-send-email.
+supabase functions deploy auth-send-email --project-ref dhrrukdcigiiqksibdfb
+```
+
+3. **Supabase → Edge Function secrets** (Dashboard → Project Settings → Edge Functions → Secrets). Type values in the dashboard — never commit them. Vault today does **not** have these (only unrelated cron/ALB secrets). Set:
+   - `RESEND_API_KEY` — Resend API key (same key for both functions)
+   - `RESEND_FROM` — `noreply@providerinterface.com` (or `EMAIL_FROM` if you already use that name)
+   CLI equivalent (prompts/paste locally; do not put the key in git or chat):
+   `supabase secrets set RESEND_API_KEY --project-ref dhrrukdcigiiqksibdfb`
+   `supabase secrets set RESEND_FROM=noreply@providerinterface.com --project-ref dhrrukdcigiiqksibdfb`
+4. **Optional on Vercel / AWS** (app-server From preview; invite delivery uses the Edge secret after this change): `RESEND_FROM=noreply@providerinterface.com`. Not required to fix the 404.
+5. **True North reply-to is already set** (`Settings → Email` → `admin@tnsutah.com`). No change needed there. Do not put client names, Medicaid IDs, or notes in invite email.
+6. **Prove it:** Employees → Invite by email (or Settings → Email → Send a test). Success toast means Resend accepted. If it still fails, the new toast names the real reason (function missing / API key missing / domain not verified) instead of a generic non-2xx.
 
 ### 1.6 Hypotheses this audit discarded
 
@@ -274,7 +298,7 @@ Today is **Thursday Aug 27**. Test is **Tuesday Sep 1**.
 3. In Supabase/Lovable: org not `locked_at`; `is_demo` badge expected or not; `nectar` / `hive_training` / `state_audit` on or off for TNS.
 4. Settings → DHHS Provider ID + EVV vendor name.
 5. Confirm Bedrock on the deploy that will be tested **if** Smart Import / Ask NECTAR are in scope. If not configured, **cut those from the Tuesday script** rather than debugging live.
-6. Confirm `RESEND_API_KEY` only if you insist on invite email; **still use Add manually**.
+6. Invite-by-email needs `send-email` **deployed** on Hive-Platform plus Resend secrets — see [Invite email ops](#invite-email-ops-hive-platform). Until then, **Copy link** or **Add manually**.
 7. Do **not** turn on policy `gate_app_access` for all staff.
 
 ### Friday 28 — Admin data path (MUST)

@@ -16,6 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requirePermission } from "@/lib/require-permission";
 import { resolveOrgSender } from "@/lib/email.functions";
+import { describeEmailInvokeFailure } from "@/lib/email-invoke-error";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { inviteJoinUrl } from "@/lib/join-invite";
@@ -148,9 +149,9 @@ async function sendInvitationEmail(args: {
         reply_to: sender.reply_to,
       },
     });
-    if (invokeErr) return { ok: false, error: invokeErr.message || "Email send failed" };
+    if (invokeErr) return { ok: false, error: describeEmailInvokeFailure(invokeErr, invokeData) };
     if (!invokeData || invokeData.ok !== true) {
-      return { ok: false, error: (invokeData && invokeData.error) || "Email send failed" };
+      return { ok: false, error: describeEmailInvokeFailure(null, invokeData) };
     }
     return { ok: true };
   } catch (e) {

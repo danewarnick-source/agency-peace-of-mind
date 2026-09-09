@@ -103,4 +103,11 @@ describe("app and edge From rails", () => {
       assert.doesNotMatch(src, /HIVE State Audit <onboarding@resend\.dev>/);
     }
   });
+
+  it("send-email reads RESEND_FROM / EMAIL_FROM instead of trusting body.from as the mailbox", () => {
+    const src = readFileSync(new URL("../../supabase/functions/send-email/index.ts", import.meta.url), "utf8");
+    assert.match(src, /Deno\.env\.get\("RESEND_FROM"\)/);
+    assert.match(src, /Deno\.env\.get\("EMAIL_FROM"\)/);
+    assert.match(src, /resolveFromHeader|resolveMailbox/);
+  });
 });

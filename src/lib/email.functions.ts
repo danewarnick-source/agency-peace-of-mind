@@ -28,6 +28,7 @@ import {
   managedFromAddress,
   stripFakeDisplayLabel,
 } from "@/lib/managed-from";
+import { describeEmailInvokeFailure } from "@/lib/email-invoke-error";
 
 export { HIVE_MANAGED_FROM_ADDRESS, managedFromAddress } from "@/lib/managed-from";
 
@@ -244,10 +245,10 @@ export const sendEmail = createServerFn({ method: "POST" })
     );
 
     if (invokeErr) {
-      return { ok: false as const, error: invokeErr.message || "Email send failed" };
+      return { ok: false as const, error: describeEmailInvokeFailure(invokeErr, invokeData) };
     }
     if (!invokeData || invokeData.ok !== true) {
-      return { ok: false as const, error: (invokeData && invokeData.error) || "Email send failed" };
+      return { ok: false as const, error: describeEmailInvokeFailure(null, invokeData) };
     }
     return { ok: true as const, id: invokeData.id ?? null };
   });

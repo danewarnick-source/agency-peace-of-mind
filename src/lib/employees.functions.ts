@@ -6,12 +6,12 @@ import { onStaffHiredInternal } from "@/lib/staff-assignment-hooks.functions";
 
 const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
 
-const CreateEmployeeInput = z.object({
+export const CreateEmployeeInput = z.object({
   organizationId: z.string().uuid(),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   email: z.string().trim().email().max(255),
-  phone: z.string().trim().min(7).max(30),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
   temporaryPassword: z.string().min(8).max(128),
   role: RoleEnum,
   department: z.string().trim().max(120).optional().or(z.literal("")),
@@ -26,6 +26,8 @@ const CreateEmployeeInput = z.object({
   workerType: z.string().trim().max(80).optional().or(z.literal("")),
   customFieldValues: z.record(z.string(), z.unknown()).optional().default({}),
 });
+
+export type HireEmployeeInput = z.infer<typeof CreateEmployeeInput>;
 
 
 async function assertOrgManager(actorId: string, orgId: string) {
@@ -42,139 +44,173 @@ async function assertOrgManager(actorId: string, orgId: string) {
   }
 }
 
+/** Shared hire path for Add employee and Smart Import. Never sends email. */
+export async function hireEmployeeInternal(
+  data: HireEmployeeInput,
+  actorUserId: string,
+  createdVia: "manual_admin" | "smart_import" = "manual_admin",
+): Promise<{ userId: string; email: string; created: boolean }> {
+  const effectiveEmail = data.email.trim().toLowerCase();
+  const startDate = data.startDate || data.hireDate || null;
+  const endDate = data.endDate || null;
+  if (startDate && endDate && endDate < startDate) {
+    throw new Error("End date must be on or after Start date.");
+  }
+
+  const { data: existingProf } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .ilike("email", effectiveEmail)
+    .maybeSingle();
+
+  if (existingProf?.id && createdVia === "manual_admin") {
+    throw new Error("An account with this email already exists.");
+  }
+
+  let newUserId = existingProf?.id ?? "";
+  let created = false;
+
+  if (!newUserId) {
+    const { data: createdUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email: effectiveEmail,
+      password: data.temporaryPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: `${data.firstName} ${data.lastName}`.trim(),
+        created_via: createdVia,
+      },
+    });
+    if (createErr || !createdUser.user) {
+      const msg = createErr?.message || "Failed to create user";
+      if (/already/i.test(msg)) {
+        const { data: again } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .ilike("email", effectiveEmail)
+          .maybeSingle();
+        if (again?.id) {
+          newUserId = again.id;
+        } else {
+          throw new Error(msg);
+        }
+      } else {
+        throw new Error(msg);
+      }
+    } else {
+      newUserId = createdUser.user.id;
+      created = true;
+    }
+  }
+
+  try {
+    const customFieldEntries = Object.entries(data.customFieldValues ?? {}).filter(
+      ([, v]) => v !== undefined && v !== "",
+    );
+    const customAttributes: Record<string, unknown> = {};
+    if (customFieldEntries.length) {
+      const { data: orgRow } = await supabaseAdmin
+        .from("organizations")
+        .select("feature_config")
+        .eq("id", data.organizationId)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields?.custom_fields ?? []) as
+        Array<{ id: string; name: string }>;
+      const nameById = new Map(customFieldDefs.map((f) => [f.id, f.name]));
+      for (const [fieldId, value] of customFieldEntries) {
+        const name = nameById.get(fieldId);
+        if (name) customAttributes[name] = value;
+      }
+    }
+
+    const profileRow: Record<string, unknown> = {
+      id: newUserId,
+      email: effectiveEmail,
+      full_name: `${data.firstName} ${data.lastName}`.trim(),
+      first_name: data.firstName,
+      last_name: data.lastName,
+      phone: data.phone?.trim() || null,
+      department: data.department || null,
+      employee_id: data.employeeId || null,
+      staff_type_keys: data.staffType,
+      hire_date: startDate,
+      start_date: startDate,
+      end_date: endDate,
+      is_active: true,
+      requires_deescalation: data.requiresDeescalation,
+      requires_abi: data.requiresAbi,
+    };
+    if (data.workerType) profileRow.worker_type = data.workerType;
+    if (created) profileRow.must_change_password = true;
+    if (Object.keys(customAttributes).length) profileRow.custom_attributes = customAttributes;
+
+    const { error: profErr } = await supabaseAdmin.from("profiles").upsert(
+      profileRow as any,
+      { onConflict: "id" },
+    );
+
+    if (profErr) throw new Error(profErr.message);
+
+    await supabaseAdmin.from("organization_members")
+      .update({ active: false })
+      .eq("user_id", newUserId)
+      .neq("organization_id", data.organizationId);
+
+    const { error: memErr } = await supabaseAdmin.from("organization_members").upsert({
+      organization_id: data.organizationId,
+      user_id: newUserId,
+      role: data.role,
+      job_title: data.department || null,
+      active: true,
+    }, { onConflict: "organization_id,user_id" });
+    if (memErr) throw new Error(memErr.message);
+
+    await supabaseAdmin.from("role_change_audit_log").insert({
+      organization_id: data.organizationId,
+      changed_by_user_id: actorUserId,
+      changed_by_name: createdVia === "smart_import" ? "Admin (smart import)" : "Admin (staff creation)",
+      target_user_id: newUserId,
+      target_user_name: `${data.firstName} ${data.lastName}`.trim(),
+      previous_role: "none",
+      new_role: data.role,
+      change_method: createdVia === "smart_import" ? "smartImportEmployee" : "createEmployee",
+    });
+
+    if (data.trackIds.length) {
+      const rows = data.trackIds.map((tid) => ({
+        track_id: tid,
+        user_id: newUserId,
+        organization_id: data.organizationId,
+        assigned_by: actorUserId,
+        status: "not_started" as const,
+      }));
+      const { error: trackErr } = await supabaseAdmin.from("track_assignments").insert(rows);
+      if (trackErr) console.warn("track assignment failed", trackErr.message);
+    }
+
+    try {
+      await onStaffHiredInternal(supabaseAdmin, data.organizationId, newUserId);
+    } catch (hireErr) {
+      console.warn("[obligations] hire auto-assign failed:", hireErr);
+    }
+
+    return { userId: newUserId, email: effectiveEmail, created };
+  } catch (e) {
+    if (created) {
+      await supabaseAdmin.auth.admin.deleteUser(newUserId).catch(() => {});
+    }
+    throw e;
+  }
+}
+
 export const createEmployeeManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => CreateEmployeeInput.parse(d))
   .handler(async ({ data, context }) => {
     if (!context.userId) return { userId: "", email: "" };
     await assertOrgManager(context.userId, data.organizationId);
-
-    const effectiveEmail = data.email.trim().toLowerCase();
-
-    // Create auth user (email confirmed so they can immediately sign in)
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email: effectiveEmail,
-      password: data.temporaryPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: `${data.firstName} ${data.lastName}`.trim(),
-        created_via: "manual_admin",
-      },
-    });
-    if (createErr || !created.user) throw new Error(createErr?.message || "Failed to create user");
-
-    const newUserId = created.user.id;
-
-    try {
-      // start_date is the single source of truth for CE; mirror to hire_date
-      // for legacy reads. Falls back to legacy hireDate if no startDate given.
-      const startDate = data.startDate || data.hireDate || null;
-      const endDate = data.endDate || null;
-      if (startDate && endDate && endDate < startDate) {
-        throw new Error("End date must be on or after Start date.");
-      }
-
-      // Custom field values are keyed by the field's id (as configured in
-      // organizations.feature_config.staff_intake_fields.custom_fields), but
-      // stored on the profile keyed by field name — profiles.custom_attributes
-      // and feature_config are the only two places this data lives, no
-      // custom_field_definitions/custom_field_values involved.
-      const customFieldEntries = Object.entries(data.customFieldValues).filter(
-        ([, v]) => v !== undefined && v !== "",
-      );
-      const customAttributes: Record<string, unknown> = {};
-      if (customFieldEntries.length) {
-        const { data: orgRow } = await supabaseAdmin
-          .from("organizations")
-          .select("feature_config")
-          .eq("id", data.organizationId)
-          .maybeSingle();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields?.custom_fields ?? []) as
-          Array<{ id: string; name: string }>;
-        const nameById = new Map(customFieldDefs.map((f) => [f.id, f.name]));
-        for (const [fieldId, value] of customFieldEntries) {
-          const name = nameById.get(fieldId);
-          if (name) customAttributes[name] = value;
-        }
-      }
-
-      // Upsert profile (handle_new_user trigger may have created a stub)
-      const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
-        id: newUserId,
-        email: effectiveEmail,
-        full_name: `${data.firstName} ${data.lastName}`.trim(),
-        first_name: data.firstName,
-        last_name: data.lastName,
-        phone: data.phone.trim(),
-        department: data.department || null,
-        employee_id: data.employeeId || null,
-        worker_type: data.workerType || undefined,
-        staff_type_keys: data.staffType,
-        hire_date: startDate,
-        start_date: startDate,
-        end_date: endDate,
-        must_change_password: true,
-        is_active: true,
-        requires_deescalation: data.requiresDeescalation,
-        requires_abi: data.requiresAbi,
-        custom_attributes: customAttributes,
-      } as any, { onConflict: "id" });
-
-      if (profErr) throw new Error(profErr.message);
-
-      // The handle_new_user trigger auto-creates a personal org + admin membership.
-      // Deactivate that auto membership and attach to the real organization instead.
-      await supabaseAdmin.from("organization_members")
-        .update({ active: false })
-        .eq("user_id", newUserId)
-        .neq("organization_id", data.organizationId);
-
-      const { error: memErr } = await supabaseAdmin.from("organization_members").upsert({
-        organization_id: data.organizationId,
-        user_id: newUserId,
-        role: data.role,
-        job_title: data.department || null,
-        active: true,
-      }, { onConflict: "organization_id,user_id" });
-      if (memErr) throw new Error(memErr.message);
-
-      await supabaseAdmin.from("role_change_audit_log").insert({
-        organization_id: data.organizationId,
-        changed_by_user_id: context.userId,
-        changed_by_name: "Admin (staff creation)",
-        target_user_id: newUserId,
-        target_user_name: `${data.firstName} ${data.lastName}`.trim(),
-        previous_role: "none",
-        new_role: data.role,
-        change_method: "createEmployee",
-      });
-
-      // Optional: assign training tracks
-      if (data.trackIds.length) {
-        const rows = data.trackIds.map((tid) => ({
-          track_id: tid,
-          user_id: newUserId,
-          organization_id: data.organizationId,
-          assigned_by: context.userId,
-          status: "not_started" as const,
-        }));
-        const { error: trackErr } = await supabaseAdmin.from("track_assignments").insert(rows);
-        if (trackErr) console.warn("track assignment failed", trackErr.message);
-      }
-
-      try {
-        await onStaffHiredInternal(supabaseAdmin, data.organizationId, newUserId);
-      } catch (hireErr) {
-        console.warn("[obligations] hire auto-assign failed:", hireErr);
-      }
-
-      return { userId: newUserId, email: effectiveEmail };
-    } catch (e) {
-      // Rollback auth user on downstream failure
-      await supabaseAdmin.auth.admin.deleteUser(newUserId).catch(() => {});
-      throw e;
-    }
+    const hired = await hireEmployeeInternal(data, context.userId, "manual_admin");
+    return { userId: hired.userId, email: hired.email };
   });
 
 const ResetInput = z.object({

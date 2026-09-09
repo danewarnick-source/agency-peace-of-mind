@@ -154,38 +154,45 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await shot(page, "employees_list_and_profile");
   });
 
-  test("5. Invite-by-email is honest — add staff manually, not a silent no-op", async ({
+  test("5. Add employee wizard — full file first, then invite or temp password", async ({
     page,
   }) => {
     await gotoAdmin(page, "/dashboard/employees");
-    await expect(page.getByRole("button", { name: /Invite by email/i })).toBeVisible({
+    await expect(page.getByRole("button", { name: /^Add employee$/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole("button", { name: /Add manually/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Invite by email/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Add manually/i })).toHaveCount(0);
 
-    // Pending-invite copy already tells testers the join link does not onboard.
-    await expect(page.getByText(/does not call/i)).toBeVisible();
-    await expect(page.getByText(/accept_invitation/i)).toBeVisible();
-
-    await page.getByRole("button", { name: /Invite by email/i }).click();
-    await expect(page.getByRole("heading", { name: /Invite an employee/i })).toBeVisible();
+    await page.getByRole("button", { name: /^Add employee$/i }).click();
+    await expect(page.getByRole("heading", { name: /Add employee/i })).toBeVisible();
+    await page.locator("#first_name").fill("Sep");
+    await page.locator("#last_name").fill("Tester");
     await page.locator("#email").fill("sep1.tester@example.test");
-    await page.getByRole("button", { name: /Create invitation/i }).click();
+    await page.locator("#phone").fill("555-010-0199");
+    await page.locator("#hire_date").fill("2026-07-01");
+    await page.getByRole("button", { name: /Create employee/i }).click();
 
+    await expect(page.getByRole("heading", { name: /How should they sign in/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: /Send invite email/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Show temporary password/i })).toBeVisible();
+
+    await page.getByRole("button", { name: /Send invite email/i }).click();
     const toast = page.locator("[data-sonner-toast]").filter({
-      hasText: /Invitation emailed|couldn't be sent|Add manually|Unauthorized|does not/i,
+      hasText: /Invite emailed|couldn't be sent|Invitation created|Unauthorized/i,
     });
     await expect(toast.first()).toBeVisible({ timeout: 10_000 });
-    const toastText = (await toast.first().innerText()) || "";
-    expect(toastText.length).toBeGreaterThan(8);
 
-    await shot(page, "invite_staff_honest_copy");
+    await shot(page, "add_employee_wizard_access");
 
     await gotoAdmin(page, "/dashboard/invitations");
     await expect(page.getByRole("heading", { name: /Employee invitations/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole("button", { name: /Invite by email/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Add employee$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Invite by email/i })).toHaveCount(0);
     await assertPageNotBlank(page, "invitations");
   });
 
@@ -247,6 +254,7 @@ test.describe("RBAC — DSP / employee cannot open employee admin", () => {
     await expect(page.getByRole("heading", { name: /Access denied/i })).toBeVisible();
     await expect(page.getByText(/View staff records/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Invite by email/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Add employee$/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /Team members/i })).toHaveCount(0);
     await shot(page, "dsp_rbac_employees_gated");
   });

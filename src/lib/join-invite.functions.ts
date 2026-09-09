@@ -33,6 +33,7 @@ export type InvitePreviewOk = {
   needs_name: boolean;
   has_username: boolean;
   account_exists: boolean;
+  must_change_password: boolean;
 };
 
 export type InvitePreviewErr = {
@@ -76,7 +77,7 @@ async function loadInvite(token: string): Promise<LoadedInvite | InvitePreviewEr
 async function loadProfileByEmail(email: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, username, email")
+    .select("id, full_name, username, email, must_change_password")
     .ilike("email", email)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -85,6 +86,7 @@ async function loadProfileByEmail(email: string) {
     full_name: string | null;
     username: string | null;
     email: string | null;
+    must_change_password: boolean | null;
   } | null;
 }
 
@@ -105,6 +107,7 @@ export const previewInvitation = createServerFn({ method: "POST" })
       needs_name: !String(profile?.full_name || "").trim(),
       has_username: !!String(profile?.username || "").trim(),
       account_exists: !!profile,
+      must_change_password: profile?.must_change_password === true,
     };
   });
 
@@ -125,8 +128,11 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
     const { invite, orgName } = loaded;
     const email = invite.email.trim().toLowerCase();
     const existing = await loadProfileByEmail(email);
+    const setsPassword = joinSetsAuthPassword(!!existing, {
+      mustChangePassword: existing?.must_change_password === true,
+    });
 
-    if (joinSetsAuthPassword(!!existing)) {
+    if (setsPassword) {
       if (!isValidJoinPassword(data.password)) {
         throw new Error("Password must be at least 8 characters and include a number.");
       }
@@ -193,6 +199,12 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
         .update({ active: false })
         .eq("user_id", userId)
         .neq("organization_id", invite.organization_id);
+    } else if (setsPassword) {
+      // Admin-created roster row (must_change_password): they set a real password here.
+      const { error: pwSetErr } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        password: data.password,
+      });
+      if (pwSetErr) throw new Error(pwSetErr.message);
     } else {
       // Existing login: verify the password they already use. Never overwrite it.
       const { data: verified, error: pwErr } = await supabaseAdmin.auth.signInWithPassword({
@@ -218,7 +230,7 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
       username: username || null,
       is_active: true,
     };
-    if (joinSetsAuthPassword(!!existing)) {
+    if (setsPassword) {
       profilePatch.must_change_password = false;
     }
 

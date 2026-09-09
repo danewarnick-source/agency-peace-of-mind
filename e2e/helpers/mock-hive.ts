@@ -690,6 +690,17 @@ function inferServerFn(url: string, body: string): string {
 
 function serverFnPayload(url: string, body: string): unknown {
   const fn = inferServerFn(url, body);
+  if (/createEmployeeManually/i.test(fn)) {
+    return { userId: "00000000-0000-4000-a000-000000000499", email: "sep1.tester@example.test" };
+  }
+  if (/inviteStaffMembers/i.test(fn)) {
+    return {
+      sent: 1,
+      skipped: 0,
+      errors: 0,
+      results: [{ email: "sep1.tester@example.test", user_id: "00000000-0000-4000-a000-000000000499", status: "sent", reason: null }],
+    };
+  }
   if (/createInvitation/i.test(fn)) {
     let email = "invited@example.test";
     const m = `${url}\n${body}`.match(/sep1\.tester@example\.test|[a-z0-9._%+-]+@example\.test/i);

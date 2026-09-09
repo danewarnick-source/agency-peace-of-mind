@@ -468,7 +468,7 @@ function SmartImportPage() {
       {!jobId && mode === "employee" && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
           <div className="text-sm text-muted-foreground">
-            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields. CSV import does not need NECTAR.
+            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields. CSV import does not need NECTAR and does not send invite email — you invite after the import succeeds.
           </div>
           <Button
             variant="outline"

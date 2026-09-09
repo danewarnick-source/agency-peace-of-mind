@@ -12,8 +12,13 @@ import {
   allRequiredTopicsComplete,
   completedCodesFromProgress,
   planThirtyDayWrites,
+  shouldPersistResumeStep,
   shouldPersistTopicStep,
+  planTopicProgressWrite,
+  staffCompletedTabEmptyCopy,
+  staffCourseProgressLabel,
   topicChecklistLabel,
+  topicCodesForCourse,
   buildExamAnswerRecords,
   buildThirtyDayCertificate,
   canIssueThirtyDayCertificate,
@@ -348,6 +353,80 @@ describe("progress UI labels", () => {
     assert.equal(shouldPersistTopicStep("in_progress"), true);
     assert.equal(shouldPersistTopicStep(null), true);
   });
+
+  it("does not persist a resume step on the complete slide after a 5/5 pass", () => {
+    assert.equal(
+      shouldPersistResumeStep({ existingStatus: "in_progress", destinationStepType: "complete" }),
+      false,
+    );
+    assert.equal(
+      shouldPersistResumeStep({ existingStatus: "in_progress", destinationStepType: "scenario" }),
+      true,
+    );
+    assert.equal(
+      shouldPersistResumeStep({ existingStatus: "completed", destinationStepType: "lesson" }),
+      false,
+    );
+  });
+
+  it("refuses a late in_progress write after a topic is completed", () => {
+    const blocked = planTopicProgressWrite({
+      existingStatus: "completed",
+      requested: "in_progress",
+    });
+    assert.equal(blocked.apply, false);
+    assert.equal(blocked.status, "completed");
+    assert.equal(blocked.requireOpenRow, true);
+    const pass = planTopicProgressWrite({
+      existingStatus: "in_progress",
+      requested: "completed",
+    });
+    assert.equal(pass.apply, true);
+    assert.equal(pass.status, "completed");
+    assert.equal(pass.requireOpenRow, false);
+    const resume = planTopicProgressWrite({
+      existingStatus: "in_progress",
+      requested: "in_progress",
+    });
+    assert.equal(resume.apply, true);
+    assert.equal(resume.requireOpenRow, true);
+  });
+});
+
+describe("staff obligations course progress", () => {
+  it("lists all 30 orientation codes and labels partial progress", () => {
+    assert.equal(topicCodesForCourse("thirty-day").length, 30);
+    assert.equal(topicCodesForCourse("abi").length, 6);
+    assert.equal(staffCourseProgressLabel(19, 30), "19 of 30 topics passed");
+    assert.equal(staffCourseProgressLabel(0, 30), "0 of 30 topics passed");
+  });
+
+  it("explains Completed (0) when 30-day is still in progress", () => {
+    assert.match(
+      staffCompletedTabEmptyCopy({
+        inProgressCourseTitle: THIRTY_DAY_OBLIGATION_TITLE,
+        completedTopics: 19,
+        totalTopics: 30,
+      }),
+      /19 of 30 topics passed/,
+    );
+    assert.match(
+      staffCompletedTabEmptyCopy({
+        inProgressCourseTitle: THIRTY_DAY_OBLIGATION_TITLE,
+        completedTopics: 19,
+        totalTopics: 30,
+      }),
+      /stays on All/,
+    );
+    assert.equal(
+      staffCompletedTabEmptyCopy({
+        inProgressCourseTitle: null,
+        completedTopics: 0,
+        totalTopics: 0,
+      }),
+      "Nothing here.",
+    );
+  });
 });
 
 describe("4/5 retake gate", () => {
@@ -471,7 +550,16 @@ describe("staff vs admin auditor export (source)", () => {
       "utf8",
     );
     assert.match(obligations, /Review course/);
+    assert.match(obligations, /staffCourseProgressLabel/);
+    assert.match(obligations, /staffCompletedTabEmptyCopy/);
     assert.doesNotMatch(obligations, /exam export/);
+    const progressFns = readFileSync(
+      fileURLToPath(new URL("./in-hive-training.functions.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(progressFns, /\.in\("ref_id"/);
+    assert.match(progressFns, /\.neq\("status", "completed"\)/);
+    assert.doesNotMatch(progressFns, /topicCodes\.map\(async/);
   });
 
   it("gates a failed segment behind Retake this segment and does not flash the answer key", () => {
@@ -481,6 +569,7 @@ describe("staff vs admin auditor export (source)", () => {
     );
     assert.match(engine, /Retake this segment/);
     assert.match(engine, /Recorded/);
+    assert.match(engine, /shouldPersistResumeStep/);
     assert.doesNotMatch(engine, /THAT IS RIGHT/);
     const diagrams = readFileSync(
       fileURLToPath(new URL("../components/training/in-hive-diagrams.tsx", import.meta.url)),

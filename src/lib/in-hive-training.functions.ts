@@ -5,7 +5,7 @@ import {
   inHiveExamRef,
   inHiveRefUuid,
   lastExamResetAt,
-  nextTopicProgressStatus,
+  planTopicProgressWrite,
   completedCodesFromProgress,
   type ExamAttemptSnapshot,
   type InHiveCourseId,
@@ -39,16 +39,28 @@ export async function loadInHiveCourseProgress(
   courseId: InHiveCourseId,
   topicCodes: readonly string[],
 ): Promise<Record<string, { status: string; position: number } | null>> {
-  const rows = await Promise.all(
-    topicCodes.map(async (code) => {
-      const row = await loadInHiveTopicProgress(userId, courseId, code);
-      return [code, row] as const;
-    }),
-  );
-  return Object.fromEntries(rows) as Record<
-    string,
-    { status: string; position: number } | null
-  >;
+  const out: Record<string, { status: string; position: number } | null> = {};
+  for (const code of topicCodes) out[code] = null;
+  if (topicCodes.length === 0) return out;
+
+  const refs = topicCodes.map((code) => inHiveRefUuid(courseId, code));
+  const refToCode = new Map(topicCodes.map((code, i) => [refs[i]!, code]));
+  const { data, error } = await (supabase as any)
+    .from("training_topic_progress")
+    .select("status, position, ref_id")
+    .eq("user_id", userId)
+    .eq("topic_kind", IN_HIVE_PROGRESS_KIND)
+    .in("ref_id", refs);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const code = refToCode.get(String((row as { ref_id?: string }).ref_id ?? ""));
+    if (!code) continue;
+    out[code] = {
+      status: String((row as { status?: string }).status ?? "not_started"),
+      position: Number((row as { position?: number }).position ?? 0),
+    };
+  }
+  return out;
 }
 
 export async function hasAnyInHiveProgress(
@@ -79,21 +91,47 @@ export async function saveInHiveTopicProgress(args: {
   position: number;
 }): Promise<void> {
   const existing = await loadInHiveTopicProgress(args.userId, args.courseId, args.topicCode);
-  const status = nextTopicProgressStatus(existing?.status, args.status);
+  const plan = planTopicProgressWrite({
+    existingStatus: existing?.status,
+    requested: args.status,
+  });
+  if (!plan.apply) return;
   const refId = inHiveRefUuid(args.courseId, args.topicCode);
+  const payload = {
+    user_id: args.userId,
+    topic_kind: IN_HIVE_PROGRESS_KIND,
+    ref_id: refId,
+    status: plan.status,
+    position: args.position,
+    updated_at: new Date().toISOString(),
+  };
+
+  // A late resume-step write must not clobber a pass that just landed.
+  if (plan.requireOpenRow) {
+    if (existing) {
+      const { error } = await (supabase as any)
+        .from("training_topic_progress")
+        .update({
+          status: plan.status,
+          position: args.position,
+          updated_at: payload.updated_at,
+        })
+        .eq("user_id", args.userId)
+        .eq("topic_kind", IN_HIVE_PROGRESS_KIND)
+        .eq("ref_id", refId)
+        .neq("status", "completed");
+      if (error) throw error;
+      return;
+    }
+    const { error } = await (supabase as any).from("training_topic_progress").insert(payload);
+    if (error && /duplicate|unique/i.test(error.message ?? "")) return;
+    if (error) throw error;
+    return;
+  }
+
   const { error } = await (supabase as any)
     .from("training_topic_progress")
-    .upsert(
-      {
-        user_id: args.userId,
-        topic_kind: IN_HIVE_PROGRESS_KIND,
-        ref_id: refId,
-        status,
-        position: args.position,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,topic_kind,ref_id" },
-    );
+    .upsert(payload, { onConflict: "user_id,topic_kind,ref_id" });
   if (error) throw error;
 }
 

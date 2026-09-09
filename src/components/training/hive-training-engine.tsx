@@ -8,7 +8,7 @@ import {
   THIRTY_DAY_SAS_TOPICS,
 } from "@/lib/in-hive-training-thirty-day-sas";
 import { PI_THEME } from "@/lib/pi-theme";
-import { choiceFollowUp, scoreSegmentGate, shuffleCopy, SEGMENT_GATE_PASS, SEGMENT_GATE_TOTAL } from "@/lib/in-hive-training";
+import { choiceFollowUp, scoreSegmentGate, shouldPersistResumeStep, shuffleCopy, SEGMENT_GATE_PASS, SEGMENT_GATE_TOTAL } from "@/lib/in-hive-training";
 import { TrainingDiagram, type DiagramId } from "@/components/training/in-hive-diagrams";
 import {
   useTrainingSpeech,
@@ -2106,7 +2106,18 @@ export function TrainingModule({
   const go = (n: number) => {
     const clamped = Math.max(0, Math.min(n, flow.length - 1));
     setI(clamped);
-    onStepChange?.(clamped);
+    const dest = flow[clamped];
+    // The complete slide fires onComplete. Writing a resume position there
+    // races the completed upsert and can leave the checklist on Open.
+    if (
+      dest &&
+      shouldPersistResumeStep({
+        existingStatus: readOnly ? "completed" : null,
+        destinationStepType: dest.type,
+      })
+    ) {
+      onStepChange?.(clamped);
+    }
   };
   const next = () => go(i + 1), back = () => go(i - 1);
   const canSign = agree && esignConsent && name.trim().length > 1;

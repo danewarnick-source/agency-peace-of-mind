@@ -89,6 +89,7 @@ export function InHiveCoursePlayer({
   const questions = useMemo(() => examQuestionsFor(courseId), [courseId]);
   const topicCodes = useMemo(() => topics.map((t) => t.code), [topics]);
   const [activeCode, setActiveCode] = useState<string | "exam" | null>(null);
+  const [localCompleted, setLocalCompleted] = useState<Set<string>>(() => new Set());
 
   const progressQ = useQuery({
     queryKey: ["in-hive-progress", userId, courseId],
@@ -100,10 +101,11 @@ export function InHiveCoursePlayer({
     queryFn: () => loadInHiveExamAttempts(userId, courseId, examResetAfterIso),
   });
 
-  const completedCodes = useMemo(
-    () => completedCodesFromProgress(topicCodes, progressQ.data ?? {}),
-    [progressQ.data, topicCodes],
-  );
+  const completedCodes = useMemo(() => {
+    const fromDb = completedCodesFromProgress(topicCodes, progressQ.data ?? {});
+    if (localCompleted.size === 0) return fromDb;
+    return new Set([...fromDb, ...localCompleted]);
+  }, [localCompleted, progressQ.data, topicCodes]);
 
   const attempts = examQ.data ?? [];
   const passed = attempts.some((a) => a.passed);
@@ -279,6 +281,12 @@ export function InHiveCoursePlayer({
     (code: string, payload?: AttestPayload) => {
       if (completedCodes.has(code) || completedOnce.current.has(code)) return;
       completedOnce.current.add(code);
+      setLocalCompleted((prev) => {
+        if (prev.has(code)) return prev;
+        const next = new Set(prev);
+        next.add(code);
+        return next;
+      });
       const completedAt = new Date().toISOString();
       const proof: SegmentProof | null = payload?.segment
         ? {
@@ -299,24 +307,36 @@ export function InHiveCoursePlayer({
         segmentPassed: proof?.passed === true,
       });
       void (async () => {
-        await saveInHiveTopicProgress({
-          userId,
-          courseId,
-          topicCode: code,
-          status: "completed",
-          position: 0,
-        });
-        if (plan.writeSegmentProof && proof) {
-          await insertInHiveSegmentProof({
+        try {
+          await saveInHiveTopicProgress({
             userId,
             courseId,
             topicCode: code,
-            signedName,
-            signerEmail,
-            proof,
+            status: "completed",
+            position: 0,
           });
+          if (plan.writeSegmentProof && proof) {
+            await insertInHiveSegmentProof({
+              userId,
+              courseId,
+              topicCode: code,
+              signedName,
+              signerEmail,
+              proof,
+            });
+          }
+          void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
+          void qc.invalidateQueries({ queryKey: ["in-hive-resume"] });
+        } catch (e) {
+          completedOnce.current.delete(code);
+          setLocalCompleted((prev) => {
+            if (!prev.has(code)) return prev;
+            const next = new Set(prev);
+            next.delete(code);
+            return next;
+          });
+          toast.error((e as Error).message || "Could not save topic progress.");
         }
-        void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
       })();
     },
     [completedCodes, courseId, qc, signedName, signerEmail, topicCodes, userId],
@@ -324,7 +344,8 @@ export function InHiveCoursePlayer({
 
   const onStepChange = useCallback(
     (code: string, step: number) => {
-      if (!shouldPersistTopicStep(completedCodes.has(code) ? "completed" : null)) return;
+      const alreadyDone = completedCodes.has(code) || completedOnce.current.has(code);
+      if (!shouldPersistTopicStep(alreadyDone ? "completed" : null)) return;
       saveTopic.mutate({
         userId,
         courseId,

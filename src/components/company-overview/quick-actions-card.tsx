@@ -4,10 +4,8 @@ import { NectarButton } from "@/components/nectar/nectar-brand";
 
 export function QuickActionsCard({
   emphasized = false,
-  onInvite,
 }: {
   emphasized?: boolean;
-  onInvite?: () => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -26,9 +24,9 @@ export function QuickActionsCard({
         <NectarButton
           variant="amber"
           icon={<Users className="h-4 w-4" />}
-          onClick={() => (onInvite ? onInvite() : navigate({ to: "/dashboard/employees" }))}
+          onClick={() => navigate({ to: "/dashboard/employees" })}
         >
-          Invite staff
+          Add employee
         </NectarButton>
         <NectarButton
           variant="ghost"

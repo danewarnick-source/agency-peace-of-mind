@@ -7,9 +7,12 @@ import {
   isValidExistingJoinPassword,
   isValidJoinPassword,
   isValidJoinUsername,
+  JOIN_PASSWORD_TOO_SHORT,
+  JOIN_USERNAME_INVALID,
   joinSetsAuthPassword,
   type InviteFailureReason,
 } from "@/lib/join-invite";
+import { stripFakeDisplayLabel } from "@/lib/managed-from";
 
 const TokenInput = z.object({
   token: z.string().trim().min(1).max(200),
@@ -70,7 +73,8 @@ async function loadInvite(token: string): Promise<LoadedInvite | InvitePreviewEr
     .select("name")
     .eq("id", row.organization_id)
     .maybeSingle();
-  const orgName = String(org?.name || "").trim() || "your organization";
+  const orgName =
+    stripFakeDisplayLabel(String(org?.name || "").trim()) || "your organization";
   return { ok: true, invite: row, orgName };
 }
 
@@ -134,7 +138,7 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
 
     if (setsPassword) {
       if (!isValidJoinPassword(data.password)) {
-        throw new Error("Password must be at least 8 characters and include a number.");
+        throw new Error(JOIN_PASSWORD_TOO_SHORT);
       }
     } else if (!isValidExistingJoinPassword(data.password)) {
       throw new Error("Enter the password you already use to sign in.");
@@ -145,9 +149,7 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
 
     if (!existing || !String(existing.username || "").trim()) {
       if (!isValidJoinUsername(usernameRaw)) {
-        throw new Error(
-          "Username must start with a letter and be 3–32 letters, numbers, or underscores.",
-        );
+        throw new Error(JOIN_USERNAME_INVALID);
       }
     }
     const username = usernameRaw || String(existing?.username || "").trim();

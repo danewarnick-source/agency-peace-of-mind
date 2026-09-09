@@ -101,8 +101,52 @@ export function joinHomeForRole(role: string | null | undefined): string {
   return "/employee";
 }
 
+/** Staff join: length only. GoTrue default is 6 with no required character classes. */
+export const JOIN_PASSWORD_MIN_LENGTH = 8;
+export const JOIN_PASSWORD_MAX_LENGTH = 200;
+
+export const JOIN_PASSWORD_HINT =
+  "At least 8 characters. Letters and numbers are fine — no special character required.";
+
+export const JOIN_USERNAME_HINT =
+  "Must start with a letter and be 3–32 letters, numbers, or underscores. Don't use an email.";
+
+export const JOIN_USERNAME_INVALID =
+  "Username must start with a letter and be 3–32 letters, numbers, or underscores.";
+
+export const JOIN_PASSWORD_TOO_SHORT = "Password must be at least 8 characters.";
+
+/**
+ * New-invite password rule: 8–200 characters. No digit / symbol / case classes.
+ * Matches reset-password and is slightly above GoTrue's default min (6).
+ * Auth may still reject a leaked / HIBP-listed password if that project flag is on.
+ */
 export function isValidJoinPassword(password: string): boolean {
-  return password.length >= 8 && /\d/.test(password);
+  return (
+    password.length >= JOIN_PASSWORD_MIN_LENGTH && password.length <= JOIN_PASSWORD_MAX_LENGTH
+  );
+}
+
+/** Live copy for a new password. Empty string means "not typed yet". */
+export function joinPasswordLiveMessage(password: string): { ok: boolean; text: string } | null {
+  if (!password) return null;
+  if (password.length < JOIN_PASSWORD_MIN_LENGTH) {
+    return { ok: false, text: `Too short — need at least ${JOIN_PASSWORD_MIN_LENGTH} characters.` };
+  }
+  if (password.length > JOIN_PASSWORD_MAX_LENGTH) {
+    return { ok: false, text: "Password is too long." };
+  }
+  return { ok: true, text: "Password looks good." };
+}
+
+export function joinConfirmLiveMessage(
+  password: string,
+  confirm: string,
+): { ok: boolean; text: string } | null {
+  if (!confirm) return null;
+  if (password !== confirm) return { ok: false, text: "Passwords don't match." };
+  if (!password) return { ok: false, text: "Passwords don't match." };
+  return { ok: true, text: "Passwords match." };
 }
 
 /**
@@ -127,6 +171,42 @@ export function isValidExistingJoinPassword(password: string): boolean {
 
 export function isValidJoinUsername(username: string): boolean {
   return /^[a-zA-Z][a-zA-Z0-9_]{2,31}$/.test(username.trim());
+}
+
+/**
+ * Live username copy. Empty / whitespace → null (helper text already explains the rule).
+ */
+export function joinUsernameLiveMessage(username: string): { ok: boolean; text: string } | null {
+  const t = username.trim();
+  if (!t) return null;
+  if (t.includes("@")) {
+    return { ok: false, text: "Don't use an email. Start with a letter; letters, numbers, or underscores only." };
+  }
+  if (!/^[a-zA-Z]/.test(t)) {
+    return { ok: false, text: "Must start with a letter." };
+  }
+  if (t.length < 3) {
+    return { ok: false, text: "Must be at least 3 characters." };
+  }
+  if (t.length > 32) {
+    return { ok: false, text: "Must be 32 characters or fewer." };
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(t)) {
+    return { ok: false, text: "Only letters, numbers, and underscores are allowed." };
+  }
+  return { ok: true, text: "Username looks good." };
+}
+
+/**
+ * Sanitize a sign-in username from an email local-part.
+ * Strips anything that isn't a letter, number, or underscore; drops a leading
+ * non-letter run so the result can pass isValidJoinUsername. Empty if it can't.
+ */
+export function suggestJoinUsername(email: string): string {
+  const local = String(email || "").split("@")[0] ?? "";
+  const stripped = local.replace(/[^a-zA-Z0-9_]/g, "");
+  const letterLed = stripped.replace(/^[^a-zA-Z]+/, "").slice(0, 32);
+  return isValidJoinUsername(letterLed) ? letterLed : "";
 }
 
 /** True when this page is new-agency signup (payment / team size), not join. */

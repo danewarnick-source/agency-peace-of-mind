@@ -19,6 +19,7 @@ import { resolveOrgSender } from "@/lib/email.functions";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { inviteJoinUrl } from "@/lib/join-invite";
+import { stripFakeDisplayLabel } from "@/lib/managed-from";
 import { canSendImportInvite } from "@/lib/import-invite";
 
 const ORG_ID = z.string().uuid();
@@ -113,7 +114,8 @@ async function sendInvitationEmail(args: {
       .select("name")
       .eq("id", organizationId)
       .maybeSingle();
-    const orgName = String(org?.name || "").trim() || "your organization";
+    const orgName =
+      stripFakeDisplayLabel(String(org?.name || "").trim()) || "your organization";
     const origin = resolveAuthOrigin(siteOrigin);
     const link = inviteJoinUrl(origin, token);
     const roleLabel = ROLE_LABEL[role] ?? role;

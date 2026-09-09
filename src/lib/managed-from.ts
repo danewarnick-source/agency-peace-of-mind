@@ -56,9 +56,15 @@ export function managedFromAddress(
   return extractEmailAddress(raw) ?? DEFAULT_MANAGED_FROM_ADDRESS;
 }
 
-/** Drop leftover test suffixes like "True North Supports (FAKE)". */
+/**
+ * Drop leftover demo "(FAKE)" markers from an org From / display name.
+ * "True North Supports (FAKE)" → "True North Supports".
+ */
 export function stripFakeDisplayLabel(displayName: string): string {
-  return displayName.replace(/\s*\(FAKE\)\s*/gi, " ").replace(/\s+/g, " ").trim();
+  return String(displayName || "")
+    .replace(/\(\s*FAKE\s*\)/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export function formatFromHeader(displayName: string, address = managedFromAddress()): string {

@@ -176,8 +176,26 @@ test.describe("invite join vs new-agency signup", () => {
     if (await form.isVisible().catch(() => false)) {
       await expect(page.getByLabel(/email/i)).toBeVisible();
       await expect(page.getByLabel(/password/i).first()).toBeVisible();
+      await expect(page.getByTestId("join-username-hint")).toBeVisible();
+      await expect(page.getByTestId("join-password-hint")).toBeVisible();
+      await expect(page.getByTestId("join-password-hint")).toContainText(/at least 8 characters/i);
       await expect(page.locator("body")).toContainText(JOIN_HEADING);
       await expect(page.locator("body")).not.toContainText(/how many staff|team size/i);
+
+      await page.locator("#join-username").fill("tester@example.com");
+      await expect(page.getByTestId("join-username-live")).toContainText(/email/i);
+      await page.getByTestId("join-username-suggest").click();
+      await expect(page.locator("#join-username")).toHaveValue("tester");
+      await expect(page.getByTestId("join-username-live")).toContainText(/looks good/i);
+
+      await page.locator("#join-password").fill("short1");
+      await expect(page.getByTestId("join-password-live")).toContainText(/too short/i);
+      await page.locator("#join-password").fill("longenough");
+      await expect(page.getByTestId("join-password-live")).toContainText(/looks good/i);
+      await page.locator("#join-confirm").fill("different");
+      await expect(page.getByTestId("join-confirm-live")).toContainText(/don't match/i);
+      await page.locator("#join-confirm").fill("longenough");
+      await expect(page.getByTestId("join-confirm-live")).toContainText(/match/i);
     } else {
       await expect(err).toContainText(ASK_ADMIN);
     }

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +60,7 @@ type Role = "admin" | "manager" | "employee";
 export function EmployeesPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -430,7 +431,9 @@ export function EmployeesPage() {
           {members?.map((m) => {
             const name = m.profile?.full_name ?? "—";
             const codes = serviceCodesByStaff.get(m.user_id) ?? [];
-            const openProfile = () => { window.location.href = `/dashboard/employees/${m.user_id}`; };
+            const openProfile = () => {
+              void navigate({ to: "/dashboard/employees/$staffId", params: { staffId: m.user_id } });
+            };
             return (
               <div
                 key={m.id}
@@ -469,12 +472,13 @@ export function EmployeesPage() {
                   )}
                 </div>
                 <div className="flex items-center justify-end pt-1" data-no-row-nav onClick={(e) => e.stopPropagation()}>
-                  <a
-                    href={`/dashboard/employees/${m.user_id}?tab=checklist`}
+                  <Link
+                    to="/dashboard/employees/$staffId"
+                    params={{ staffId: m.user_id }}
                     className="flex items-center gap-1 text-sm font-medium text-primary"
                   >
                     View <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  </Link>
                 </div>
               </div>
             );
@@ -503,7 +507,7 @@ export function EmployeesPage() {
                 // Roster avatar now uses <PersonAvatar>, which handles the
                 // initials fallback itself when photo_path is null.
                 const openProfile = () => {
-                  window.location.href = `/dashboard/employees/${m.user_id}`;
+                  void navigate({ to: "/dashboard/employees/$staffId", params: { staffId: m.user_id } });
                 };
                 const compliance = complianceByStaff.get(m.user_id);
                 const hasOverdue = (compliance?.overdue ?? 0) > 0;
@@ -595,9 +599,12 @@ export function EmployeesPage() {
                           asChild
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <a href={`/dashboard/employees/${m.user_id}?tab=checklist`}>
+                          <Link
+                            to="/dashboard/employees/$staffId"
+                            params={{ staffId: m.user_id }}
+                          >
                             View <ExternalLink className="ml-1 h-3 w-3" />
-                          </a>
+                          </Link>
                         </Button>
                         <Button
                           variant="outline"
@@ -819,7 +826,13 @@ export function EmployeesPage() {
               onClick={() => {
                 const newStaffId = credentialsShown?.newStaffId;
                 setCredentialsShown(null);
-                if (newStaffId) window.location.href = `/dashboard/employees/${newStaffId}?tab=record`;
+                if (newStaffId) {
+                  void navigate({
+                    to: "/dashboard/employees/$staffId",
+                    params: { staffId: newStaffId },
+                    search: { tab: "record" },
+                  });
+                }
               }}
             >
               Done

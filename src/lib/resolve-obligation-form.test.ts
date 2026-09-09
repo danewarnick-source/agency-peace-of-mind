@@ -36,6 +36,14 @@ describe("resolveObligationFormId", () => {
     assert.equal(isUnlinkedFormDuty({ evidence_type: "form", linked_form_id: "null" }), true);
     assert.equal(isUnlinkedFormDuty({ evidence_type: "form", linked_form_id: FORMS[0].id }), false);
     assert.equal(isUnlinkedFormDuty({ evidence_type: "attestation", linked_form_id: null }), false);
+    assert.equal(
+      isUnlinkedFormDuty({
+        evidence_type: "form",
+        linked_form_id: null,
+        title: "30-Day New Hire Orientation Training",
+      }),
+      false,
+    );
   });
 
   it("does not hide per-client training forms that have no company form UUID", () => {

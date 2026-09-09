@@ -16,6 +16,15 @@ export function isFormUuid(id: string | null | undefined): id is string {
   return typeof id === "string" && UUID_RE.test(id);
 }
 
+function isInHiveCourseTitle(title: string): boolean {
+  const t = title.trim().toLowerCase();
+  return (
+    t === "30-day new hire orientation training" ||
+    t === "abi training — before working alone" ||
+    t.startsWith("abi training")
+  );
+}
+
 /** Form-typed duty with no published form UUID — unactionable for staff.
  *  Per-client PCT / support strategies / client-specific forms live on the
  *  existing client-training viewer, not a company Forms UUID. */
@@ -25,6 +34,7 @@ export function isUnlinkedFormDuty(ob: {
   title?: string;
 }): boolean {
   if (ob.title && isPerClientTrainingFormTitle(ob.title)) return false;
+  if (ob.title && isInHiveCourseTitle(ob.title)) return false;
   return ob.evidence_type === "form" && !isFormUuid(ob.linked_form_id);
 }
 

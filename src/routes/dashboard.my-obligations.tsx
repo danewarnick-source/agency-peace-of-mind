@@ -23,10 +23,15 @@ import { dueLabel } from "@/components/company-obligations/my-obligations-widget
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import {
   IN_HIVE_COURSE_EVIDENCE,
-  THIRTY_DAY_TOPIC_CODES,
   inHiveCourseIdForTitle,
+  staffCompletedTabEmptyCopy,
+  staffCourseProgressLabel,
+  topicCodesForCourse,
 } from "@/lib/in-hive-training";
-import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
+import {
+  completedCodesFromProgress,
+  loadInHiveCourseProgress,
+} from "@/lib/in-hive-training.functions";
 import {
   CLIENT_FORM_LABEL,
   clientFormKindForTitle,
@@ -37,10 +42,6 @@ import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.func
 import { getAgencyPolicyForInstance } from "@/lib/agency-policies.functions";
 import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
-
-function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
-  return courseId === "thirty-day" ? [...THIRTY_DAY_TOPIC_CODES] : "ABCDEF".split("");
-}
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "My obligations — Provider Interface" }] }),
@@ -215,10 +216,12 @@ function OpenCard({
   orgId,
   instance,
   onCompleted,
+  courseProgress,
 }: {
   orgId: string;
   instance: MyObligationInstanceRow;
   onCompleted: () => void;
+  courseProgress?: { completed: number; total: number } | null;
 }) {
   const recordFn = useServerFn(recordCompletion);
   const policyFn = useServerFn(getAgencyPolicyForInstance);
@@ -251,13 +254,7 @@ function OpenCard({
   const mediaKind = policy
     ? policyMediaKind(policy.file_mime, policy.file_name)
     : null;
-  const { user } = useAuth();
-  const resumeQ = useQuery({
-    queryKey: ["in-hive-resume", user?.id, courseId],
-    enabled: !!user && !!courseId,
-    queryFn: () =>
-      hasAnyInHiveProgress(user!.id, courseId!, courseTopicCodes(courseId!)),
-  });
+  const hasCourseProgress = (courseProgress?.completed ?? 0) > 0;
   const needsUpload =
     ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation =
@@ -378,12 +375,17 @@ function OpenCard({
               Open the course from here. Finish each topic, then pass the competency exam (80%,
               three tries). Completing the exam greens this obligation.
             </p>
+            {courseProgress && courseProgress.total > 0 ? (
+              <p className="mt-1 text-sm font-medium">
+                {staffCourseProgressLabel(courseProgress.completed, courseProgress.total)}
+              </p>
+            ) : null}
             <Link
               to="/dashboard/my-obligations/course/$instanceId"
               params={{ instanceId: instance.id }}
             >
               <Button size="sm" className="mt-2 min-h-[44px]">
-                {resumeQ.data ? "Pick up where you left off" : "Open course"}
+                {hasCourseProgress ? "Pick up where you left off" : "Open course"}
               </Button>
             </Link>
           </div>
@@ -604,6 +606,51 @@ function MyObligationsPage() {
     staleTime: 60_000,
   });
 
+  const thirtyDayOpen = useMemo(
+    () =>
+      instances.find(
+        (row) =>
+          inHiveCourseIdForTitle(row.obligation.title) === "thirty-day" &&
+          row.status !== "completed" &&
+          row.status !== "waived",
+      ) ?? null,
+    [instances],
+  );
+  const abiOpen = useMemo(
+    () =>
+      instances.find(
+        (row) =>
+          inHiveCourseIdForTitle(row.obligation.title) === "abi" &&
+          row.status !== "completed" &&
+          row.status !== "waived",
+      ) ?? null,
+    [instances],
+  );
+  const thirtyDayCodes = useMemo(() => topicCodesForCourse("thirty-day"), []);
+  const abiCodes = useMemo(() => topicCodesForCourse("abi"), []);
+  const thirtyProgressQ = useQuery({
+    queryKey: ["in-hive-progress", user?.id, "thirty-day"],
+    enabled: !!user && !!thirtyDayOpen,
+    queryFn: () => loadInHiveCourseProgress(user!.id, "thirty-day", thirtyDayCodes),
+  });
+  const abiProgressQ = useQuery({
+    queryKey: ["in-hive-progress", user?.id, "abi"],
+    enabled: !!user && !!abiOpen,
+    queryFn: () => loadInHiveCourseProgress(user!.id, "abi", abiCodes),
+  });
+  const courseProgressByInstance = useMemo(() => {
+    const m = new Map<string, { completed: number; total: number }>();
+    if (thirtyDayOpen) {
+      const done = completedCodesFromProgress(thirtyDayCodes, thirtyProgressQ.data ?? {});
+      m.set(thirtyDayOpen.id, { completed: done.size, total: thirtyDayCodes.length });
+    }
+    if (abiOpen) {
+      const done = completedCodesFromProgress(abiCodes, abiProgressQ.data ?? {});
+      m.set(abiOpen.id, { completed: done.size, total: abiCodes.length });
+    }
+    return m;
+  }, [abiCodes, abiOpen, abiProgressQ.data, thirtyDayCodes, thirtyDayOpen, thirtyProgressQ.data]);
+
   const instanceIds = useMemo(() => instances.map((i) => i.id), [instances]);
   const { data: myCompletions = [] } = useQuery({
     queryKey: ["my-obligation-completions", orgId, user?.id, instanceIds],
@@ -726,6 +773,7 @@ function MyObligationsPage() {
     qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
     qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
     qc.invalidateQueries({ queryKey: ["my-client-training-statuses"] });
+    qc.invalidateQueries({ queryKey: ["in-hive-progress"] });
   };
 
   return (
@@ -773,7 +821,28 @@ function MyObligationsPage() {
         </div>
       ) : shown.length === 0 && shownOverlay.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {unlinkedFormCount > 0 ? "No duties you can complete yet." : "Nothing here."}
+          {unlinkedFormCount > 0 ? (
+            "No duties you can complete yet."
+          ) : tab === "completed" && thirtyDayOpen ? (
+            <div className="space-y-3">
+              <p>
+                {staffCompletedTabEmptyCopy({
+                  inProgressCourseTitle: thirtyDayOpen.obligation.title,
+                  completedTopics: courseProgressByInstance.get(thirtyDayOpen.id)?.completed ?? 0,
+                  totalTopics: courseProgressByInstance.get(thirtyDayOpen.id)?.total ?? 0,
+                })}
+              </p>
+              <Link
+                to="/dashboard/my-obligations/course/$instanceId"
+                params={{ instanceId: thirtyDayOpen.id }}
+                className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+              >
+                Continue course
+              </Link>
+            </div>
+          ) : (
+            "Nothing here."
+          )}
         </div>
       ) : (
         <div className="grid w-full gap-3">
@@ -809,7 +878,13 @@ function MyObligationsPage() {
                 );
               }
               return (
-                <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />
+                <OpenCard
+                  key={inst.id}
+                  orgId={orgId!}
+                  instance={inst}
+                  onCompleted={onCompleted}
+                  courseProgress={courseProgressByInstance.get(inst.id) ?? null}
+                />
               );
             };
 

@@ -21,7 +21,7 @@ import {
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
-import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
+import { inHiveCourseIdForTitle, topicCodesForCourse } from "@/lib/in-hive-training";
 import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
 import { clientFormKindForTitle } from "@/lib/client-form-obligations";
 
@@ -199,13 +199,7 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
     queryKey: ["in-hive-resume", user?.id, courseId],
     enabled: !!user && !!courseId,
     queryFn: () =>
-      hasAnyInHiveProgress(
-        user!.id,
-        courseId!,
-        courseId === "thirty-day"
-          ? "ABCDEFGHIJKLMNOPQRSTUVW".split("")
-          : "ABCDEF".split(""),
-      ),
+      hasAnyInHiveProgress(user!.id, courseId!, topicCodesForCourse(courseId!)),
   });
 
   if (removed) return null;

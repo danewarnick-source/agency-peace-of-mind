@@ -161,6 +161,66 @@ export function shouldPersistTopicStep(existingStatus: string | null | undefined
   return existingStatus !== "completed";
 }
 
+/**
+ * Resume-step writes must not land on the complete slide (that races the
+ * completed upsert) and must not touch a topic that already passed.
+ */
+export function shouldPersistResumeStep(args: {
+  existingStatus: string | null | undefined;
+  destinationStepType: string | null | undefined;
+}): boolean {
+  if (args.destinationStepType === "complete" || args.destinationStepType === "attest") {
+    return false;
+  }
+  return shouldPersistTopicStep(args.existingStatus);
+}
+
+export type TopicProgressWritePlan = {
+  apply: boolean;
+  status: "in_progress" | "completed";
+  /** in_progress updates must skip rows that already say completed. */
+  requireOpenRow: boolean;
+};
+
+/** Completed always wins. A late in_progress write must not overwrite a pass. */
+export function planTopicProgressWrite(args: {
+  existingStatus: string | null | undefined;
+  requested: "in_progress" | "completed";
+}): TopicProgressWritePlan {
+  if (args.requested === "in_progress" && args.existingStatus === "completed") {
+    return { apply: false, status: "completed", requireOpenRow: true };
+  }
+  return {
+    apply: true,
+    status: nextTopicProgressStatus(args.existingStatus, args.requested),
+    requireOpenRow: args.requested === "in_progress",
+  };
+}
+
+export function topicCodesForCourse(courseId: InHiveCourseId): string[] {
+  return courseId === "thirty-day" ? [...THIRTY_DAY_TOPIC_CODES] : "ABCDEF".split("");
+}
+
+export function staffCourseProgressLabel(completed: number, total: number): string {
+  if (total <= 0) return "";
+  return `${completed} of ${total} topics passed`;
+}
+
+/** Completed-tab copy when the 30-day course is still open. */
+export function staffCompletedTabEmptyCopy(args: {
+  inProgressCourseTitle: string | null;
+  completedTopics: number;
+  totalTopics: number;
+}): string {
+  if (args.inProgressCourseTitle && args.completedTopics > 0 && args.totalTopics > 0) {
+    return `${args.inProgressCourseTitle} is still open — ${args.completedTopics} of ${args.totalTopics} topics passed. Finish the remaining topics and the competency exam to complete it. It stays on All until then.`;
+  }
+  if (args.inProgressCourseTitle) {
+    return `${args.inProgressCourseTitle} is still open. Open it from All to continue.`;
+  }
+  return "Nothing here.";
+}
+
 /** End of each SOW segment: 4 of 5 scored beats to pass. */
 export const SEGMENT_GATE_TOTAL = 5;
 export const SEGMENT_GATE_PASS = 4;

@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { adminResetEmployeePassword } from "@/lib/employees.functions";
 import { resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
-import { interpretInviteSendResult, resendInviteToastMessage } from "@/lib/invite-send-result";
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
@@ -161,22 +160,22 @@ export function EmployeesPage() {
   const resendInviteMutation = useMutation({
     mutationFn: async (invitationId: string) => {
       if (!org) throw new Error("No organization selected.");
-      const raw = await resendInviteFn({
+      return await resendInviteFn({
         data: {
           organization_id: org.organization_id,
           invitation_id: invitationId,
           site_origin: resolveAuthOrigin(),
         },
       });
-      const out = interpretInviteSendResult(raw);
-      if (out.rpc_failure) throw new Error(out.message);
-      return out;
     },
-    onSuccess: (out) => {
-      const toastMsg = resendInviteToastMessage(out);
-      if (toastMsg.tone === "success") toast.success(toastMsg.text);
-      else if (toastMsg.tone === "warning") toast.warning(toastMsg.text);
-      else toast.error(toastMsg.text);
+    onSuccess: (res) => {
+      if (res.email_sent) {
+        toast.success(`Invitation re-emailed to ${res.invitation.email}`);
+      } else {
+        toast.warning(
+          `Invitation refreshed, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Copy the join link instead.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["invites"] });
     },
     onError: (e: Error) => toast.error(e.message),

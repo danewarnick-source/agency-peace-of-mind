@@ -5,7 +5,7 @@ import { Copy, KeyRound, Mail, ShieldPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createEmployeeManually } from "@/lib/employees.functions";
-import { inviteStaffMembers } from "@/lib/invitations.functions";
+import { createInvitation, resendInvitation } from "@/lib/invitations.functions";
 import { interpretInviteSendResult } from "@/lib/invite-send-result";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
@@ -44,7 +44,8 @@ export function AddEmployeeWizard({
 }) {
   const qc = useQueryClient();
   const createManual = useServerFn(createEmployeeManually);
-  const inviteFn = useServerFn(inviteStaffMembers);
+  const createInviteFn = useServerFn(createInvitation);
+  const resendInviteFn = useServerFn(resendInvitation);
 
   const [step, setStep] = useState<"details" | "access">("details");
   const [created, setCreated] = useState<CreatedEmployee | null>(null);
@@ -156,27 +157,44 @@ export function AddEmployeeWizard({
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
-      if (!organizationId || !created) throw new Error("No organization selected.");
-      const raw = await inviteFn({
-        data: {
-          organization_id: organizationId,
-          site_origin: resolveAuthOrigin(),
-          user_ids: created.userId ? [created.userId] : [],
-          emails: created.email ? [created.email] : [],
-          role,
-          force: true,
-        },
-      });
-      const out = interpretInviteSendResult(raw);
-      if (out.rpc_failure) throw new Error(out.message);
-      return out;
+      if (!organizationId || !created?.email) throw new Error("No organization selected.");
+      const site_origin = resolveAuthOrigin();
+      const email = created.email.trim().toLowerCase();
+      // Same rail as Pending invitations → Resend (createInvitation / resendInvitation).
+      // inviteStaffMembers is a different RPC that can resolve undefined; do not read `.sent` on it.
+      try {
+        const raw = await createInviteFn({
+          data: { organization_id: organizationId, email, role, site_origin },
+        });
+        const out = interpretInviteSendResult(raw);
+        if (out.rpc_failure) throw new Error(out.message);
+        return out;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (!/pending invitation already exists/i.test(msg)) throw e;
+        const { data: pending, error } = await supabase
+          .from("invitations")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .eq("email", email)
+          .eq("status", "pending")
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!pending?.id) throw e;
+        const raw = await resendInviteFn({
+          data: { organization_id: organizationId, invitation_id: pending.id, site_origin },
+        });
+        const out = interpretInviteSendResult(raw);
+        if (out.rpc_failure) throw new Error(out.message);
+        return out;
+      }
     },
     onSuccess: (out) => {
       if (out.email_sent) {
         toast.success(`Invite emailed to ${out.email ?? created?.email ?? "the employee"}.`);
-      } else if (out.results[0]?.status === "created_unsent" || out.email_error) {
+      } else if (out.email_error) {
         toast.warning(
-          `Invitation created, but the email couldn't be sent (${out.email_error ?? "unknown error"}). Share the join link from Pending invitations.`,
+          `Invitation created, but the email couldn't be sent (${out.email_error}). Share the join link from Pending invitations.`,
         );
       } else {
         toast.warning(out.message);

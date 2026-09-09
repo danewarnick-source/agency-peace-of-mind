@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
-import { interpretInviteSendResult, resendInviteToastMessage } from "@/lib/invite-send-result";
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { toast } from "sonner";
@@ -47,22 +46,22 @@ function InvitationsPage() {
   const resendInvite = useMutation({
     mutationFn: async (id: string) => {
       if (!org) throw new Error("No organization selected.");
-      const raw = await resendInviteFn({
+      return await resendInviteFn({
         data: {
           organization_id: org.organization_id,
           invitation_id: id,
           site_origin: resolveAuthOrigin(),
         },
       });
-      const out = interpretInviteSendResult(raw);
-      if (out.rpc_failure) throw new Error(out.message);
-      return out;
     },
-    onSuccess: (out) => {
-      const toastMsg = resendInviteToastMessage(out);
-      if (toastMsg.tone === "success") toast.success(toastMsg.text);
-      else if (toastMsg.tone === "warning") toast.warning(toastMsg.text);
-      else toast.error(toastMsg.text);
+    onSuccess: (res) => {
+      if (res.email_sent) {
+        toast.success(`Invitation re-emailed to ${res.invitation.email} — expires in 14 days`);
+      } else {
+        toast.warning(
+          `Invitation refreshed, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the link manually instead.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["invitations"] });
     },
     onError: (e: Error) => toast.error(e.message),

@@ -7,6 +7,7 @@ import {
   extractEmailAddress,
   formatFromHeader,
   managedFromAddress,
+  stripFakeDisplayLabel,
 } from "./managed-from.ts";
 
 const FROM_RAILS = [
@@ -75,6 +76,14 @@ describe("formatFromHeader", () => {
       "Provider Interface <noreply@providerinterface.com>",
     );
     assert.doesNotMatch(formatFromHeader("HIVE Notifications"), /Hive Certify/);
+  });
+
+  it("strips leftover (FAKE) test labels from the display name", () => {
+    assert.equal(stripFakeDisplayLabel("True North Supports (FAKE)"), "True North Supports");
+    assert.equal(
+      formatFromHeader("True North Supports (FAKE)", DEFAULT_MANAGED_FROM_ADDRESS),
+      "True North Supports <noreply@providerinterface.com>",
+    );
   });
 });
 

@@ -71,6 +71,14 @@ export const PI_HOME_NAV = [
   { label: "About", to: "/about" as const, hash: undefined },
 ] as const;
 
+/** Same labels and order as the homepage, pointed at dedicated public routes. */
+export const PI_PUBLIC_NAV = [
+  { label: "Nectar", to: "/nectar" as const },
+  { label: "Training", to: "/training" as const },
+  { label: "Pricing", to: "/pricing" as const },
+  { label: "About", to: "/about" as const },
+] as const;
+
 export const PI_HOME_FOOTER_LINKS = [
   { label: PI_HOME_PRIVACY, to: "/privacy" as const },
   { label: PI_HOME_TERMS, to: "/terms" as const },

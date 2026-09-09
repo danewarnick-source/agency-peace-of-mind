@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SiteHeader } from "@/components/site-header";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { Contact } from "@/components/landing/contact";
-import { Footer } from "@/components/landing/footer";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -17,21 +16,12 @@ export const Route = createFileRoute("/contact")({
 
 function ContactPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#0b1220] text-[#f3efe6]">
-      <SiteHeader />
-      <main className="flex-1 pt-12">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <h1
-            className="text-4xl font-medium tracking-tight md:text-5xl"
-            style={{ fontFamily: '"Newsreader", "Times New Roman", serif' }}
-          >
-            We'd love to hear from you
-          </h1>
-          <p className="mt-4 text-[#f3efe6]/62">Questions, the office, custom rollouts — drop us a note.</p>
-        </div>
+    <PiPublicPage>
+      <main className="wrap pi-home-contact">
+        <h1>We'd love to hear from you</h1>
+        <p className="pi-home-lede">Questions, the office, custom rollouts — drop us a note.</p>
         <Contact />
       </main>
-      <Footer />
-    </div>
+    </PiPublicPage>
   );
 }

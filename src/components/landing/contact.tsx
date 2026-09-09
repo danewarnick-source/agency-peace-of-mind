@@ -1,9 +1,5 @@
 import { useState } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 const schema = z.object({
@@ -19,8 +15,10 @@ export function Contact() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const parsed = schema.safeParse({
-      name: fd.get("name"), email: fd.get("email"),
-      company: fd.get("company"), message: fd.get("message"),
+      name: fd.get("name"),
+      email: fd.get("email"),
+      company: fd.get("company"),
+      message: fd.get("message"),
     });
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     setBusy(true);
@@ -31,27 +29,48 @@ export function Contact() {
   };
 
   return (
-    <section id="contact" className="bg-[color:var(--surface-2)] py-24">
-      <div className="mx-auto grid max-w-5xl gap-12 px-6 lg:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--amber-600)]">Contact</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[color:var(--navy-900)] md:text-4xl">Talk to our team</h2>
-          <p className="mt-4 text-[color:var(--text-soft)]">Questions about a rollout, custom training, or enterprise pricing? We typically reply within one business day.</p>
-          <dl className="mt-8 space-y-3 text-sm">
-            <div><dt className="font-semibold text-[color:var(--navy-900)]">Email</dt><dd className="text-[color:var(--text-soft)]">hello@careacademy.example</dd></div>
-            <div><dt className="font-semibold text-[color:var(--navy-900)]">Hours</dt><dd className="text-[color:var(--text-soft)]">Mon–Fri · 9am–6pm ET</dd></div>
-          </dl>
-        </div>
-        <form onSubmit={onSubmit} className="rounded-2xl border border-[color:var(--border-light)] bg-white p-7 shadow-[var(--shadow-card)]">
-          <div className="grid gap-4">
-            <div className="grid gap-2"><Label htmlFor="name">Full name</Label><Input id="name" name="name" required /></div>
-            <div className="grid gap-2"><Label htmlFor="email">Work email</Label><Input id="email" name="email" type="email" required /></div>
-            <div className="grid gap-2"><Label htmlFor="company">Company</Label><Input id="company" name="company" /></div>
-            <div className="grid gap-2"><Label htmlFor="message">Message</Label><Textarea id="message" name="message" rows={5} required /></div>
-            <Button type="submit" disabled={busy} size="lg">{busy ? "Sending…" : "Send message"}</Button>
+    <section id="contact" className="pi-home-contact-grid">
+      <div>
+        <p className="pi-home-kicker">Contact</p>
+        <h2>Talk to our team</h2>
+        <p className="pi-home-lede">
+          Questions about a rollout, custom training, or enterprise pricing? We typically reply
+          within one business day.
+        </p>
+        <dl className="pi-home-contact-meta">
+          <div>
+            <dt>Email</dt>
+            <dd>Use the form — we reply within one business day.</dd>
           </div>
-        </form>
+          <div>
+            <dt>Hours</dt>
+            <dd>Mon–Fri · 9am–6pm ET</dd>
+          </div>
+        </dl>
       </div>
+      <form onSubmit={onSubmit} className="pi-home-cream-card">
+        <div className="grid gap-4">
+          <div className="pi-home-field">
+            <label htmlFor="name">Full name</label>
+            <input id="name" name="name" required />
+          </div>
+          <div className="pi-home-field">
+            <label htmlFor="email">Work email</label>
+            <input id="email" name="email" type="email" required />
+          </div>
+          <div className="pi-home-field">
+            <label htmlFor="company">Company</label>
+            <input id="company" name="company" />
+          </div>
+          <div className="pi-home-field">
+            <label htmlFor="message">Message</label>
+            <textarea id="message" name="message" rows={5} required />
+          </div>
+          <button type="submit" disabled={busy} className="pi-home-btn gold">
+            {busy ? "Sending…" : "Send message"}
+          </button>
+        </div>
+      </form>
     </section>
   );
 }

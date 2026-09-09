@@ -16,6 +16,7 @@ import {
   PI_HOME_HERO_FINE,
   PI_HOME_MAX_WIDTH,
   PI_HOME_NAV,
+  PI_PUBLIC_NAV,
   PI_HOME_NAV_BREAKPOINT,
   PI_HOME_NAVY,
   PI_HOME_PHONE_ROWS,
@@ -69,6 +70,14 @@ describe("public homepage tokens stay off the in-app cream theme", () => {
     assert.deepEqual(
       PI_HOME_NAV.map((item) => item.label),
       ["Nectar", "Training", "Pricing", "About"],
+    );
+    assert.deepEqual(
+      PI_PUBLIC_NAV.map((item) => item.label),
+      ["Nectar", "Training", "Pricing", "About"],
+    );
+    assert.deepEqual(
+      PI_PUBLIC_NAV.map((item) => item.to),
+      ["/nectar", "/training", "/pricing", "/about"],
     );
     assert.deepEqual(
       PI_HOME_FOOTER_LINKS.map((item) => item.to),

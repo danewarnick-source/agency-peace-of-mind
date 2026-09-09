@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
-import { PiWordmark } from "@/components/pi-landing/pi-mark";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 
 import { supabase } from "@/integrations/supabase/client";
 import { authRedirectUrl } from "@/lib/auth-redirect";
@@ -74,11 +74,9 @@ function persistPreferredOrgFromRows(
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0b1220] text-[#f3efe6]">
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 py-12">
-        {children}
-      </div>
-    </div>
+    <PiPublicPage>
+      <main className="wrap pi-home-auth">{children}</main>
+    </PiPublicPage>
   );
 }
 
@@ -249,120 +247,110 @@ function LoginPage() {
   };
 
   const fieldClass =
-    "flex h-12 w-full rounded-md border border-white/[0.12] bg-[#0b1220] px-3 py-2 text-base text-[#f3efe6] outline-none placeholder:text-[#f3efe6]/40 focus:ring-2 focus:ring-[#f3efe6]/25";
+    "flex h-12 w-full rounded-md border border-[#0a0f1c]/15 bg-white px-3 py-2 text-base text-[#0a0f1c] outline-none placeholder:text-[#0a0f1c]/40 focus:ring-2 focus:ring-[#c4a35a]/35";
 
   return (
     <AuthFrame>
-      <div className="flex w-full max-w-md flex-col items-center">
-        <PiWordmark to="/" />
-
-        <div className="mt-8 w-full rounded-xl border border-white/[0.10] bg-[#111827] p-7">
-          <div className="mb-7 text-center">
-            <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#f3efe6]">
-              Welcome back
-            </h1>
-            <p className="mt-1.5 text-sm text-[#f3efe6]/60">
-              Sign in to your Provider Interface account
-            </p>
-          </div>
-
-          <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
-            <div className="grid gap-2">
-              <Label htmlFor="identifier" className="text-[#f3efe6]/70">
-                Email
-              </Label>
-              <input
-                id="identifier"
-                name="identifier"
-                type="text"
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                inputMode="email"
-                required
-                placeholder="you@example.com"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password" className="text-[#f3efe6]/70">
-                Password
-              </Label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  className={`${fieldClass} pr-10`}
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[#f3efe6]/50 hover:text-[#f3efe6]"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <Link
-                to="/forgot-password"
-                className="text-xs font-medium text-[#f3efe6]/70 hover:text-[#f3efe6]"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-[#f3efe6]/70">
-              <input
-                id="remember-me"
-                name="rememberMe"
-                type="checkbox"
-                data-testid="remember-me"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-white/20 bg-[#0b1220]"
-              />
-              Remember me
-            </label>
-            <p className="text-xs text-[#f3efe6]/45">
-              Saves your email on this device. You still click Sign in.
-            </p>
-
-            <Button
-              type="submit"
-              disabled={busy}
-              className="h-11 w-full bg-[#f3efe6] text-[#0b1220] hover:bg-[#f3efe6]/90"
-            >
-              {busy ? "Signing in…" : "Sign in"}
-            </Button>
-          </form>
-
-          <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-[#f3efe6]/40">
-            <div className="absolute inset-x-0 top-1/2 h-px bg-white/[0.10]" />
-            <span className="relative bg-[#111827] px-3">or</span>
-          </div>
-
-          <Button
-            asChild
-            variant="outline"
-            className="h-11 w-full border-[#f3efe6]/25 bg-transparent text-[#f3efe6] hover:bg-white/[0.06] hover:text-[#f3efe6]"
-          >
-            <Link to="/signup">Get started</Link>
-          </Button>
-
-          <button
-            type="button"
-            onClick={google}
-            className="mt-4 w-full text-center text-xs text-[#f3efe6]/50 hover:text-[#f3efe6]"
-          >
-            Continue with Google
-          </button>
+      <div className="pi-home-cream-card pi-home-auth-card">
+        <div className="mb-7 text-center">
+          <h1>Welcome back</h1>
+          <p className="mt-1.5 text-sm text-[#0a0f1c]/65">
+            Sign in to your Provider Interface account
+          </p>
         </div>
+
+        <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
+          <div className="grid gap-2">
+            <Label htmlFor="identifier" className="text-[#0a0f1c]">
+              Email
+            </Label>
+            <input
+              id="identifier"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              inputMode="email"
+              required
+              placeholder="you@example.com"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="password" className="text-[#0a0f1c]">
+              Password
+            </Label>
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                className={`${fieldClass} pr-10`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-[#0a0f1c]/45 hover:text-[#0a0f1c]"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <Link
+              to="/forgot-password"
+              className="text-xs font-medium text-[#8a6d32] hover:text-[#0a0f1c]"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-[#0a0f1c]/75">
+            <input
+              id="remember-me"
+              name="rememberMe"
+              type="checkbox"
+              data-testid="remember-me"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-[#0a0f1c]/25 bg-white"
+            />
+            Remember me
+          </label>
+          <p className="text-xs text-[#0a0f1c]/55">
+            Saves your email on this device. You still click Sign in.
+          </p>
+
+          <button type="submit" disabled={busy} className="pi-home-btn gold" style={{ width: "100%" }}>
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+
+        <div className="relative my-6 text-center text-[11px] uppercase tracking-[0.18em] text-[#0a0f1c]/40">
+          <div className="absolute inset-x-0 top-1/2 h-px bg-[#0a0f1c]/10" />
+          <span className="relative bg-[#f1ecdf] px-3">or</span>
+        </div>
+
+        <Button
+          asChild
+          variant="outline"
+          className="h-11 w-full border-[#0a0f1c]/20 bg-white text-[#0a0f1c] hover:bg-white hover:text-[#0a0f1c]"
+        >
+          <Link to="/signup">Get started</Link>
+        </Button>
+
+        <button
+          type="button"
+          onClick={google}
+          className="mt-4 w-full text-center text-xs text-[#0a0f1c]/50 hover:text-[#0a0f1c]"
+        >
+          Continue with Google
+        </button>
       </div>
     </AuthFrame>
   );
@@ -383,17 +371,12 @@ export function AuthShell({
 }) {
   return (
     <AuthFrame>
-      <div className="flex w-full max-w-md flex-col items-center">
-        <PiWordmark to="/" />
-        <div className="mt-8 w-full rounded-xl border border-white/[0.10] bg-[#f3efe6] p-7 text-[#0b1220]">
-          <div className="mb-7 text-center">
-            <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#0b1220]">
-              {title}
-            </h1>
-            <p className="mt-1.5 text-sm text-[#0b1220]/65">{subtitle}</p>
-          </div>
-          {children}
+      <div className="pi-home-cream-card pi-home-auth-card">
+        <div className="mb-7 text-center">
+          <h1>{title}</h1>
+          <p className="mt-1.5 text-sm text-[#0a0f1c]/65">{subtitle}</p>
         </div>
+        {children}
       </div>
     </AuthFrame>
   );

@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/landing/footer";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { formatUsdFromCents } from "@/lib/hive-pricing";
 import {
   confirmTrainingOnlyCheckoutFn,
@@ -55,20 +54,14 @@ function TrainingConfirmPage() {
   const hasClass = order?.seats.some((s) => s.includesClassSeat) ?? false;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0b1220] text-[#f3efe6]">
-      <SiteHeader />
-      <main className="flex-1">
-        <section className="mx-auto max-w-2xl px-4 pb-16 pt-12 sm:px-6 md:pt-16">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f3efe6]/45">
-            Training
-          </p>
-          <h1
-            className="mt-3 text-3xl font-medium tracking-tight text-[#f3efe6]"
-            style={{ fontFamily: '"Newsreader", "Times New Roman", serif' }}
-          >
+    <PiPublicPage>
+      <main className="wrap pi-home-commerce">
+        <section className="mx-auto max-w-2xl">
+          <p className="pi-home-kicker">Training</p>
+          <h1>
             {order?.paymentStatus === "paid" ? "Seats are paid" : "Confirming payment"}
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-[#f3efe6]/62">
+          <p className="pi-home-lede">
             This is not an office. You are not an admin. The office places class seats and sends
             30-day access from Provider Interface Executive.
           </p>
@@ -138,7 +131,6 @@ function TrainingConfirmPage() {
           </div>
         </section>
       </main>
-      <Footer />
-    </div>
+    </PiPublicPage>
   );
 }

@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Sparkles, Upload, FileText, Trash2, Download, Loader2, ShieldCheck } from "lucide-react";
-import { RequirePermission } from "@/components/rbac-guard";
+import { IfPermission } from "@/components/rbac-guard";
 import {
   listEmployeeDocuments,
   createEmployeeDocumentUploadUrl,
@@ -163,7 +163,7 @@ export function EmployeeDocumentsCard({
         <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Employee documents
         </CardTitle>
-        <RequirePermission perm="edit_staff_records">
+        <IfPermission perm="edit_staff_records">
           <div className="flex items-center gap-2">
             <Select value={kind} onValueChange={setKind}>
               <SelectTrigger className="h-8 w-[180px] text-xs">
@@ -187,7 +187,7 @@ export function EmployeeDocumentsCard({
               Upload
             </Button>
           </div>
-        </RequirePermission>
+        </IfPermission>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
@@ -308,7 +308,7 @@ function DocRow({
           <div className="text-xs text-rose-700">NECTAR error: {doc.nectar_error}</div>
         )}
       </div>
-      <RequirePermission perm="edit_staff_records">
+      <IfPermission perm="edit_staff_records">
         <div className="flex flex-wrap items-center gap-1">
           <Button size="sm" variant="ghost" onClick={onOpen} title="Open">
             <Download className="h-3.5 w-3.5" />
@@ -327,7 +327,7 @@ function DocRow({
             <Trash2 className="h-3.5 w-3.5 text-rose-500" />
           </Button>
         </div>
-      </RequirePermission>
+      </IfPermission>
     </li>
   );
 }

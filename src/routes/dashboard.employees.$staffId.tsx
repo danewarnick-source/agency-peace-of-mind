@@ -53,7 +53,7 @@ import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 
-import { RequirePermission } from "@/components/rbac-guard";
+import { IfPermission, RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
 import { POSITIONS, type Position } from "@/lib/employee-positions";
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
     return out;
   },
   component: () => (
-    <RequirePermission perm="edit_staff_records">
+    <RequirePermission perm="view_staff_records">
       <StaffProfilePage />
     </RequirePermission>
   ),
@@ -988,7 +988,7 @@ function ContactCard({
         <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Contact &amp; position
         </CardTitle>
-        <RequirePermission perm="edit_staff_records">
+        <IfPermission perm="edit_staff_records">
           <button
             type="button"
             aria-label="Edit contact"
@@ -997,7 +997,7 @@ function ContactCard({
           >
             {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
           </button>
-        </RequirePermission>
+        </IfPermission>
       </CardHeader>
       <CardContent>
         {!editing ? (

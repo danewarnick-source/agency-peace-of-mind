@@ -3,28 +3,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAuth } from "./use-auth";
 import { ALL_PERMISSIONS, PROVIDER_ROLES, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
-import { resolveCan } from "@/lib/permissions-can";
+import { permissionsAreLoading, queryAwaitingFirstResult, resolveCan } from "@/lib/permissions-can";
 
 export type PermissionMap = Record<ProviderRole, Record<Permission, boolean>>;
 
+/** Sparse map: only keys that exist in role_permissions. Missing ≠ deny. */
 function buildEmpty(): PermissionMap {
   const out = {} as PermissionMap;
   PROVIDER_ROLES.forEach((r) => {
     out[r] = {} as Record<Permission, boolean>;
-    ALL_PERMISSIONS.forEach((p) => {
-      out[r][p] = false;
-    });
   });
   return out;
 }
 
 /**
  * Org-scoped role permission matrix, read straight from `role_permissions`.
- * New orgs are seeded by seed_org_role_permissions (trigger + signup RPC).
- * usePermissions() still falls back to DEFAULT_MATRIX when this query
- * returns no enabled grants — live Hive-Platform had 13 unseeded orgs
- * (Salt Lake Care Co / pi20 among them) and RequirePermission sent
- * owners to /unauthorized.
+ * Only keys that have a row are present. resolveCan() falls back to
+ * DEFAULT_MATRIX for unseeded keys so a retired manage_users →
+ * edit_staff_records gap cannot send an owner to /unauthorized.
  */
 export function useOrgPermissions() {
   const { data: org } = useCurrentOrg();
@@ -40,7 +36,9 @@ export function useOrgPermissions() {
       (data ?? []).forEach((row) => {
         const r = row.role as ProviderRole;
         const p = row.permission as Permission;
-        if (r in map && p in map[r]) map[r][p] = !!row.enabled;
+        if (r in map && (ALL_PERMISSIONS as readonly string[]).includes(p)) {
+          map[r][p] = !!row.enabled;
+        }
       });
       return map;
     },
@@ -79,18 +77,46 @@ export function useUserOverrides() {
  *   3. DEFAULT_MATRIX when the org was never seeded (fresh paid signup)
  */
 export function usePermissions() {
-  const { data: org, isLoading: orgLoading } = useCurrentOrg();
-  const { data: matrix, isLoading: matrixLoading } = useOrgPermissions();
-  const { data: overrides, isLoading: overridesLoading } = useUserOverrides();
+  const { user, loading: authLoading } = useAuth();
+  const orgQ = useCurrentOrg();
+  const matrixQ = useOrgPermissions();
+  const overridesQ = useUserOverrides();
 
-  const role = (org?.role ?? null) as Role | null;
+  const role = (orgQ.data?.role ?? null) as Role | null;
 
   const can = (perm: Permission): boolean =>
-    resolveCan({ role, perm, matrix, overrides });
+    resolveCan({ role, perm, matrix: matrixQ.data, overrides: overridesQ.data });
 
-  // Wait for org to load before reporting ready — otherwise role-based guards
-  // see role=null and incorrectly redirect to /unauthorized on first paint.
-  return { role, can, isLoading: orgLoading || matrixLoading || overridesLoading };
+  // Wait for auth + org + matrix. Disabled queries report isLoading=false in
+  // TanStack Query v5 — that used to look like "ready, no permission".
+  const isLoading = permissionsAreLoading({
+    authLoading,
+    hasUser: !!user,
+    org: orgQ.data,
+    orgPending: queryAwaitingFirstResult({
+      enabled: !!user,
+      data: orgQ.data,
+      isError: orgQ.isError,
+      isPending: orgQ.isPending,
+      isFetching: orgQ.isFetching,
+    }),
+    matrixPending: queryAwaitingFirstResult({
+      enabled: !!orgQ.data,
+      data: matrixQ.data,
+      isError: matrixQ.isError,
+      isPending: matrixQ.isPending,
+      isFetching: matrixQ.isFetching,
+    }),
+    overridesPending: queryAwaitingFirstResult({
+      enabled: !!orgQ.data && !!user,
+      data: overridesQ.data,
+      isError: overridesQ.isError,
+      isPending: overridesQ.isPending,
+      isFetching: overridesQ.isFetching,
+    }),
+  });
+
+  return { role, can, isLoading };
 }
 
 export type EffectivePermissionSource = "role" | "individual_grant" | "individual_deny";

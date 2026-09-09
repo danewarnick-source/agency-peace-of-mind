@@ -121,7 +121,7 @@ export function PiMarketingPage() {
           </h1>
           <p className="pi-home-lede">{PI_SUBHEAD}</p>
           <div className="pi-home-ctas">
-            <Link className="pi-home-btn gold" to="/contact">
+            <Link className="pi-home-btn gold" to="/contact" hash="">
               {PI_HOME_SEE_IT}
             </Link>
             <Link className="pi-home-btn ghost" to="/" hash="nectar">
@@ -162,7 +162,7 @@ export function PiMarketingPage() {
           <strong>{PI_LIST_PRICE_DISPLAY}</strong>
           <span>{PI_HOME_PRICING_UNIT}</span>
           <p>{PI_HOME_PRICING_MIN}</p>
-          <Link className="pi-home-btn gold" to="/signup">
+          <Link className="pi-home-btn gold" to="/signup" hash="">
             {PI_HOME_START_SIGNUP}
           </Link>
         </div>

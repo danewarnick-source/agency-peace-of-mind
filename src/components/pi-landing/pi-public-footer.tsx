@@ -14,7 +14,7 @@ export function PiPublicFooter({ home: _home = false }: { home?: boolean }) {
         <div className="pi-home-foot-row">
           <div className="links">
             {PI_HOME_FOOTER_LINKS.map((item) => (
-              <Link key={item.label} to={item.to}>
+              <Link key={item.label} to={item.to} hash="">
                 {item.label}
               </Link>
             ))}

@@ -102,7 +102,7 @@ export function PiHomeLockup({
   markSize?: number;
 }) {
   return (
-    <Link to={to} className="pi-home-logo" aria-label={PI_PRODUCT_NAME}>
+    <Link to={to} hash="" className="pi-home-logo" aria-label={PI_PRODUCT_NAME}>
       <PiHomepageMark size={markSize} className="pi-home-logo-mark" />
       <span className="pi-home-logo-name">
         <span className="pi-home-logo-pi">{PI_PRODUCT_SHORT}</span>

@@ -33,6 +33,54 @@ type InvitationRow = {
   expires_at: string;
 };
 
+type InviteTargetResult = {
+  email: string;
+  user_id: string | null;
+  status: "sent" | "created_unsent" | "skipped" | "error";
+  reason: string | null;
+};
+
+/** Unified payload so hire-wizard (`res.sent`) and resend (`res.email_sent`) share one shape. */
+function inviteSendPayload(args: {
+  invitation?: InvitationRow | { id: string; email: string } | null;
+  email?: string | null;
+  userId?: string | null;
+  email_sent: boolean;
+  email_error?: string | null;
+  sent?: number;
+  skipped?: number;
+  errors?: number;
+  results?: InviteTargetResult[];
+  status?: InviteTargetResult["status"];
+}) {
+  const email =
+    (args.email && args.email.trim()) ||
+    (args.invitation && "email" in args.invitation ? String(args.invitation.email ?? "") : "");
+  const status =
+    args.status ?? (args.email_sent ? "sent" : args.email_error ? "created_unsent" : "error");
+  const results =
+    args.results ??
+    (email || args.email_error
+      ? [
+          {
+            email,
+            user_id: args.userId ?? null,
+            status,
+            reason: args.email_sent ? null : (args.email_error ?? null),
+          },
+        ]
+      : []);
+  return {
+    invitation: args.invitation ?? null,
+    email_sent: args.email_sent,
+    email_error: args.email_error ?? null,
+    sent: args.sent ?? (args.email_sent ? 1 : 0),
+    skipped: args.skipped ?? 0,
+    errors: args.errors ?? (args.email_sent ? 0 : results.length ? 1 : 0),
+    results,
+  };
+}
+
 function inviteRoleFromMember(role: string | undefined): Role {
   if (role === "admin") return "admin";
   if (role === "manager" || role === "program_manager") return "manager";
@@ -262,13 +310,6 @@ export const revokeInvitation = createServerFn({ method: "POST" })
     return { invitation: invite as { id: string; email: string } };
   });
 
-type InviteTargetResult = {
-  email: string;
-  user_id: string | null;
-  status: "sent" | "created_unsent" | "skipped" | "error";
-  reason: string | null;
-};
-
 async function upsertPendingInviteAndSend(args: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any;
@@ -347,13 +388,21 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
         emails: z.array(z.string().trim().toLowerCase().email().max(255)).max(200).default([]),
         role: INVITE_ROLE.optional(),
         resend_accepted: z.boolean().optional().default(false),
+        force: z.boolean().optional().default(false),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const empty = { sent: 0, skipped: 0, errors: 0, results: [] as InviteTargetResult[] };
-    if (!supabase || !userId) return empty;
+    const empty = inviteSendPayload({
+      email_sent: false,
+      sent: 0,
+      skipped: 0,
+      errors: 0,
+      results: [],
+    });
+    if (!supabase || !userId) return { ...empty, email_error: "Unauthorized" };
+    try {
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,
@@ -438,7 +487,7 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
             mustChangePassword: t.mustChange,
             invitationStatus,
           },
-          { resendAccepted: data.resend_accepted },
+          { resendAccepted: data.resend_accepted, force: data.force },
         )
       ) {
         skipped += 1;
@@ -488,5 +537,23 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
       }
     }
 
-    return { sent, skipped, errors, results };
+    const emailError = results.find((r) => r.status === "created_unsent" || r.status === "error")?.reason ?? null;
+    return inviteSendPayload({
+      email_sent: sent > 0,
+      email_error: emailError,
+      sent,
+      skipped,
+      errors,
+      results,
+    });
+    } catch (e) {
+      return inviteSendPayload({
+        email_sent: false,
+        email_error: e instanceof Error ? e.message : "Invite failed",
+        sent: 0,
+        skipped: 0,
+        errors: 1,
+        status: "error",
+      });
+    }
   });

@@ -6,14 +6,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { isBillingExempt } from "@/lib/billing-access";
 import { isTrainingOnlySku, trainingOnlyIncludesThirtyDay } from "@/lib/training-only";
 import {
+  orgSelectMissingBillingExempt,
   resolveThirtyDayAccess,
   rosterPaymentUnlocksThirtyDay,
   rosterTypeUnlocksThirtyDay,
   staffMatchesRosterRow,
+  thirtyDayOrgIsComped,
   type ThirtyDayAccessReason,
+  type ThirtyDayOrgRow,
 } from "@/lib/in-hive-training-access";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,23 +46,31 @@ export const thirtyDayCourseAccessFn = createServerFn({ method: "POST" })
     if (!userId) return empty;
     const admin = supabaseAdmin as AnySupabase;
 
-    const { data: org, error: orgErr } = await admin
+    const full = await admin
       .from("organizations")
       .select("id, name, legal_name, dba_name, display_acronym, billing_exempt")
       .eq("id", data.organizationId)
       .maybeSingle();
-    if (orgErr) throw new Error(orgErr.message);
+    let org = (full.data ?? null) as ThirtyDayOrgRow | null;
+    if (full.error) {
+      if (!orgSelectMissingBillingExempt(full.error.message)) {
+        throw new Error(full.error.message);
+      }
+      const basic = await admin
+        .from("organizations")
+        .select("id, name, legal_name, dba_name, display_acronym")
+        .eq("id", data.organizationId)
+        .maybeSingle();
+      if (basic.error) throw new Error(basic.error.message);
+      org = (basic.data ?? null) as ThirtyDayOrgRow | null;
+    }
     if (!org) return empty;
 
     const organizationName = String(org.name ?? "Provider agency");
-    const billingExempt = isBillingExempt({
-      billingExempt: org.billing_exempt === true,
-      orgName: org.name,
-      legalName: org.legal_name,
-      dbaName: org.dba_name,
-      organizationId: org.id,
-      displayAcronym: org.display_acronym,
-    });
+    const billingExempt = thirtyDayOrgIsComped(org);
+    if (billingExempt) {
+      return { allowed: true, reason: "tns_or_comped", charged: false, organizationName };
+    }
 
     const { data: prof } = await admin
       .from("profiles")

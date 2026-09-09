@@ -324,6 +324,7 @@ function AdminView({ orgId }: { orgId: string }) {
         onPurchased={() => {
           qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] });
           qc.invalidateQueries({ queryKey: ["ht-org-classes", orgId] });
+          qc.invalidateQueries({ queryKey: ["thirty-day-course-access"] });
         }}
       />
 

@@ -2,13 +2,36 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   officeStaffMayTakeThirtyDay,
+  orgSelectMissingBillingExempt,
   resolveThirtyDayAccess,
   rosterPaymentUnlocksThirtyDay,
   rosterTypeUnlocksThirtyDay,
   staffMatchesRosterRow,
+  thirtyDayOrgIsComped,
 } from "./in-hive-training-access.ts";
 
 describe("thirty-day paywall", () => {
+  it("Hive-Platform missing billing_exempt is a known schema gap, not a hard fail", () => {
+    assert.equal(orgSelectMissingBillingExempt('column "billing_exempt" does not exist'), true);
+    assert.equal(orgSelectMissingBillingExempt("permission denied"), false);
+  });
+
+  it("True North comps without a billing_exempt column on the org row", () => {
+    assert.equal(
+      thirtyDayOrgIsComped({
+        id: "7fabcf5d-f826-487f-8730-8b0c3f1969bb",
+        name: "True North Supports LLC",
+        dba_name: "TNS",
+        display_acronym: "TNS",
+      }),
+      true,
+    );
+    assert.equal(
+      thirtyDayOrgIsComped({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Acme DSPD" }),
+      false,
+    );
+  });
+
   it("True North / comped orgs never need a purchased seat", () => {
     assert.equal(officeStaffMayTakeThirtyDay({ billingExempt: true, hasPaidRosterSeat: false }), true);
     const r = resolveThirtyDayAccess({ billingExempt: true, hasPaidRosterSeat: false });

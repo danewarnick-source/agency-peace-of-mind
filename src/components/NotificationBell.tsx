@@ -9,6 +9,7 @@ import { Bell, AlertTriangle, Clock, CheckCircle2, X, GraduationCap } from "luci
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getOrgCeRoster } from "@/lib/ce.functions";
 import { useDeadlines } from "@/hooks/use-deadlines";
 import { isUpiReminderFireDay } from "@/lib/upi-reminder-cadence";
@@ -68,8 +69,6 @@ export function NotificationBell({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const toastedIdsRef = useRef<Set<string>>(new Set());
   const toastStorageKey = org?.organization_id && user?.id
     ? `notification-bell-toasted:${org.organization_id}:${user.id}`
@@ -128,25 +127,6 @@ export function NotificationBell({
       toastedIdsRef.current = new Set();
     }
   }, [toastStorageKey]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handler(e: MouseEvent) {
-      if (
-        panelRef.current && !panelRef.current.contains(e.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(e.target as Node)
-      ) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   const { data: notifications = [] } = useQuery({
     enabled: !!user?.id && !!org?.organization_id,
@@ -289,23 +269,36 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative">
-      <button
-        ref={buttonRef} type="button"
-        onClick={() => { setOpen((o) => !o); if (!open && unreadCount > 0) markAllReadMut.mutate(); }}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={`Notifications${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`}
-      >
-        <Bell className="h-5 w-5 text-[var(--hive-gold)]" />
-        {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--hive-gold)] text-[10px] font-bold text-[var(--hive-on-gold)]">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
+    // Admin chrome applies backdrop-filter + an overflow-hidden column. An
+    // in-tree absolute panel is clipped (click looks dead). Portal via Popover.
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next && unreadCount > 0) markAllReadMut.mutate();
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="relative z-20 flex h-9 w-9 pointer-events-auto items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:pointer-events-none"
+          aria-label={`Notifications${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`}
+        >
+          <Bell className="h-5 w-5 text-[var(--hive-gold)]" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--hive-gold)] text-[10px] font-bold text-[var(--hive-on-gold)]">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
 
-      {open && (
-        <div ref={panelRef} className="absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        collisionPadding={8}
+        className="z-50 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-xl"
+      >
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-muted-foreground" />
@@ -385,8 +378,7 @@ export function NotificationBell({
               </Button>
             </div>
           )}
-        </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

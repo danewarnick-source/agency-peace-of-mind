@@ -156,6 +156,13 @@ html.pi-html-landing:has(.pi-home) body {
   transform: translateY(-1px);
 }
 
+.pi-home-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .pi-home-atmosphere {
   position: absolute;
   inset: 0;
@@ -833,5 +840,160 @@ html.pi-html-landing:has(.pi-home) body {
   }
   50% {
     transform: translateY(-20px);
+  }
+}
+
+/* Shared public / pre-login surfaces (not Admin cream). */
+.pi-home.pi-landing-root .pi-home-article,
+.pi-home.pi-landing-root .pi-home-contact,
+.pi-home.pi-landing-root .pi-home-auth,
+.pi-home.pi-landing-root .pi-home-signup,
+.pi-home.pi-landing-root .pi-home-commerce {
+  padding: 48px 0 96px;
+  position: relative;
+  z-index: 1;
+}
+
+.pi-home.pi-landing-root .pi-home-article h1,
+.pi-home.pi-landing-root .pi-home-contact h1,
+.pi-home.pi-landing-root .pi-home-auth h1,
+.pi-home.pi-landing-root .pi-home-signup h1,
+.pi-home.pi-landing-root .pi-home-commerce h1 {
+  max-width: 16ch;
+  margin: 12px 0 16px;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+}
+
+.pi-home.pi-landing-root .pi-home-article h2 {
+  max-width: none;
+  margin: 0 0 12px;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.2;
+}
+
+.pi-home-lede {
+  margin: 0;
+  max-width: 36em;
+  color: var(--ink2);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.pi-home-cream-card {
+  background: #f1ecdf;
+  color: #0a0f1c;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.55);
+}
+
+.pi-home-cream-card h1,
+.pi-home-cream-card h2,
+.pi-home.pi-landing-root .pi-home-cream-card h1 {
+  color: #0a0f1c;
+  max-width: none;
+  margin: 0 0 8px;
+  font-size: clamp(26px, 4vw, 34px);
+}
+
+.pi-home-cream-card p,
+.pi-home-cream-card label,
+.pi-home-cream-card dt {
+  color: #3a4553;
+}
+
+.pi-home-cream-card .pi-home-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pi-home-cream-card .pi-home-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a0f1c;
+}
+
+.pi-home-cream-card input,
+.pi-home-cream-card textarea {
+  width: 100%;
+  border: 1px solid rgba(10, 15, 28, 0.14);
+  background: #fff;
+  color: #0a0f1c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--sans);
+  outline: none;
+}
+
+.pi-home-cream-card input:focus,
+.pi-home-cream-card textarea:focus {
+  border-color: rgba(196, 163, 90, 0.7);
+  box-shadow: 0 0 0 3px rgba(196, 163, 90, 0.18);
+}
+
+.pi-home-contact-grid {
+  display: grid;
+  gap: 40px;
+  margin-top: 36px;
+}
+
+.pi-home-contact-meta {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.pi-home-contact-meta dt {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.pi-home-contact-meta dd {
+  margin: 4px 0 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+
+.pi-home-auth {
+  display: flex;
+  justify-content: center;
+}
+
+.pi-home-auth-card {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.pi-home-signup {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.pi-home-signup-account {
+  margin: 0 0 20px;
+  color: var(--ink2);
+  font-size: 14px;
+}
+
+.pi-home-signup-account a {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pi-home-banner-gold {
+  background: rgba(196, 163, 90, 0.16);
+  border: 1px solid rgba(196, 163, 90, 0.45);
+  color: #6b5428;
+}
+
+@media (min-width: 820px) {
+  .pi-home-contact-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
   }
 }

@@ -52,6 +52,8 @@ const PUBLIC_FILES = [
   new URL("../routes/terms.tsx", import.meta.url),
   new URL("../routes/baa.tsx", import.meta.url),
   new URL("../routes/privacy.tsx", import.meta.url),
+  new URL("../routes/contact.tsx", import.meta.url),
+  new URL("../routes/login.tsx", import.meta.url),
   new URL("../components/pi-landing/pi-marketing-page.tsx", import.meta.url),
   new URL("../lib/pi-homepage.ts", import.meta.url),
   new URL("../components/pi-landing/pi-hero-glass.tsx", import.meta.url),
@@ -294,7 +296,7 @@ describe("Provider Interface marketing homepage", () => {
     assert.equal(PI_ABOUT_PAGE_HEADLINE, "The office, already standing.");
     assert.deepEqual(
       PI_NAV_LINKS.map((item) => item.to),
-      ["/pricing", "/nectar", "/about"],
+      ["/nectar", "/training", "/pricing", "/about"],
     );
     assert.equal(PI_FEATURE_HIGHLIGHTS.length >= 3, true);
     assert.equal(PI_FEATURE_HIGHLIGHTS.length <= 6, true);

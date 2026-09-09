@@ -22,8 +22,8 @@ html.pi-html-landing body {
   --c14: rgba(243, 239, 230, 0.14);
   --c08: rgba(243, 239, 230, 0.08);
   --c04: rgba(243, 239, 230, 0.04);
-  --gold: #c9a227;
-  --gold-s: rgba(201, 162, 39, 0.16);
+  --gold: #c4a35a;
+  --gold-s: rgba(196, 163, 90, 0.16);
   --ok: #5fae7f;
   --red: #e08a80;
   --nr: "Newsreader", Georgia, serif;
@@ -463,7 +463,7 @@ html.pi-html-landing body {
 .pi-landing-root h1 em {
   font-style: italic;
   font-weight: 300;
-  background: linear-gradient(90deg, #f3efe6, #d9c98e 60%, #c9a227);
+  background: linear-gradient(90deg, #f3efe6, #d9c284 60%, #c4a35a);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

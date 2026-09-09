@@ -26,7 +26,7 @@ describe("Provider Interface BAA", () => {
     assert.match(page, /PI_BAA_AGREE_COPY/);
     assert.doesNotMatch(page, /Hive Certify|not legal advice|DocuSign|SignatureCanvas/i);
     assert.match(signup, /signup-baa-checkbox/);
-    assert.match(signup, /to="\/baa"/);
+    assert.match(signup, /href="\/baa"/);
     assert.match(signup, /authorized to bind this agency/);
   });
 });

@@ -10,7 +10,7 @@ import {
   Loader2,
   ShieldCheck,
 } from "lucide-react";
-import { PiWordmark } from "@/components/pi-landing/pi-mark";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,7 @@ import {
 } from "@/lib/stripe-checkout.functions";
 import { formatUsdFromCents, type BillingInterval } from "@/lib/hive-pricing";
 import { PI_LIST_MINIMUM_LINE, PI_LIST_PRICE_DISPLAY, PI_SIGNUP_PRICE_LINE } from "@/lib/pi-landing";
+import { PI_HOME_SERIF } from "@/lib/pi-homepage";
 import {
   SIGNUP_AGENCY_PLACEHOLDER,
   SIGNUP_TRAINING_ADDONS,
@@ -90,7 +91,6 @@ export const Route = createFileRoute("/signup")({
 /* ──────────────────────────── design tokens ──────────────────────────── */
 
 const JAKARTA = '"Inter", ui-sans-serif, system-ui, sans-serif';
-const NAVY_BG = "#0b1220";
 const AMBER = "#f3efe6";
 
 const inputStyle: React.CSSProperties = {
@@ -143,10 +143,6 @@ const initialForm: FormState = {
 };
 
 /* ──────────────────────────── shell ──────────────────────────── */
-
-function Brand() {
-  return <PiWordmark to="/" />;
-}
 
 function Stepper({ step }: { step: number }) {
   return (
@@ -331,17 +327,13 @@ function SignupPage() {
   const goBack = () => setStep((s) => Math.max(0, s - 1));
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-[#f3efe6]" style={{ background: NAVY_BG, fontFamily: JAKARTA }}>
-      <div className="relative mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 md:py-12">
-        <header className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Brand />
-          <Link to="/login" className="text-sm text-[#f3efe6]/60 hover:text-[#f3efe6]">
-            Already have an account? <span className="font-medium text-[#f3efe6]">Sign in</span>
-          </Link>
-        </header>
-
-        <main className="mx-auto w-full max-w-2xl flex-1">
-          <Stepper step={step} />
+    <PiPublicPage>
+      <main className="wrap pi-home-signup">
+        <p className="pi-home-signup-account">
+          Already have an account?{" "}
+          <Link to="/login">Sign in</Link>
+        </p>
+        <Stepper step={step} />
           <div
             className="rounded-2xl border border-white/[0.10] bg-[#f3efe6] p-6 text-[#0b1220] shadow-[0_24px_60px_-30px_rgba(0,0,0,0.55)] sm:p-8"
             data-testid="signup-new-agency"
@@ -382,18 +374,8 @@ function SignupPage() {
               />
             )}
           </div>
-        </main>
-        <p className="mt-8 text-center text-xs text-[#f3efe6]/40">
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
-            Terms
-          </a>
-          {" · "}
-          <a href="/baa" target="_blank" rel="noopener noreferrer" className="hover:text-[#f3efe6]">
-            BAA
-          </a>
-        </p>
-      </div>
-    </div>
+      </main>
+    </PiPublicPage>
   );
 }
 
@@ -736,7 +718,7 @@ function Step1Account({
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
+            className="font-medium text-[#8a6d32] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-tos-link"
           >
             Terms
@@ -762,7 +744,7 @@ function Step1Account({
             href="/baa"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-[var(--hive-gold)] underline underline-offset-2 hover:text-[#0b1220]"
+            className="font-medium text-[#8a6d32] underline underline-offset-2 hover:text-[#0b1220]"
             data-testid="signup-baa-link"
           >
             Business Associate Agreement
@@ -796,10 +778,10 @@ function Step1Account({
 
 function PwRule({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
-    <li className="flex items-center gap-2" style={{ color: ok ? "#86efac" : "rgba(255,255,255,0.5)" }}>
+    <li className="flex items-center gap-2" style={{ color: ok ? "#1e3a30" : "#3a4553" }}>
       <span
         className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px]"
-        style={{ background: ok ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.08)" }}
+        style={{ background: ok ? "rgba(127, 209, 168, 0.28)" : "rgba(10, 15, 28, 0.08)" }}
       >
         {ok ? <Check className="h-3 w-3" /> : "•"}
       </span>
@@ -1488,12 +1470,12 @@ function Header({ title, subtitle }: { title: string; subtitle: React.ReactNode 
   return (
     <div className="mb-6">
       <h1
-        className="text-2xl tracking-tight text-[var(--hive-text)] sm:text-3xl"
-        style={{ fontFamily: JAKARTA, fontWeight: 800, letterSpacing: "-0.01em" }}
+        className="text-2xl tracking-tight text-[#0a0f1c] sm:text-3xl"
+        style={{ fontFamily: PI_HOME_SERIF, fontWeight: 400, letterSpacing: "-0.02em" }}
       >
         {title}
       </h1>
-      <p className="mt-1.5 text-sm text-[var(--hive-text-muted)]">{subtitle}</p>
+      <p className="mt-1.5 text-sm text-[#3a4553]">{subtitle}</p>
     </div>
   );
 }

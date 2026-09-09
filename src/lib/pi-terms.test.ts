@@ -63,7 +63,7 @@ describe("Provider Interface terms draft", () => {
     assert.match(signup, /href="\/baa"/);
     assert.match(signup, /target="_blank"/);
     assert.match(signup, /rel="noopener noreferrer"/);
-    assert.match(footer, /PI_FOOTER_LINKS/);
+    assert.match(footer, /PI_HOME_FOOTER_LINKS/);
     const links = readFileSync(new URL("./pi-landing.ts", import.meta.url), "utf8");
     assert.match(links, /to: "\/terms"/);
     assert.match(links, /to: "\/baa"/);

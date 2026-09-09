@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/landing/footer";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SIGNUP_TRAINING_ADDONS } from "@/lib/pi-signup-pricing";
@@ -116,20 +115,12 @@ function TrainingPurchasePage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0b1220] text-[#f3efe6]">
-      <SiteHeader />
-      <main className="flex-1">
-        <section className="mx-auto max-w-2xl px-4 pb-16 pt-12 sm:px-6 md:pt-16">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f3efe6]/45">
-            Training
-          </p>
-          <h1
-            className="mt-3 text-3xl font-medium tracking-tight text-[#f3efe6]"
-            style={{ fontFamily: '"Newsreader", "Times New Roman", serif' }}
-          >
-            Buy classes without the office
-          </h1>
-          <p className="mt-4 text-sm leading-relaxed text-[#f3efe6]/62">
+    <PiPublicPage>
+      <main className="wrap pi-home-commerce">
+        <section className="mx-auto max-w-2xl">
+          <p className="pi-home-kicker">Training</p>
+          <h1>Buy classes without the office</h1>
+          <p className="pi-home-lede">
             Add each person and pick one seat. This is not a Provider Interface subscription.
             No office, no per-client plan. The office places class seats and sends 30-day access.
           </p>
@@ -162,12 +153,12 @@ function TrainingPurchasePage() {
               </div>
             ) : (
               <div
-                className="mb-5 flex items-start gap-3 rounded-lg border p-3 text-sm"
+                className="pi-home-banner-gold mb-5 flex items-start gap-3 rounded-lg border p-3 text-sm"
                 data-testid="stripe-test-mode-hint"
                 style={{
-                  background: "rgba(244,169,58,0.12)",
-                  borderColor: "rgba(180,120,20,0.45)",
-                  color: "#7a4b00",
+                  background: "rgba(196, 163, 90, 0.16)",
+                  borderColor: "rgba(196, 163, 90, 0.45)",
+                  color: "#6b5428",
                 }}
               >
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -324,21 +315,20 @@ function TrainingPurchasePage() {
               >
                 Need the office instead?
               </Link>
-              <Button
+              <button
                 type="button"
                 data-testid="training-pay"
                 onClick={() => void pay()}
                 disabled={busy || !canPay || quote.people === 0 || !termsAccepted}
-                className="h-11 w-full min-w-0 border-0 bg-[#0b1220] text-[#f3efe6] hover:bg-[#111827] sm:w-auto sm:min-w-[160px]"
-                style={{ fontFamily: JAKARTA, fontWeight: 700 }}
+                className="pi-home-btn gold"
+                style={{ fontFamily: JAKARTA, fontWeight: 700, minWidth: 160 }}
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay with Stripe"}
-              </Button>
+              </button>
             </div>
           </div>
         </section>
       </main>
-      <Footer />
-    </div>
+    </PiPublicPage>
   );
 }

@@ -68,8 +68,9 @@ export const PI_NAV_TERMS = "Terms";
 export const PI_NAV_BAA = "BAA";
 
 export const PI_NAV_LINKS = [
-  { href: "/pricing", label: PI_NAV_PRICING, to: "/pricing" as const },
   { href: "/nectar", label: PI_NAV_NECTAR, to: "/nectar" as const },
+  { href: "/training", label: PI_NAV_TRAINING, to: "/training" as const },
+  { href: "/pricing", label: PI_NAV_PRICING, to: "/pricing" as const },
   { href: "/about", label: PI_NAV_ABOUT, to: "/about" as const },
 ] as const;
 

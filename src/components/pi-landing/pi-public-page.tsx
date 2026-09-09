@@ -19,11 +19,10 @@ export function PiPublicPage({
 }) {
   usePiLandingHtmlClass();
   return (
-    <div className={home ? "pi-landing-root pi-home" : "pi-landing-root"}>
-      {home ? null : <div className="grain" aria-hidden />}
+    <div className="pi-landing-root pi-home">
       <PiPublicHeader home={home} />
       {children}
-      <PiPublicFooter home={home} />
+      <PiPublicFooter />
     </div>
   );
 }

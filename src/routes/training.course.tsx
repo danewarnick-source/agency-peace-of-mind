@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { InHiveCoursePlayer } from "@/components/training/in-hive-course-player";
-import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/landing/footer";
+import { PiPublicPage } from "@/components/pi-landing/pi-public-page";
 import { THIRTY_DAY_OBLIGATION_TITLE } from "@/lib/in-hive-training";
 import { trainingOnlyHomeForMeFn } from "@/lib/training-only-access.functions";
 
@@ -28,20 +27,12 @@ function TrainingOnlyCoursePage() {
   const seat = q.data?.seats[0];
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0b1220] text-[#f3efe6]">
-      <SiteHeader />
-      <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pb-16 pt-12 sm:px-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f3efe6]/45">
-            Training only
-          </p>
-          <h1
-            className="mt-3 text-3xl font-medium tracking-tight text-[#f3efe6]"
-            style={{ fontFamily: '"Newsreader", "Times New Roman", serif' }}
-          >
-            30-day course
-          </h1>
-          <p className="mt-3 text-sm text-[#f3efe6]/62">
+    <PiPublicPage>
+      <main className="wrap pi-home-commerce">
+        <section className="mx-auto max-w-3xl">
+          <p className="pi-home-kicker">Training only</p>
+          <h1>30-day course</h1>
+          <p className="pi-home-lede">
             This login opens the course. It does not open the office.
           </p>
 
@@ -90,7 +81,6 @@ function TrainingOnlyCoursePage() {
           </div>
         </section>
       </main>
-      <Footer />
-    </div>
+    </PiPublicPage>
   );
 }

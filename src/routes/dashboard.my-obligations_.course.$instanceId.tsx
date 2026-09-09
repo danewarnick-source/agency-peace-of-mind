@@ -11,6 +11,7 @@ import {
   lastExamResetAt,
 } from "@/lib/in-hive-training";
 import { thirtyDayCourseAccessFn } from "@/lib/in-hive-training-access.functions";
+import { thirtyDayOrgIsComped } from "@/lib/in-hive-training-access";
 import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,9 +53,17 @@ function InHiveCoursePage() {
     ? inHiveCourseIdForTitle(ctxQ.data.obligation.title)
     : null;
 
+  const orgComped = thirtyDayOrgIsComped({
+    id: org?.organization_id,
+    name: org?.organization_name,
+    legal_name: org?.legal_name,
+    dba_name: org?.dba_name,
+    display_acronym: org?.display_acronym,
+  });
+
   const accessQ = useQuery({
     queryKey: ["thirty-day-course-access", orgId, user?.id],
-    enabled: !!orgId && !!user && courseIdPreview === "thirty-day",
+    enabled: !!orgId && !!user && courseIdPreview === "thirty-day" && !orgComped,
     queryFn: () => accessFn({ data: { organizationId: orgId! } }),
   });
 
@@ -97,9 +106,9 @@ function InHiveCoursePage() {
   const alreadyComplete =
     instance.status === "completed" || instance.status === "waived";
   const examResetAfterIso = lastExamResetAt(instance.admin_notes, user.id);
-  const needsSeat = courseId === "thirty-day";
+  const needsPurchasedSeat = courseId === "thirty-day" && !orgComped;
   const accessBlocked =
-    needsSeat &&
+    needsPurchasedSeat &&
     (accessQ.isError || (accessQ.isSuccess && accessQ.data && !accessQ.data.allowed));
 
   return (
@@ -110,7 +119,7 @@ function InHiveCoursePage() {
         title={obligation.title}
         subtitle="Complete each topic, then the competency exam. You can leave and pick up where you left off."
       />
-      {needsSeat && accessQ.isLoading ? (
+      {needsPurchasedSeat && accessQ.isLoading ? (
         <p className="text-sm text-muted-foreground p-4">Checking training access…</p>
       ) : accessBlocked ? (
         <div className="rounded-xl border bg-card p-5 text-sm space-y-3">

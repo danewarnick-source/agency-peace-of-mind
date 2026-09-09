@@ -4,11 +4,39 @@
  * Paid orgs need a paid or waived 30-day or package roster seat for that staff.
  */
 
+import { isBillingExempt } from "./billing-access.ts";
+
 export type ThirtyDayAccessReason =
   | "tns_or_comped"
   | "paid_roster_seat"
   | "training_only_seat"
   | "denied";
+
+/** Live Hive-Platform `organizations` has no `billing_exempt` column. */
+export function orgSelectMissingBillingExempt(message: string | null | undefined): boolean {
+  return /billing_exempt/i.test(message ?? "");
+}
+
+export type ThirtyDayOrgRow = {
+  id?: string | null;
+  name?: string | null;
+  legal_name?: string | null;
+  dba_name?: string | null;
+  display_acronym?: string | null;
+  billing_exempt?: boolean | null;
+};
+
+/** TNS / comped orgs skip purchased seats entirely. */
+export function thirtyDayOrgIsComped(org: ThirtyDayOrgRow): boolean {
+  return isBillingExempt({
+    billingExempt: org.billing_exempt === true,
+    orgName: org.name,
+    legalName: org.legal_name,
+    dbaName: org.dba_name,
+    organizationId: org.id,
+    displayAcronym: org.display_acronym,
+  });
+}
 
 export function officeStaffMayTakeThirtyDay(input: {
   billingExempt: boolean;

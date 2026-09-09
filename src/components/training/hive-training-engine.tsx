@@ -8,7 +8,7 @@ import {
   THIRTY_DAY_SAS_TOPICS,
 } from "@/lib/in-hive-training-thirty-day-sas";
 import { PI_THEME } from "@/lib/pi-theme";
-import { shuffleCopy } from "@/lib/in-hive-training";
+import { choiceFollowUp, scoreSegmentGate, shuffleCopy, SEGMENT_GATE_PASS, SEGMENT_GATE_TOTAL } from "@/lib/in-hive-training";
 import { TrainingDiagram, type DiagramId } from "@/components/training/in-hive-diagrams";
 import {
   useTrainingSpeech,
@@ -296,12 +296,12 @@ const C_STEPS: Step[] = [
       ["Who to call for mental health concerns", "Depending on your agency: the person\u2019s therapist, counselor, or behavioral health provider; an on-call mental health clinician; a mobile crisis team; or the 988 Suicide and Crisis Lifeline (call or text 988) for someone in emotional crisis. For immediate danger to life, call 911."],
       ["Signs someone may need mental-health support", "Ongoing sadness or hopelessness; withdrawing from people and activities; big changes in sleep or appetite; rising agitation, anger, or anxiety; talking about being a burden or wanting to disappear; or any talk or signs of self-harm. Trust what you notice and report it."],
     ] },
-  { type: "check", kicker: "Knowledge check 1 of 4",
+  { type: "check", kicker: "Knowledge check 1 of 5",
     stem: "A person quietly tells you they feel hopeless and that \u201ceveryone would be better off without me.\u201d What do you do?",
     options: [
-      { k: "A", t: "Change the subject to cheer them up, and keep it between the two of you.", correct: false, fb: "Never dismiss or hide this. Statements like these are taken seriously and acted on." },
-      { k: "B", t: "Take it seriously, stay calm and with them, don\u2019t leave them alone, and contact a mental health professional or the 988 Lifeline right away \u2014 911 if there\u2019s immediate danger.", correct: true, fb: "Right. Stay, listen, don\u2019t leave them alone, and get professional help engaged now." },
-      { k: "C", t: "Tell them not to talk like that and that they\u2019ll feel better tomorrow.", correct: false, fb: "That shuts the person down. Take it seriously, stay with them, and get the right help involved." },
+      { k: "A", t: "Change the subject to cheer them up, and keep the conversation between the two of you only.", correct: false, fb: "Never dismiss or hide this. Statements like these are taken seriously and acted on." },
+      { k: "B", t: "Take it seriously, stay with them, and contact a mental health professional or the 988 Suicide and Crisis Lifeline now.", correct: true, fb: "Stay, listen, don\u2019t leave them alone, and get professional help engaged now." },
+      { k: "C", t: "Tell them not to talk like that and that they will feel better by tomorrow on their own.", correct: false, fb: "That shuts the person down. Take it seriously, stay with them, and get the right help involved." },
     ] },
   { type: "lesson", kicker: "Lesson 2 of 2", title: "Crisis vs. emergency, and how to respond",
     lead: "A mental health crisis means someone is overwhelmed and may be at risk. It becomes a 911 emergency when there is immediate danger to their life or someone else\u2019s.",
@@ -316,26 +316,33 @@ const C_STEPS: Step[] = [
       ["How to respond in the moment", "Speak calmly and slowly, use the person\u2019s name, listen more than you talk, and don\u2019t make promises you can\u2019t keep. Don\u2019t debate their feelings or rush them. Your goal is to keep them safe and connected until professional help is engaged."],
       ["The 988 Suicide and Crisis Lifeline", "Anyone can call or text 988, any time, to reach trained crisis counselors \u2014 a resource for the person you support and for you if a situation has shaken you. For immediate, life-threatening danger, call 911."],
     ] },
-  { type: "check", kicker: "Knowledge check 2 of 4",
+  { type: "check", kicker: "Knowledge check 2 of 5",
     stem: "A person is extremely agitated and distressed, but is not in immediate physical danger. What\u2019s the best first response?",
     options: [
-      { k: "A", t: "Walk away to give them space and deal with it later.", correct: false, fb: "Don\u2019t leave a person in crisis alone, and don\u2019t delay. Stay, stay calm, and get help engaged." },
-      { k: "B", t: "Stay calm and present, listen without judgment, keep them and others safe, and contact the mental health professional or crisis line.", correct: true, fb: "Right. Calm presence first, safety always, and the right professional engaged." },
-      { k: "C", t: "Restrain them so they calm down.", correct: false, fb: "Restraint is never a first response. Use calm presence and positive supports, and get professional help." },
+      { k: "A", t: "Walk away to give them space, then deal with the distress later in the shift.", correct: false, fb: "Don\u2019t leave a person in crisis alone, and don\u2019t delay. Stay, stay calm, and get help engaged." },
+      { k: "B", t: "Stay present, keep everyone safe, and contact the mental health professional or crisis line.", correct: true, fb: "Calm presence first, safety always, and the right professional engaged." },
+      { k: "C", t: "Restrain them until they calm down, then decide whether to call anyone.", correct: false, fb: "Restraint is never a first response. Use calm presence and positive supports, and get professional help." },
     ] },
-  { type: "check", kicker: "Knowledge check 3 of 4",
+  { type: "check", kicker: "Knowledge check 3 of 5",
     stem: "A person is actively attempting to harm themselves right now. What do you do?",
     options: [
       { k: "A", t: "Call the therapist\u2019s office and leave a voicemail.", correct: false, fb: "Far too slow for immediate danger. Active, immediate risk to life is 911." },
       { k: "B", t: "Call 911 immediately, stay with them, keep them and yourself safe, and follow the dispatcher\u2019s guidance.", correct: true, fb: "Right. Immediate danger to life is always 911. Stay, keep everyone safe, and follow the dispatcher." },
       { k: "C", t: "Wait for your supervisor to arrive before doing anything.", correct: false, fb: "Don\u2019t wait \u2014 call 911 now and stay with them. Notify your supervisor after help is on the way." },
     ] },
-  { type: "check", kicker: "Knowledge check 4 of 4",
+  { type: "check", kicker: "Knowledge check 4 of 5",
     stem: "A crisis has passed and the person is stable again. What\u2019s the right follow-up?",
     options: [
       { k: "A", t: "Document what happened, report to your supervisor, and make sure the right professionals and plans are looped in.", correct: true, fb: "Right. Accurate documentation and reporting get the person the ongoing support they need." },
       { k: "B", t: "Don\u2019t write anything down, to protect their privacy.", correct: false, fb: "Documentation is required \u2014 it\u2019s shared only with those who need it to support the person. That\u2019s confidentiality, not silence." },
       { k: "C", t: "Tell other people you know about what happened.", correct: false, fb: "That breaks confidentiality. Information is shared only with those who need it to help the person." },
+    ] },
+  { type: "check", kicker: "Knowledge check 5 of 5",
+    stem: "Someone is crying and overwhelmed but is not trying to harm themselves or anyone else. What is the better first call?",
+    options: [
+      { k: "A", t: "Call 911 for every tearful moment so you are never blamed later.", correct: false, fb: "911 is for immediate danger to life. Distress without that danger is a crisis-line or clinician call." },
+      { k: "B", t: "Stay with them and use the 988 Suicide and Crisis Lifeline or the on-call clinician unless immediate danger appears.", correct: true, fb: "988 and the on-call clinician fit a crisis that is not a life-threatening emergency. Escalate to 911 if danger starts." },
+      { k: "C", t: "Leave them alone with the television so they can cry it out in private.", correct: false, fb: "Do not leave a person in crisis alone. Stay, listen, and get the right help engaged." },
     ] },
 ];
 
@@ -512,9 +519,9 @@ const D_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 1 of 5",
     stem: "A person trips and scrapes their knee. It\u2019s minor, and you clean and bandage it. Do you report it?",
     options: [
-      { k: "A", t: "No \u2014 it\u2019s too minor to bother with.", correct: false, fb: "Even minor injuries get documented. You don\u2019t decide alone what\u2019s \u201ctoo small\u201d \u2014 report it and let your supervisor judge." },
-      { k: "B", t: "Yes \u2014 report it through your agency\u2019s process; minor injuries are still documented, and your supervisor decides what rises to a critical incident.", correct: true, fb: "Right. Report it with the facts. It\u2019s better to over-report than to miss something that mattered." },
-      { k: "C", t: "Only if the person asks you to report it.", correct: false, fb: "Reporting isn\u2019t up to the person\u2019s request \u2014 it\u2019s your responsibility whenever an incident occurs." },
+      { k: "A", t: "No — it is too minor, so you skip the report and stay quiet.", correct: false, fb: "Even minor injuries get documented. You don\u2019t decide alone what\u2019s \u201ctoo small\u201d \u2014 report it and let your supervisor judge." },
+      { k: "B", t: "Yes — report it through the agency process; your supervisor decides next.", correct: true, fb: "Report it with the facts. It\u2019s better to over-report than to miss something that mattered." },
+      { k: "C", t: "Only if the person asks you to write it down and send it in.", correct: false, fb: "Reporting isn\u2019t up to the person\u2019s request \u2014 it\u2019s your responsibility whenever an incident occurs." },
     ] },
   { type: "lesson", kicker: "Lesson 2 of 3", title: "How to report: facts, timing, and content",
     lead: "A good incident report is prompt, factual, and objective \u2014 what you saw and did, not your guesses about why.",
@@ -533,9 +540,9 @@ const D_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 2 of 5",
     stem: "Which of these is the right way to document what happened in an incident report?",
     options: [
-      { k: "A", t: "\u201cThe staff before me must not have been watching him.\u201d", correct: false, fb: "That\u2019s speculation and blame, not observation. Report only what you witnessed." },
-      { k: "B", t: "\u201cAt 9:40 am I found Maria on the floor next to her chair. She said she slipped. I helped her up, saw no injury, and notified my supervisor at 9:45.\u201d", correct: true, fb: "Right \u2014 objective, factual, and timed, with the actions you took and who you notified." },
-      { k: "C", t: "\u201cMaria fell because she\u2019s clumsy and never listens.\u201d", correct: false, fb: "That\u2019s opinion and is disrespectful. Stick to what you observed, with times and actions." },
+      { k: "A", t: "“The staff before me must not have been watching him at all.”", correct: false, fb: "That\u2019s speculation and blame, not observation. Report only what you witnessed." },
+      { k: "B", t: "“At 9:40 am I found Maria on the floor. She said she slipped. I notified my supervisor at 9:45.”", correct: true, fb: "Objective, factual, and timed, with the actions you took and who you notified." },
+      { k: "C", t: "“Maria fell because she is clumsy and never listens to staff.”", correct: false, fb: "That\u2019s opinion and is disrespectful. Stick to what you observed, with times and actions." },
     ] },
   { type: "check", kicker: "Knowledge check 3 of 5",
     stem: "You come on shift and learn something happened on the previous shift that was never reported. What do you do?",
@@ -567,9 +574,9 @@ const D_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 5 of 5",
     stem: "After an incident, who can you discuss the details with?",
     options: [
-      { k: "A", t: "Anyone who asks \u2014 people are naturally curious.", correct: false, fb: "No \u2014 that breaks confidentiality. Details go only to those who need them to respond." },
-      { k: "B", t: "Only those who need to know to respond \u2014 your supervisor, the nurse, the Support Coordinator, and authorities as required.", correct: true, fb: "Right. Incident details are confidential and shared on a need-to-know basis." },
-      { k: "C", t: "Post about it without names on social media to vent.", correct: false, fb: "Never \u2014 even without names, that\u2019s a confidentiality breach. Keep it within the people who need to know." },
+      { k: "A", t: "Anyone who asks — people on the shift are naturally curious.", correct: false, fb: "No \u2014 that breaks confidentiality. Details go only to those who need them to respond." },
+      { k: "B", t: "Only people who need to know to respond — supervisor, nurse, authorities.", correct: true, fb: "Incident details are confidential and shared on a need-to-know basis." },
+      { k: "C", t: "Post about it without names on social media just to vent.", correct: false, fb: "Never \u2014 even without names, that\u2019s a confidentiality breach. Keep it within the people who need to know." },
     ] },
 ];
 
@@ -686,7 +693,7 @@ const L_STEPS: Step[] = [
     drops: [
       ["Common everyday breaches", "Talking about a person by name in a hallway, break room, or restaurant; leaving files, screens, or notes where others can see; sharing a login or leaving a computer unlocked; texting a person\u2019s information on a personal phone; or telling friends a \u201cstory\u201d about your day that identifies someone. Small habits are where most breaches happen."],
       ["Social media \u2014 a hard line", "Never post about the people you support \u2014 no names, no photos, no stories, no \u201cvague\u201d posts that could identify them, even on private accounts. This includes venting, \u201ccute\u201d moments, or asking for advice. Posting about a person you support is one of the fastest ways to cause a serious, public breach."],
-      ["Keeping records and devices secure", "Log off or lock your screen when you step away, don\u2019t share usernames or passwords, keep paper records put away and out of view, and only use approved systems (like Hive) for the person\u2019s information. Access only what you need for your role."],
+      ["Keeping records and devices secure", "Log off or lock your screen when you step away, don\u2019t share usernames or passwords, keep paper records put away and out of view, and only use approved systems (like Provider Interface) for the person\u2019s information. Access only what you need for your role."],
     ] },
   { type: "check", kicker: "Knowledge check 2 of 5",
     stem: "You had a sweet moment with a person you support and want to share a photo of the two of you on your private Instagram. Is that okay?",
@@ -1372,9 +1379,9 @@ const M_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 1 of 5",
     stem: "What is a key difference between an intellectual disability and an acquired brain injury?",
     options: [
-      { k: "A", t: "They\u2019re the same thing with different names.", correct: false, fb: "They\u2019re different. The timing and cause set them apart." },
-      { k: "B", t: "An intellectual disability begins before adulthood, while an acquired brain injury happens later in life from an injury, stroke, or illness.", correct: true, fb: "Right. ABI changes someone who lived with different abilities before \u2014 which shapes how you support them." },
-      { k: "C", t: "ABI is always mild and ID is always severe.", correct: false, fb: "Both vary widely in severity. That\u2019s not the difference \u2014 onset and cause are." },
+      { k: "A", t: "Intellectual disability and acquired brain injury are two names for the same thing.", correct: false, fb: "They\u2019re different. The timing and cause set them apart." },
+      { k: "B", t: "Intellectual disability starts before adulthood; acquired brain injury happens later.", correct: true, fb: "An acquired brain injury changes someone who lived with different abilities before \u2014 which shapes how you support them." },
+      { k: "C", t: "Acquired brain injury is always mild; intellectual disability is always severe.", correct: false, fb: "Both vary widely in severity. That\u2019s not the difference \u2014 onset and cause are." },
     ] },
   { type: "lesson", kicker: "Lesson 2 of 3", title: "How it can affect daily life",
     lead: "ID, related conditions, and ABI can affect thinking, communication, movement, emotions, and daily living \u2014 but in very different ways from person to person. Your job is to learn how it shows up for each individual.",
@@ -1393,16 +1400,16 @@ const M_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 2 of 5",
     stem: "Two people you support both have autism. What\u2019s the right assumption about their support needs?",
     options: [
-      { k: "A", t: "They\u2019ll need the same things since they share a diagnosis.", correct: false, fb: "A shared diagnosis doesn\u2019t mean shared needs. People with the same label can be very different." },
-      { k: "B", t: "They may have very different abilities and needs \u2014 learn each person as an individual.", correct: true, fb: "Right. The diagnosis is a starting point; the individual is what you actually support." },
-      { k: "C", t: "Neither of them will be able to communicate.", correct: false, fb: "That\u2019s a stereotype. Communication varies enormously \u2014 learn how each person communicates." },
+      { k: "A", t: "They will need the same supports because they share one diagnosis and label.", correct: false, fb: "A shared diagnosis does not mean shared needs. People with the same label can be very different." },
+      { k: "B", t: "Their abilities and needs can differ a lot — learn each person as an individual.", correct: true, fb: "The diagnosis is a starting point; the individual is what you actually support." },
+      { k: "C", t: "Neither person will be able to communicate in any useful way on their own.", correct: false, fb: "That is a stereotype. Communication varies — learn how each person communicates." },
     ] },
   { type: "check", kicker: "Knowledge check 3 of 5",
     stem: "A person with an acquired brain injury becomes frustrated and tearful about things they used to do easily. What\u2019s a helpful understanding?",
     options: [
-      { k: "A", t: "They\u2019re being dramatic and should get over it.", correct: false, fb: "That dismisses real grief. An ABI can bring genuine loss and changes in emotion." },
-      { k: "B", t: "An ABI can affect emotions and bring real grief over lost abilities \u2014 respond with patience and understanding.", correct: true, fb: "Right. Understanding the injury\u2019s effects lets you respond with compassion instead of judgment." },
-      { k: "C", t: "Their feelings have nothing to do with the injury.", correct: false, fb: "They often do \u2014 ABI affects emotions and brings grief over what changed. Meet it with patience." },
+      { k: "A", t: "They are being dramatic about ordinary frustration and should move on.", correct: false, fb: "That dismisses real grief. An acquired brain injury can bring genuine loss and changes in emotion." },
+      { k: "B", t: "An acquired brain injury can bring real grief over lost abilities — stay patient.", correct: true, fb: "Understanding the injury’s effects lets you respond with compassion instead of judgment." },
+      { k: "C", t: "Their feelings are unrelated to the injury and should be ignored on shift.", correct: false, fb: "Feelings often do relate — an acquired brain injury affects emotions. Meet it with patience." },
     ] },
   { type: "lesson", kicker: "Lesson 3 of 3", title: "The mindset: person-first, strengths, dignity",
     lead: "How you think about the people you support shapes how you treat them. This whole field is built on seeing the person first.",
@@ -1428,9 +1435,9 @@ const M_STEPS: Step[] = [
   { type: "check", kicker: "Knowledge check 5 of 5",
     stem: "A person communicates very little with words and needs a lot of support. What\u2019s the right mindset?",
     options: [
-      { k: "A", t: "Assume they can\u2019t understand and make all decisions for them.", correct: false, fb: "That\u2019s the opposite of presuming competence \u2014 and it strips away their voice and rights." },
-      { k: "B", t: "Presume competence \u2014 assume they understand and have preferences, talk to them directly, and support their communication and choices.", correct: true, fb: "Right. Presume competence and support the person to understand and decide as much as possible." },
-      { k: "C", t: "Talk about them to other staff as if they\u2019re not there.", correct: false, fb: "Never. Talk to people directly and respectfully \u2014 presume they understand." },
+      { k: "A", t: "Assume they cannot understand, and make every decision for them without asking.", correct: false, fb: "That\u2019s the opposite of presuming competence \u2014 and it strips away their voice and rights." },
+      { k: "B", t: "Presume competence: talk to them directly and support their choices.", correct: true, fb: "Presume competence and support the person to understand and decide as much as possible." },
+      { k: "C", t: "Talk about them to other staff as if they are not in the room.", correct: false, fb: "Never. Talk to people directly and respectfully \u2014 presume they understand." },
     ] },
 ];
 
@@ -1783,6 +1790,37 @@ export const TRAINING_TOPICS: Topic[] = [
     attest: "I attest that I have completed this training, understand the person-specific facts I must know before working alone, and that I will review the current record rather than guess." },
 ];
 
+function extractBeats(steps: Step[]): ScenarioBeat[] {
+  const beats: ScenarioBeat[] = [];
+  for (const s of steps) {
+    if (s.type === "check") beats.push({ fact: s.stem, options: s.options });
+    if (s.type === "scenario") beats.push(...s.beats);
+  }
+  return beats;
+}
+
+/** Lessons stay; scored items become one 5-beat decision chain (4 of 5 to pass). */
+export function withSegmentGate(topic: Topic): Topic {
+  const lessons = (topic.steps ?? []).filter((s): s is LessonStep => s.type === "lesson");
+  const beats = extractBeats(topic.steps ?? []).slice(0, SEGMENT_GATE_TOTAL);
+  if (beats.length < SEGMENT_GATE_TOTAL) {
+    throw new Error(`30-day topic ${topic.code} needs ${SEGMENT_GATE_TOTAL} scored items, has ${beats.length}`);
+  }
+  return {
+    ...topic,
+    steps: [
+      ...lessons,
+      {
+        type: "scenario",
+        kicker: "Decision chain · 5 beats",
+        title: "Apply what you learned",
+        setup: "Use only the facts in each beat. The situation continues after every choice. This is not an answer key — keep going through all five beats.",
+        beats,
+      },
+    ],
+  };
+}
+
 /** SOW letter order A–W, then separately scored SAS essential topics. */
 export function thirtyDayTopicsInSowOrder(): Topic[] {
   const by = new Map(TRAINING_TOPICS.map((t) => [t.code, t]));
@@ -1792,21 +1830,22 @@ export function thirtyDayTopicsInSowOrder(): Topic[] {
       throw new Error(`30-day topic ${code} is not ready`);
     }
     const extra = SCENARIO_STEPS_BY_CODE[code];
-    return extra?.length ? { ...t, steps: [...(t.steps ?? []), ...extra] } : t;
+    const raw = extra?.length ? { ...t, steps: [...(t.steps ?? []), ...extra] } : t;
+    return withSegmentGate(raw);
   });
   for (const t of THIRTY_DAY_SAS_TOPICS) {
     if (t.status !== "ready" || !t.steps?.length) {
       throw new Error(`30-day topic ${t.code} is not ready`);
     }
   }
-  return [...sow, ...THIRTY_DAY_SAS_TOPICS];
+  return [...sow, ...THIRTY_DAY_SAS_TOPICS.map(withSegmentGate)];
 }
 
 /* ───────────────────────── UI bits ───────────────────────── */
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #e4e7ef", borderRadius: 14, overflow: "hidden", maxWidth: "100%", width: "100%", margin: "0 auto", boxShadow: "0 12px 40px rgba(11,17,38,.10)" };
 const btn = (kind: "pri" | "out" | "dis"): React.CSSProperties => ({
   font: "inherit", fontSize: 13.5, fontWeight: 600, padding: "11px 18px", borderRadius: 10, cursor: kind === "dis" ? "not-allowed" : "pointer", border: kind === "out" ? "1px solid #cdd2e0" : "none",
-  background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : "var(--hive-ink)",
+  background: kind === "pri" ? GOLD : kind === "dis" ? "#eef0f5" : "#fff", color: kind === "pri" ? NAVY : kind === "dis" ? "#a3a8b8" : NAVY,
 });
 
 function Accordion({ drops, open, onOpenChange }: { drops: [string, string][]; open?: number | null; onOpenChange?: (n: number | null) => void }) {
@@ -1818,7 +1857,7 @@ function Accordion({ drops, open, onOpenChange }: { drops: [string, string][]; o
     <div>
       {drops.map(([t, b], i) => (
         <div key={i}>
-          <button onClick={() => set(value === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: "var(--hive-ink)", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
+          <button onClick={() => set(value === i ? null : i)} style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13, fontWeight: 600, color: NAVY, background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 10, padding: "11px 13px", marginBottom: 7, cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
             <span>{t}</span><span>{value === i ? "\u25B4" : "\u25BE"}</span>
           </button>
           {value === i && <div style={{ fontSize: 12.8, color: "#42485a", lineHeight: 1.6, padding: "2px 4px 12px" }} dangerouslySetInnerHTML={{ __html: b }} />}
@@ -1838,9 +1877,9 @@ function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClic
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         font: "inherit", fontSize: 11.5, fontWeight: 600,
-        background: speaking ? "var(--hive-ink)" : "#fff",
-        color: speaking ? "#fff" : "var(--hive-ink)",
-        border: "1px solid var(--hive-ink)",
+        background: speaking ? NAVY : "#fff",
+        color: speaking ? "#fff" : NAVY,
+        border: `1px solid ${NAVY}`,
         borderRadius: 999, padding: "5px 10px", cursor: "pointer",
       }}
     >
@@ -1850,46 +1889,92 @@ function SpeakerButton({ speaking, onClick, label }: { speaking: boolean; onClic
   );
 }
 
-function Check({ step, onPass, speaking, onSpeak, onStop }: { step: CheckStep; onPass: () => void; speaking: boolean; onSpeak: () => void; onStop: () => void }) {
-  const [done, setDone] = useState(false);
+function ScoredChoice({
+  kicker,
+  prompt,
+  options,
+  onAnswer,
+  continueLabel,
+  speaking,
+  onSpeak,
+  onStop,
+}: {
+  kicker: string;
+  prompt: string;
+  options: { k: string; t: string; correct: boolean; fb: string }[];
+  onAnswer: (correct: boolean) => void;
+  continueLabel: string;
+  speaking: boolean;
+  onSpeak: () => void;
+  onStop: () => void;
+}) {
   const [picked, setPicked] = useState<string | null>(null);
-  const [options] = useState(() => shuffleCopy(step.options));
-  const chosen = options.find(o => o.k === picked);
+  const [shuffled] = useState(() => shuffleCopy(options));
+  const chosen = shuffled.find((o) => o.k === picked);
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>{step.kicker}</div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>{kicker}</div>
         <SpeakerButton speaking={speaking} onClick={speaking ? onStop : onSpeak} label="Read this slide aloud" />
       </div>
-      <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{step.stem}</div>
-      {options.map((o, i) => {
-        const label = String.fromCharCode(65 + i);
+      <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{prompt}</div>
+      {shuffled.map((o, oi) => {
+        const label = String.fromCharCode(65 + oi);
         const isPicked = picked === o.k;
-        const border = isPicked ? (o.correct ? "#1D9E75" : "#e29a9a") : "#e4e7ef";
-        const bg = isPicked ? (o.correct ? "#e1f5ee" : "#fdeded") : "#fff";
         return (
-          <button key={o.k} disabled={done} onClick={() => { setPicked(o.k); if (o.correct) setDone(true); }}
-            style={{ width: "100%", textAlign: "left", font: "inherit", fontSize: 13.5, padding: "12px 13px", border: `1px solid ${border}`, borderRadius: 12, background: bg, cursor: done ? "default" : "pointer", color: "#2a3040", marginBottom: 9, display: "flex", gap: 10, lineHeight: 1.45, opacity: done && !o.correct ? .5 : 1 }}>
-            <b style={{ color: "#6b7180" }}>{label}.</b><span>{o.t}</span>
+          <button
+            key={o.k}
+            disabled={!!picked}
+            onClick={() => setPicked(o.k)}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              font: "inherit",
+              fontSize: 13.5,
+              padding: "12px 13px",
+              border: `1px solid ${isPicked ? GOLD : "#e4e7ef"}`,
+              borderRadius: 12,
+              background: isPicked ? "#fff8e6" : "#fff",
+              cursor: picked ? "default" : "pointer",
+              color: "#2a3040",
+              marginBottom: 9,
+              display: "flex",
+              gap: 10,
+              lineHeight: 1.45,
+            }}
+          >
+            <b style={{ color: "#6b7180" }}>{label}.</b>
+            <span>{o.t}</span>
           </button>
         );
       })}
-      {chosen && !chosen.correct && (
-        <div style={{ fontSize: 12.5, color: "#854f0b", background: "#faeeda", border: "1px solid #fac775", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Try again</div>
-          {chosen.fb}
-        </div>
-      )}
-      {chosen && chosen.correct && (
+      {chosen && (
         <>
-          <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>That is right</div>
-            {chosen.fb}
+          <div style={{ fontSize: 12.5, color: "#2a3040", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4, color: "#5b6172" }}>Recorded</div>
+            {choiceFollowUp(chosen.fb)}
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><button style={btn("pri")} onClick={onPass}>Continue</button></div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+            <button style={btn("pri")} onClick={() => onAnswer(chosen.correct)}>{continueLabel}</button>
+          </div>
         </>
       )}
     </div>
+  );
+}
+
+function Check({ step, onAnswer, speaking, onSpeak, onStop }: { step: CheckStep; onAnswer: (correct: boolean) => void; speaking: boolean; onSpeak: () => void; onStop: () => void }) {
+  return (
+    <ScoredChoice
+      kicker={step.kicker}
+      prompt={step.stem}
+      options={step.options}
+      onAnswer={onAnswer}
+      continueLabel="Continue"
+      speaking={speaking}
+      onSpeak={onSpeak}
+      onStop={onStop}
+    />
   );
 }
 
@@ -1899,6 +1984,7 @@ export type AttestPayload = {
   consentStatement: string;
   consentAccepted: true;
   contentVersion: string;
+  segment?: { correctCount: number; total: number; passed: boolean };
 };
 
 export const TRAINING_ENGINE_VERSION = "hive-training-engine@2026.06.05";
@@ -1949,8 +2035,12 @@ export function TrainingModule({
   const [agree, setAgree] = useState(false);
   const [esignConsent, setEsignConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [scoreFlags, setScoreFlags] = useState<boolean[]>([]);
+  const [gateAttempt, setGateAttempt] = useState(0);
   const step = flow[i] as any;
   const pct = Math.round((i / Math.max(1, flow.length - 1)) * 100);
+  const gate = scoreSegmentGate(scoreFlags);
+  const firstScoredIndex = flow.findIndex((s) => s.type === "check" || s.type === "scenario");
 
   // ── Read aloud (on-device Web Speech only) ──
   const { supported: ttsSupported, speaking, speak, stop } = useTrainingSpeech();
@@ -1976,15 +2066,17 @@ export function TrainingModule({
   useEffect(() => {
     if (!skipAttest || readOnly || !onComplete) return;
     if (step?.type !== "complete") return;
+    if (!gate.passed) return;
     void onComplete({
       signature: "topic-passed",
       consentStatement: ESIGN_CONSENT_STATEMENT,
       consentAccepted: true,
       contentVersion: TRAINING_ENGINE_VERSION,
+      segment: gate,
     });
-  // Fire once when the complete slide is reached in course mode.
+  // Fire once when the complete slide is reached with a passing gate.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skipAttest, step?.type]);
+  }, [skipAttest, step?.type, gate.passed]);
 
   // Auto-read the current slide if the staff member opted in.
   useEffect(() => {
@@ -2143,12 +2235,28 @@ export function TrainingModule({
           </>
         )}
 
-        {step.type === "check" && <Check step={step as CheckStep} onPass={next} speaking={speaking} onSpeak={speakCurrentCheck} onStop={stop} />}
+        {step.type === "check" && (
+          <Check
+            key={`${topic.code}-check-${i}-${gateAttempt}`}
+            step={step as CheckStep}
+            onAnswer={(correct) => {
+              setScoreFlags((prev) => [...prev, correct]);
+              next();
+            }}
+            speaking={speaking}
+            onSpeak={speakCurrentCheck}
+            onStop={stop}
+          />
+        )}
 
         {step.type === "scenario" && (
           <Scenario
+            key={`${topic.code}-scenario-${i}-${gateAttempt}`}
             step={step as ScenarioStep}
-            onPass={next}
+            onBeatAnswer={(correct, last) => {
+              setScoreFlags((prev) => [...prev, correct]);
+              if (last) next();
+            }}
             speaking={speaking}
             onSpeak={(beatIndex) => {
               const text = buildScenarioSpeech(step, beatIndex);
@@ -2163,7 +2271,7 @@ export function TrainingModule({
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#4e1f81" }}>Attestation · Electronic signature</div>
             <div style={{ fontSize: 17, fontWeight: 600, color: INK, margin: "4px 0 14px" }}>Confirm and sign</div>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 12, padding: "13px 14px", cursor: "pointer" }}>
-              <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: "var(--hive-ink)" }} />
+              <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: NAVY }} />
               <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>{topic.attest}</span>
             </label>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#fff8e6", border: "1px solid #f5d889", borderRadius: 12, padding: "13px 14px", cursor: "pointer", marginTop: 10 }}>
@@ -2190,25 +2298,48 @@ export function TrainingModule({
           </>
         )}
 
-        {step.type === "complete" && (
+        {step.type === "complete" && skipAttest && !gate.passed && (
+          <>
+            <div style={{ textAlign: "center", paddingTop: 6 }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: INK }}>Segment not passed</div>
+              <div style={{ fontSize: 13.5, color: "#5b6172", marginTop: 8, lineHeight: 1.5 }}>
+                You scored {gate.correctCount} of {gate.total || SEGMENT_GATE_TOTAL}. You need {SEGMENT_GATE_PASS} of {SEGMENT_GATE_TOTAL} to pass this Scope of Work segment. You cannot continue until you pass.
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+              <button
+                style={btn("pri")}
+                onClick={() => {
+                  setScoreFlags([]);
+                  setGateAttempt((n) => n + 1);
+                  go(firstScoredIndex >= 0 ? firstScoredIndex : 1);
+                }}
+              >
+                Retake this segment
+              </button>
+            </div>
+          </>
+        )}
+
+        {step.type === "complete" && (!skipAttest || gate.passed) && (
           <>
             <div style={{ textAlign: "center", paddingTop: 6 }}>
               <div style={{ width: 48, height: 48, margin: "0 auto", borderRadius: "50%", background: "#e1f5ee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#0f6e56" }}>{"\u2713"}</div>
               <div style={{ fontSize: 19, fontWeight: 700, color: INK, marginTop: 12 }}>Topic complete</div>
               <div style={{ fontSize: 12.5, color: "#8a8f9e", marginTop: 4 }}>
                 {skipAttest
-                  ? `Passed · ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  ? `Passed ${gate.correctCount}/${gate.total} · ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                   : `Signed by ${name || "\u2014"} · ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              {[[`${checks + scenarios}/${checks + scenarios}`, checks && scenarios ? "checks and chains" : "knowledge checks", "#0f6e56"], [topic.code, "topic", "var(--hive-ink)"], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
+              {[[`${gate.correctCount}/${gate.total || SEGMENT_GATE_TOTAL}`, "segment score", "#0f6e56"], [topic.code, "topic", NAVY], [skipAttest ? "Pass" : "\u2713", skipAttest ? "topic passed" : "attestation", "#b07819"]].map(([n, l, c], k) => (
                 <div key={k} style={{ flex: 1, background: "#f7f8fb", border: "1px solid #e4e7ef", borderRadius: 11, padding: 11, textAlign: "center" }}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: c as string }}>{n}</div><div style={{ fontSize: 11, color: "#8a8f9e" }}>{l}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11.5, color: TEAL, textAlign: "center", marginTop: 13 }}>Logged to the staff training record — timestamped, signed, and tamper-evident for audit.</div>
+            <div style={{ fontSize: 11.5, color: TEAL, textAlign: "center", marginTop: 13 }}>Logged to the staff training record — timestamped and saved on the staff file for audit.</div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><button style={btn("pri")} onClick={onFinished ?? onExit}>{hideAllTopics ? "Continue" : "All topics"}</button></div>
           </>
         )}
@@ -2219,104 +2350,48 @@ export function TrainingModule({
 
 function Scenario({
   step,
-  onPass,
+  onBeatAnswer,
   speaking,
   onSpeak,
   onStop,
 }: {
   step: ScenarioStep;
-  onPass: () => void;
+  onBeatAnswer: (correct: boolean, last: boolean) => void;
   speaking: boolean;
   onSpeak: (beatIndex: number) => void;
   onStop: () => void;
 }) {
   const [beatI, setBeatI] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
   const beat = step.beats[beatI];
-  const [options, setOptions] = useState(() => shuffleCopy(beat?.options ?? []));
-  useEffect(() => {
-    setPicked(null);
-    setDone(false);
-    setOptions(shuffleCopy(step.beats[beatI]?.options ?? []));
-  }, [beatI, step.beats]);
   if (!beat) return null;
-  const chosen = options.find((o) => o.k === picked);
   const last = beatI >= step.beats.length - 1;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#b07819" }}>
-          {step.kicker} · beat {beatI + 1} of {step.beats.length}
-        </div>
-        <SpeakerButton speaking={speaking} onClick={speaking ? onStop : () => onSpeak(beatI)} label="Read this slide aloud" />
-      </div>
-      <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "3px 0 8px" }}>{step.title}</div>
-      {step.setup && beatI === 0 && (
-        <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>{step.setup}</div>
-      )}
-      <div style={{ fontSize: 15.5, fontWeight: 600, color: INK, margin: "5px 0 14px", lineHeight: 1.4 }}>{beat.fact}</div>
-      {options.map((o, i) => {
-        const label = String.fromCharCode(65 + i);
-        const isPicked = picked === o.k;
-        const border = isPicked ? (o.correct ? "#1D9E75" : "#e29a9a") : "#e4e7ef";
-        const bg = isPicked ? (o.correct ? "#e1f5ee" : "#fdeded") : "#fff";
-        return (
-          <button
-            key={o.k}
-            disabled={done}
-            onClick={() => {
-              setPicked(o.k);
-              if (o.correct) setDone(true);
-            }}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              font: "inherit",
-              fontSize: 13.5,
-              padding: "12px 13px",
-              border: `1px solid ${border}`,
-              borderRadius: 12,
-              background: bg,
-              cursor: done ? "default" : "pointer",
-              color: "#2a3040",
-              marginBottom: 9,
-              display: "flex",
-              gap: 10,
-              lineHeight: 1.45,
-              opacity: done && !o.correct ? 0.5 : 1,
-            }}
-          >
-            <b style={{ color: "#6b7180" }}>{label}.</b>
-            <span>{o.t}</span>
-          </button>
-        );
-      })}
-      {chosen && !chosen.correct && (
-        <div style={{ fontSize: 12.5, color: "#854f0b", background: "#faeeda", border: "1px solid #fac775", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>Try again</div>
-          {chosen.fb}
-        </div>
-      )}
-      {chosen && chosen.correct && (
+      {beatI === 0 && (
         <>
-          <div style={{ fontSize: 12.5, color: "#0f6e56", background: "#e1f5ee", border: "1px solid #9fe1cb", borderRadius: 11, padding: "11px 13px", lineHeight: 1.5 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>That is right</div>
-            {chosen.fb}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-            <button
-              style={btn("pri")}
-              onClick={() => {
-                if (last) onPass();
-                else setBeatI((n) => n + 1);
-              }}
-            >
-              {last ? "Continue" : "Next fact"}
-            </button>
-          </div>
+          <div style={{ fontSize: 21, fontWeight: 700, color: INK, margin: "0 0 8px" }}>{step.title}</div>
+          {step.setup && (
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>{step.setup}</div>
+          )}
         </>
       )}
+      <ScoredChoice
+        key={beatI}
+        kicker={`${step.kicker} · beat ${beatI + 1} of ${step.beats.length}`}
+        prompt={beat.fact}
+        options={beat.options}
+        onAnswer={(correct) => {
+          if (last) onBeatAnswer(correct, true);
+          else {
+            onBeatAnswer(correct, false);
+            setBeatI((n) => n + 1);
+          }
+        }}
+        continueLabel={last ? "See results" : "Next fact"}
+        speaking={speaking}
+        onSpeak={() => onSpeak(beatI)}
+        onStop={onStop}
+      />
     </div>
   );
 }

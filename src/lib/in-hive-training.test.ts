@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   ABI_OBLIGATION_TITLE,
   EXAM_MAX_ATTEMPTS,
@@ -8,6 +10,10 @@ import {
   THIRTY_DAY_SOW_LETTERS,
   THIRTY_DAY_TOPIC_CODES,
   allRequiredTopicsComplete,
+  completedCodesFromProgress,
+  planThirtyDayWrites,
+  shouldPersistTopicStep,
+  topicChecklistLabel,
   buildExamAnswerRecords,
   buildThirtyDayCertificate,
   canIssueThirtyDayCertificate,
@@ -23,6 +29,13 @@ import {
   lastExamResetAt,
   remainingExamAttempts,
   scoreExam,
+  scoreSegmentGate,
+  nextTopicProgressStatus,
+  choiceFollowUp,
+  correctChoiceIsUniquelyLongest,
+  buildSegmentProof,
+  SEGMENT_GATE_PASS,
+  SEGMENT_GATE_TOTAL,
   shuffleCopy,
   topicUnlocked,
   type ExamQuestion,
@@ -217,6 +230,264 @@ describe("sequential unlock", () => {
     assert.equal(examUnlocked(codes, done, true), false);
     assert.equal(examUnlocked(codes, new Set(codes), true), true);
     assert.equal(topicUnlocked(2, done, codes, false), true);
+  });
+});
+
+describe("segment gate", () => {
+  it("requires 4 of 5 on a full SOW segment", () => {
+    assert.equal(SEGMENT_GATE_TOTAL, 5);
+    assert.equal(SEGMENT_GATE_PASS, 4);
+    assert.equal(scoreSegmentGate([true, true, true, true, false]).passed, true);
+    assert.equal(scoreSegmentGate([true, true, true, false, false]).passed, false);
+    assert.equal(scoreSegmentGate([true, true, true, true, false]).correctCount, 4);
+    assert.equal(scoreSegmentGate([true, true, true, true, true, false]).total, 5);
+  });
+
+  it("on a four-beat topic, three correct is enough; empty is not", () => {
+    assert.equal(scoreSegmentGate([true, true, true, false]).passed, true);
+    assert.equal(scoreSegmentGate([true, true, false, false]).passed, false);
+    assert.equal(scoreSegmentGate([]).passed, false);
+  });
+
+  it("marks Success only from completed progress rows", () => {
+    const codes = ["A", "B", "C", "D"];
+    const done = completedCodesFromProgress(codes, {
+      A: { status: "completed", position: 0 },
+      B: { status: "in_progress", position: 2 },
+      C: { status: "completed", position: 0 },
+      D: null,
+    });
+    assert.deepEqual([...done].sort(), ["A", "C"]);
+    assert.equal(done.has("D"), false);
+  });
+
+  it("never downgrades a completed topic to in_progress", () => {
+    assert.equal(nextTopicProgressStatus("completed", "in_progress"), "completed");
+    assert.equal(nextTopicProgressStatus("in_progress", "completed"), "completed");
+    assert.equal(nextTopicProgressStatus(null, "in_progress"), "in_progress");
+  });
+
+  it("strips verdict words so follow-up is not an answer key", () => {
+    assert.equal(choiceFollowUp("Right. Stay with them."), "Stay with them.");
+    assert.equal(choiceFollowUp("Do not wait."), "Do not wait.");
+  });
+
+  it("keeps topic M diagnosis and ABI stems from a uniquely long correct choice", () => {
+    assert.equal(
+      correctChoiceIsUniquelyLongest([
+        { t: "Intellectual disability and acquired brain injury are two names for the same thing.", correct: false },
+        { t: "Intellectual disability starts before adulthood; acquired brain injury happens later.", correct: true },
+        { t: "Acquired brain injury is always mild; intellectual disability is always severe.", correct: false },
+      ]),
+      false,
+    );
+    assert.equal(
+      correctChoiceIsUniquelyLongest([
+        { t: "They will need the same supports because they share one diagnosis and label.", correct: false },
+        { t: "Their abilities and needs can differ a lot — learn each person as an individual.", correct: true },
+        { t: "Neither person will be able to communicate in any useful way on their own.", correct: false },
+      ]),
+      false,
+    );
+  });
+
+  it("flags a uniquely long correct choice", () => {
+    assert.equal(
+      correctChoiceIsUniquelyLongest([
+        { t: "Short no", correct: false },
+        { t: "This correct option is much longer than the other two choices by design", correct: true },
+        { t: "Also short", correct: false },
+      ]),
+      true,
+    );
+    assert.equal(
+      correctChoiceIsUniquelyLongest([
+        { t: "They may have different needs — learn each person.", correct: true },
+        { t: "They will need the same supports from a shared diagnosis.", correct: false },
+        { t: "Neither person will be able to communicate at all.", correct: false },
+      ]),
+      false,
+    );
+  });
+
+  it("builds a segment proof only from the gate score", () => {
+    const proof = buildSegmentProof({
+      topicCode: "D",
+      correctFlags: [true, true, true, true, false],
+      completedAt: "2026-09-09T12:00:00.000Z",
+    });
+    assert.equal(proof.kind, "segment-gate");
+    assert.equal(proof.passed, true);
+    assert.equal(proof.topicCode, "D");
+  });
+
+  it("keeps the certificate UUID distinct from exam and topic A", () => {
+    assert.equal(inHiveRefUuid("thirty-day", "__cert__"), "a11ce000-1e8f-4000-8000-0000000001fe");
+    assert.notEqual(inHiveRefUuid("thirty-day", "__cert__"), inHiveRefUuid("thirty-day", "__exam__"));
+    assert.notEqual(inHiveRefUuid("thirty-day", "__cert__"), inHiveRefUuid("thirty-day", "A"));
+  });
+});
+
+describe("progress UI labels", () => {
+  it("shows Success only for a completed SOW row — in_progress and missing stay Open", () => {
+    assert.equal(topicChecklistLabel("completed"), "Success");
+    assert.equal(topicChecklistLabel("in_progress"), "Open");
+    assert.equal(topicChecklistLabel(null), "Open");
+    assert.equal(topicChecklistLabel(undefined), "Open");
+    const afterReview = completedCodesFromProgress(["A", "D", "E"], {
+      A: { status: "completed", position: 4 },
+      D: { status: nextTopicProgressStatus("completed", "in_progress"), position: 1 },
+      E: { status: "in_progress", position: 2 },
+    });
+    assert.equal(topicChecklistLabel(afterReview.has("D") ? "completed" : "in_progress"), "Success");
+    assert.equal(topicChecklistLabel(afterReview.has("E") ? "completed" : "in_progress"), "Open");
+  });
+
+  it("does not persist a review step over a passed topic", () => {
+    assert.equal(shouldPersistTopicStep("completed"), false);
+    assert.equal(shouldPersistTopicStep("in_progress"), true);
+    assert.equal(shouldPersistTopicStep(null), true);
+  });
+});
+
+describe("4/5 retake gate", () => {
+  it("fails a segment at 3 of 5 and requires a retake; 4 of 5 passes", () => {
+    const fail = scoreSegmentGate([true, true, true, false, false]);
+    assert.equal(fail.passed, false);
+    assert.equal(fail.correctCount, 3);
+    assert.equal(fail.total, SEGMENT_GATE_TOTAL);
+    const pass = scoreSegmentGate([true, false, true, true, true]);
+    assert.equal(pass.passed, true);
+    assert.equal(pass.correctCount, SEGMENT_GATE_PASS);
+    const retake = scoreSegmentGate([]);
+    assert.equal(retake.passed, false);
+  });
+});
+
+describe("obligation and certificate write path", () => {
+  it("writes segment proof on a passed beat, certificate + obligation only after every topic and exam", () => {
+    const missingD = new Set(THIRTY_DAY_TOPIC_CODES.filter((c) => c !== "D"));
+    const all = new Set(THIRTY_DAY_TOPIC_CODES);
+
+    const midCourse = planThirtyDayWrites({
+      examPassed: false,
+      topicCodes: THIRTY_DAY_TOPIC_CODES,
+      completedCodes: missingD,
+      skipObligation: false,
+      alreadyComplete: false,
+      segmentPassed: true,
+    });
+    assert.equal(midCourse.writeSegmentProof, true);
+    assert.equal(midCourse.writeCertificate, false);
+    assert.equal(midCourse.writeObligation, false);
+
+    const examButDOpen = planThirtyDayWrites({
+      examPassed: true,
+      topicCodes: THIRTY_DAY_TOPIC_CODES,
+      completedCodes: missingD,
+      skipObligation: false,
+      alreadyComplete: false,
+      segmentPassed: false,
+    });
+    assert.equal(examButDOpen.writeCertificate, false);
+    assert.equal(examButDOpen.writeObligation, false);
+
+    const fullPass = planThirtyDayWrites({
+      examPassed: true,
+      topicCodes: THIRTY_DAY_TOPIC_CODES,
+      completedCodes: all,
+      skipObligation: false,
+      alreadyComplete: false,
+      segmentPassed: false,
+    });
+    assert.equal(fullPass.writeCertificate, true);
+    assert.equal(fullPass.writeObligation, true);
+
+    const tnsTrainingOnly = planThirtyDayWrites({
+      examPassed: true,
+      topicCodes: THIRTY_DAY_TOPIC_CODES,
+      completedCodes: all,
+      skipObligation: true,
+      alreadyComplete: false,
+      segmentPassed: false,
+    });
+    assert.equal(tnsTrainingOnly.writeCertificate, true);
+    assert.equal(tnsTrainingOnly.writeObligation, false);
+
+    const alreadyOnFile = planThirtyDayWrites({
+      examPassed: true,
+      topicCodes: THIRTY_DAY_TOPIC_CODES,
+      completedCodes: all,
+      skipObligation: false,
+      alreadyComplete: true,
+      segmentPassed: false,
+    });
+    assert.equal(alreadyOnFile.writeCertificate, true);
+    assert.equal(alreadyOnFile.writeObligation, false);
+  });
+
+  it("certificate lists Open for a topic that was never passed", () => {
+    const titles = THIRTY_DAY_TOPIC_CODES.map((code) => ({ code, title: code }));
+    const missingD = new Set(THIRTY_DAY_TOPIC_CODES.filter((c) => c !== "D"));
+    const cert = buildThirtyDayCertificate({
+      staffName: "Staff",
+      organizationName: "True North Supports",
+      completedAt: "2026-09-09T12:00:00.000Z",
+      completedCodes: missingD,
+      examPassed: true,
+      examScorePct: 90,
+      topicTitles: titles,
+    });
+    const d = cert.topics.find((t) => t.code === "D");
+    assert.equal(d?.passed, false);
+    assert.match(d?.sowCite ?? "", /1\.8\(4\)\(D\)/);
+    assert.ok(cert.topics.filter((t) => t.passed).length === THIRTY_DAY_TOPIC_CODES.length - 1);
+  });
+});
+
+describe("staff vs admin auditor export (source)", () => {
+  it("removes the staff Download auditor export and keeps the saved-on-file notice", () => {
+    const player = readFileSync(
+      fileURLToPath(new URL("../components/training/in-hive-course-player.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.doesNotMatch(player, /Download auditor export/);
+    assert.match(player, /saved on your staff file/);
+    assert.match(player, /topicChecklistLabel/);
+    assert.match(player, /planThirtyDayWrites/);
+    assert.match(player, /shouldPersistTopicStep/);
+    assert.doesNotMatch(player, /Hive Certify|Ask Hive|like Hive/);
+  });
+
+  it("keeps auditor export on the admin obligation card only", () => {
+    const card = readFileSync(
+      fileURLToPath(new URL("../components/company-obligations/obligation-card.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(card, /Auditor export/);
+    assert.match(card, /AdminExamExportButton/);
+    const obligations = readFileSync(
+      fileURLToPath(new URL("../routes/dashboard.my-obligations.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(obligations, /Review course/);
+    assert.doesNotMatch(obligations, /exam export/);
+  });
+
+  it("gates a failed segment behind Retake this segment and does not flash the answer key", () => {
+    const engine = readFileSync(
+      fileURLToPath(new URL("../components/training/hive-training-engine.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(engine, /Retake this segment/);
+    assert.match(engine, /Recorded/);
+    assert.doesNotMatch(engine, /THAT IS RIGHT/);
+    const diagrams = readFileSync(
+      fileURLToPath(new URL("../components/training/in-hive-diagrams.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.doesNotMatch(diagrams, /Picture:/i);
+    assert.doesNotMatch(diagrams, /PICTURE:/);
   });
 });
 

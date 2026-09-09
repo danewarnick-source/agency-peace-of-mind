@@ -16,8 +16,10 @@ import {
   EXAM_MAX_ATTEMPTS,
   EXAM_PASS_RATIO,
   IN_HIVE_COURSE_EVIDENCE,
-  allRequiredTopicsComplete,
   completedCodesFromProgress,
+  planThirtyDayWrites,
+  shouldPersistTopicStep,
+  topicChecklistLabel,
   buildExamAnswerRecords,
   buildThirtyDayCertificate,
   canIssueThirtyDayCertificate,
@@ -128,7 +130,15 @@ export function InHiveCoursePlayer({
   const persistCertificateIfReady = useCallback(
     async (codes: ReadonlySet<string>, examPassed: boolean, examScorePct: number | null, completedAt: string) => {
       if (courseId !== "thirty-day") return;
-      if (!canIssueThirtyDayCertificate({ topicCodes, completedCodes: codes, examPassed })) return;
+      const plan = planThirtyDayWrites({
+        examPassed,
+        topicCodes,
+        completedCodes: codes,
+        skipObligation: true,
+        alreadyComplete: true,
+        segmentPassed: false,
+      });
+      if (!plan.writeCertificate) return;
       await insertInHiveCourseCertificate({
         userId,
         courseId,
@@ -153,17 +163,26 @@ export function InHiveCoursePlayer({
       topicCodes,
       await loadInHiveCourseProgress(userId, courseId, topicCodes),
     );
-    if (!allRequiredTopicsComplete(topicCodes, codes)) return;
     const examAttempts = await loadInHiveExamAttempts(userId, courseId, examResetAfterIso);
     const passedExam = examAttempts.some((a) => a.passed);
     const lastPass = [...examAttempts].reverse().find((a) => a.passed);
-    await persistCertificateIfReady(
-      codes,
-      passedExam,
-      lastPass?.scorePct ?? null,
-      lastPass?.completedAt ?? new Date().toISOString(),
-    );
-    if (skipObligation || !organizationId) return;
+    const plan = planThirtyDayWrites({
+      examPassed: passedExam,
+      topicCodes,
+      completedCodes: codes,
+      skipObligation,
+      alreadyComplete,
+      segmentPassed: false,
+    });
+    if (plan.writeCertificate) {
+      await persistCertificateIfReady(
+        codes,
+        passedExam,
+        lastPass?.scorePct ?? null,
+        lastPass?.completedAt ?? new Date().toISOString(),
+      );
+    }
+    if (!plan.writeObligation || !organizationId) return;
     await recordFn({
       data: {
         organizationId,
@@ -179,6 +198,7 @@ export function InHiveCoursePlayer({
     instanceId,
     obligationTitle,
     organizationId,
+    alreadyComplete,
     persistCertificateIfReady,
     recordFn,
     skipObligation,
@@ -270,6 +290,14 @@ export function InHiveCoursePlayer({
             completedAt,
           }
         : null;
+      const plan = planThirtyDayWrites({
+        examPassed: false,
+        topicCodes,
+        completedCodes: completedCodes,
+        skipObligation: true,
+        alreadyComplete: true,
+        segmentPassed: proof?.passed === true,
+      });
       void (async () => {
         await saveInHiveTopicProgress({
           userId,
@@ -278,7 +306,7 @@ export function InHiveCoursePlayer({
           status: "completed",
           position: 0,
         });
-        if (proof?.passed) {
+        if (plan.writeSegmentProof && proof) {
           await insertInHiveSegmentProof({
             userId,
             courseId,
@@ -291,12 +319,12 @@ export function InHiveCoursePlayer({
         void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
       })();
     },
-    [completedCodes, courseId, qc, signedName, signerEmail, userId],
+    [completedCodes, courseId, qc, signedName, signerEmail, topicCodes, userId],
   );
 
   const onStepChange = useCallback(
     (code: string, step: number) => {
-      if (completedCodes.has(code)) return;
+      if (!shouldPersistTopicStep(completedCodes.has(code) ? "completed" : null)) return;
       saveTopic.mutate({
         userId,
         courseId,
@@ -377,7 +405,7 @@ export function InHiveCoursePlayer({
                 )}
                 <span className="leading-snug">
                   <span className="font-medium">
-                    {done ? "Success" : "Open"} · {t.code}. {t.title}
+                    {topicChecklistLabel(done ? "completed" : progressQ.data?.[t.code]?.status)} · {t.code}. {t.title}
                   </span>
                 </span>
               </button>

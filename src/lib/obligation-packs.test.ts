@@ -143,6 +143,31 @@ describe("obligation pack mapping", () => {
     assert.equal(cellIncrementsRed("unassigned"), false);
     assert.equal(cellIncrementsRed("complete"), false);
     assert.equal(cellIncrementsRed("incomplete"), true);
+    assert.equal(
+      packCellStatus({ assigned: true, complete: true, required: true }),
+      "complete",
+    );
+    assert.equal(cellIncrementsRed("complete"), false);
+  });
+
+  it("30-day orientation is the required Credentials pack column that goes green on complete", () => {
+    const col = packColumnForObligation({
+      id: "thirty",
+      title: THIRTY_DAY_OBLIGATION_TITLE,
+      scope: "staff",
+    });
+    assert.equal(col?.packKey, "credentials");
+    assert.equal(col?.columnKey, "thirty-day");
+    assert.equal(col?.required, true);
+    assert.equal(col?.label, "30-day orientation");
+    assert.equal(
+      packCellStatus({ assigned: true, complete: false, required: true }),
+      "incomplete",
+    );
+    assert.equal(
+      packCellStatus({ assigned: true, complete: true, required: true }),
+      "complete",
+    );
   });
 
   it("hides pack sentinel rows from columns", () => {

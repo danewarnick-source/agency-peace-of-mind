@@ -151,6 +151,16 @@ export function completedCodesFromProgress(
   return new Set(topicCodes.filter((code) => map[code]?.status === "completed"));
 }
 
+/** Staff checklist / certificate row: Success only after the segment is passed. */
+export function topicChecklistLabel(status: string | null | undefined): "Success" | "Open" {
+  return status === "completed" ? "Success" : "Open";
+}
+
+/** Reviewing a passed topic must not write a new in_progress row. */
+export function shouldPersistTopicStep(existingStatus: string | null | undefined): boolean {
+  return existingStatus !== "completed";
+}
+
 /** End of each SOW segment: 4 of 5 scored beats to pass. */
 export const SEGMENT_GATE_TOTAL = 5;
 export const SEGMENT_GATE_PASS = 4;
@@ -236,6 +246,37 @@ export function canIssueThirtyDayCertificate(args: {
   examPassed: boolean;
 }): boolean {
   return args.examPassed && allRequiredTopicsComplete(args.topicCodes, args.completedCodes);
+}
+
+export type ThirtyDayWritePlan = {
+  writeSegmentProof: boolean;
+  writeCertificate: boolean;
+  writeObligation: boolean;
+};
+
+/**
+ * What the course player writes after a segment or exam.
+ * Certificate + obligation require every required topic completed and a passing exam.
+ * TNS / training-only seats skip the office obligation write.
+ */
+export function planThirtyDayWrites(args: {
+  examPassed: boolean;
+  topicCodes: readonly string[];
+  completedCodes: ReadonlySet<string>;
+  skipObligation: boolean;
+  alreadyComplete: boolean;
+  segmentPassed: boolean;
+}): ThirtyDayWritePlan {
+  const ready = canIssueThirtyDayCertificate({
+    topicCodes: args.topicCodes,
+    completedCodes: args.completedCodes,
+    examPassed: args.examPassed,
+  });
+  return {
+    writeSegmentProof: args.segmentPassed,
+    writeCertificate: ready,
+    writeObligation: ready && !args.skipObligation && !args.alreadyComplete,
+  };
 }
 
 export const EXAM_RESET_PREFIX = "inhive-exam-reset:";

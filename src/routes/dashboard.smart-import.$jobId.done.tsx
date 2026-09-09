@@ -19,6 +19,8 @@ import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-histo
 import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
 import { SetupChecklist } from "@/components/clients/setup-checklist";
 import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
+import { EmployeeInviteSummary } from "@/components/smart-import/employee-invite-summary";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -46,6 +48,7 @@ function describeUndo(r: unknown): string {
 function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
+  const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const search = (typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null);
   // TanStack's typed search serializes "1" as the JSON string `"1"`, so the
@@ -158,9 +161,8 @@ function DonePage() {
       navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committed[0].record_id } }).catch(() => navigate({ to: "/dashboard/clients" }));
     } else if (mode === "client") {
       navigate({ to: "/dashboard/clients" });
-    } else {
-      navigate({ to: "/dashboard/employees" });
     }
+    // Employee jobs stay here so the admin can invite from the summary.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.data?.subjects, q.data?.job?.mode]);
 
@@ -258,6 +260,13 @@ function DonePage() {
         </div>
       </div>
 
+
+      {job.mode === "employee" && q.data.invite_summary && (
+        <EmployeeInviteSummary
+          organizationId={org?.organization_id ?? null}
+          summary={q.data.invite_summary}
+        />
+      )}
 
       {/* Readiness / gap readout per subject */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

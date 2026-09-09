@@ -92,7 +92,7 @@ function TeamAccessPage() {
       }),
     onSuccess: () => {
       toast.warning(
-        "Invitation created — this screen does not send email. Copy the join link from Employees or Invitations (it now joins this organization). Or use Employees → Add manually and share the temp password.",
+        "Invitation created — this screen does not send email. Copy the join link from Employees or Invitations. Prefer Employees → Add employee for a complete file, then send a join email or copy a temp password.",
       );
       setInviteEmail("");
       setInviteRole("employee");
@@ -164,7 +164,7 @@ function TeamAccessPage() {
       >
         <div className="flex items-center gap-2">
           <Mail className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Invite by email</h3>
+          <h3 className="text-sm font-semibold">New hire</h3>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_14rem_auto]">
           <div className="grid gap-1">
@@ -194,9 +194,8 @@ function TeamAccessPage() {
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          This form writes a pending invitation row only — it does not send email.
-          Copy the join link from Employees or Invitations; that link now joins this
-          organization. Add manually still works if you would rather share a temp password.
+          Prefer Employees → Add employee for a complete staff file, then send a join email or copy a temp password.
+          This form only writes a pending invitation row — it does not send email.
           Committee Member is assigned after they join.
         </p>
       </form>

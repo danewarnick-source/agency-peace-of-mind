@@ -89,7 +89,11 @@ function JoinPage() {
         "Username must start with a letter and be 3–32 letters, numbers, or underscores.",
       );
     }
-    if (joinSetsAuthPassword(preview.account_exists)) {
+    if (
+      joinSetsAuthPassword(preview.account_exists, {
+        mustChangePassword: preview.must_change_password,
+      })
+    ) {
       if (!isValidJoinPassword(password)) {
         return toast.error("Password must be at least 8 characters and include a number.");
       }
@@ -167,7 +171,9 @@ function JoinPage() {
   }
 
   const roleLabel = ROLE_LABEL[preview.role as Role] ?? preview.role;
-  const setsNewPassword = joinSetsAuthPassword(preview.account_exists);
+  const setsNewPassword = joinSetsAuthPassword(preview.account_exists, {
+    mustChangePassword: preview.must_change_password,
+  });
   const matchOk = password.length > 0 && password === confirm;
   const lenOk = setsNewPassword
     ? isValidJoinPassword(password)

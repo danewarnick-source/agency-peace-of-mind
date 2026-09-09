@@ -23,6 +23,9 @@ import {
   onStaffHiredInternal,
 } from "@/lib/staff-assignment-hooks.functions";
 import { enrichNamesFromFull } from "@/lib/person-name";
+import { hireEmployeeInternal } from "@/lib/employees.functions";
+import { generateTempPassword } from "@/lib/temp-password";
+import { classifyImportInvite, hasUsableInviteEmail } from "@/lib/import-invite";
 
 const JobId = z.object({ jobId: z.string().uuid() });
 
@@ -445,7 +448,38 @@ export async function runJobCommit(
         }
       }
 
-      if (!recordId) throw new Error("Failed to produce target record id");
+      if (!recordId) {
+        if (subj.subject_type === "employee") {
+          await sb
+            .from("import_subjects")
+            .update({
+              committed_record_id: null,
+              committed_at: new Date().toISOString(),
+              review_status: "approved",
+              commit_error: null,
+            })
+            .eq("id", subj.id);
+          await audit(
+            sb,
+            jobId,
+            orgId,
+            subj.id,
+            "Employee imported without a login (missing email)",
+            "admin_override",
+            userId,
+            "imported_no_email",
+          );
+          results.push({
+            subjectId: subj.id,
+            display_name: subj.display_name,
+            committed: true,
+            record_id: null,
+            gaps,
+          });
+          continue;
+        }
+        throw new Error("Failed to produce target record id");
+      }
 
       await attachCustomAttributes(
         sb,
@@ -1069,6 +1103,21 @@ function buildClientDraftFromFields(
 }
 
 // --------------------------------------------------------------
+function extractedFieldValue(
+  fields: Array<{ target_field: string; value: string | null }>,
+  key: string,
+): string {
+  const hit = fields.find((f) => f.target_field === key);
+  return String(hit?.value ?? "").trim();
+}
+
+function importedStaffRole(raw: string): "admin" | "manager" | "employee" {
+  const n = raw.trim().toLowerCase().replace(/\s+/g, "_");
+  if (n === "admin" || n === "company_admin") return "admin";
+  if (n === "manager" || n === "program_manager") return "manager";
+  return "employee";
+}
+
 async function commitEmployee(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
@@ -1092,23 +1141,71 @@ async function commitEmployee(
   userId: string,
   gaps: string[],
 ): Promise<string | null> {
-  // Employees: profiles.id mirrors auth.users.id — we cannot create auth users from a server fn here.
-  if (!subj.matched_record_id || subj.review_decision !== "update") {
-    // Create new path: queue an invitation gap and skip profile creation.
-    gaps.push("Invitation required — auth user must be created via the invitation flow.");
+  const email = extractedFieldValue(fields, "email");
+  const isUpdate = !!subj.matched_record_id && subj.review_decision === "update";
+
+  // New employee without email: import the subject but no login / no invite.
+  if (!isUpdate && !hasUsableInviteEmail(email)) {
+    gaps.push("Missing email — imported but not inviteable.");
     await audit(
       sb,
       jobId,
       orgId,
       subj.id,
-      "Employee marked for invitation (no auth user created here)",
+      "Employee imported without email (no login created, no invite sent)",
       "admin_override",
       userId,
-      "queue_invite",
+      "imported_no_email",
     );
-    // Use a placeholder uuid so downstream provenance still links; but we can't insert without a real auth user — return null id to signal partial.
-    // To remain "advisory, never blocks", we mark the subject as committed with no record_id.
     return null;
+  }
+
+  if (!isUpdate) {
+    const firstRaw = extractedFieldValue(fields, "first_name");
+    const lastRaw = extractedFieldValue(fields, "last_name");
+    const fullRaw = extractedFieldValue(fields, "full_name") || subj.display_name;
+    const names = enrichNamesFromFull(firstRaw, lastRaw, fullRaw);
+    const firstName = names.first_name || names.display_name || "Staff";
+    const lastName = names.last_name || "Member";
+    const hired = await hireEmployeeInternal(
+      {
+        organizationId: orgId,
+        firstName,
+        lastName,
+        email,
+        phone: extractedFieldValue(fields, "phone"),
+        temporaryPassword: generateTempPassword(),
+        role: importedStaffRole(extractedFieldValue(fields, "position") || extractedFieldValue(fields, "role")),
+        hireDate: extractedFieldValue(fields, "hire_date"),
+        startDate: extractedFieldValue(fields, "hire_date"),
+        department: extractedFieldValue(fields, "department"),
+        employeeId: extractedFieldValue(fields, "employee_id"),
+        workerType: extractedFieldValue(fields, "worker_type"),
+        staffType: String(extractedFieldValue(fields, "staff_type") || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        trackIds: [],
+        requiresDeescalation: true,
+        requiresAbi: true,
+        customFieldValues: {},
+      },
+      userId,
+      "smart_import",
+    );
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
+      hired.created
+        ? "Created employee login + roster record (invite not sent during import)"
+        : "Linked existing account and updated roster record (invite not sent during import)",
+      "admin_override",
+      userId,
+      hired.created ? "create_employee" : "link_employee",
+    );
+    return hired.userId;
   }
 
   const mapped: Record<string, unknown> = {};
@@ -1534,12 +1631,14 @@ export const getDoneReadout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
-    if (!context.supabase || !context.userId) return { job: null, subjects: [], audit: [] };
+    if (!context.supabase || !context.userId) {
+      return { job: null, subjects: [], audit: [], invite_summary: null };
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job } = await sb
       .from("import_jobs")
-      .select("id, status, mode, committed_at, submitted_at")
+      .select("id, status, mode, committed_at, submitted_at, organization_id")
       .eq("id", data.jobId)
       .single();
     if (!job) throw new Error("Job not found");
@@ -1552,6 +1651,21 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       .eq("import_job_id", data.jobId)
       .order("created_at");
 
+    const employeeSubjects = (subjects ?? []).filter((s: { subject_type: string }) => s.subject_type === "employee");
+    const employeeIds = employeeSubjects.map((s: { id: string }) => s.id);
+    const emailBySubject = new Map<string, string>();
+    if (employeeIds.length) {
+      const { data: emailFields } = await sb
+        .from("extracted_fields")
+        .select("import_subject_id, value")
+        .in("import_subject_id", employeeIds)
+        .eq("target_field", "email")
+        .is("dismissed_at", null);
+      for (const f of emailFields ?? []) {
+        emailBySubject.set(f.import_subject_id, String(f.value ?? "").trim());
+      }
+    }
+
     const subjectSummaries: Array<{
       id: string;
       display_name: string;
@@ -1563,6 +1677,8 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       requirements_met: number;
       requirements_total: number;
       gaps: string[];
+      invite_bucket?: "ready" | "missing_email" | "already_login";
+      invite_email?: string | null;
       staff_training?: {
         required: number;
         conditional_active: number;
@@ -1570,6 +1686,59 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         hire_date_missing: boolean;
       };
     }> = [];
+
+    type InviteRow = {
+      subject_id: string;
+      record_id: string | null;
+      display_name: string;
+      email: string | null;
+    };
+    const inviteSummary = {
+      ready: [] as InviteRow[],
+      missing_email: [] as InviteRow[],
+      already_login: [] as InviteRow[],
+    };
+
+    const recordIds = employeeSubjects
+      .map((s: { committed_record_id: string | null }) => s.committed_record_id)
+      .filter((id: string | null): id is string => !!id);
+    const loginById = new Map<string, { email: string | null; mustChange: boolean | null }>();
+    if (recordIds.length) {
+      const { data: loginProfs } = await sb
+        .from("profiles")
+        .select("id, email, must_change_password")
+        .in("id", recordIds);
+      for (const p of loginProfs ?? []) {
+        loginById.set(p.id, {
+          email: (p.email as string | null) ?? null,
+          mustChange: (p.must_change_password as boolean | null) ?? null,
+        });
+      }
+    }
+    const inviteEmails = [
+      ...new Set(
+        [
+          ...emailBySubject.values(),
+          ...[...loginById.values()].map((p) => p.email ?? ""),
+        ]
+          .map((e) => e.trim().toLowerCase())
+          .filter((e) => e.includes("@")),
+      ),
+    ];
+    const inviteStatusByEmail = new Map<string, string>();
+    if (inviteEmails.length && job.mode === "employee") {
+      const { data: invRows } = await sb
+        .from("invitations")
+        .select("email, status")
+        .eq("organization_id", job.organization_id)
+        .in("email", inviteEmails);
+      for (const row of invRows ?? []) {
+        const key = String(row.email ?? "").toLowerCase();
+        if (row.status === "accepted" || inviteStatusByEmail.get(key) !== "accepted") {
+          inviteStatusByEmail.set(key, String(row.status ?? ""));
+        }
+      }
+    }
 
     for (const s of subjects ?? []) {
       const { data: certs } = await sb
@@ -1635,6 +1804,27 @@ export const getDoneReadout = createServerFn({ method: "POST" })
           );
       }
 
+      let inviteBucket: "ready" | "missing_email" | "already_login" | undefined;
+      let inviteEmail: string | null = null;
+      if (s.subject_type === "employee") {
+        const login = s.committed_record_id ? loginById.get(s.committed_record_id) : undefined;
+        inviteEmail = login?.email || emailBySubject.get(s.id) || null;
+        inviteBucket = classifyImportInvite({
+          email: inviteEmail,
+          mustChangePassword: login?.mustChange ?? (s.committed_record_id ? null : true),
+          invitationStatus: inviteEmail
+            ? inviteStatusByEmail.get(inviteEmail.trim().toLowerCase()) ?? null
+            : null,
+        });
+        const row = {
+          subject_id: s.id,
+          record_id: s.committed_record_id as string | null,
+          display_name: s.display_name as string,
+          email: inviteEmail,
+        };
+        inviteSummary[inviteBucket].push(row);
+      }
+
       subjectSummaries.push({
         id: s.id,
         display_name: s.display_name,
@@ -1647,6 +1837,8 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         requirements_met: met,
         requirements_total: total,
         gaps,
+        invite_bucket: inviteBucket,
+        invite_email: inviteEmail,
       });
     }
 
@@ -1657,5 +1849,10 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(200);
 
-    return { job, subjects: subjectSummaries, audit: auditTrail ?? [] };
+    return {
+      job,
+      subjects: subjectSummaries,
+      audit: auditTrail ?? [],
+      invite_summary: job.mode === "employee" ? inviteSummary : null,
+    };
   });

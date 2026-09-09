@@ -98,9 +98,11 @@ describe("join field rules", () => {
     assert.equal(isValidJoinPassword("longenough"), false);
     assert.equal(isValidJoinPassword("goodpass1"), true);
   });
-  it("never overwrites an existing account's password", () => {
+  it("never overwrites an existing account's password unless first-login is pending", () => {
     assert.equal(joinSetsAuthPassword(true), false);
     assert.equal(joinSetsAuthPassword(false), true);
+    assert.equal(joinSetsAuthPassword(true, { mustChangePassword: true }), true);
+    assert.equal(joinSetsAuthPassword(true, { mustChangePassword: false }), false);
   });
   it("requires a letter-led username", () => {
     assert.equal(isValidJoinUsername("ab"), false);

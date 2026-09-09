@@ -1,20 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
-import { createInvitation, resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
+import { resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { toast } from "sonner";
@@ -28,13 +23,9 @@ export const Route = createFileRoute("/dashboard/invitations")({
   ),
 });
 
-type InviteRole = "admin" | "manager" | "employee";
-
 function InvitationsPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const createInviteFn = useServerFn(createInvitation);
   const resendInviteFn = useServerFn(resendInvitation);
   const revokeInviteFn = useServerFn(revokeInvitation);
 
@@ -52,43 +43,12 @@ function InvitationsPage() {
     },
   });
 
-  const createInvite = useMutation({
-    mutationFn: async (input: { email: string; role: InviteRole }) => {
-      const email = input.email.trim().toLowerCase();
-      // Check duplicates among pending
-      const existing = (invites ?? []).find(
-        (i) => i.status === "pending" && i.email.toLowerCase() === email,
-      );
-      if (existing) throw new Error("A pending invitation already exists for this email");
-
-      return await createInviteFn({
-        data: {
-          organization_id: org!.organization_id,
-          email,
-          role: input.role,
-          site_origin: resolveAuthOrigin(),
-        },
-      });
-    },
-    onSuccess: (res) => {
-      if (res.email_sent) {
-        toast.success(`Invitation emailed to ${res.invitation.email}`);
-      } else {
-        toast.warning(
-          `Invitation created, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the link manually instead.`,
-        );
-      }
-      qc.invalidateQueries({ queryKey: ["invitations"] });
-      setOpen(false);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const resendInvite = useMutation({
     mutationFn: async (id: string) => {
+      if (!org) throw new Error("No organization selected.");
       return await resendInviteFn({
         data: {
-          organization_id: org!.organization_id,
+          organization_id: org.organization_id,
           invitation_id: id,
           site_origin: resolveAuthOrigin(),
         },
@@ -109,8 +69,9 @@ function InvitationsPage() {
 
   const revokeInvite = useMutation({
     mutationFn: async (id: string) => {
+      if (!org) throw new Error("No organization selected.");
       return await revokeInviteFn({
-        data: { organization_id: org!.organization_id, invitation_id: id },
+        data: { organization_id: org.organization_id, invitation_id: id },
       });
     },
     onSuccess: (res) => {
@@ -131,7 +92,7 @@ function InvitationsPage() {
         <div>
           <h2 className="text-base font-semibold">Employee invitations</h2>
           <p className="text-sm text-muted-foreground">
-            Invite people to {org?.organization_name ?? "your organization"} by email. Links expire after 14 days.
+            Resend or copy join links for pending invites. New hires start from Employees → Add employee (full file first, then invite or temp password).
           </p>
           <div className="mt-3 flex gap-2 text-xs">
             <Badge variant="secondary">{counts.pending ?? 0} pending</Badge>
@@ -139,48 +100,11 @@ function InvitationsPage() {
             {counts.revoked ? <Badge variant="secondary">{counts.revoked} revoked</Badge> : null}
           </div>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
-              <UserPlus className="mr-2 h-4 w-4" /> Invite by email
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Invite an employee</DialogTitle></DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                createInvite.mutate({
-                  email: String(fd.get("email") ?? ""),
-                  role: String(fd.get("role") ?? "employee") as InviteRole,
-                });
-              }}
-              className="grid gap-4"
-            >
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email address</Label>
-                <Input id="email" name="email" type="email" required placeholder="alex@company.com" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="role">Assigned role</Label>
-                <Select name="role" defaultValue="employee">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Company Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={createInvite.isPending}>
-                  {createInvite.isPending ? "Creating…" : "Create invitation"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button asChild className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
+          <Link to="/dashboard/hub/employees">
+            <UserPlus className="mr-2 h-4 w-4" /> Add employee
+          </Link>
+        </Button>
       </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">

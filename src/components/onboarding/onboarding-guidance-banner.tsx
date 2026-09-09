@@ -17,7 +17,7 @@ const COPY: Record<number, { title: string; body: string }> = {
   3: {
     title: "Add your staff members",
     body:
-      "Add your staff members here. You can add them one at a time or invite them to complete their own profiles. Once they're in the system, I can help you schedule them and track their credentials.",
+      "Add your staff members here. Add employee collects the full file first, then you can send a join email or copy a temporary password. Once they're in the system, I can help you schedule them and track their credentials.",
   },
   4: {
     title: "Add your clients",

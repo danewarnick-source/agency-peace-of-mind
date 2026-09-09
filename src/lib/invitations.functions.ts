@@ -19,6 +19,7 @@ import { resolveOrgSender } from "@/lib/email.functions";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { inviteJoinUrl } from "@/lib/join-invite";
+import { canSendImportInvite } from "@/lib/import-invite";
 
 const ORG_ID = z.string().uuid();
 const INVITE_ROLE = z.enum(["admin", "manager", "employee"]);
@@ -31,6 +32,12 @@ type InvitationRow = {
   role: Role;
   expires_at: string;
 };
+
+function inviteRoleFromMember(role: string | undefined): Role {
+  if (role === "admin") return "admin";
+  if (role === "manager" || role === "program_manager") return "manager";
+  return "employee";
+}
 
 function escapeHtml(s: string): string {
   return String(s)
@@ -63,11 +70,11 @@ async function sendInvitationEmail(args: {
     const link = inviteJoinUrl(origin, token);
     const roleLabel = ROLE_LABEL[role] ?? role;
 
-    const subject = `You're invited to join ${orgName} on HIVE`;
+    const subject = `You're invited to join ${orgName} on Provider Interface`;
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#243040">
         <p>Hello,</p>
-        <p><strong>${escapeHtml(orgName)}</strong> has invited you to join their team on HIVE as a
+        <p><strong>${escapeHtml(orgName)}</strong> has invited you to join their team on Provider Interface as a
           <strong>${escapeHtml(roleLabel)}</strong>.</p>
         <p style="margin:28px 0">
           <a href="${link}"
@@ -253,4 +260,233 @@ export const revokeInvitation = createServerFn({ method: "POST" })
     if (!invite) throw new Error("Invitation not found or already resolved");
 
     return { invitation: invite as { id: string; email: string } };
+  });
+
+type InviteTargetResult = {
+  email: string;
+  user_id: string | null;
+  status: "sent" | "created_unsent" | "skipped" | "error";
+  reason: string | null;
+};
+
+async function upsertPendingInviteAndSend(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+  organizationId: string;
+  userId: string;
+  email: string;
+  role: Role;
+  siteOrigin: string;
+}): Promise<{ invitation: InvitationRow; email_sent: boolean; email_error: string | null }> {
+  const { supabase, organizationId, userId, email, role, siteOrigin } = args;
+  const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: pending, error: pendingErr } = await supabase
+    .from("invitations")
+    .select("id, token, email, role, expires_at")
+    .eq("organization_id", organizationId)
+    .eq("email", email)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (pendingErr) throw new Error(pendingErr.message);
+
+  let invite = pending as InvitationRow | null;
+  if (invite) {
+    const { data: refreshed, error: refreshErr } = await supabase
+      .from("invitations")
+      .update({ expires_at: expires, role })
+      .eq("id", invite.id)
+      .eq("organization_id", organizationId)
+      .select("id, token, email, role, expires_at")
+      .single();
+    if (refreshErr) throw new Error(refreshErr.message);
+    invite = refreshed as InvitationRow;
+  } else {
+    const { data: created, error: createErr } = await supabase
+      .from("invitations")
+      .insert({
+        organization_id: organizationId,
+        email,
+        role,
+        invited_by: userId,
+      })
+      .select("id, token, email, role, expires_at")
+      .single();
+    if (createErr) throw new Error(createErr.message);
+    invite = created as InvitationRow;
+  }
+
+  const emailResult = await sendInvitationEmail({
+    supabase,
+    organizationId,
+    email,
+    role,
+    token: invite.token,
+    siteOrigin,
+  });
+  return {
+    invitation: invite,
+    email_sent: emailResult.ok,
+    email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
+  };
+}
+
+/**
+ * Invite already-created roster members (Add employee access step + Smart Import
+ * bulk/per-row). Never emails during CSV parse. Never re-invites an accepted
+ * join unless resend_accepted is explicit.
+ */
+export const inviteStaffMembers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        organization_id: ORG_ID,
+        site_origin: SITE_ORIGIN,
+        user_ids: z.array(z.string().uuid()).max(200).default([]),
+        emails: z.array(z.string().trim().toLowerCase().email().max(255)).max(200).default([]),
+        role: INVITE_ROLE.optional(),
+        resend_accepted: z.boolean().optional().default(false),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const empty = { sent: 0, skipped: 0, errors: 0, results: [] as InviteTargetResult[] };
+    if (!supabase || !userId) return empty;
+    await requirePermission(
+      supabase as unknown as SupabaseClient,
+      userId,
+      data.organization_id,
+      "invite_staff",
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+    const targets = new Map<string, { userId: string | null; email: string; role: Role; mustChange: boolean | null }>();
+
+    if (data.user_ids.length) {
+      const { data: members, error: memErr } = await sb
+        .from("organization_members")
+        .select("user_id, role")
+        .eq("organization_id", data.organization_id)
+        .in("user_id", data.user_ids);
+      if (memErr) throw new Error(memErr.message);
+      const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
+      const roleByUser = new Map(
+        (members ?? []).map((m: { user_id: string; role: string }) => [m.user_id, m.role as Role]),
+      );
+      if (ids.length) {
+        const { data: profs, error: pErr } = await sb
+          .from("profiles")
+          .select("id, email, must_change_password")
+          .in("id", ids);
+        if (pErr) throw new Error(pErr.message);
+        for (const p of profs ?? []) {
+          const email = String(p.email ?? "").trim().toLowerCase();
+          if (!email) continue;
+          targets.set(email, {
+            userId: p.id,
+            email,
+            role: (data.role ?? inviteRoleFromMember(roleByUser.get(p.id))) as Role,
+            mustChange: p.must_change_password ?? null,
+          });
+        }
+      }
+    }
+
+    for (const raw of data.emails) {
+      const email = raw.trim().toLowerCase();
+      if (targets.has(email)) continue;
+      targets.set(email, {
+        userId: null,
+        email,
+        role: data.role ?? "employee",
+        mustChange: true,
+      });
+    }
+
+    const emails = [...targets.keys()];
+    const inviteByEmail = new Map<string, string>();
+    if (emails.length) {
+      const { data: invites, error: invErr } = await sb
+        .from("invitations")
+        .select("email, status")
+        .eq("organization_id", data.organization_id)
+        .in("email", emails);
+      if (invErr) throw new Error(invErr.message);
+      for (const row of invites ?? []) {
+        const key = String(row.email ?? "").toLowerCase();
+        const prev = inviteByEmail.get(key);
+        if (row.status === "accepted" || prev !== "accepted") {
+          inviteByEmail.set(key, String(row.status ?? ""));
+        }
+      }
+    }
+
+    const results: InviteTargetResult[] = [];
+    let sent = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const t of targets.values()) {
+      const invitationStatus = inviteByEmail.get(t.email) ?? null;
+      if (
+        !canSendImportInvite(
+          {
+            email: t.email,
+            mustChangePassword: t.mustChange,
+            invitationStatus,
+          },
+          { resendAccepted: data.resend_accepted },
+        )
+      ) {
+        skipped += 1;
+        results.push({
+          email: t.email,
+          user_id: t.userId,
+          status: "skipped",
+          reason:
+            invitationStatus === "accepted"
+              ? "Already accepted — use Resend to send again"
+              : t.mustChange === false
+                ? "Already has a login"
+                : "Not inviteable",
+        });
+        continue;
+      }
+
+      try {
+        const out = await upsertPendingInviteAndSend({
+          supabase: sb,
+          organizationId: data.organization_id,
+          userId,
+          email: t.email,
+          role: t.role,
+          siteOrigin: data.site_origin,
+        });
+        if (out.email_sent) {
+          sent += 1;
+          results.push({ email: t.email, user_id: t.userId, status: "sent", reason: null });
+        } else {
+          errors += 1;
+          results.push({
+            email: t.email,
+            user_id: t.userId,
+            status: "created_unsent",
+            reason: out.email_error,
+          });
+        }
+      } catch (e) {
+        errors += 1;
+        results.push({
+          email: t.email,
+          user_id: t.userId,
+          status: "error",
+          reason: e instanceof Error ? e.message : "Invite failed",
+        });
+      }
+    }
+
+    return { sent, skipped, errors, results };
   });

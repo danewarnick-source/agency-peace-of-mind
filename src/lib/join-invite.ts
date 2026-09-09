@@ -106,10 +106,17 @@ export function isValidJoinPassword(password: string): boolean {
 }
 
 /**
- * New invitees set a password. Existing auth users must type the password they
- * already use — join must never call admin.updateUserById({ password }).
+ * New invitees set a password. Existing logins that already chose a password
+ * must type that password — join must not overwrite it.
+ *
+ * Exception: admin-created roster rows with must_change_password still need
+ * the join/set-password step (Add employee → Send invite).
  */
-export function joinSetsAuthPassword(accountExists: boolean): boolean {
+export function joinSetsAuthPassword(
+  accountExists: boolean,
+  opts?: { mustChangePassword?: boolean },
+): boolean {
+  if (opts?.mustChangePassword) return true;
   return !accountExists;
 }
 

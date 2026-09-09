@@ -142,7 +142,7 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 | `SUPABASE_SERVICE_ROLE_KEY` | Login username lookup, create-employee, many server fns |
 | `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, daily-log coach |
 | `RESEND_API_KEY` on `send-email` / `auth-send-email` | Invite / notification / auth email |
-| `RESEND_FROM` or `EMAIL_FROM` (optional) | From mailbox. Default `noreply@providerinterface.com`. Do not use `onboarding@resend.dev`. **Must also be set as a Supabase Edge Function secret** — see [Invite email ops](#invite-email-ops-hive-platform). |
+| `RESEND_FROM` or `EMAIL_FROM` (optional) | **App / Lambda** From mailbox (`managedFromAddress()`). Default `noreply@providerinterface.com`. `send-email` does **not** read this — it uses the invoke `from` body. See [Invite email ops](#invite-email-ops-hive-platform). |
 | `STRIPE_SECRET_KEY` / training webhook secret | HIVE Training checkout |
 | `NECTAR_CRON_SECRET` / `CRON_SHARED_SECRET` | Scheduled NECTAR jobs |
 | `PUBLIC_APP_URL` / `SITE_URL` | Invite links, emails |
@@ -158,25 +158,23 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 
 Invite-by-email writes the pending invite first, then calls `supabase.functions.invoke("send-email")`. There is **no** `send-invite` function. Live Hive-Platform (`dhrrukdcigiiqksibdfb`) returned **HTTP 404** on `/functions/v1/send-email` on 2026-09-09 — the function source is in this repo but was never deployed. Until Core does the steps below, **Copy link** from the pending list still works and is the supported workaround. Do not paste API keys into chat or git.
 
-1. **Resend → verify the sending domain.** Dashboard → Domains → add `providerinterface.com` → add the DNS records Resend shows → wait until status is **Verified**. Confirm a mailbox `noreply@providerinterface.com` is allowed. Do **not** use `onboarding@resend.dev` (PR #261 removed it; sandbox only delivers to the Resend account owner).
-2. **Supabase → deploy from this repo** (CLI logged into Hive-Platform). Source lives at `supabase/functions/send-email` and `supabase/functions/auth-send-email`. There is no CI job that deploys functions.
+Dane’s invite-email checklist (employee invites use `send-email` only):
+
+1. **Deploy `send-email`** (today’s toast is a 404 — the function is not on Hive-Platform). From repo root:
 
 ```bash
 supabase functions deploy send-email --project-ref dhrrukdcigiiqksibdfb
-# Auth mail (password reset / magic link). Also set SEND_EMAIL_HOOK_SECRET
-# and point Authentication → Hooks → Send Email at auth-send-email.
-supabase functions deploy auth-send-email --project-ref dhrrukdcigiiqksibdfb
 ```
 
-3. **Supabase → Edge Function secrets** (Dashboard → Project Settings → Edge Functions → Secrets). Type values in the dashboard — never commit them. Vault today does **not** have these (only unrelated cron/ALB secrets). Set:
-   - `RESEND_API_KEY` — Resend API key (same key for both functions)
-   - `RESEND_FROM` — `noreply@providerinterface.com` (or `EMAIL_FROM` if you already use that name)
-   CLI equivalent (prompts/paste locally; do not put the key in git or chat):
-   `supabase secrets set RESEND_API_KEY --project-ref dhrrukdcigiiqksibdfb`
-   `supabase secrets set RESEND_FROM=noreply@providerinterface.com --project-ref dhrrukdcigiiqksibdfb`
-4. **Optional on Vercel / AWS** (app-server From preview; invite delivery uses the Edge secret after this change): `RESEND_FROM=noreply@providerinterface.com`. Not required to fix the 404.
-5. **True North reply-to is already set** (`Settings → Email` → `admin@tnsutah.com`). No change needed there. Do not put client names, Medicaid IDs, or notes in invite email.
-6. **Prove it:** Employees → Invite by email (or Settings → Email → Send a test). Success toast means Resend accepted. If it still fails, the new toast names the real reason (function missing / API key missing / domain not verified) instead of a generic non-2xx.
+2. **Edge secret on `send-email`: `RESEND_API_KEY`.** Dashboard → Project Settings → Edge Functions → Secrets (type it there; never commit or paste into chat). Vault currently does not have this. CLI: `supabase secrets set RESEND_API_KEY --project-ref dhrrukdcigiiqksibdfb`. The Edge function does **not** read `RESEND_FROM`.
+
+3. **App / Lambda `RESEND_FROM` (or `EMAIL_FROM`)** = a mailbox on a verified domain, e.g. `noreply@providerinterface.com`. Server fns put that in the invoke `from` body. If unset, code already sends `noreply@providerinterface.com`.
+
+4. **Resend → verify `providerinterface.com`.** Domains → add → DNS records → wait until **Verified**. Unverified domain → Resend non-2xx → Edge non-2xx. Do not use `onboarding@resend.dev`.
+
+5. **Prove it:** Employees → Invite by email, or Settings → Email → Send a test. Until then, **Copy link**. True North reply-to is already `admin@tnsutah.com`. No PHI in invite mail.
+
+Auth mail is a **separate** rail (`auth-send-email`): deploy that function only for password-reset/signup, and set `RESEND_API_KEY`, `SEND_EMAIL_HOOK_SECRET`, `SUPABASE_URL`, plus optional `RESEND_FROM`/`EMAIL_FROM`. Wire Authentication → Hooks → Send Email to that function.
 
 ### 1.6 Hypotheses this audit discarded
 

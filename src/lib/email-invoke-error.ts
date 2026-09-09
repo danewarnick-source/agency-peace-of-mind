@@ -67,10 +67,10 @@ export function describeEmailInvokeFailure(
     return "Email sending isn't installed on this environment yet (send-email function missing).";
   }
   if (/RESEND_API_KEY not configured/i.test(detail)) {
-    return "Email sending isn't configured (RESEND_API_KEY missing on send-email).";
+    return "Email sending isn't configured (RESEND_API_KEY missing on the send-email function).";
   }
   if (/domain is not verified|not verified/i.test(detail) || /invalid `?from`?/i.test(detail)) {
-    return "The From domain isn't verified in Resend. Verify providerinterface.com, or set RESEND_FROM to a verified mailbox.";
+    return "The From domain isn't verified in Resend. Verify providerinterface.com, or set app RESEND_FROM to a verified mailbox.";
   }
   if (detail && !/non-2xx/i.test(detail)) return detail;
   if (status === 401 || status === 403) return "Email sending was rejected (not authorized to call send-email).";

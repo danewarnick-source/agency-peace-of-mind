@@ -104,10 +104,11 @@ describe("app and edge From rails", () => {
     }
   });
 
-  it("send-email reads RESEND_FROM / EMAIL_FROM instead of trusting body.from as the mailbox", () => {
+  it("send-email uses invoke-body from and does not read RESEND_FROM (app/Lambda owns the mailbox)", () => {
     const src = readFileSync(new URL("../../supabase/functions/send-email/index.ts", import.meta.url), "utf8");
-    assert.match(src, /Deno\.env\.get\("RESEND_FROM"\)/);
-    assert.match(src, /Deno\.env\.get\("EMAIL_FROM"\)/);
-    assert.match(src, /resolveFromHeader|resolveMailbox/);
+    assert.doesNotMatch(src, /Deno\.env\.get\("RESEND_FROM"\)/);
+    assert.doesNotMatch(src, /Deno\.env\.get\("EMAIL_FROM"\)/);
+    assert.match(src, /bodyFrom|body\.from/);
+    assert.match(src, /RESEND_API_KEY/);
   });
 });

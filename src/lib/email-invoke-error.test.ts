@@ -29,7 +29,7 @@ describe("describeEmailInvokeFailure", () => {
         { message: "Edge Function returned a non-2xx status code", context: { status: 500 } },
         { error: "RESEND_API_KEY not configured" },
       ),
-      "Email sending isn't configured (RESEND_API_KEY missing on send-email).",
+      "Email sending isn't configured (RESEND_API_KEY missing on the send-email function).",
     );
   });
 
@@ -39,6 +39,7 @@ describe("describeEmailInvokeFailure", () => {
       { error: "The providerinterface.com domain is not verified. You can only send to dane@tnsutah.com" },
     );
     assert.match(text, /From domain isn't verified in Resend/);
+    assert.match(text, /app RESEND_FROM/);
     assert.doesNotMatch(text, /dane@tnsutah\.com/);
   });
 

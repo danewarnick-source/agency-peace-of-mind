@@ -8,12 +8,13 @@
 //   performs the send if RESEND_API_KEY is configured.
 // - No HTML in error responses, no PII echoed back.
 //
-// FROM:
-// - Mailbox comes from RESEND_FROM / EMAIL_FROM on this function (same
-//   rule as auth-send-email and src/lib/managed-from.ts), then a valid
-//   address in the request body, then noreply@providerinterface.com.
-// - Never send from @resend.dev. Display name stays the caller's
-//   "Name <addr>" prefix (org name) when present.
+// FROM (Apex / main contract):
+// - This function does NOT read RESEND_FROM. It sends the `from` field
+//   from the invoke body. App/Lambda server fns compose that via
+//   managedFromAddress() (RESEND_FROM / EMAIL_FROM, else
+//   noreply@providerinterface.com).
+// - Sandbox @resend.dev in the body is rewritten to the default mailbox
+//   so a leftover PR-261-era From cannot hit Resend.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,19 +51,15 @@ function extractDisplayName(raw: string): string | undefined {
   return name || undefined;
 }
 
-/** Mailbox: function secret first, then a valid body address, then default. */
-function resolveMailbox(bodyFrom: string): string {
-  const envRaw = (Deno.env.get("RESEND_FROM") ?? Deno.env.get("EMAIL_FROM") ?? "").trim();
-  return extractEmailAddress(envRaw) ?? extractEmailAddress(bodyFrom) ?? DEFAULT_MANAGED_FROM_ADDRESS;
-}
-
-function resolveFromHeader(bodyFrom: string): string {
+/** Use invoke-body From. Rewrite only a missing/sandbox mailbox. */
+function resolveFromHeader(bodyFrom: string): string | null {
   const display = extractDisplayName(bodyFrom) || DEFAULT_MANAGED_FROM_NAME;
-  return `${display} <${resolveMailbox(bodyFrom)}>`;
+  const mailbox = extractEmailAddress(bodyFrom) ?? DEFAULT_MANAGED_FROM_ADDRESS;
+  return `${display} <${mailbox}>`;
 }
 
 type SendBody = {
-  from?: string;            // "Name <addr@domain>" — display name kept; mailbox may be replaced
+  from: string;            // "Name <addr@domain>" from the app server fn
   to: string | string[];
   subject: string;
   html?: string;
@@ -90,10 +87,12 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => null)) as SendBody | null;
     if (!body || typeof body !== "object") return json({ error: "Invalid JSON body" }, 400);
 
-    const { to, subject, html, text, reply_to, cc, bcc } = body;
-    const bodyFrom = typeof body.from === "string" ? body.from : "";
+    const { from: bodyFrom, to, subject, html, text, reply_to, cc, bcc } = body;
+    if (typeof bodyFrom !== "string" || !bodyFrom.includes("@")) {
+      return json({ error: "Missing/invalid 'from'" }, 400);
+    }
     const from = resolveFromHeader(bodyFrom);
-    if (!from.includes("@")) return json({ error: "Missing/invalid 'from'" }, 400);
+    if (!from) return json({ error: "Missing/invalid 'from'" }, 400);
     if (!to || (typeof to !== "string" && !Array.isArray(to))) return json({ error: "Missing 'to'" }, 400);
     if (typeof subject !== "string" || !subject.trim()) return json({ error: "Missing 'subject'" }, 400);
     if (!html && !text) return json({ error: "Missing 'html' or 'text'" }, 400);
@@ -128,7 +127,7 @@ Deno.serve(async (req) => {
           ? String((parsed as Record<string, unknown>).message)
           : `Resend error ${resp.status}`;
       const errMsg = /not verified|invalid `?from`?/i.test(rawMsg)
-        ? "The From domain isn't verified in Resend. Verify providerinterface.com, or set RESEND_FROM to a verified mailbox."
+        ? "The From domain isn't verified in Resend. Verify providerinterface.com, or set app RESEND_FROM to a verified mailbox."
         : rawMsg;
       console.error("[send-email] Resend failure", resp.status, errMsg);
       return json({ ok: false, error: errMsg, status: resp.status }, 502);

@@ -182,11 +182,13 @@ test.describe("invite join vs new-agency signup", () => {
       await expect(page.locator("body")).toContainText(JOIN_HEADING);
       await expect(page.locator("body")).not.toContainText(/how many staff|team size/i);
 
-      await page.locator("#join-username").fill("tester@example.com");
+      await expect(page.locator("#join-username")).toHaveValue("tester@example.com");
+      await expect(page.getByTestId("join-username-live")).toContainText(/email/i);
+      await page.locator("#join-username").fill("1staff");
       await expect(page.getByTestId("join-username-live")).toContainText(/email/i);
       await page.getByTestId("join-username-suggest").click();
-      await expect(page.locator("#join-username")).toHaveValue("tester");
-      await expect(page.getByTestId("join-username-live")).toContainText(/looks good/i);
+      await expect(page.locator("#join-username")).toHaveValue("tester@example.com");
+      await expect(page.getByTestId("join-username-live")).toContainText(/email/i);
 
       await page.locator("#join-password").fill("short1");
       await expect(page.getByTestId("join-password-live")).toContainText(/too short/i);

@@ -1,4 +1,5 @@
 import { resolveAuthOrigin } from "./auth-redirect.ts";
+import { defaultUsernameFromEmail } from "./account-username.ts";
 
 /** Shown on every failed join so testers are not dumped into new-agency signup. */
 export const ASK_ADMIN_MANUAL = "Ask your admin to add you manually.";
@@ -108,11 +109,15 @@ export const JOIN_PASSWORD_MAX_LENGTH = 200;
 export const JOIN_PASSWORD_HINT =
   "At least 8 characters. Letters and numbers are fine — no special character required.";
 
-export const JOIN_USERNAME_HINT =
-  "Must start with a letter and be 3–32 letters, numbers, or underscores. Don't use an email.";
-
-export const JOIN_USERNAME_INVALID =
-  "Username must start with a letter and be 3–32 letters, numbers, or underscores.";
+export {
+  USERNAME_HINT as JOIN_USERNAME_HINT,
+  USERNAME_INVALID as JOIN_USERNAME_INVALID,
+  USERNAME_MAX_LENGTH as JOIN_USERNAME_MAX_LENGTH,
+  defaultUsernameFromEmail,
+  isValidUsername as isValidJoinUsername,
+  resolveAccountUsername,
+  usernameLiveMessage as joinUsernameLiveMessage,
+} from "./account-username.ts";
 
 export const JOIN_PASSWORD_TOO_SHORT = "Password must be at least 8 characters.";
 
@@ -169,44 +174,9 @@ export function isValidExistingJoinPassword(password: string): boolean {
   return password.length > 0 && password.length <= 200;
 }
 
-export function isValidJoinUsername(username: string): boolean {
-  return /^[a-zA-Z][a-zA-Z0-9_]{2,31}$/.test(username.trim());
-}
-
-/**
- * Live username copy. Empty / whitespace → null (helper text already explains the rule).
- */
-export function joinUsernameLiveMessage(username: string): { ok: boolean; text: string } | null {
-  const t = username.trim();
-  if (!t) return null;
-  if (t.includes("@")) {
-    return { ok: false, text: "Don't use an email. Start with a letter; letters, numbers, or underscores only." };
-  }
-  if (!/^[a-zA-Z]/.test(t)) {
-    return { ok: false, text: "Must start with a letter." };
-  }
-  if (t.length < 3) {
-    return { ok: false, text: "Must be at least 3 characters." };
-  }
-  if (t.length > 32) {
-    return { ok: false, text: "Must be 32 characters or fewer." };
-  }
-  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(t)) {
-    return { ok: false, text: "Only letters, numbers, and underscores are allowed." };
-  }
-  return { ok: true, text: "Username looks good." };
-}
-
-/**
- * Sanitize a sign-in username from an email local-part.
- * Strips anything that isn't a letter, number, or underscore; drops a leading
- * non-letter run so the result can pass isValidJoinUsername. Empty if it can't.
- */
+/** Prefill / restore: username is the invite email (not a sanitized local-part). */
 export function suggestJoinUsername(email: string): string {
-  const local = String(email || "").split("@")[0] ?? "";
-  const stripped = local.replace(/[^a-zA-Z0-9_]/g, "");
-  const letterLed = stripped.replace(/^[^a-zA-Z]+/, "").slice(0, 32);
-  return isValidJoinUsername(letterLed) ? letterLed : "";
+  return defaultUsernameFromEmail(email);
 }
 
 /** True when this page is new-agency signup (payment / team size), not join. */

@@ -66,6 +66,7 @@ import {
   parseSignupStaffCount,
   signupCountDraftFromInput,
 } from "@/lib/signup-count-input";
+import { defaultUsernameFromEmail } from "@/lib/account-username";
 import { toast } from "sonner";
 import {
   SIGNUP_EMAIL_IN_USE_MESSAGE,
@@ -411,7 +412,6 @@ function Step1Account({
   }, [authCallbackError]);
 
   const lenOk = form.password.length >= 8;
-  const numOk = /\d/.test(form.password);
   const matchOk = form.password.length > 0 && form.password === form.confirm;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
 
@@ -468,7 +468,7 @@ function Step1Account({
     if (!form.acceptedTos) return toast.error("Agree to the Terms to continue.");
     if (!form.acceptedBaa) return toast.error("Agree to the Business Associate Agreement to continue.");
     if (!emailValid) return setEmailErr("Please enter a valid email address.");
-    if (!lenOk || !numOk) return toast.error("Password must be at least 8 characters and include a number.");
+    if (!lenOk) return toast.error("Password must be at least 8 characters.");
     if (!matchOk) return toast.error("Passwords don't match.");
     if (await verifyPasswordPwned(form.password)) return;
     setBusy(true);
@@ -505,6 +505,7 @@ function Step1Account({
           data: {
             full_name: form.contactName || form.email.split("@")[0],
             agency_name: form.agencyName || `${form.email.split("@")[0]}'s workspace`,
+            username: defaultUsernameFromEmail(form.email),
           },
         },
       });
@@ -606,6 +607,7 @@ function Step1Account({
       <div className="grid gap-4">
         <Field
           label="Email address"
+          hint="This is also your username — you'll sign in with this email."
           error={
             emailErr ? (
               <>
@@ -674,7 +676,6 @@ function Step1Account({
 
         <ul className="-mt-1 grid gap-1 text-xs">
           <PwRule ok={lenOk}>At least 8 characters</PwRule>
-          <PwRule ok={numOk}>At least one number</PwRule>
         </ul>
 
         <Field label="Confirm password" error={!matchOk && form.confirm ? "Passwords don't match." : null}>
@@ -764,7 +765,6 @@ function Step1Account({
               !form.acceptedBaa ||
               !emailValid ||
               !lenOk ||
-              !numOk ||
               !matchOk ||
               !!emailErr ||
               !!passwordWeakErr

@@ -108,24 +108,24 @@ describe("join field rules", () => {
     assert.equal(joinSetsAuthPassword(true, { mustChangePassword: true }), true);
     assert.equal(joinSetsAuthPassword(true, { mustChangePassword: false }), false);
   });
-  it("requires a letter-led username", () => {
+  it("accepts an email as the username (same rule as owner signup)", () => {
     assert.equal(isValidJoinUsername("ab"), false);
     assert.equal(isValidJoinUsername("1staff"), false);
-    assert.equal(isValidJoinUsername("staff@agency"), false);
+    assert.equal(isValidJoinUsername("staff@agency.com"), true);
     assert.equal(isValidJoinUsername("dsp_jane"), true);
   });
-  it("suggests a sanitized username from the email local-part", () => {
-    assert.equal(suggestJoinUsername("jane.doe@example.com"), "janedoe");
-    assert.equal(suggestJoinUsername("dsp_jane+night@example.com"), "dsp_janenight");
-    assert.equal(suggestJoinUsername("1lead.house@example.com"), "leadhouse");
-    assert.equal(suggestJoinUsername("ab@example.com"), "");
+  it("defaults the username to the invite email, not a sanitized local-part", () => {
+    assert.equal(suggestJoinUsername("jane.doe@example.com"), "jane.doe@example.com");
+    assert.equal(suggestJoinUsername("DSP_Jane+night@Example.com"), "dsp_jane+night@example.com");
+    assert.equal(suggestJoinUsername("1lead.house@example.com"), "1lead.house@example.com");
     assert.equal(isValidJoinUsername(suggestJoinUsername("tester@example.com")), true);
   });
-  it("live-validates username, including email-like autofill", () => {
+  it("live-validates an email username as good", () => {
     assert.equal(joinUsernameLiveMessage(""), null);
     const emailLike = joinUsernameLiveMessage("tester@example.com");
-    assert.equal(emailLike?.ok, false);
+    assert.equal(emailLike?.ok, true);
     assert.match(String(emailLike?.text), /email/i);
+    assert.doesNotMatch(String(emailLike?.text), /start with a letter|underscores only/i);
     assert.equal(joinUsernameLiveMessage("ab")?.ok, false);
     assert.equal(joinUsernameLiveMessage("dsp_jane")?.ok, true);
   });

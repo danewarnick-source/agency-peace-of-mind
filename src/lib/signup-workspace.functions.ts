@@ -6,6 +6,7 @@ import {
   type SignupWorkspaceReason,
   workspaceNameFromSignup,
 } from "@/lib/signup-workspace";
+import { defaultUsernameFromEmail } from "@/lib/account-username";
 
 export type EnsureSignupWorkspaceResult = {
   ok: boolean;
@@ -141,10 +142,12 @@ export const ensureSignupWorkspace = createServerFn({ method: "POST" })
       .replace(/^-|-$/g, "");
 
     try {
+      const profileEmail = context.claims?.email ?? null;
       const profileUpsert = await admin.from("profiles").upsert(
         {
           id: userId,
-          email: context.claims?.email ?? null,
+          email: profileEmail,
+          username: defaultUsernameFromEmail(profileEmail) || null,
           agency_name: data.agencyName || null,
         },
         { onConflict: "id" },

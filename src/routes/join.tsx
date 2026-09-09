@@ -269,7 +269,7 @@ function JoinPage() {
             <p id="join-username-hint" className="text-xs text-[#0a0f1c]/55" data-testid="join-username-hint">
               {JOIN_USERNAME_HINT}
             </p>
-            {suggestedUsername && suggestedUsername !== username.trim() && (
+            {suggestedUsername && suggestedUsername !== username.trim().toLowerCase() && (
               <button
                 type="button"
                 data-testid="join-username-suggest"
@@ -279,7 +279,7 @@ function JoinPage() {
                 }}
                 className="text-left text-xs font-medium text-[#8a6d32] hover:text-[#0a0f1c] hover:underline"
               >
-                Use suggested username: {suggestedUsername}
+                Use email as username: {suggestedUsername}
               </button>
             )}
             <LiveLine id="join-username-live" testId="join-username-live" status={usernameLive} />

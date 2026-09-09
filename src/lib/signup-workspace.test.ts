@@ -70,4 +70,10 @@ describe("signup workspace / session", () => {
     assert.match(src, /seedSignupOrgRolePermissions/);
     assert.match(src, /seed_org_role_permissions/);
   });
+
+  it("defaults the owner profile username to the signup email", () => {
+    const src = readFileSync(new URL("./signup-workspace.functions.ts", import.meta.url), "utf8");
+    assert.match(src, /defaultUsernameFromEmail/);
+    assert.match(src, /username:\s*defaultUsernameFromEmail/);
+  });
 });

@@ -9,7 +9,9 @@ import {
   isValidJoinUsername,
   JOIN_PASSWORD_TOO_SHORT,
   JOIN_USERNAME_INVALID,
+  JOIN_USERNAME_MAX_LENGTH,
   joinSetsAuthPassword,
+  resolveAccountUsername,
   type InviteFailureReason,
 } from "@/lib/join-invite";
 import { stripFakeDisplayLabel } from "@/lib/managed-from";
@@ -118,7 +120,7 @@ export const previewInvitation = createServerFn({ method: "POST" })
 const PrepareInput = z.object({
   token: z.string().trim().min(1).max(200),
   password: z.string().min(1).max(200),
-  username: z.string().trim().max(32).optional().or(z.literal("")),
+  username: z.string().trim().max(JOIN_USERNAME_MAX_LENGTH).optional().or(z.literal("")),
   full_name: z.string().trim().max(120).optional().or(z.literal("")),
 });
 
@@ -146,13 +148,14 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
 
     const usernameRaw = String(data.username || "").trim();
     const fullNameRaw = String(data.full_name || "").trim();
+    const existingUsername = String(existing?.username || "").trim();
+    const username = existingUsername
+      ? existingUsername
+      : resolveAccountUsername({ username: usernameRaw, email });
 
-    if (!existing || !String(existing.username || "").trim()) {
-      if (!isValidJoinUsername(usernameRaw)) {
-        throw new Error(JOIN_USERNAME_INVALID);
-      }
+    if (!existingUsername && !isValidJoinUsername(username)) {
+      throw new Error(JOIN_USERNAME_INVALID);
     }
-    const username = usernameRaw || String(existing?.username || "").trim();
 
     if (username) {
       const { data: taken } = await supabaseAdmin

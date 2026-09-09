@@ -364,9 +364,9 @@ function LiveLine({
   testId: string;
   status: { ok: boolean; text: string } | null;
 }) {
-  if (!status) return <p id={id} data-testid={testId} className="sr-only" />;
+  if (!status) return <div id={id} data-testid={testId} className="sr-only" />;
   return (
-    <p
+    <div
       id={id}
       data-testid={testId}
       role="status"
@@ -374,7 +374,7 @@ function LiveLine({
       className={`text-xs font-medium ${status.ok ? "text-[#1e3a30]" : "text-[#8a3228]"}`}
     >
       {status.text}
-    </p>
+    </div>
   );
 }
 

@@ -195,6 +195,16 @@ describe("staff phone leftover search + tab scroll (source)", () => {
     assert.match(chat, /staffNectarFailureMessage/);
     assert.match(fn, /staffNectarFailureMessage/);
     assert.doesNotMatch(fn, /AI error \(/);
+    assert.doesNotMatch(chat, /\bHive\b/);
+    assert.doesNotMatch(chat, /How many hours have I worked this period/);
+    assert.match(chat, /I only know your assignments, your shifts, and your policies/);
+    assert.match(chat, /STAFF_PAY_PERIOD_PATH/);
+    assert.match(chat, /to="\/dashboard"/);
+    assert.match(fn, /scheduled_shifts/);
+    assert.match(fn, /questionWantsPayOrHours/);
+    assert.doesNotMatch(fn, /evv_timesheets/);
+    assert.doesNotMatch(fn, /hours_this_period/);
+    assert.doesNotMatch(fn, /estimated_earnings/);
   });
 
   it("Ask NECTAR page does not pull under the title bar", () => {

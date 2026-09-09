@@ -21,14 +21,14 @@ export function PiPublicHeader({ home = false }: { home?: boolean }) {
                 {item.label}
               </Link>
             ) : (
-              <Link key={item.label} to={item.to}>
+              <Link key={item.label} to={item.to} hash="">
                 {item.label}
               </Link>
             ),
           )}
         </div>
         <div className="nav-end">
-          <Link className="pi-home-btn cream sm" to="/login">
+          <Link className="pi-home-btn cream sm" to="/login" hash="">
             {PI_SIGN_IN}
           </Link>
           <PublicMobileMenuButton
@@ -51,12 +51,12 @@ export function PiPublicHeader({ home = false }: { home?: boolean }) {
                 {item.label}
               </Link>
             ) : (
-              <Link key={item.label} to={item.to} onClick={() => setOpen(false)}>
+              <Link key={item.label} to={item.to} hash="" onClick={() => setOpen(false)}>
                 {item.label}
               </Link>
             ),
           )}
-          <Link to="/login" onClick={() => setOpen(false)}>
+          <Link to="/login" hash="" onClick={() => setOpen(false)}>
             {PI_SIGN_IN}
           </Link>
         </div>

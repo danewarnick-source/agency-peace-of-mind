@@ -52,6 +52,9 @@ describe("public pages share homepage marketing chrome", () => {
     assert.match(footer, /PI_HOME_FOOTER_LINKS/);
     assert.match(footer, /PI_HOME_FOOTER_HCBS/);
     assert.match(page, /pi-landing-root pi-home/);
+    assert.match(page, /applyPublicPageScroll/);
+    assert.match(header, /hash=""/);
+    assert.match(footer, /hash=""/);
     assert.doesNotMatch(header, /btn p sm/);
     assert.doesNotMatch(footer, /PI_FOOTER_LINKS/);
   });

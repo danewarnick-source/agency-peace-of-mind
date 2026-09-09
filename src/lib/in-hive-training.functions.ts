@@ -5,8 +5,12 @@ import {
   inHiveExamRef,
   inHiveRefUuid,
   lastExamResetAt,
+  nextTopicProgressStatus,
+  completedCodesFromProgress,
   type ExamAttemptSnapshot,
   type InHiveCourseId,
+  type SegmentProof,
+  type ThirtyDayCertificateRecord,
 } from "@/lib/in-hive-training";
 
 export async function loadInHiveTopicProgress(
@@ -28,6 +32,23 @@ export async function loadInHiveTopicProgress(
     status: String(data.status ?? "not_started"),
     position: Number(data.position ?? 0),
   };
+}
+
+export async function loadInHiveCourseProgress(
+  userId: string,
+  courseId: InHiveCourseId,
+  topicCodes: readonly string[],
+): Promise<Record<string, { status: string; position: number } | null>> {
+  const rows = await Promise.all(
+    topicCodes.map(async (code) => {
+      const row = await loadInHiveTopicProgress(userId, courseId, code);
+      return [code, row] as const;
+    }),
+  );
+  return Object.fromEntries(rows) as Record<
+    string,
+    { status: string; position: number } | null
+  >;
 }
 
 export async function hasAnyInHiveProgress(
@@ -57,6 +78,8 @@ export async function saveInHiveTopicProgress(args: {
   status: "in_progress" | "completed";
   position: number;
 }): Promise<void> {
+  const existing = await loadInHiveTopicProgress(args.userId, args.courseId, args.topicCode);
+  const status = nextTopicProgressStatus(existing?.status, args.status);
   const refId = inHiveRefUuid(args.courseId, args.topicCode);
   const { error } = await (supabase as any)
     .from("training_topic_progress")
@@ -65,13 +88,67 @@ export async function saveInHiveTopicProgress(args: {
         user_id: args.userId,
         topic_kind: IN_HIVE_PROGRESS_KIND,
         ref_id: refId,
-        status: args.status,
+        status,
         position: args.position,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,topic_kind,ref_id" },
     );
   if (error) throw error;
+}
+
+export async function insertInHiveSegmentProof(args: {
+  userId: string;
+  courseId: InHiveCourseId;
+  topicCode: string;
+  signedName: string;
+  signerEmail: string | null;
+  proof: SegmentProof;
+}): Promise<void> {
+  if (!args.proof.passed) return;
+  const refId = inHiveRefUuid(args.courseId, args.topicCode);
+  const { error } = await (supabase as any).from("training_completions").insert({
+    user_id: args.userId,
+    topic_kind: IN_HIVE_PROGRESS_KIND,
+    ref_id: refId,
+    topic_code: args.topicCode,
+    topic_title: `30-day segment ${args.topicCode}`,
+    dspd_letter: args.topicCode.length === 1 ? args.topicCode : null,
+    attestation_statement: `SOW segment ${args.topicCode} passed (${args.proof.correctCount}/${args.proof.total}).`,
+    typed_signature: args.signedName,
+    signer_full_name: args.signedName,
+    signer_email: args.signerEmail,
+    consent_accepted: true,
+    question_answers: args.proof,
+    completed_at: args.proof.completedAt,
+  });
+  if (error && !/duplicate|unique/i.test(error.message ?? "")) throw error;
+}
+
+export async function insertInHiveCourseCertificate(args: {
+  userId: string;
+  courseId: InHiveCourseId;
+  signedName: string;
+  signerEmail: string | null;
+  certificate: ThirtyDayCertificateRecord;
+}): Promise<void> {
+  const refId = inHiveRefUuid(args.courseId, "__cert__");
+  const { error } = await (supabase as any).from("training_completions").insert({
+    user_id: args.userId,
+    topic_kind: IN_HIVE_PROGRESS_KIND,
+    ref_id: refId,
+    topic_code: "CERT",
+    topic_title: args.certificate.courseName,
+    dspd_letter: null,
+    attestation_statement: `${args.certificate.courseName} certificate — ${args.certificate.citation}.`,
+    typed_signature: args.signedName,
+    signer_full_name: args.signedName,
+    signer_email: args.signerEmail,
+    consent_accepted: true,
+    question_answers: args.certificate,
+    completed_at: args.certificate.completedAt,
+  });
+  if (error && !/duplicate|unique/i.test(error.message ?? "")) throw error;
 }
 
 function parseSnapshot(raw: unknown): ExamAttemptSnapshot | null {
@@ -170,4 +247,4 @@ export async function resetInHiveExamAttempts(args: {
   if (upErr) throw upErr;
 }
 
-export { lastExamResetAt, inHiveExamRef };
+export { lastExamResetAt, inHiveExamRef, completedCodesFromProgress };

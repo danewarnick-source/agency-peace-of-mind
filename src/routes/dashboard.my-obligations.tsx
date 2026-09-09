@@ -139,7 +139,7 @@ function CompletedCard({
               params={{ instanceId: instance.id }}
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--hive-ink)] hover:underline"
             >
-              Open course / exam export <ExternalLink className="h-3 w-3" />
+              Review course <ExternalLink className="h-3 w-3" />
             </Link>
           ) : clientFormKindForTitle(ob.title) && instance.client_id ? (
             <Link

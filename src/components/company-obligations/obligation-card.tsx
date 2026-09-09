@@ -41,6 +41,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  Download,
   Lock,
   MoreHorizontal,
 } from "lucide-react";
@@ -62,8 +63,9 @@ import { FulfillmentBadge, RollupStatus, catalogFor, fulfillmentFor } from "./ob
 import { ObligationCatalogNote } from "./obligation-catalog-note";
 import { CATEGORY_LABEL, OWNER_LABEL } from "@/lib/sow-obligation-catalog";
 import { cn } from "@/lib/utils";
-import { isInHiveCourseTitle } from "@/lib/in-hive-training";
-import { resetInHiveExamAttempts } from "@/lib/in-hive-training.functions";
+import { formatExamExportCsv, inHiveCourseIdForTitle, isInHiveCourseTitle } from "@/lib/in-hive-training";
+import { examTitleFor } from "@/lib/in-hive-training-exams";
+import { loadInHiveExamAttempts, resetInHiveExamAttempts } from "@/lib/in-hive-training.functions";
 
 export type ObligationWithInstance = CompanyObligationRow & {
   current_instance: ObligationInstanceRow | null;
@@ -256,6 +258,61 @@ function ConfirmNectarOverrideButton({
   );
 }
 
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function AdminExamExportButton({
+  staffId,
+  staffName,
+  obligationTitle,
+}: {
+  staffId: string;
+  staffName: string;
+  obligationTitle: string;
+}) {
+  const courseId = inHiveCourseIdForTitle(obligationTitle);
+  const m = useMutation({
+    mutationFn: async () => {
+      if (!courseId) throw new Error("This obligation is not an in-platform course.");
+      const attempts = await loadInHiveExamAttempts(staffId, courseId, null);
+      const last = [...attempts].reverse().find((a) => a.passed) ?? attempts[attempts.length - 1];
+      if (!last) throw new Error("No exam attempt on file yet.");
+      return formatExamExportCsv({
+        courseTitle: examTitleFor(courseId),
+        staffName,
+        completedAt: last.completedAt,
+        snapshot: last,
+      });
+    },
+    onSuccess: (csv) => {
+      downloadCsv(`${courseId ?? "course"}-exam-export.csv`, csv);
+      toast.success("Auditor export downloaded.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!courseId) return null;
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-6 px-1.5 text-[11px]"
+      disabled={m.isPending}
+      onClick={() => m.mutate()}
+    >
+      <Download className="h-3 w-3 mr-1" />
+      Auditor export
+    </Button>
+  );
+}
+
 function ResetExamAttemptsButton({
   instanceId,
   staffId,
@@ -413,6 +470,13 @@ function PerNameCompletion({
                         staffName={c.staff_name}
                       />
                     )}
+                    {showExamReset && (
+                      <AdminExamExportButton
+                        staffId={c.staff_id}
+                        staffName={c.staff_name}
+                        obligationTitle={obligation.title}
+                      />
+                    )}
                   </div>
                   {failed && (c.nectar_validation_reasons?.length ?? 0) > 0 && (
                     <p className="ml-4 text-[11px] text-muted-foreground">
@@ -449,10 +513,17 @@ function PerNameCompletion({
                     {a.staff_name} — {text}
                   </span>
                   {showExamReset && instanceByStaff[a.staff_id] && (
-                    <ResetExamAttemptsButton
-                      instanceId={instanceByStaff[a.staff_id]}
-                      staffId={a.staff_id}
-                    />
+                    <>
+                      <AdminExamExportButton
+                        staffId={a.staff_id}
+                        staffName={a.staff_name}
+                        obligationTitle={obligation.title}
+                      />
+                      <ResetExamAttemptsButton
+                        instanceId={instanceByStaff[a.staff_id]}
+                        staffId={a.staff_id}
+                      />
+                    </>
                   )}
                 </li>
               );

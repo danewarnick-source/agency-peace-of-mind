@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CheckCircle2, Download, Lock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   TrainingModule,
   thirtyDayTopicsInSowOrder,
+  type AttestPayload,
   type Topic,
 } from "@/components/training/hive-training-engine";
 import { ABI_TOPICS } from "@/lib/in-hive-training-abi";
@@ -16,13 +17,13 @@ import {
   EXAM_PASS_RATIO,
   IN_HIVE_COURSE_EVIDENCE,
   allRequiredTopicsComplete,
+  completedCodesFromProgress,
   buildExamAnswerRecords,
   buildThirtyDayCertificate,
   canIssueThirtyDayCertificate,
   courseTitle,
   examLocked,
   examUnlocked,
-  formatExamExportCsv,
   remainingExamAttempts,
   scoreExam,
   shuffleCopy,
@@ -30,12 +31,15 @@ import {
   type ExamAttemptSnapshot,
   type ExamQuestion,
   type InHiveCourseId,
+  type SegmentProof,
 } from "@/lib/in-hive-training";
 import { InHiveCertificate } from "@/components/training/in-hive-certificate";
 import {
+  insertInHiveCourseCertificate,
   insertInHiveExamAttempt,
+  insertInHiveSegmentProof,
+  loadInHiveCourseProgress,
   loadInHiveExamAttempts,
-  loadInHiveTopicProgress,
   saveInHiveTopicProgress,
 } from "@/lib/in-hive-training.functions";
 import { recordCompletion } from "@/lib/company-obligations.functions";
@@ -86,18 +90,7 @@ export function InHiveCoursePlayer({
 
   const progressQ = useQuery({
     queryKey: ["in-hive-progress", userId, courseId],
-    queryFn: async () => {
-      const rows = await Promise.all(
-        topics.map(async (t) => {
-          const row = await loadInHiveTopicProgress(userId, courseId, t.code);
-          return [t.code, row] as const;
-        }),
-      );
-      return Object.fromEntries(rows) as Record<
-        string,
-        { status: string; position: number } | null
-      >;
-    },
+    queryFn: () => loadInHiveCourseProgress(userId, courseId, topicCodes),
   });
 
   const examQ = useQuery({
@@ -105,10 +98,10 @@ export function InHiveCoursePlayer({
     queryFn: () => loadInHiveExamAttempts(userId, courseId, examResetAfterIso),
   });
 
-  const completedCodes = useMemo(() => {
-    const map = progressQ.data ?? {};
-    return new Set(topics.filter((t) => map[t.code]?.status === "completed").map((t) => t.code));
-  }, [progressQ.data, topics]);
+  const completedCodes = useMemo(
+    () => completedCodesFromProgress(topicCodes, progressQ.data ?? {}),
+    [progressQ.data, topicCodes],
+  );
 
   const attempts = examQ.data ?? [];
   const passed = attempts.some((a) => a.passed);
@@ -132,9 +125,45 @@ export function InHiveCoursePlayer({
     },
   });
 
-  const markObligation = useCallback(async () => {
+  const persistCertificateIfReady = useCallback(
+    async (codes: ReadonlySet<string>, examPassed: boolean, examScorePct: number | null, completedAt: string) => {
+      if (courseId !== "thirty-day") return;
+      if (!canIssueThirtyDayCertificate({ topicCodes, completedCodes: codes, examPassed })) return;
+      await insertInHiveCourseCertificate({
+        userId,
+        courseId,
+        signedName,
+        signerEmail,
+        certificate: buildThirtyDayCertificate({
+          staffName: signedName,
+          organizationName,
+          completedAt,
+          completedCodes: codes,
+          examPassed: true,
+          examScorePct,
+          topicTitles: topics.map((t) => ({ code: t.code, title: t.title })),
+        }),
+      });
+    },
+    [courseId, organizationName, signedName, signerEmail, topicCodes, topics, userId],
+  );
+
+  const markObligation = useCallback(async (freshCodes?: ReadonlySet<string>) => {
+    const codes = freshCodes ?? completedCodesFromProgress(
+      topicCodes,
+      await loadInHiveCourseProgress(userId, courseId, topicCodes),
+    );
+    if (!allRequiredTopicsComplete(topicCodes, codes)) return;
+    const examAttempts = await loadInHiveExamAttempts(userId, courseId, examResetAfterIso);
+    const passedExam = examAttempts.some((a) => a.passed);
+    const lastPass = [...examAttempts].reverse().find((a) => a.passed);
+    await persistCertificateIfReady(
+      codes,
+      passedExam,
+      lastPass?.scorePct ?? null,
+      lastPass?.completedAt ?? new Date().toISOString(),
+    );
     if (skipObligation || !organizationId) return;
-    if (!allRequiredTopicsComplete(topicCodes, completedCodes)) return;
     await recordFn({
       data: {
         organizationId,
@@ -145,13 +174,16 @@ export function InHiveCoursePlayer({
       },
     });
   }, [
-    recordFn,
-    organizationId,
+    courseId,
+    examResetAfterIso,
     instanceId,
     obligationTitle,
+    organizationId,
+    persistCertificateIfReady,
+    recordFn,
     skipObligation,
     topicCodes,
-    completedCodes,
+    userId,
   ]);
 
   const finishCourse = useMutation({
@@ -161,6 +193,8 @@ export function InHiveCoursePlayer({
       void qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
       void qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
       void qc.invalidateQueries({ queryKey: ["obligation-instance-context"] });
+      void qc.invalidateQueries({ queryKey: ["obligation-pack-matrix"] });
+      void qc.invalidateQueries({ queryKey: ["company-obligations"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -184,16 +218,32 @@ export function InHiveCoursePlayer({
         signerEmail,
         snapshot,
       });
-      if (snapshot.passed && !alreadyComplete) {
-        await markObligation();
+      if (snapshot.passed) {
+        const fresh = completedCodesFromProgress(
+          topicCodes,
+          await loadInHiveCourseProgress(userId, courseId, topicCodes),
+        );
+        if (!alreadyComplete) {
+          await markObligation(fresh);
+        } else {
+          await persistCertificateIfReady(
+            fresh,
+            true,
+            snapshot.scorePct,
+            snapshot.completedAt,
+          );
+        }
       }
       return snapshot;
     },
     onSuccess: (snap) => {
       void qc.invalidateQueries({ queryKey: ["in-hive-exam"] });
+      void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
       void qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
       void qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
       void qc.invalidateQueries({ queryKey: ["obligation-instance-context"] });
+      void qc.invalidateQueries({ queryKey: ["obligation-pack-matrix"] });
+      void qc.invalidateQueries({ queryKey: ["company-obligations"] });
       if (snap.passed) toast.success(`Exam passed at ${snap.scorePct}%.`);
       else if (examLocked(failedCount + 1, false)) {
         toast.error("Three attempts used. An admin must reassign this exam.");
@@ -206,22 +256,47 @@ export function InHiveCoursePlayer({
 
   const completedOnce = useRef<Set<string>>(new Set());
   const onTopicComplete = useCallback(
-    (code: string) => {
-      if (completedOnce.current.has(code)) return;
+    (code: string, payload?: AttestPayload) => {
+      if (completedCodes.has(code) || completedOnce.current.has(code)) return;
       completedOnce.current.add(code);
-      saveTopic.mutate({
-        userId,
-        courseId,
-        topicCode: code,
-        status: "completed",
-        position: 0,
-      });
+      const completedAt = new Date().toISOString();
+      const proof: SegmentProof | null = payload?.segment
+        ? {
+            kind: "segment-gate",
+            topicCode: code,
+            correctCount: payload.segment.correctCount,
+            total: payload.segment.total,
+            passed: payload.segment.passed,
+            completedAt,
+          }
+        : null;
+      void (async () => {
+        await saveInHiveTopicProgress({
+          userId,
+          courseId,
+          topicCode: code,
+          status: "completed",
+          position: 0,
+        });
+        if (proof?.passed) {
+          await insertInHiveSegmentProof({
+            userId,
+            courseId,
+            topicCode: code,
+            signedName,
+            signerEmail,
+            proof,
+          });
+        }
+        void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
+      })();
     },
-    [userId, courseId, saveTopic],
+    [completedCodes, courseId, qc, signedName, signerEmail, userId],
   );
 
   const onStepChange = useCallback(
     (code: string, step: number) => {
+      if (completedCodes.has(code)) return;
       saveTopic.mutate({
         userId,
         courseId,
@@ -230,31 +305,13 @@ export function InHiveCoursePlayer({
         position: step,
       });
     },
-    [userId, courseId, saveTopic],
+    [completedCodes, courseId, saveTopic, userId],
   );
 
   const goNextAfterTopic = (code: string) => {
     const idx = topicCodes.indexOf(code);
     const next = topics[idx + 1];
     setActiveCode(next ? next.code : "exam");
-  };
-
-  const downloadExport = () => {
-    const last = [...attempts].reverse().find((a) => a.passed) ?? attempts[attempts.length - 1];
-    if (!last) return;
-    const csv = formatExamExportCsv({
-      courseTitle: examTitleFor(courseId),
-      staffName: signedName,
-      completedAt: last.completedAt,
-      snapshot: last,
-    });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${courseId}-exam-export.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   if (progressQ.isLoading || examQ.isLoading || activeCode === null) {
@@ -275,7 +332,7 @@ export function InHiveCoursePlayer({
           <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" asChild>
             <Link to="/dashboard/my-obligations">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              My Obligations
+              My Compliance
             </Link>
           </Button>
         )}
@@ -293,7 +350,11 @@ export function InHiveCoursePlayer({
         >
           {topics.map((t, i) => {
             const done = completedCodes.has(t.code);
-            const unlocked = done || topicUnlocked(i, completedCodes, topicCodes, sequential);
+            const unlocked =
+              done ||
+              alreadyComplete ||
+              passed ||
+              topicUnlocked(i, completedCodes, topicCodes, sequential);
             const isActive = activeCode === t.code;
             return (
               <button
@@ -310,14 +371,14 @@ export function InHiveCoursePlayer({
                 {done ? (
                   <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />
                 ) : unlocked ? (
-                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]">
-                    {t.code}
-                  </span>
+                  <Circle className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
                 ) : (
                   <Lock className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
                 )}
-                <span className="leading-snug font-medium">
-                  {t.code}. {t.title}
+                <span className="leading-snug">
+                  <span className="font-medium">
+                    {done ? "Success" : "Open"} · {t.code}. {t.title}
+                  </span>
                 </span>
               </button>
             );
@@ -352,14 +413,15 @@ export function InHiveCoursePlayer({
       <div className="min-w-0 flex-1">
         {activeTopic && (
           <TrainingModule
-            key={activeTopic.code}
+            key={`${activeTopic.code}-${completedCodes.has(activeTopic.code) ? "review" : "take"}`}
             topic={activeTopic}
-            onExit={() => undefined}
+            onExit={() => setActiveCode(passed || alreadyComplete ? "exam" : firstOpen)}
             onFinished={() => goNextAfterTopic(activeTopic.code)}
-            onComplete={() => onTopicComplete(activeTopic.code)}
+            onComplete={(payload) => onTopicComplete(activeTopic.code, payload)}
             skipAttest
             hideAllTopics
-            initialStep={resumeStep}
+            readOnly={completedCodes.has(activeTopic.code)}
+            initialStep={completedCodes.has(activeTopic.code) ? 0 : resumeStep}
             onStepChange={(step) => onStepChange(activeTopic.code, step)}
           />
         )}
@@ -372,7 +434,6 @@ export function InHiveCoursePlayer({
             passed={passed}
             submitting={submitExam.isPending}
             onSubmit={(answers) => submitExam.mutate(answers)}
-            onDownload={downloadExport}
             alreadyComplete={alreadyComplete}
             finishPending={finishCourse.isPending}
             onMarkObligation={() => finishCourse.mutate()}
@@ -415,7 +476,6 @@ function ExamPane({
   passed,
   submitting,
   onSubmit,
-  onDownload,
   alreadyComplete,
   finishPending,
   onMarkObligation,
@@ -430,7 +490,6 @@ function ExamPane({
   passed: boolean;
   submitting: boolean;
   onSubmit: (answers: Record<string, string>) => void;
-  onDownload: () => void;
   alreadyComplete: boolean;
   finishPending: boolean;
   onMarkObligation: () => void;
@@ -461,12 +520,10 @@ function ExamPane({
             Three attempts were used without a passing score. An admin must reassign this exam
             before you can try again.
           </p>
-          {last && (
-            <Button variant="outline" onClick={onDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download attempt record
-            </Button>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Your attempts are saved on your staff file. An administrator can download the
+            auditor export if one is needed.
+          </p>
         </CardContent>
       </Card>
     );
@@ -490,21 +547,16 @@ function ExamPane({
           {certificate && (
             <InHiveCertificate record={certificate} issued={certificateIssued} />
           )}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={onDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download auditor export
-            </Button>
-            {!alreadyComplete && !hideObligation && certificateIssued && (
-              <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
-                Record on My Obligations
-              </Button>
-            )}
+          <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+            Completion is submitted and saved on your staff file. An administrator can
+            download the auditor export if one is needed. You can reopen any topic above to
+            review the material anytime.
           </div>
-          <p className="text-xs text-muted-foreground">
-            The export includes each question, your answer, correct/incorrect, and the SOW cite.
-            Cites are not shown during the test.
-          </p>
+          {!alreadyComplete && !hideObligation && certificateIssued && (
+            <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
+              Record on My Compliance
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -560,7 +612,7 @@ function ExamPane({
           {submitting ? "Scoring…" : "Submit exam"}
         </Button>
         <p className="text-[11px] text-muted-foreground">
-          {EXAM_MAX_ATTEMPTS} attempts maximum. An auditor export is available after you submit.
+          {EXAM_MAX_ATTEMPTS} attempts maximum. Results are saved on your staff file.
         </p>
       </CardContent>
     </Card>

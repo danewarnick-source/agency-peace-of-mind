@@ -35,6 +35,10 @@ export function inHiveExamRef(courseId: InHiveCourseId): string {
   return `inhive:${courseId}:__exam__`;
 }
 
+export function inHiveCertificateRef(courseId: InHiveCourseId): string {
+  return `inhive:${courseId}:__cert__`;
+}
+
 export function isInHiveProgressRef(refId: string): boolean {
   return refId.startsWith("inhive:");
 }
@@ -105,6 +109,9 @@ export function inHiveRefUuid(courseId: InHiveCourseId, topicCode: string): stri
   if (topicCode === "__exam__") {
     return `a11ce000-1e8f-4000-8000-00000000${courseByte}ff`;
   }
+  if (topicCode === "__cert__") {
+    return `a11ce000-1e8f-4000-8000-00000000${courseByte}fe`;
+  }
   if (topicCode.length === 1) {
     const topicByte = topicCode.charCodeAt(0).toString(16).padStart(2, "0");
     return `a11ce000-1e8f-4000-8000-00000000${courseByte}${topicByte}`;
@@ -135,6 +142,92 @@ export function allRequiredTopicsComplete(
   completed: ReadonlySet<string>,
 ): boolean {
   return topicCodes.every((c) => completed.has(c));
+}
+
+export function completedCodesFromProgress(
+  topicCodes: readonly string[],
+  map: Record<string, { status: string; position: number } | null | undefined>,
+): Set<string> {
+  return new Set(topicCodes.filter((code) => map[code]?.status === "completed"));
+}
+
+/** End of each SOW segment: 4 of 5 scored beats to pass. */
+export const SEGMENT_GATE_TOTAL = 5;
+export const SEGMENT_GATE_PASS = 4;
+
+export type SegmentGateResult = {
+  correctCount: number;
+  total: number;
+  passed: boolean;
+};
+
+export function scoreSegmentGate(correctFlags: readonly boolean[]): SegmentGateResult {
+  if (correctFlags.length >= SEGMENT_GATE_TOTAL) {
+    const gate = correctFlags.slice(0, SEGMENT_GATE_TOTAL);
+    const correctCount = gate.filter(Boolean).length;
+    return {
+      correctCount,
+      total: SEGMENT_GATE_TOTAL,
+      passed: correctCount >= SEGMENT_GATE_PASS,
+    };
+  }
+  const total = correctFlags.length;
+  const correctCount = correctFlags.filter(Boolean).length;
+  const need = total >= 4 ? 3 : total;
+  return { correctCount, total, passed: total > 0 && correctCount >= need };
+}
+
+/** Reviewing a passed topic must not un-complete it. */
+export function nextTopicProgressStatus(
+  existing: string | null | undefined,
+  requested: "in_progress" | "completed",
+): "in_progress" | "completed" {
+  if (existing === "completed") return "completed";
+  return requested;
+}
+
+export function choiceFollowUp(fb: string): string {
+  return fb.replace(/^(Right|Correct|Exactly|Yes)\.\s*/i, "").trim();
+}
+
+export type LengthCheckedChoice = { t: string; correct: boolean };
+
+/** True when the correct choice is the unique longest by more than 12 characters. */
+export function correctChoiceIsUniquelyLongest(
+  options: readonly LengthCheckedChoice[],
+): boolean {
+  if (options.length < 2) return false;
+  const correct = options.find((o) => o.correct);
+  if (!correct) return false;
+  const others = options.filter((o) => !o.correct);
+  if (others.length === 0) return false;
+  const maxOther = Math.max(...others.map((o) => o.t.length));
+  return correct.t.length > maxOther + 12;
+}
+
+export type SegmentProof = {
+  kind: "segment-gate";
+  topicCode: string;
+  correctCount: number;
+  total: number;
+  passed: boolean;
+  completedAt: string;
+};
+
+export function buildSegmentProof(args: {
+  topicCode: string;
+  correctFlags: readonly boolean[];
+  completedAt: string;
+}): SegmentProof {
+  const gate = scoreSegmentGate(args.correctFlags);
+  return {
+    kind: "segment-gate",
+    topicCode: args.topicCode,
+    correctCount: gate.correctCount,
+    total: gate.total,
+    passed: gate.passed,
+    completedAt: args.completedAt,
+  };
 }
 
 export function canIssueThirtyDayCertificate(args: {

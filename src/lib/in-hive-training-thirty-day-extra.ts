@@ -210,7 +210,7 @@ export const P_STEPS: Step[] = [
   },
   {
     type: "check",
-    kicker: "Knowledge check 1 of 4",
+    kicker: "Knowledge check 1 of 5",
     stem: "Staff Jordan used a different incident form at a previous job. What should Jordan use here?",
     options: [
       { k: "A", t: "The old form — it is what they know.", correct: false, fb: "A previous job’s form is not this agency’s process." },
@@ -247,22 +247,22 @@ export const P_STEPS: Step[] = [
   },
   {
     type: "check",
-    kicker: "Knowledge check 2 of 4",
+    kicker: "Knowledge check 2 of 5",
     stem: "A client offers you $20 “for being nice.” Agency policy forbids accepting money. What do you do?",
     options: [
-      { k: "A", t: "Take it and buy them a snack later.", correct: false, fb: "Accepting money from a client is not allowed." },
-      { k: "B", t: "Decline, explain that staff cannot accept money, and follow the agency’s reporting process if needed.", correct: true, fb: "Right. The written policy — not the awkwardness of the moment — decides this." },
-      { k: "C", t: "Take it if no one else sees.", correct: false, fb: "A hidden gift is still a policy violation." },
+      { k: "A", t: "Take the money and buy them a snack later so it feels even.", correct: false, fb: "Accepting money from a client is not allowed." },
+      { k: "B", t: "Decline it and explain that staff cannot accept money from a client.", correct: true, fb: "The written policy — not the awkwardness of the moment — decides this." },
+      { k: "C", t: "Take it quietly if no one else on the shift can see.", correct: false, fb: "A hidden gift is still a policy violation." },
     ],
   },
   {
     type: "check",
-    kicker: "Knowledge check 3 of 4",
+    kicker: "Knowledge check 3 of 5",
     stem: "You cannot find the emergency procedure for a death in the home, and you are anxious about a hospice client. What is the right step now — before a crisis?",
     options: [
-      { k: "A", t: "Wait until something happens, then improvise.", correct: false, fb: "Emergency procedures are read before the emergency." },
-      { k: "B", t: "Ask your supervisor for this agency’s emergency procedures and read the sections that apply.", correct: true, fb: "Exactly. Find the document now." },
-      { k: "C", t: "Copy a procedure from a different agency’s website.", correct: false, fb: "Another agency’s website is not your employer’s policy." },
+      { k: "A", t: "Wait until something happens, then invent the steps in the moment.", correct: false, fb: "Emergency procedures are read before the emergency." },
+      { k: "B", t: "Ask your supervisor for this agency’s emergency procedures and read them now.", correct: true, fb: "Find the document now." },
+      { k: "C", t: "Copy a procedure from a different agency’s website and keep that.", correct: false, fb: "Another agency’s website is not your employer’s policy." },
     ],
   },
   {
@@ -285,12 +285,22 @@ export const P_STEPS: Step[] = [
   },
   {
     type: "check",
-    kicker: "Knowledge check 4 of 4",
+    kicker: "Knowledge check 4 of 5",
     stem: "Leadership says the grievance procedure was updated last week. You last read it at hire. What do you do?",
     options: [
       { k: "A", t: "Keep using the old steps — you already signed something once.", correct: false, fb: "An old read does not override a current policy." },
       { k: "B", t: "Read the current grievance procedure your agency just updated.", correct: true, fb: "Right. Current document, not the hire-day memory." },
       { k: "C", t: "Wait until a client complains, then look.", correct: false, fb: "Read it before you need it." },
+    ],
+  },
+  {
+    type: "check",
+    kicker: "Knowledge check 5 of 5",
+    stem: "You cannot find this agency’s written emergency procedure and you are about to work alone overnight. What do you do?",
+    options: [
+      { k: "A", t: "Start the overnight shift anyway and invent steps if something happens.", correct: false, fb: "Guessing an emergency process is not this agency’s procedure." },
+      { k: "B", t: "Ask your supervisor where the current emergency procedures live, then read them.", correct: true, fb: "Find this agency’s document before you are the only staff." },
+      { k: "C", t: "Copy a procedure from a previous employer’s binder and use that tonight.", correct: false, fb: "A previous job’s binder is not this agency’s written policy." },
     ],
   },
 ];

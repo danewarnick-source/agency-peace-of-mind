@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { PI_HOME_GOLD, PI_HOME_GOLD2, PI_PUBLIC_NAV } from "./pi-homepage.ts";
 
@@ -38,6 +38,11 @@ describe("public pages share homepage marketing chrome", () => {
     const forgot = read("../routes/forgot-password.tsx");
     assert.match(forgot, /AuthShell/);
     assert.equal(forgot.includes('from "@/components/site-header"'), false);
+  });
+
+  it("does not keep unused SiteHeader/Footer stub files", () => {
+    assert.equal(existsSync(new URL("../components/site-header.tsx", import.meta.url)), false);
+    assert.equal(existsSync(new URL("../components/landing/footer.tsx", import.meta.url)), false);
   });
 
   it("header and footer cannot drift from homepage chrome", () => {

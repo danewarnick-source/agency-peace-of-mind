@@ -404,7 +404,7 @@
 }
 
 /*
- * Public marketing hamburger (landing + SiteHeader).
+ * Public marketing hamburger (PiPublicHeader / PiPublicPage).
  * Own compositing layer so iOS Safari does not drop taps on an SVG child
  * inside a backdrop-filter sticky bar. Opaque fill is on the button itself.
  */

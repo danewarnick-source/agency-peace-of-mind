@@ -11,7 +11,11 @@ import {
   PI_HOME_GOLD,
   PI_HOME_GOLD2,
   PI_HOME_GUTTER_PX,
+  PI_HOME_H1_BUILT,
   PI_HOME_H1_FOR,
+  PI_HOME_H1_LEAD,
+  PI_HOME_H1_MID,
+  PI_HOME_H1_TAIL,
   PI_HOME_H1_TO,
   PI_HOME_HERO_FINE,
   PI_HOME_MAX_WIDTH,
@@ -56,8 +60,16 @@ describe("public homepage tokens stay off the in-app cream theme", () => {
     assert.equal(PI_HOME_SEE_IT, "See it in 10 minutes");
     assert.equal(PI_HOME_START_SIGNUP, "Start signup");
     assert.equal(PI_HOME_PRICING_HEADLINE, "One number. Whole platform.");
+    assert.equal(PI_HOME_H1_LEAD, "You focus on what's important");
     assert.equal(PI_HOME_H1_TO, "to");
+    assert.equal(PI_HOME_H1_MID, "your business,");
+    assert.equal(PI_HOME_H1_BUILT, "We focus on what's important");
     assert.equal(PI_HOME_H1_FOR, "for");
+    assert.equal(PI_HOME_H1_TAIL, "your business");
+    assert.equal(
+      `${PI_HOME_H1_LEAD} ${PI_HOME_H1_TO} ${PI_HOME_H1_MID} ${PI_HOME_H1_BUILT} ${PI_HOME_H1_FOR} ${PI_HOME_H1_TAIL}`,
+      "You focus on what's important to your business, We focus on what's important for your business",
+    );
     assert.equal(PI_HOME_HERO_FINE, "$69/client · $350 min");
     assert.equal(PI_HOME_PHONE_ROWS.length, 5);
     assert.deepEqual(

@@ -36,12 +36,12 @@ export const PI_HOME_NAV_BREAKPOINT = 820;
 export const PI_HOME_GUTTER_PX = 24;
 
 export const PI_HOME_EYEBROW = "Already standing the day you sign in.";
-export const PI_HOME_H1_LEAD = "The interface";
+export const PI_HOME_H1_LEAD = "You focus on what's important";
 export const PI_HOME_H1_TO = "to";
-export const PI_HOME_H1_MID = "the contract.";
-export const PI_HOME_H1_BUILT = "Built";
+export const PI_HOME_H1_MID = "your business,";
+export const PI_HOME_H1_BUILT = "We focus on what's important";
 export const PI_HOME_H1_FOR = "for";
-export const PI_HOME_H1_TAIL = "the people who run it.";
+export const PI_HOME_H1_TAIL = "your business";
 export const PI_HOME_SEE_IT = "See it in 10 minutes";
 export const PI_HOME_HOW_NECTAR = "How Nectar works";
 export const PI_HOME_HERO_FINE = "$69/client · $350 min";

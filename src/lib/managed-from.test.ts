@@ -78,11 +78,17 @@ describe("formatFromHeader", () => {
     assert.doesNotMatch(formatFromHeader("HIVE Notifications"), /Hive Certify/);
   });
 
-  it("strips leftover (FAKE) test labels from the display name", () => {
+  it("strips leftover (FAKE) from the From display name", () => {
     assert.equal(stripFakeDisplayLabel("True North Supports (FAKE)"), "True North Supports");
+    assert.equal(stripFakeDisplayLabel("True North Supports (fake)"), "True North Supports");
+    assert.equal(stripFakeDisplayLabel("Agency ( FAKE ) LLC"), "Agency LLC");
     assert.equal(
       formatFromHeader("True North Supports (FAKE)", DEFAULT_MANAGED_FROM_ADDRESS),
       "True North Supports <noreply@providerinterface.com>",
+    );
+    assert.doesNotMatch(
+      formatFromHeader("True North Supports (FAKE)", DEFAULT_MANAGED_FROM_ADDRESS),
+      /\(FAKE\)/i,
     );
   });
 });

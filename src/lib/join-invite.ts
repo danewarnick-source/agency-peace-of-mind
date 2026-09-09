@@ -1,4 +1,5 @@
 import { resolveAuthOrigin } from "./auth-redirect.ts";
+import { defaultUsernameFromEmail } from "./account-username.ts";
 
 /** Shown on every failed join so testers are not dumped into new-agency signup. */
 export const ASK_ADMIN_MANUAL = "Ask your admin to add you manually.";
@@ -101,8 +102,56 @@ export function joinHomeForRole(role: string | null | undefined): string {
   return "/employee";
 }
 
+/** Staff join: length only. GoTrue default is 6 with no required character classes. */
+export const JOIN_PASSWORD_MIN_LENGTH = 8;
+export const JOIN_PASSWORD_MAX_LENGTH = 200;
+
+export const JOIN_PASSWORD_HINT =
+  "At least 8 characters. Letters and numbers are fine — no special character required.";
+
+export {
+  USERNAME_HINT as JOIN_USERNAME_HINT,
+  USERNAME_INVALID as JOIN_USERNAME_INVALID,
+  USERNAME_MAX_LENGTH as JOIN_USERNAME_MAX_LENGTH,
+  defaultUsernameFromEmail,
+  isValidUsername as isValidJoinUsername,
+  resolveAccountUsername,
+  usernameLiveMessage as joinUsernameLiveMessage,
+} from "./account-username.ts";
+
+export const JOIN_PASSWORD_TOO_SHORT = "Password must be at least 8 characters.";
+
+/**
+ * New-invite password rule: 8–200 characters. No digit / symbol / case classes.
+ * Matches reset-password and is slightly above GoTrue's default min (6).
+ * Auth may still reject a leaked / HIBP-listed password if that project flag is on.
+ */
 export function isValidJoinPassword(password: string): boolean {
-  return password.length >= 8 && /\d/.test(password);
+  return (
+    password.length >= JOIN_PASSWORD_MIN_LENGTH && password.length <= JOIN_PASSWORD_MAX_LENGTH
+  );
+}
+
+/** Live copy for a new password. Empty string means "not typed yet". */
+export function joinPasswordLiveMessage(password: string): { ok: boolean; text: string } | null {
+  if (!password) return null;
+  if (password.length < JOIN_PASSWORD_MIN_LENGTH) {
+    return { ok: false, text: `Too short — need at least ${JOIN_PASSWORD_MIN_LENGTH} characters.` };
+  }
+  if (password.length > JOIN_PASSWORD_MAX_LENGTH) {
+    return { ok: false, text: "Password is too long." };
+  }
+  return { ok: true, text: "Password looks good." };
+}
+
+export function joinConfirmLiveMessage(
+  password: string,
+  confirm: string,
+): { ok: boolean; text: string } | null {
+  if (!confirm) return null;
+  if (password !== confirm) return { ok: false, text: "Passwords don't match." };
+  if (!password) return { ok: false, text: "Passwords don't match." };
+  return { ok: true, text: "Passwords match." };
 }
 
 /**
@@ -125,8 +174,9 @@ export function isValidExistingJoinPassword(password: string): boolean {
   return password.length > 0 && password.length <= 200;
 }
 
-export function isValidJoinUsername(username: string): boolean {
-  return /^[a-zA-Z][a-zA-Z0-9_]{2,31}$/.test(username.trim());
+/** Prefill / restore: username is the invite email (not a sanitized local-part). */
+export function suggestJoinUsername(email: string): string {
+  return defaultUsernameFromEmail(email);
 }
 
 /** True when this page is new-agency signup (payment / team size), not join. */

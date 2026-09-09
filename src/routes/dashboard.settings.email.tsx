@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getOrgEmailSettings, updateOrgEmailSettings, sendEmail } from "@/lib/email.functions";
-import { DEFAULT_MANAGED_FROM_ADDRESS, DEFAULT_MANAGED_FROM_NAME } from "@/lib/managed-from";
+import {
+  DEFAULT_MANAGED_FROM_ADDRESS,
+  DEFAULT_MANAGED_FROM_NAME,
+  stripFakeDisplayLabel,
+} from "@/lib/managed-from";
 
 export const Route = createFileRoute("/dashboard/settings/email")({
   component: EmailSettingsPage,
@@ -39,7 +43,7 @@ function EmailSettingsPage() {
         setHiveFromAddress(res.hive_managed_from_address);
         const row = res.settings;
         if (row) {
-          setFromName(row.from_name ?? "");
+          setFromName(stripFakeDisplayLabel(row.from_name ?? ""));
           setReplyTo(row.reply_to ?? "");
         }
       } catch (e) {
@@ -51,7 +55,8 @@ function EmailSettingsPage() {
   }, [org, getFn]);
 
   const previewDisplayName =
-    fromName.trim() || org?.organization_name || DEFAULT_MANAGED_FROM_NAME;
+    stripFakeDisplayLabel(fromName.trim() || org?.organization_name || "") ||
+    DEFAULT_MANAGED_FROM_NAME;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -26,6 +26,7 @@ import {
   DEFAULT_MANAGED_FROM_NAME,
   formatFromHeader,
   managedFromAddress,
+  stripFakeDisplayLabel,
 } from "@/lib/managed-from";
 
 export { HIVE_MANAGED_FROM_ADDRESS, managedFromAddress } from "@/lib/managed-from";
@@ -158,7 +159,7 @@ export const updateOrgEmailSettings = createServerFn({ method: "POST" })
         {
           organization_id: data.organization_id,
           send_mode: "hive_managed",
-          from_name: (data.from_name ?? "").trim() || null,
+          from_name: stripFakeDisplayLabel(data.from_name ?? "") || null,
           from_address: null, // Mode 1 uses managedFromAddress()
           reply_to: data.reply_to,
           verified: true, // Mode 1 is trusted (shared HIVE sender)

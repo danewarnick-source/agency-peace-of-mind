@@ -6,8 +6,8 @@
  * That message only appears after signUp today. We run the same HIBP range check
  * before submit (type / blur) and surface that same copy under the field.
  *
- * Do not add length, symbol, or complexity rules here. The existing 8-character
- * / one-number hints stay in the signup UI.
+ * Do not add length, symbol, or complexity rules here. Signup and join both
+ * require 8+ characters with no digit / symbol class.
  */
 
 /** Exact GoTrue HIBP / pwned copy (supabase/auth internal/api/password.go). */

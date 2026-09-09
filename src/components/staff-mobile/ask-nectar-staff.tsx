@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, Loader2, Shield, AlertTriangle } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Send, Loader2, Shield, AlertTriangle, ArrowRight } from "lucide-react";
+import {
+  STAFF_PAY_PERIOD_LINK_LABEL,
+  STAFF_PAY_PERIOD_PATH,
+} from "@/lib/nectar-staff-scope";
 import {
   askNectarStaff,
   type NectarStaffReply,
@@ -29,10 +34,10 @@ interface ChatMsg {
 }
 
 const STARTERS = [
+  "What's my schedule this week?",
+  "When's the next time I work with someone on my caseload?",
   "What are my client's PCSP goals today?",
-  "Walk me through the reimbursement process.",
   "What's the medication procedure for a missed dose?",
-  "How many hours have I worked this period?",
 ];
 
 /** Ignore rubber-band / swipe; only treat a real keyboard shrink as lift. */
@@ -175,12 +180,14 @@ export function AskNectarStaff({ clientId, initialQuestion }: AskNectarStaffProp
             <div className="flex items-start gap-2 rounded-lg border border-[var(--hive-gold)]/30 bg-[#fff7ed] px-3 py-2 text-[11px] leading-snug text-[#7a4a0a]">
               <Shield className="mt-0.5 h-3 w-3 shrink-0" />
               <span>
+                I only know your assignments, your shifts, and your policies.
                 Client info here is for people on your caseload — treat as confidential PHI.
               </span>
             </div>
             <p className="text-[13px] leading-snug text-muted-foreground">
-              I help with company policies, your trainings, job duties, your pay,
-              and the people on your caseload — their goals, safety, and meds.
+              I help with company policies, your trainings, job duties, your published
+              schedule, and the people on your caseload — their goals, safety, and meds.
+              Hours and pay stay on Caseload.
             </p>
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -218,6 +225,15 @@ export function AskNectarStaff({ clientId, initialQuestion }: AskNectarStaffProp
                   </div>
                 )}
                 <NectarAnswer text={m.text} />
+                {m.reply?.deepLink?.path === STAFF_PAY_PERIOD_PATH && (
+                  <Link
+                    to="/dashboard"
+                    className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-[var(--hive-gold)] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#b8651a]"
+                  >
+                    {m.reply.deepLink.label || STAFF_PAY_PERIOD_LINK_LABEL}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
                 {m.reply && m.reply.citations.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {m.reply.citations.map((c, i) => (
@@ -230,7 +246,9 @@ export function AskNectarStaff({ clientId, initialQuestion }: AskNectarStaffProp
                           ? "PCSP"
                           : c.type === "medication"
                             ? "Med"
-                            : c.type}
+                            : c.type === "schedule"
+                              ? "Schedule"
+                              : c.type}
                         {" · "}
                         {c.title.length > 28 ? c.title.slice(0, 26) + "…" : c.title}
                       </span>
@@ -273,7 +291,7 @@ export function AskNectarStaff({ clientId, initialQuestion }: AskNectarStaffProp
                 send(input);
               }
             }}
-            placeholder="Ask NECTAR anything about your training…"
+            placeholder="Ask about your schedule, caseload, or training…"
             rows={1}
             className="min-h-[48px] max-h-32 flex-1 resize-none rounded-full border border-input bg-background px-4 py-3 text-sm leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--hive-gold)]/40"
             disabled={mutation.isPending}

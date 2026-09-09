@@ -9,6 +9,18 @@ import {
   slimPcspGoals,
   staffNectarFailureMessage,
 } from "@/lib/nectar-staff-errors";
+import {
+  buildSchedulePack,
+  questionWantsPayOrHours,
+  questionWantsSchedule,
+  resolveScheduleSubject,
+  scheduleQueryWindow,
+  staffPayHoursRefusalReply,
+  staffUnresolvedPersonRefusal,
+  type NamedPerson,
+  type StaffScheduleFact,
+  type StaffShiftRow,
+} from "@/lib/nectar-staff-scope";
 
 /**
  * NECTAR Staff — a scoped, lower-privilege assistant for the staff app.
@@ -16,14 +28,19 @@ import {
  * Distinct from admin NECTAR (`askNectarHelp`). The sources are strictly:
  *   - Company policies & training documents (org-wide, but only doc types
  *     staff are allowed to read: policy/procedure/sop/training/contract).
- *   - The caller's OWN profile, role, and pay records.
- *   - The caller's ASSIGNED clients only — resolved at query time via
+ *   - The caller's OWN profile and role (never pay, hours, or earnings).
+ *   - The caller's OWN published upcoming / recent shifts (`scheduled_shifts`
+ *     where staff_id = caller).
+ *   - The caller's ASSIGNED clients — resolved at query time via
  *     `clients_for_staff(org, uid)`. PCSP goals, safety/special directions,
  *     and active medications needed to deliver care.
+ *   - Schedule questions about a named person only when that person is the
+ *     caller, on the caseload, or on a shift assigned to the caller.
  *
  * Hard denies (enforced server-side, before the model call):
- *   - Any client not on the caller's caseload right now.
- *   - Other staff members' pay, hours, or profile data.
+ *   - Pay, rates, overtime pay, estimated earnings, and hours worked.
+ *   - Any client not on the caller's caseload and not on the caller's shifts.
+ *   - Other staff members' pay, hours, profile, or schedules.
  *   - Billing, financial, admin, business, audit, or hive-exec data.
  *   - Admin NECTAR tools.
  *
@@ -33,7 +50,7 @@ import {
  */
 
 export interface NectarStaffCitation {
-  type: "policy" | "training" | "pcsp" | "medication" | "pay";
+  type: "policy" | "training" | "pcsp" | "medication" | "schedule";
   id: string;
   title: string;
 }
@@ -43,6 +60,7 @@ export interface NectarStaffReply {
   citations: NectarStaffCitation[];
   usedClientIds: string[];
   refused: boolean;
+  deepLink?: { path: string; label: string } | null;
 }
 
 interface AskStaffInput {
@@ -106,11 +124,15 @@ interface StaffFacts {
     worker_type: string | null;
   };
   organization_id: string;
-  pay_period: {
-    hours_this_period: number | null;
-    estimated_earnings: number | null;
-    period_label: string | null;
-  };
+  schedule: {
+    today: string;
+    upcoming: StaffScheduleFact[];
+    this_month: StaffScheduleFact[];
+    next_with_client: StaffScheduleFact | null;
+    shifts_this_month_with_client: number | null;
+    focused_client_id: string | null;
+    note: string;
+  } | null;
   policies: PolicyFact[];
   training: TrainingFact[];
   clients: ClientFact[];
@@ -221,6 +243,7 @@ export const askNectarStaff = createServerFn({ method: "POST" })
         citations: [],
         usedClientIds: [],
         refused: true,
+        deepLink: null,
       };
     }
     const orgId = data.organizationId;
@@ -233,6 +256,10 @@ export const askNectarStaff = createServerFn({ method: "POST" })
       orgId,
       "employee",
     );
+
+    if (questionWantsPayOrHours(data.question)) {
+      return staffPayHoursRefusalReply();
+    }
 
     // Load the caller's role/job_title within this org for prompt context.
     const memQ = await supabase
@@ -257,35 +284,106 @@ export const askNectarStaff = createServerFn({ method: "POST" })
       pcsp_goals: string[] | null; special_directions: string | null;
     }> | null) ?? [];
     const allowed = new Set(assignedRows.map((r) => r.id));
+    const caseloadPeople: NamedPerson[] = assignedRows.map((r) => ({
+      id: r.id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+    }));
 
-    // If a focused clientId was passed, assert it's allowed; otherwise drop it.
+    // 3. Caller profile + own published shifts (never pay / clocked hours).
+    const window = scheduleQueryWindow();
+    const [profQ, shiftsQ] = await Promise.all([
+      supabase.from("profiles").select("full_name, worker_type").eq("id", userId).maybeSingle(),
+      supabase
+        .from("scheduled_shifts")
+        .select("id, client_id, job_code, starts_at, ends_at, status, published, clients:client_id(first_name, last_name)")
+        .eq("staff_id", userId)
+        .eq("organization_id", orgId)
+        .eq("published", true)
+        .neq("status", "cancelled")
+        .gte("starts_at", window.fromIso)
+        .lt("starts_at", window.toIso)
+        .order("starts_at", { ascending: true })
+        .limit(200),
+    ]);
+    const prof = (profQ.data as { full_name: string | null; worker_type: string | null } | null) ?? null;
+
+    const rawShifts = (shiftsQ.data ?? []) as Array<{
+      id: string;
+      client_id: string;
+      job_code: string | null;
+      starts_at: string;
+      ends_at: string;
+      clients: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+    }>;
+    const ownShifts: StaffShiftRow[] = rawShifts.map((r) => {
+      const client = Array.isArray(r.clients) ? r.clients[0] : r.clients;
+      const fromCaseload = assignedRows.find((c) => c.id === r.client_id);
+      const name = client
+        ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()
+        : fromCaseload
+          ? `${fromCaseload.first_name} ${fromCaseload.last_name}`.trim()
+          : "Client";
+      return {
+        id: r.id,
+        client_id: r.client_id,
+        client_name: name || "Client",
+        job_code: r.job_code,
+        starts_at: r.starts_at,
+        ends_at: r.ends_at,
+      };
+    });
+    const ownShiftClientIds = new Set(ownShifts.map((s) => s.client_id));
+    const ownShiftPeople: NamedPerson[] = [];
+    const seenShiftClient = new Set<string>();
+    for (const s of ownShifts) {
+      if (seenShiftClient.has(s.client_id)) continue;
+      seenShiftClient.add(s.client_id);
+      const fromCase = caseloadPeople.find((c) => c.id === s.client_id);
+      if (fromCase) {
+        ownShiftPeople.push(fromCase);
+        continue;
+      }
+      const parts = s.client_name.split(/\s+/).filter(Boolean);
+      ownShiftPeople.push({
+        id: s.client_id,
+        first_name: parts[0] ?? "Client",
+        last_name: parts.slice(1).join(" "),
+      });
+    }
+
+    const wantsSchedule = questionWantsSchedule(data.question);
+
+    // Focused clientId: caseload (PHI + schedule) or own published shift (schedule only).
     let focusedId: string | undefined;
     if (data.clientId) {
-      if (!allowed.has(data.clientId)) {
+      if (!allowed.has(data.clientId) && !ownShiftClientIds.has(data.clientId)) {
         return {
-          answer: "That person isn't on your caseload, so I can't share information about them. Please ask your manager if you think this is a mistake.",
+          answer: "That person isn't on your caseload or on a shift assigned to you, so I can't share information about them. Please ask your manager if you think this is a mistake.",
           citations: [],
           usedClientIds: [],
           refused: true,
+          deepLink: null,
         };
       }
       focusedId = data.clientId;
     }
 
-    // 3. Caller profile + pay period (own only).
-    const [profQ, periodQ] = await Promise.all([
-      supabase.from("profiles").select("full_name, worker_type").eq("id", userId).maybeSingle(),
-      // Simple self-scoped pay period summary — current month aggregate
-      supabase
-        .from("evv_timesheets")
-        .select("clock_in_timestamp, clock_out_timestamp, total_hours")
-        .eq("staff_id", userId)
-        .gte("clock_in_timestamp", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-        .limit(500),
-    ]);
-    const prof = (profQ.data as { full_name: string | null; worker_type: string | null } | null) ?? null;
-    const periodRows = (periodQ.data as Array<{ total_hours: number | null }> | null) ?? [];
-    const periodHours = periodRows.reduce((sum, r) => sum + (typeof r.total_hours === "number" ? r.total_hours : 0), 0);
+    let scheduleSubjectClientId: string | undefined;
+    if (wantsSchedule) {
+      const subject = resolveScheduleSubject(
+        data.question,
+        { user_id: userId, full_name: prof?.full_name ?? null },
+        caseloadPeople,
+        ownShiftPeople,
+      );
+      if (subject.kind === "unresolved") {
+        return staffUnresolvedPersonRefusal(subject.token);
+      }
+      if (subject.kind === "client") {
+        scheduleSubjectClientId = subject.person.id;
+      }
+    }
 
     // 4. Policies + training docs (org-wide but type-restricted).
     const docsQ = await supabase
@@ -369,6 +467,15 @@ export const askNectarStaff = createServerFn({ method: "POST" })
       }
     }
 
+    const scheduleFocusId = scheduleSubjectClientId ?? (wantsSchedule ? focusedId : undefined);
+    const schedulePack = wantsSchedule
+      ? {
+          ...buildSchedulePack(ownShifts, new Date(), scheduleFocusId),
+          focused_client_id: scheduleFocusId ?? null,
+          note: "These are THIS staff member's published shifts only. Never invent shifts. Never report hours or pay. Count = number of these rows, not duration.",
+        }
+      : null;
+
     const facts: StaffFacts = {
       caller: {
         user_id: userId,
@@ -378,11 +485,7 @@ export const askNectarStaff = createServerFn({ method: "POST" })
         worker_type: prof?.worker_type ?? null,
       },
       organization_id: orgId,
-      pay_period: {
-        hours_this_period: Math.round(periodHours * 100) / 100,
-        estimated_earnings: null,
-        period_label: "current month",
-      },
+      schedule: schedulePack,
       policies,
       training,
       clients: clientFacts,
@@ -390,26 +493,29 @@ export const askNectarStaff = createServerFn({ method: "POST" })
       notes: [],
     };
 
-    const system = `You are NECTAR Staff — a scoped, plain-language shift-manager assistant inside the HIVE staff app. You help one staff member do their job for the people they support.
+    const system = `You are NECTAR Staff — a scoped, plain-language shift-manager assistant inside the Provider Interface staff app. You help one staff member do their job for the people they support.
 
 ABSOLUTE SCOPE RULES (you MUST refuse anything outside these):
 1. ALLOWED TOPICS:
    - Company policies & procedures (from FACTS.policies).
    - Training material the staff member has access to (from FACTS.training).
    - The staff member's OWN role/duties/processes (FACTS.caller).
-   - The staff member's OWN pay & reimbursement (FACTS.pay_period). NEVER other staff's pay.
+   - The staff member's OWN published schedule (FACTS.schedule) — upcoming shifts and how many of THEIR shifts they have with a named person this month. Times are Mountain Time. Answer day-name questions from this pack.
    - For clients listed in FACTS.clients: their PCSP goals, special directions (safety), and active medications needed to safely deliver care. These people are on this staff member's caseload right now.
-2. FORBIDDEN — REFUSE and direct them to a manager/admin:
-   - Any client NOT in FACTS.clients (do not even confirm whether such a person exists in the system).
-   - Any other staff member's information (name, pay, hours, role).
-   - Billing rates, dollar amounts, financial figures, business operations.
-   - Admin tools (audit, 520, PBA, requirement approvals, agency health).
+2. FORBIDDEN — REFUSE and direct them to a manager/admin (do not compute or guess):
+   - Pay, rates, dollars, overtime pay, estimated earnings, "how much did I make", or any money.
+   - Hours worked / hours this week / month / pay period. Even if you can see shift start/end times, do not add them up as hours worked.
+   - Any client NOT in FACTS.clients and NOT named in FACTS.schedule (do not even confirm whether such a person exists in the system).
+   - Any other staff member's information (name, pay, hours, role, schedule). Never another DSP's calendar or a client's full roster.
+   - Billing rates, invoices, 520, PBA, financial figures, business operations.
+   - Admin tools (audit, requirement approvals, agency health). Quiz answer keys and audit verdicts.
 3. You explain policy and process. You do NOT make compliance verdicts or business rulings — if asked for a verdict, state the relevant policy and recommend escalating to a manager.
 4. TRAINING INTEGRITY — REFUSE TO ANSWER QUIZ/KNOWLEDGE-CHECK QUESTIONS DIRECTLY. If the staff member asks you to pick the correct answer to a training quiz/knowledge-check/test question (e.g. "what's the answer to question 3", "is A or B correct", "which option is right", "give me the answer"), DO NOT supply the answer or rank the choices. Instead: (a) briefly explain the underlying concept in your own words from the training/policy material, (b) tell them to review the lesson and choose the answer themselves, and (c) remind them the completion is a signed personal attestation of their understanding. This rule overrides everything else when the request looks like a quiz lookup.
 
 ANSWER STYLE:
-- Plain, warm, mobile-friendly. Short paragraphs. Bullets when listing meds, goals, or steps.
-- Lead with the direct answer. Then specifics. Then a brief "Source:" line with the policy/training title when used.
+- Plain, warm, mobile-friendly. Short paragraphs. Bullets when listing shifts, meds, goals, or steps.
+- Lead with the direct answer. Then specifics. Then a brief "Source:" line with the policy/training/schedule title when used.
+- For schedule answers, list weekday + time + person + service code from FACTS.schedule. If the pack is empty, say you do not see published shifts in this window.
 - For medications, ALWAYS include dosage, frequency, route, and any choking-risk or PRN notes when present.
 - For PCSP goals, list them as the goals the staff member should be reporting on in daily paperwork.
 - If the question is outside scope, respond ONLY with a short refusal that tells them to ask their manager/admin. Do not hedge or guess.
@@ -419,10 +525,10 @@ PRIVACY: Client information here is PHI. The user is authorized for these specif
 CALLER:
 ${JSON.stringify(facts.caller, null, 2)}
 
-PAY (own only):
-${JSON.stringify(facts.pay_period, null, 2)}
+YOUR SCHEDULE (own published shifts only; omit hours and pay):
+${facts.schedule ? JSON.stringify(facts.schedule, null, 2) : "not loaded — question is not a schedule question"}
 
-ASSIGNED CLIENTS (the only people you may discuss):
+ASSIGNED CLIENTS (the only people you may discuss for care details):
 ${JSON.stringify(facts.clients, null, 2)}
 
 POLICIES:
@@ -434,10 +540,10 @@ ${JSON.stringify(facts.training.map((t) => ({ id: t.id, title: t.title, excerpt:
 OUTPUT — STRICT JSON ONLY:
 {
   "answer": "<plain-language answer with markdown bullets where helpful>",
-  "citations": [{ "type": "policy"|"training"|"pcsp"|"medication"|"pay", "id": "<id from FACTS>", "title": "<title>" }],
+  "citations": [{ "type": "policy"|"training"|"pcsp"|"medication"|"schedule", "id": "<id from FACTS>", "title": "<title>" }],
   "refused": true | false
 }
-"refused" = true ONLY when you declined an out-of-scope request.`;
+"refused" = true ONLY when you declined an out-of-scope request. When you used FACTS.schedule, include a citation { "type": "schedule", "id": "own-schedule", "title": "Your schedule" }.`;
 
     const raw = await callAI(system, data.question);
     let parsed: Partial<NectarStaffReply> = {};
@@ -455,6 +561,7 @@ OUTPUT — STRICT JSON ONLY:
     const allowedTrainingIds = new Set(training.map((t) => t.id));
     const allowedMedIds = new Set(clientFacts.flatMap((c) => c.medications.map((m) => m.id)));
     const allowedClientIds = new Set(clientFacts.map((c) => c.id));
+    const allowedShiftIds = new Set(ownShifts.map((s) => s.id));
     const rawCitations = Array.isArray(parsed.citations) ? parsed.citations : [];
     const citations: NectarStaffCitation[] = [];
     for (const c of rawCitations) {
@@ -466,13 +573,27 @@ OUTPUT — STRICT JSON ONLY:
       else if (cc.type === "training" && allowedTrainingIds.has(id)) citations.push({ type: "training", id, title: cc.title });
       else if (cc.type === "pcsp" && allowedClientIds.has(id)) citations.push({ type: "pcsp", id, title: cc.title });
       else if (cc.type === "medication" && allowedMedIds.has(id)) citations.push({ type: "medication", id, title: cc.title });
-      else if (cc.type === "pay") citations.push({ type: "pay", id: userId, title: "Your pay period" });
+      else if (
+        cc.type === "schedule" &&
+        (id === "own-schedule" || allowedShiftIds.has(id) || (scheduleFocusId && id === scheduleFocusId))
+      ) {
+        citations.push({ type: "schedule", id, title: cc.title || "Your schedule" });
+      }
     }
+    if (wantsSchedule && !parsed.refused && !citations.some((c) => c.type === "schedule")) {
+      citations.push({ type: "schedule", id: "own-schedule", title: "Your schedule" });
+    }
+
+    const usedClientIds = [
+      ...clientFacts.map((c) => c.id),
+      ...(scheduleFocusId ? [scheduleFocusId] : []),
+    ].filter((id, i, arr) => arr.indexOf(id) === i);
 
     return {
       answer,
       citations,
-      usedClientIds: clientFacts.map((c) => c.id),
+      usedClientIds,
       refused: !!parsed.refused,
+      deepLink: null,
     };
   });

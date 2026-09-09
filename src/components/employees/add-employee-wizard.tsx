@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createEmployeeManually } from "@/lib/employees.functions";
 import { inviteStaffMembers } from "@/lib/invitations.functions";
+import { interpretInviteSendResult } from "@/lib/invite-send-result";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
 import { Button } from "@/components/ui/button";
@@ -156,25 +157,29 @@ export function AddEmployeeWizard({
   const inviteMutation = useMutation({
     mutationFn: async () => {
       if (!organizationId || !created) throw new Error("No organization selected.");
-      return await inviteFn({
+      const raw = await inviteFn({
         data: {
           organization_id: organizationId,
           site_origin: resolveAuthOrigin(),
           user_ids: created.userId ? [created.userId] : [],
-          emails: created.userId ? [] : [created.email],
+          emails: created.email ? [created.email] : [],
           role,
+          force: true,
         },
       });
+      const out = interpretInviteSendResult(raw);
+      if (out.rpc_failure) throw new Error(out.message);
+      return out;
     },
-    onSuccess: (res) => {
-      if (res.sent > 0) {
-        toast.success(`Invite emailed to ${created?.email ?? "the employee"}.`);
-      } else if (res.results[0]?.status === "created_unsent") {
+    onSuccess: (out) => {
+      if (out.email_sent) {
+        toast.success(`Invite emailed to ${out.email ?? created?.email ?? "the employee"}.`);
+      } else if (out.results[0]?.status === "created_unsent" || out.email_error) {
         toast.warning(
-          `Invitation created, but the email couldn't be sent (${res.results[0].reason ?? "unknown error"}). Share the join link from Pending invitations.`,
+          `Invitation created, but the email couldn't be sent (${out.email_error ?? "unknown error"}). Share the join link from Pending invitations.`,
         );
       } else {
-        toast.warning(res.results[0]?.reason ?? "Invite was not sent.");
+        toast.warning(out.message);
       }
       qc.invalidateQueries({ queryKey: ["invites"] });
       qc.invalidateQueries({ queryKey: ["invitations"] });

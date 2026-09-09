@@ -31,14 +31,15 @@ export function classifyImportInvite(input: ImportInviteInput): ImportInviteBuck
 /** Invite / resend is allowed. Never auto-reinvite an accepted join. */
 export function canSendImportInvite(
   input: ImportInviteInput,
-  opts?: { resendAccepted?: boolean },
+  opts?: { resendAccepted?: boolean; force?: boolean },
 ): boolean {
-  const bucket = classifyImportInvite(input);
-  if (bucket === "ready") return true;
-  if (bucket === "already_login" && opts?.resendAccepted && hasUsableInviteEmail(input.email)) {
-    return String(input.invitationStatus ?? "").toLowerCase() === "accepted";
-  }
-  return false;
+  if (!hasUsableInviteEmail(input.email)) return false;
+  const status = String(input.invitationStatus ?? "").toLowerCase();
+  if (status === "accepted") return opts?.resendAccepted === true;
+  // Hire wizard "Send invite email" is an explicit admin action — send even
+  // when must_change_password is unreadable over RLS.
+  if (opts?.force) return true;
+  return classifyImportInvite(input) === "ready";
 }
 
 export function summarizeImportInviteBuckets(

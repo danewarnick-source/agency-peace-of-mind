@@ -85,6 +85,23 @@ describe("canSendImportInvite", () => {
       false,
     );
   });
+
+  it("force-sends explicit hire-wizard invites unless already accepted", () => {
+    assert.equal(
+      canSendImportInvite(
+        { email: "new@agency.org", mustChangePassword: null, invitationStatus: "pending" },
+        { force: true },
+      ),
+      true,
+    );
+    assert.equal(
+      canSendImportInvite(
+        { email: "done@agency.org", mustChangePassword: null, invitationStatus: "accepted" },
+        { force: true },
+      ),
+      false,
+    );
+  });
 });
 
 describe("summarizeImportInviteBuckets", () => {

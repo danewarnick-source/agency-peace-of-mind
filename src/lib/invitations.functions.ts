@@ -33,6 +33,54 @@ type InvitationRow = {
   expires_at: string;
 };
 
+type InviteTargetResult = {
+  email: string;
+  user_id: string | null;
+  status: "sent" | "created_unsent" | "skipped" | "error";
+  reason: string | null;
+};
+
+/** Unified payload so hire-wizard (`res.sent`) and resend (`res.email_sent`) share one shape. */
+function inviteSendPayload(args: {
+  invitation?: InvitationRow | { id: string; email: string } | null;
+  email?: string | null;
+  userId?: string | null;
+  email_sent: boolean;
+  email_error?: string | null;
+  sent?: number;
+  skipped?: number;
+  errors?: number;
+  results?: InviteTargetResult[];
+  status?: InviteTargetResult["status"];
+}) {
+  const email =
+    (args.email && args.email.trim()) ||
+    (args.invitation && "email" in args.invitation ? String(args.invitation.email ?? "") : "");
+  const status =
+    args.status ?? (args.email_sent ? "sent" : args.email_error ? "created_unsent" : "error");
+  const results =
+    args.results ??
+    (email || args.email_error
+      ? [
+          {
+            email,
+            user_id: args.userId ?? null,
+            status,
+            reason: args.email_sent ? null : (args.email_error ?? null),
+          },
+        ]
+      : []);
+  return {
+    invitation: args.invitation ?? null,
+    email_sent: args.email_sent,
+    email_error: args.email_error ?? null,
+    sent: args.sent ?? (args.email_sent ? 1 : 0),
+    skipped: args.skipped ?? 0,
+    errors: args.errors ?? (args.email_sent ? 0 : results.length ? 1 : 0),
+    results,
+  };
+}
+
 function inviteRoleFromMember(role: string | undefined): Role {
   if (role === "admin") return "admin";
   if (role === "manager" || role === "program_manager") return "manager";
@@ -128,52 +176,62 @@ export const createInvitation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId)
-      return { invitation: null, email_sent: false, email_error: null };
-    await requirePermission(
-      supabase as unknown as SupabaseClient,
-      userId,
-      data.organization_id,
-      "invite_staff",
-    );
+      return inviteSendPayload({ email_sent: false, email_error: "Unauthorized", email: data.email });
+    try {
+      await requirePermission(
+        supabase as unknown as SupabaseClient,
+        userId,
+        data.organization_id,
+        "invite_staff",
+      );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing, error: existErr } = await (supabase as any)
-      .from("invitations")
-      .select("id")
-      .eq("organization_id", data.organization_id)
-      .eq("email", data.email)
-      .eq("status", "pending")
-      .maybeSingle();
-    if (existErr) throw new Error(existErr.message);
-    if (existing) throw new Error("A pending invitation already exists for this email");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existing, error: existErr } = await (supabase as any)
+        .from("invitations")
+        .select("id")
+        .eq("organization_id", data.organization_id)
+        .eq("email", data.email)
+        .eq("status", "pending")
+        .maybeSingle();
+      if (existErr) throw new Error(existErr.message);
+      if (existing) throw new Error("A pending invitation already exists for this email");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invite, error } = await (supabase as any)
-      .from("invitations")
-      .insert({
-        organization_id: data.organization_id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: invite, error } = await (supabase as any)
+        .from("invitations")
+        .insert({
+          organization_id: data.organization_id,
+          email: data.email,
+          role: data.role,
+          invited_by: userId,
+        })
+        .select("id, token, email, role, expires_at")
+        .single();
+      if (error) throw new Error(error.message);
+
+      const emailResult = await sendInvitationEmail({
+        supabase,
+        organizationId: data.organization_id,
         email: data.email,
         role: data.role,
-        invited_by: userId,
-      })
-      .select("id, token, email, role, expires_at")
-      .single();
-    if (error) throw new Error(error.message);
+        token: (invite as InvitationRow).token,
+        siteOrigin: data.site_origin,
+      });
 
-    const emailResult = await sendInvitationEmail({
-      supabase,
-      organizationId: data.organization_id,
-      email: data.email,
-      role: data.role,
-      token: (invite as InvitationRow).token,
-      siteOrigin: data.site_origin,
-    });
-
-    return {
-      invitation: invite as InvitationRow,
-      email_sent: emailResult.ok,
-      email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
-    };
+      return inviteSendPayload({
+        invitation: invite as InvitationRow,
+        email: data.email,
+        email_sent: emailResult.ok,
+        email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
+      });
+    } catch (e) {
+      return inviteSendPayload({
+        email: data.email,
+        email_sent: false,
+        email_error: e instanceof Error ? e.message : "Invite failed",
+        status: "error",
+      });
+    }
   });
 
 export const resendInvitation = createServerFn({ method: "POST" })
@@ -190,41 +248,50 @@ export const resendInvitation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId)
-      return { invitation: null, email_sent: false, email_error: null };
-    await requirePermission(
-      supabase as unknown as SupabaseClient,
-      userId,
-      data.organization_id,
-      "invite_staff",
-    );
+      return inviteSendPayload({ email_sent: false, email_error: "Unauthorized" });
+    try {
+      await requirePermission(
+        supabase as unknown as SupabaseClient,
+        userId,
+        data.organization_id,
+        "invite_staff",
+      );
 
-    const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invite, error } = await (supabase as any)
-      .from("invitations")
-      .update({ expires_at: expires, status: "pending" })
-      .eq("id", data.invitation_id)
-      .eq("organization_id", data.organization_id)
-      .select("id, token, email, role, expires_at")
-      .single();
-    if (error) throw new Error(error.message);
-    if (!invite) throw new Error("Invitation not found");
+      const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: invite, error } = await (supabase as any)
+        .from("invitations")
+        .update({ expires_at: expires, status: "pending" })
+        .eq("id", data.invitation_id)
+        .eq("organization_id", data.organization_id)
+        .select("id, token, email, role, expires_at")
+        .single();
+      if (error) throw new Error(error.message);
+      if (!invite) throw new Error("Invitation not found");
 
-    const row = invite as InvitationRow;
-    const emailResult = await sendInvitationEmail({
-      supabase,
-      organizationId: data.organization_id,
-      email: row.email,
-      role: row.role,
-      token: row.token,
-      siteOrigin: data.site_origin,
-    });
+      const row = invite as InvitationRow;
+      const emailResult = await sendInvitationEmail({
+        supabase,
+        organizationId: data.organization_id,
+        email: row.email,
+        role: row.role,
+        token: row.token,
+        siteOrigin: data.site_origin,
+      });
 
-    return {
-      invitation: row,
-      email_sent: emailResult.ok,
-      email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
-    };
+      return inviteSendPayload({
+        invitation: row,
+        email: row.email,
+        email_sent: emailResult.ok,
+        email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
+      });
+    } catch (e) {
+      return inviteSendPayload({
+        email_sent: false,
+        email_error: e instanceof Error ? e.message : "Invite failed",
+        status: "error",
+      });
+    }
   });
 
 export const revokeInvitation = createServerFn({ method: "POST" })
@@ -261,13 +328,6 @@ export const revokeInvitation = createServerFn({ method: "POST" })
 
     return { invitation: invite as { id: string; email: string } };
   });
-
-type InviteTargetResult = {
-  email: string;
-  user_id: string | null;
-  status: "sent" | "created_unsent" | "skipped" | "error";
-  reason: string | null;
-};
 
 async function upsertPendingInviteAndSend(args: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,13 +407,21 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
         emails: z.array(z.string().trim().toLowerCase().email().max(255)).max(200).default([]),
         role: INVITE_ROLE.optional(),
         resend_accepted: z.boolean().optional().default(false),
+        force: z.boolean().optional().default(false),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const empty = { sent: 0, skipped: 0, errors: 0, results: [] as InviteTargetResult[] };
-    if (!supabase || !userId) return empty;
+    const empty = inviteSendPayload({
+      email_sent: false,
+      sent: 0,
+      skipped: 0,
+      errors: 0,
+      results: [],
+    });
+    if (!supabase || !userId) return { ...empty, email_error: "Unauthorized" };
+    try {
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,
@@ -438,7 +506,7 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
             mustChangePassword: t.mustChange,
             invitationStatus,
           },
-          { resendAccepted: data.resend_accepted },
+          { resendAccepted: data.resend_accepted, force: data.force },
         )
       ) {
         skipped += 1;
@@ -488,5 +556,23 @@ export const inviteStaffMembers = createServerFn({ method: "POST" })
       }
     }
 
-    return { sent, skipped, errors, results };
+    const emailError = results.find((r) => r.status === "created_unsent" || r.status === "error")?.reason ?? null;
+    return inviteSendPayload({
+      email_sent: sent > 0,
+      email_error: emailError,
+      sent,
+      skipped,
+      errors,
+      results,
+    });
+    } catch (e) {
+      return inviteSendPayload({
+        email_sent: false,
+        email_error: e instanceof Error ? e.message : "Invite failed",
+        sent: 0,
+        skipped: 0,
+        errors: 1,
+        status: "error",
+      });
+    }
   });

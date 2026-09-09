@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { inviteStaffMembers } from "@/lib/invitations.functions";
+import { interpretInviteSendResult } from "@/lib/invite-send-result";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 
 export type ImportInviteRow = {
@@ -42,7 +43,7 @@ export function EmployeeInviteSummary({
     mutationFn: async (userIds: string[]) => {
       if (!organizationId) throw new Error("No organization selected.");
       if (!userIds.length) throw new Error("No inviteable employees selected.");
-      return await inviteFn({
+      const raw = await inviteFn({
         data: {
           organization_id: organizationId,
           site_origin: resolveAuthOrigin(),
@@ -50,16 +51,19 @@ export function EmployeeInviteSummary({
           emails: [],
         },
       });
+      const out = interpretInviteSendResult(raw);
+      if (out.rpc_failure) throw new Error(out.message);
+      return out;
     },
-    onSuccess: (res) => {
-      if (res.sent > 0) {
-        toast.success(`Invited ${res.sent} employee${res.sent === 1 ? "" : "s"}.`);
+    onSuccess: (out) => {
+      if (out.sent > 0) {
+        toast.success(`Invited ${out.sent} employee${out.sent === 1 ? "" : "s"}.`);
       }
-      if (res.errors > 0) {
-        toast.warning(`${res.errors} invite${res.errors === 1 ? "" : "s"} could not be emailed.`);
+      if (out.errors > 0) {
+        toast.warning(`${out.errors} invite${out.errors === 1 ? "" : "s"} could not be emailed.`);
       }
-      if (res.sent === 0 && res.errors === 0) {
-        toast.info(res.results[0]?.reason ?? "Nothing to invite.");
+      if (out.sent === 0 && out.errors === 0) {
+        toast.info(out.results[0]?.reason ?? out.message);
       }
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["smart-import-done"] });

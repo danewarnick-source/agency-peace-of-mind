@@ -46,7 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { ClientFileTab } from "@/components/clients/client-file-tab";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 import { displayMedicaidId } from "@/lib/medicaid-id";
@@ -166,6 +166,7 @@ const search = z.object({
       "hhcert",
       "deadlines",
       "documents",
+      "client-file",
     ])
     .optional(),
 });
@@ -181,7 +182,7 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
 });
 
 // Map legacy deep-link tab values to the consolidated tab model.
-// Identity / Care plan / Billing / Files are the four editable tabs.
+// Identity / Care plan / Billing / Client file are the four editable tabs.
 // Activity / Operations / Compliance are sibling read/coordination tabs.
 function resolveTab(raw: string | undefined): ProfileTab {
   if (!raw) return "identity";
@@ -203,7 +204,7 @@ function resolveTab(raw: string | undefined): ProfileTab {
   if (raw === "shifts" || raw === "logs" || raw === "incidents") return "activity";
   if (raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "compliance";
   if (raw === "funds" || raw === "codes") return "billing";
-  if (raw === "documents" || raw === "pcsp") return "files";
+  if (raw === "documents" || raw === "pcsp" || raw === "client-file") return "files";
   return "identity";
 }
 
@@ -361,7 +362,7 @@ function ClientProfileHub() {
           <TabsTrigger value="identity">Identity</TabsTrigger>
           <TabsTrigger value="care-plan">Care plan</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsTrigger value="files">Client file</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="operations">Operations</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
@@ -460,14 +461,24 @@ function ClientProfileHub() {
           <CustomFieldsForSection clientId={clientId} section="billing" />
         </TabsContent>
 
-        {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
+        {/* CLIENT FILE — status cards plus uploaded source documents. */}
         <TabsContent value="files" className="space-y-10">
           <SectionGroup
-            label="Documents"
-            hint="Uploaded files for this client — PCSPs, 1056s, intake, and more"
+            label="Client file"
+            hint="On file, Missing, or Due soon — one card per duty. Renew keeps the same card."
           >
             <SectionPanel icon={FolderOpen} accent="sky">
-              <ClientDocumentsCard clientId={clientId} clientName={fullName} />
+              {orgId ? (
+                <ClientFileTab
+                  organizationId={orgId}
+                  clientId={clientId}
+                  clientName={fullName}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Select an organization to open the client file.
+                </p>
+              )}
             </SectionPanel>
           </SectionGroup>
           <CustomFieldsForSection clientId={clientId} section="files" />
@@ -1139,7 +1150,7 @@ function SupportStrategiesPanel({
           <DialogDescription>
             This client has no PCSP on file. Support strategies and client-specific training are
             built from the PCSP, so you'll need to upload it before drafting. Add it under the
-            client's Files tab.
+            client's Client file.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -1166,7 +1177,7 @@ function SupportStrategiesPanel({
             {!pcspReady && (
               <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
                 Upload a PCSP to get started — drafting is disabled until a PCSP is on file (add it
-                from the client's Files tab).
+                from the client's Client file).
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -1419,7 +1430,7 @@ function SupportStrategiesPanel({
             {!pcspReady && (
               <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
                 Upload a PCSP to get started — editing and publishing are disabled until a PCSP is
-                on file (add it from the client's Files tab).
+                on file (add it from the client's Client file).
               </div>
             )}
             {training.status === "published" && (
@@ -1629,7 +1640,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
               <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
                 Upload a PCSP to get started — this profile is part of the PCSP-derived workflow.
                 Creating and publishing are disabled until a PCSP is on file (add it from the
-                client's Files tab).
+                client's Client file).
               </div>
             )}
             {q.isLoading ? (
@@ -1678,7 +1689,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
             <DialogDescription>
               This client has no PCSP on file. The Person-Centered Profile is part of the
               PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under
-              the client's Files tab.
+              the client's Client file.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

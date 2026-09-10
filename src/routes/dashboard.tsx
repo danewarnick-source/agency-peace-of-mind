@@ -286,6 +286,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },
   { to: "/dashboard/personnel-file", label: "Personnel file", icon: ClipboardList },
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
+  { to: "/dashboard/client-file", label: "Client file", icon: FolderArchive },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
   {
     to: "/dashboard/hub/documentation",

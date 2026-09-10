@@ -124,6 +124,7 @@ export type EffectivePermissionSource = "role" | "individual_grant" | "individua
 export interface EffectivePermissionEntry {
   granted: boolean;
   source: EffectivePermissionSource;
+  roleGranted: boolean;
   overrideDetails?: {
     by: string;
     reason: string;
@@ -173,11 +174,14 @@ export function useEffectivePermissions(userId: string | null) {
       const resolved: Record<string, EffectivePermissionEntry> = {};
 
       ALL_PERMISSIONS.forEach((perm) => {
+        const roleRow = (roleConfig ?? []).find((r) => r.permission === perm);
+        const roleGranted = !!roleRow?.enabled;
         const override = activeOverrides.find((o) => o.permission === perm);
         if (override) {
           resolved[perm] = {
             granted: override.granted,
             source: override.granted ? "individual_grant" : "individual_deny",
+            roleGranted,
             overrideDetails: {
               by: override.granted_by_name ?? "Unknown",
               reason: override.reason ?? "",
@@ -185,10 +189,10 @@ export function useEffectivePermissions(userId: string | null) {
             },
           };
         } else {
-          const roleRow = (roleConfig ?? []).find((r) => r.permission === perm);
           resolved[perm] = {
-            granted: !!roleRow?.enabled,
+            granted: roleGranted,
             source: "role",
+            roleGranted,
           };
         }
       });

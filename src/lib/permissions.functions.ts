@@ -288,6 +288,162 @@ export const removeUserPermissionOverride = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+const PROFILE_OVERRIDE_REASON = "Set from employee profile";
+
+/**
+ * Persist per-person permission toggles. Matching the role default removes
+ * the override; differing from it writes an individual grant/deny.
+ */
+export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        targetUserId: z.string().uuid(),
+        toggles: z.array(z.object({ permission: PermissionEnum, granted: z.boolean() })),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) throw new Error("Not authenticated");
+    await requireOrgMembership(supabase, userId, data.organizationId, "admin");
+
+    const { data: member } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", data.targetUserId)
+      .maybeSingle();
+    if (!member) throw new Error("Staffer not found in this organization");
+
+    const { data: roleRows } = await supabase
+      .from("role_permissions")
+      .select("permission, enabled")
+      .eq("organization_id", data.organizationId)
+      .eq("role", member.role);
+    const roleGranted = new Map<string, boolean>(
+      (roleRows ?? []).map((r: { permission: string; enabled: boolean }) => [r.permission, !!r.enabled]),
+    );
+
+    const changedByName = await fetchName(supabase, userId);
+    const targetName = await fetchName(supabase, data.targetUserId);
+
+    for (const toggle of data.toggles) {
+      const matchesRole = (roleGranted.get(toggle.permission) ?? false) === toggle.granted;
+      const { data: existing } = await supabase
+        .from("user_permission_overrides")
+        .select("granted")
+        .eq("organization_id", data.organizationId)
+        .eq("user_id", data.targetUserId)
+        .eq("permission", toggle.permission)
+        .maybeSingle();
+
+      if (matchesRole) {
+        if (!existing) continue;
+        const { error } = await supabase
+          .from("user_permission_overrides")
+          .delete()
+          .eq("organization_id", data.organizationId)
+          .eq("user_id", data.targetUserId)
+          .eq("permission", toggle.permission);
+        if (error) throw new Error(error.message);
+        await writeAuditLog({
+          organizationId: data.organizationId,
+          changedByUserId: userId,
+          changedByName,
+          changeType: "individual_override_removed",
+          targetUserId: data.targetUserId,
+          targetUserName: targetName,
+          permission: toggle.permission,
+          previousValue: existing.granted ?? null,
+          newValue: null,
+          reason: PROFILE_OVERRIDE_REASON,
+        });
+        continue;
+      }
+
+      const { error } = await supabase.from("user_permission_overrides").upsert(
+        {
+          organization_id: data.organizationId,
+          user_id: data.targetUserId,
+          permission: toggle.permission,
+          granted: toggle.granted,
+          granted_by: userId,
+          granted_by_name: changedByName,
+          reason: PROFILE_OVERRIDE_REASON,
+          expires_at: null,
+        },
+        { onConflict: "organization_id,user_id,permission" },
+      );
+      if (error) throw new Error(error.message);
+      await writeAuditLog({
+        organizationId: data.organizationId,
+        changedByUserId: userId,
+        changedByName,
+        changeType: toggle.granted ? "individual_override_granted" : "individual_override_denied",
+        targetUserId: data.targetUserId,
+        targetUserName: targetName,
+        permission: toggle.permission,
+        previousValue: existing?.granted ?? null,
+        newValue: toggle.granted,
+        reason: PROFILE_OVERRIDE_REASON,
+      });
+    }
+
+    return { success: true };
+  });
+
+/** Remove every individual override so the staffer falls back to role defaults. */
+export const resetStaffPermissionOverrides = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        targetUserId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) throw new Error("Not authenticated");
+    await requireOrgMembership(supabase, userId, data.organizationId, "admin");
+
+    const { data: existing } = await supabase
+      .from("user_permission_overrides")
+      .select("permission, granted")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", data.targetUserId);
+
+    const { error } = await supabase
+      .from("user_permission_overrides")
+      .delete()
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", data.targetUserId);
+    if (error) throw new Error(error.message);
+
+    const changedByName = await fetchName(supabase, userId);
+    const targetName = await fetchName(supabase, data.targetUserId);
+    for (const row of existing ?? []) {
+      await writeAuditLog({
+        organizationId: data.organizationId,
+        changedByUserId: userId,
+        changedByName,
+        changeType: "individual_override_removed",
+        targetUserId: data.targetUserId,
+        targetUserName: targetName,
+        permission: row.permission,
+        previousValue: row.granted ?? null,
+        newValue: null,
+        reason: "Reset to role defaults",
+      });
+    }
+
+    return { success: true };
+  });
+
 // ─── listEffectivePermissions ───────────────────────────────────────────
 export const listEffectivePermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

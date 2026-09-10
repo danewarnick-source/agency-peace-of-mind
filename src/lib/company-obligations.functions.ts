@@ -1557,6 +1557,149 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
       .filter((r: MyObligationInstanceRow | null): r is MyObligationInstanceRow => r !== null);
   });
 
+export type StaffObligationCompletion = {
+  id: string;
+  instance_id: string;
+  upload_path: string | null;
+  upload_filename: string | null;
+  completed_at: string | null;
+  evidence_type_used: string | null;
+  nectar_validation_status: string | null;
+};
+
+export type StaffObligationFileRow = MyObligationInstanceRow & {
+  completion: StaffObligationCompletion | null;
+};
+
+/**
+ * Admin/manager list of one staffer's obligation instances — same register
+ * as the compliance matrix / My Obligations, plus that staffer's latest
+ * completion row. No new tables.
+ */
+export const listStaffObligationInstances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [] as StaffObligationFileRow[];
+    if (data.staffId === userId) {
+      await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    } else {
+      await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+    }
+
+    await checkAndMarkOverdueInternal(supabase, data.organizationId);
+
+    const [{ data: assigneeRows, error: aErr }, { data: directRows, error: dErr }] =
+      await Promise.all([
+        supabase
+          .from("company_obligation_instance_assignees")
+          .select("instance_id")
+          .eq("organization_id", data.organizationId)
+          .eq("staff_id", data.staffId),
+        supabase
+          .from("company_obligation_instances")
+          .select("id")
+          .eq("organization_id", data.organizationId)
+          .eq("assignee_staff_id", data.staffId),
+      ]);
+    if (aErr) throw new Error(aErr.message);
+    if (dErr) throw new Error(dErr.message);
+
+    const instanceIds = Array.from(
+      new Set([
+        ...(assigneeRows ?? []).map((r: { instance_id: string }) => r.instance_id),
+        ...(directRows ?? []).map((r: { id: string }) => r.id),
+      ]),
+    );
+    if (!instanceIds.length) return [];
+
+    const { data: instances, error: iErr } = await supabase
+      .from("company_obligation_instances")
+      .select("*")
+      .in("id", instanceIds)
+      .order("due_at", { ascending: true });
+    if (iErr) throw new Error(iErr.message);
+
+    const obligationIds = Array.from(
+      new Set((instances ?? []).map((i: ObligationInstanceRow) => i.obligation_id)),
+    );
+    if (!obligationIds.length) return [];
+    const { data: obligations, error: oErr } = await supabase
+      .from("company_obligations")
+      .select("*")
+      .in("id", obligationIds);
+    if (oErr) throw new Error(oErr.message);
+    const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
+
+    const formNeeded = (obligations ?? []).some(
+      (o: CompanyObligationRow) =>
+        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+    );
+    let publishedForms: Array<{ id: string; name: string }> = [];
+    if (formNeeded) {
+      const { data: formRows } = await supabase
+        .from("forms")
+        .select("id, name")
+        .eq("organization_id", data.organizationId)
+        .eq("status", "published");
+      publishedForms = (formRows ?? []) as Array<{ id: string; name: string }>;
+    }
+
+    const { data: completions, error: cErr } = await supabase
+      .from("company_obligation_completions")
+      .select(
+        "id, instance_id, upload_path, upload_filename, completed_at, evidence_type_used, nectar_validation_status",
+      )
+      .eq("organization_id", data.organizationId)
+      .eq("staff_id", data.staffId)
+      .in("instance_id", instanceIds)
+      .order("completed_at", { ascending: false });
+    if (cErr) throw new Error(cErr.message);
+
+    const completionByInstance = new Map<string, StaffObligationCompletion>();
+    for (const row of (completions ?? []) as StaffObligationCompletion[]) {
+      const existing = completionByInstance.get(row.instance_id);
+      if (!existing) {
+        completionByInstance.set(row.instance_id, row);
+        continue;
+      }
+      if (existing.nectar_validation_status === "failed" && row.nectar_validation_status !== "failed") {
+        completionByInstance.set(row.instance_id, row);
+      }
+    }
+
+    return (instances ?? [])
+      .map((i: ObligationInstanceRow) => {
+        const obligation = obligationById.get(i.obligation_id);
+        if (!obligation || isPackSentinel(obligation)) return null;
+        const resolved =
+          obligation.evidence_type === "form"
+            ? {
+                ...obligation,
+                linked_form_id: resolveObligationFormId(
+                  obligation.linked_form_id,
+                  publishedForms,
+                  obligation.title,
+                ),
+              }
+            : obligation;
+        return {
+          ...i,
+          obligation: resolved,
+          completion: completionByInstance.get(i.id) ?? null,
+        };
+      })
+      .filter((r: StaffObligationFileRow | null): r is StaffObligationFileRow => r !== null);
+  });
+
 /** Obligation + instance context for the form-fill obligation banner. */
 export const getObligationInstanceContext = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

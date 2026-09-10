@@ -217,3 +217,42 @@ export const deleteEntity = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Reverse of archiveEntity — puts a deactivated employee back on the Active roster. */
+export const restoreEntity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      kind: Kind,
+      id: z.string().uuid(),
+      organizationId: z.string().uuid(),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.userId) return { ok: false };
+    await assertCallerAndTargetInOrg(context.userId, data.kind, data.id, data.organizationId);
+    await assertManager(context.userId, data.organizationId);
+
+    if (data.kind === "employee") {
+      const { error: pErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ account_status: "active", is_active: true })
+        .eq("id", data.id);
+      if (pErr) throw new Error(pErr.message);
+
+      const { error: mErr } = await supabaseAdmin
+        .from("organization_members")
+        .update({ active: true })
+        .eq("user_id", data.id)
+        .eq("organization_id", data.organizationId);
+      if (mErr) throw new Error(mErr.message);
+    } else {
+      const { error } = await supabaseAdmin
+        .from("clients")
+        .update({ account_status: "active" })
+        .eq("id", data.id)
+        .eq("organization_id", data.organizationId);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+

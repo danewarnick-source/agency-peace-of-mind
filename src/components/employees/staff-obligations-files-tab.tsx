@@ -34,6 +34,7 @@ import {
   liveObligationTitle,
   obligationFileStatus,
   obligationFileStatusLabel,
+  personnelPackHtml,
   type ObligationFileStatus,
 } from "@/lib/staff-obligation-files";
 
@@ -201,6 +202,7 @@ export function StaffObligationsFilesTab({
     try {
       const files = await Promise.all(
         pack.map(async (r) => ({
+          staffName: staffName,
           title: r.title,
           filename: r.evidenceFilename ?? "evidence",
           url: await signedEvidenceUrl(r.evidencePath!),
@@ -208,17 +210,7 @@ export function StaffObligationsFilesTab({
       );
       const win = window.open("", "_blank");
       if (!win) throw new Error("Pop-up blocked — allow pop-ups to print the pack.");
-      const body = files
-        .map((f) => {
-          const media = guessIsImage(f.filename)
-            ? `<img src="${f.url}" alt="" style="max-width:100%;" />`
-            : `<iframe src="${f.url}" style="width:100%;height:80vh;border:0;"></iframe>`;
-          return `<section style="page-break-after:always;margin-bottom:24px;"><h2 style="font:600 16px system-ui;">${escapeHtml(f.title)}</h2>${media}</section>`;
-        })
-        .join("");
-      win.document.write(
-        `<!doctype html><html><head><title>Personnel file</title></head><body>${body}</body></html>`,
-      );
+      win.document.write(personnelPackHtml(files));
       win.document.close();
       win.focus();
       win.print();
@@ -360,7 +352,7 @@ export function StaffObligationsFilesTab({
           <DialogHeader>
             <DialogTitle>{targetInstance?.status === "on_file" ? "Replace evidence" : "Upload evidence"}</DialogTitle>
             <DialogDescription>
-              File attaches to this staff member’s existing personnel file item — the same record as the compliance matrix.
+              File attaches to this staff member’s existing personnel file item — the same record as the org-wide Personnel file.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -465,10 +457,3 @@ export function StaffObligationsFilesTab({
   );
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

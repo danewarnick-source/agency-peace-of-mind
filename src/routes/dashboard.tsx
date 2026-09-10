@@ -279,6 +279,7 @@ const STAFF_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },
+  { to: "/dashboard/personnel-file", label: "Personnel file", icon: ClipboardList },
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
   {

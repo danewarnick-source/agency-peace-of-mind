@@ -1573,7 +1573,7 @@ export type StaffObligationFileRow = MyObligationInstanceRow & {
 
 /**
  * Admin/manager list of one staffer's obligation instances — same register
- * as the compliance matrix / personnel file, plus that staffer's latest
+ * as the org-wide Personnel file, plus that staffer's latest
  * completion row. No new tables.
  */
 export const listStaffObligationInstances = createServerFn({ method: "POST" })

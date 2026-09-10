@@ -674,7 +674,8 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/getInboxUnreadCount|getPendingUpgradeRequestCount/i.test(fn)) return { count: 0 };
   if (/getActiveDraftJobs/i.test(fn)) return { jobs: [] };
   if (/listPendingClientSubjects/i.test(fn)) return { items: [], jobs: {} };
-  if (/getHrComplianceMatrix/i.test(fn)) return { requirements: [], staff: [] };
+  if (/listOrgPersonnelFileMatrix/i.test(fn)) return [];
+  if (/listOrgPersonnelFilePack/i.test(fn)) return [];
   if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
   if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
   if (/getClientCareData/i.test(fn)) {

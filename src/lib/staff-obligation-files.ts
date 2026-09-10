@@ -68,3 +68,125 @@ export function liveObligationTitle(
 export function obligationFileStatusLabel(status: ObligationFileStatus): string {
   return OBLIGATION_FILE_STATUS_LABEL[status];
 }
+
+/** Same On file / Due soon / Missing path the per-person Personnel file uses. */
+export function statusForObligationInstance(args: {
+  instanceStatus: "pending" | "completed" | "overdue" | "waived";
+  dueAt: string;
+  instanceUploadPath?: string | null;
+  completion?: {
+    upload_path?: string | null;
+    nectar_validation_status?: string | null;
+  } | null;
+  now?: Date;
+}): ObligationFileStatus {
+  const hasCompletion = !!(
+    args.completion ||
+    args.instanceUploadPath ||
+    args.instanceStatus === "completed" ||
+    args.instanceStatus === "waived"
+  );
+  const hasValidEvidence = hasValidObligationEvidence({
+    instanceStatus: args.instanceStatus,
+    hasCompletion,
+    nectarValidationStatus: args.completion?.nectar_validation_status ?? null,
+  });
+  return obligationFileStatus({
+    instanceStatus: args.instanceStatus,
+    dueAt: args.dueAt,
+    hasValidEvidence,
+    now: args.now,
+  });
+}
+
+export type ObligationFileStatusCounts = {
+  missing: number;
+  due_soon: number;
+  on_file: number;
+};
+
+export function emptyObligationFileStatusCounts(): ObligationFileStatusCounts {
+  return { missing: 0, due_soon: 0, on_file: 0 };
+}
+
+export function tallyObligationFileStatus(
+  counts: ObligationFileStatusCounts,
+  status: ObligationFileStatus,
+): void {
+  counts[status] += 1;
+}
+
+export function csvCell(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export type PersonnelMissingCsvRow = {
+  full_name: string;
+  role: string;
+  job_title: string | null;
+  service_codes: string[];
+  missing: number;
+  due_soon: number;
+  on_file: number;
+  missing_items: Array<{ title: string; due_at: string }>;
+};
+
+/** Missing-item CSV for the org-wide Personnel file. Same statuses as the matrix. */
+export function missingPersonnelCsv(rows: PersonnelMissingCsvRow[]): string {
+  const header = [
+    "Staff",
+    "Role",
+    "Job title",
+    "Service codes",
+    "Missing",
+    "Due soon",
+    "On file",
+    "Missing items",
+  ];
+  const lines = [
+    header.map(csvCell).join(","),
+    ...rows.map((r) =>
+      [
+        r.full_name,
+        r.role,
+        r.job_title ?? "",
+        r.service_codes.join(" "),
+        String(r.missing),
+        String(r.due_soon),
+        String(r.on_file),
+        r.missing_items.map((i) => i.title).join("; "),
+      ]
+        .map(csvCell)
+        .join(","),
+    ),
+  ];
+  return lines.join("\n");
+}
+
+export type PersonnelPackFile = {
+  staffName: string;
+  title: string;
+  filename: string;
+  url: string;
+};
+
+/** Print pack HTML — same evidence-pull pattern as the per-person Personnel file. */
+export function personnelPackHtml(files: PersonnelPackFile[]): string {
+  const body = files
+    .map((f) => {
+      const media = /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.filename)
+        ? `<img src="${escapeHtml(f.url)}" alt="" style="max-width:100%;" />`
+        : `<iframe src="${escapeHtml(f.url)}" style="width:100%;height:80vh;border:0;"></iframe>`;
+      return `<section style="page-break-after:always;margin-bottom:24px;"><h2 style="font:600 16px system-ui;">${escapeHtml(f.staffName)} — ${escapeHtml(f.title)}</h2>${media}</section>`;
+    })
+    .join("");
+  return `<!doctype html><html><head><title>Personnel file</title></head><body>${body}</body></html>`;
+}

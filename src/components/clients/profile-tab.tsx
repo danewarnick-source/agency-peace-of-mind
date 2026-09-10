@@ -892,7 +892,7 @@ function RecordCompletenessBar({
             })}
             <div className="flex justify-end gap-2 pt-3 border-t">
               <Button variant="outline" size="sm" onClick={onContinueIntake}>Continue intake</Button>
-              <Button size="sm" onClick={onOpenFiles}>Open Files</Button>
+              <Button size="sm" onClick={onOpenFiles}>Open Client file</Button>
             </div>
           </div>
         ) : null}

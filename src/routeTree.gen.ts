@@ -95,6 +95,7 @@ import { Route as DashboardCompanyObligationsRouteImport } from './routes/dashbo
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardClientLoansRouteImport } from './routes/dashboard.client-loans'
+import { Route as DashboardClientFileRouteImport } from './routes/dashboard.client-file'
 import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashboard.client-billing-codes'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
@@ -670,6 +671,11 @@ const DashboardClientsRoute = DashboardClientsRouteImport.update({
 const DashboardClientLoansRoute = DashboardClientLoansRouteImport.update({
   id: '/client-loans',
   path: '/client-loans',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardClientFileRoute = DashboardClientFileRouteImport.update({
+  id: '/client-file',
+  path: '/client-file',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardClientBillingCodesRoute =
@@ -1462,6 +1468,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
+  '/dashboard/client-file': typeof DashboardClientFileRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
@@ -1682,6 +1689,7 @@ export interface FileRoutesByTo {
   '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
+  '/dashboard/client-file': typeof DashboardClientFileRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
   '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
@@ -1900,6 +1908,7 @@ export interface FileRoutesById {
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
+  '/dashboard/client-file': typeof DashboardClientFileRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
@@ -2124,6 +2133,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
+    | '/dashboard/client-file'
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
@@ -2344,6 +2354,7 @@ export interface FileRouteTypes {
     | '/dashboard/behaviorist'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
+    | '/dashboard/client-file'
     | '/dashboard/client-loans'
     | '/dashboard/command-center'
     | '/dashboard/company-obligations'
@@ -2561,6 +2572,7 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
+    | '/dashboard/client-file'
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
@@ -3401,6 +3413,13 @@ declare module '@tanstack/react-router' {
       path: '/client-loans'
       fullPath: '/dashboard/client-loans'
       preLoaderRoute: typeof DashboardClientLoansRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/client-file': {
+      id: '/dashboard/client-file'
+      path: '/client-file'
+      fullPath: '/dashboard/client-file'
+      preLoaderRoute: typeof DashboardClientFileRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/client-billing-codes': {
@@ -4654,6 +4673,7 @@ interface DashboardRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
+  DashboardClientFileRoute: typeof DashboardClientFileRoute
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
   DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
@@ -4752,6 +4772,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBillingRoute: DashboardBillingRouteWithChildren,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
+  DashboardClientFileRoute: DashboardClientFileRoute,
   DashboardClientLoansRoute: DashboardClientLoansRoute,
   DashboardClientsRoute: DashboardClientsRouteWithChildren,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,

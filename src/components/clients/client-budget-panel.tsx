@@ -481,7 +481,7 @@ function BudgetEditor({
   };
 
   // ── Ship to client file: generate the current PDF and store the
-  // snapshot under the client's Files tab (client_documents), tagged as
+  // snapshot under the client's Client file (client_documents), tagged as
   // financial-support evidence. Deliberate action — never automatic.
   const shipToClientFile = async () => {
     if (dirty) {
@@ -564,7 +564,7 @@ function BudgetEditor({
               variant="secondary"
               onClick={shipToClientFile}
               disabled={pdfBusy !== null || dirty}
-              title={dirty ? "Save your changes before shipping" : "Save a finalized snapshot to the client's Files"}
+              title={dirty ? "Save your changes before shipping" : "Save a finalized snapshot to the client's Client file"}
             >
               <Send className="mr-2 h-4 w-4" />
               {pdfBusy === "ship" ? "Shipping…" : "Ship to client file"}

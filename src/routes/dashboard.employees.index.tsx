@@ -7,11 +7,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { adminResetEmployeePassword } from "@/lib/employees.functions";
 import { resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
+import { archiveEntity, deleteEntity, restoreEntity } from "@/lib/lifecycle.functions";
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
 import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
 import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
+import {
+  countEmployeesOnRosterTab,
+  filterEmployeesByRosterTab,
+  isEmployeeOnActiveRoster,
+  type EmployeeRosterTab,
+} from "@/lib/employee-roster";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 import { AddEmployeeButton, AddEmployeeWizard } from "@/components/employees/add-employee-wizard";
 
@@ -22,7 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings, FileSpreadsheet, RefreshCcw } from "lucide-react";
+import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings, FileSpreadsheet, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
 import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -50,6 +57,9 @@ export function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [rosterTab, setRosterTab] = useState<EmployeeRosterTab>("active");
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => generateTempPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string; newStaffId?: string } | null>(null);
@@ -94,29 +104,36 @@ export function EmployeesPage() {
   const resetPwFn = useServerFn(adminResetEmployeePassword);
   const resendInviteFn = useServerFn(resendInvitation);
   const revokeInviteFn = useServerFn(revokeInvitation);
+  const archiveFn = useServerFn(archiveEntity);
+  const restoreFn = useServerFn(restoreEntity);
+  const deleteFn = useServerFn(deleteEntity);
 
-  const { data: members } = useQuery({
+  const { data: members, isLoading: membersLoading } = useQuery({
     enabled: !!org,
     queryKey: ["members", org?.organization_id],
     queryFn: async () => {
+      if (!org) throw new Error("No organization selected.");
       const { data } = await supabase
         .from("organization_members")
         .select("id, role, job_title, active, user_id, created_at")
-        .eq("organization_id", org!.organization_id);
+        .eq("organization_id", org.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, employee_id, position, account_status, worker_type, photo_path, photo_updated_at" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, employee_id, position, account_status, is_active, worker_type, photo_path, photo_updated_at" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? [])
-        .map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }))
-        // Hide archived accounts from the active operational roster.
-        .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
+      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }));
     },
   });
+  const visibleMembers = useMemo(
+    () => filterEmployeesByRosterTab(members, rosterTab),
+    [members, rosterTab],
+  );
+  const activeCount = useMemo(() => countEmployeesOnRosterTab(members, "active"), [members]);
+  const inactiveCount = useMemo(() => countEmployeesOnRosterTab(members, "inactive"), [members]);
   const { data: invites } = useQuery({
     enabled: !!org,
     queryKey: ["invites", org?.organization_id],
@@ -195,13 +212,52 @@ export function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: async (input: { memberId: string; active: boolean }) => {
-      const { error } = await supabase.from("organization_members")
-        .update({ active: input.active }).eq("id", input.memberId);
-      if (error) throw error;
+  const deactivateMutation = useMutation({
+    mutationFn: async (input: { userId: string; name: string }) => {
+      if (!org) throw new Error("No organization selected.");
+      await archiveFn({
+        data: { kind: "employee", id: input.userId, organizationId: org.organization_id },
+      });
     },
-    onSuccess: () => { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["members"] }); },
+    onSuccess: (_d, vars) => {
+      toast.success(`${vars.name} moved to Inactive.`);
+      qc.invalidateQueries({ queryKey: ["members"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (input: { userId: string; name: string }) => {
+      if (!org) throw new Error("No organization selected.");
+      await restoreFn({
+        data: { kind: "employee", id: input.userId, organizationId: org.organization_id },
+      });
+    },
+    onSuccess: (_d, vars) => {
+      toast.success(`${vars.name} is active again.`);
+      qc.invalidateQueries({ queryKey: ["members"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (input: { userId: string; name: string; confirmName: string }) => {
+      if (!org) throw new Error("No organization selected.");
+      await deleteFn({
+        data: {
+          kind: "employee",
+          id: input.userId,
+          organizationId: org.organization_id,
+          confirmName: input.confirmName,
+        },
+      });
+    },
+    onSuccess: (_d, vars) => {
+      toast.success(`${vars.name} permanently deleted.`);
+      setDeleteTarget(null);
+      setConfirmDeleteName("");
+      qc.invalidateQueries({ queryKey: ["members"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -229,7 +285,8 @@ export function EmployeesPage() {
         <div>
           <h2 className="text-base font-semibold">Team members</h2>
           <p className="text-sm text-muted-foreground">
-            {members?.filter((m) => m.active).length ?? 0} active
+            {activeCount} active
+            {inactiveCount > 0 && ` · ${inactiveCount} inactive`}
             {(invites?.length ?? 0) > 0 && ` · ${invites!.length} pending invite${invites!.length === 1 ? "" : "s"}`}
           </p>
         </div>
@@ -304,12 +361,50 @@ export function EmployeesPage() {
         </div>
       )}
 
+      <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5 text-xs">
+        {(["active", "inactive"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setRosterTab(t)}
+            className={
+              "rounded px-3 py-1 font-medium capitalize transition-colors " +
+              (rosterTab === t
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground")
+            }
+          >
+            {t === "active" ? "Active" : "Inactive"}
+            {t === "inactive" && inactiveCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                {inactiveCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        {membersLoading ? (
+          <div className="flex items-center justify-center gap-2 p-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading employees…
+          </div>
+        ) : !visibleMembers.length ? (
+          <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">
+            <p>
+              {rosterTab === "inactive"
+                ? "No deactivated employees."
+                : "No active employees."}
+            </p>
+          </div>
+        ) : (
+        <>
         {/* Mobile card list — the table overflows on small screens, so below
             md we render the same roster as stacked cards instead. */}
         <div className="block divide-y divide-border md:hidden">
-          {members?.map((m) => {
+          {visibleMembers.map((m) => {
             const name = m.profile?.full_name ?? "—";
+            const onActiveRoster = isEmployeeOnActiveRoster(m);
             const codes = serviceCodesByStaff.get(m.user_id) ?? [];
             const openProfile = () => {
               void navigate({ to: "/dashboard/employees/$staffId", params: { staffId: m.user_id } });
@@ -333,12 +428,12 @@ export function EmployeesPage() {
                   <span
                     className={
                       "shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
-                      (m.active
+                      (onActiveRoster
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                         : "bg-muted text-muted-foreground")
                     }
                   >
-                    {m.active ? "Active" : "Deactivated"}
+                    {onActiveRoster ? "Active" : "Deactivated"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -351,7 +446,31 @@ export function EmployeesPage() {
                     <span className="text-xs text-muted-foreground">No service codes</span>
                   )}
                 </div>
-                <div className="flex items-center justify-end pt-1" data-no-row-nav onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-end gap-2 pt-1" data-no-row-nav onClick={(e) => e.stopPropagation()}>
+                  {rosterTab === "inactive" && m.user_id !== user?.id && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={reactivateMutation.isPending}
+                        onClick={() => reactivateMutation.mutate({ userId: m.user_id, name })}
+                      >
+                        Reactivate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setConfirmDeleteName("");
+                          setDeleteTarget({ userId: m.user_id, name });
+                        }}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" /> Delete
+                      </Button>
+                    </>
+                  )}
                   <Link
                     to="/dashboard/employees/$staffId"
                     params={{ staffId: m.user_id }}
@@ -378,8 +497,9 @@ export function EmployeesPage() {
               </tr>
             </thead>
             <tbody>
-              {members?.map((m) => {
+              {visibleMembers.map((m) => {
                 const name = m.profile?.full_name ?? "—";
+                const onActiveRoster = isEmployeeOnActiveRoster(m);
                 const login = m.profile?.username ?? m.profile?.email ?? "—";
                 const needsReset = m.profile?.must_change_password;
                 const position = (m.profile?.position ?? "") as Position | "";
@@ -433,12 +553,12 @@ export function EmployeesPage() {
                       <span
                         className={
                           "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
-                          (m.active
+                          (onActiveRoster
                             ? "hive-status-active"
                             : "bg-muted text-muted-foreground")
                         }
                       >
-                        {m.active ? "Active" : "Deactivated"}
+                        {onActiveRoster ? "Active" : "Deactivated"}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
@@ -503,16 +623,30 @@ export function EmployeesPage() {
                             <DropdownMenuItem onSelect={() => setResetUser({ id: m.user_id, name })}>
                               <KeyRound className="mr-2 h-3.5 w-3.5" /> Reset password
                             </DropdownMenuItem>
+                            {m.user_id !== user?.id && rosterTab === "active" && (
+                              <DropdownMenuItem
+                                onSelect={() => deactivateMutation.mutate({ userId: m.user_id, name })}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <UserX className="mr-2 h-3.5 w-3.5" /> Deactivate
+                              </DropdownMenuItem>
+                            )}
+                            {m.user_id !== user?.id && rosterTab === "inactive" && (
+                              <DropdownMenuItem
+                                onSelect={() => reactivateMutation.mutate({ userId: m.user_id, name })}
+                              >
+                                <UserCheck className="mr-2 h-3.5 w-3.5" /> Reactivate
+                              </DropdownMenuItem>
+                            )}
                             {m.user_id !== user?.id && (
                               <DropdownMenuItem
-                                onSelect={() => toggleActiveMutation.mutate({ memberId: m.id, active: !m.active })}
-                                className={m.active ? "text-destructive focus:text-destructive" : ""}
+                                onSelect={() => {
+                                  setConfirmDeleteName("");
+                                  setDeleteTarget({ userId: m.user_id, name });
+                                }}
+                                className="text-destructive focus:text-destructive"
                               >
-                                {m.active ? (
-                                  <><UserX className="mr-2 h-3.5 w-3.5" /> Deactivate</>
-                                ) : (
-                                  <><UserCheck className="mr-2 h-3.5 w-3.5" /> Reactivate</>
-                                )}
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -525,6 +659,8 @@ export function EmployeesPage() {
             </tbody>
           </table>
         </div>
+        </>
+        )}
       </div>
 
 
@@ -534,6 +670,70 @@ export function EmployeesPage() {
         organizationId={org?.organization_id ?? null}
         onOpenSettings={() => setStaffFieldsOpen(true)}
       />
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteTarget(null);
+            setConfirmDeleteName("");
+          }
+        }}
+      >
+        <DialogContent className="border-destructive/60">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Delete {deleteTarget?.name}?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently removes {deleteTarget?.name} from this organization. Type their full name to confirm. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="confirm-employee-delete" className="text-sm">
+              Type <span className="font-mono font-semibold">{deleteTarget?.name}</span> to confirm
+            </Label>
+            <Input
+              id="confirm-employee-delete"
+              value={confirmDeleteName}
+              onChange={(e) => setConfirmDeleteName(e.target.value)}
+              placeholder={deleteTarget?.name}
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setConfirmDeleteName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                !deleteTarget ||
+                confirmDeleteName.trim().toLowerCase() !== (deleteTarget.name ?? "").trim().toLowerCase() ||
+                deleteEmployeeMutation.isPending
+              }
+              onClick={() => {
+                if (!deleteTarget) return;
+                deleteEmployeeMutation.mutate({
+                  userId: deleteTarget.userId,
+                  name: deleteTarget.name,
+                  confirmName: confirmDeleteName,
+                });
+              }}
+            >
+              {deleteEmployeeMutation.isPending
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting…</>
+                : <><Trash2 className="mr-2 h-4 w-4" /> Delete permanently</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reset password */}
       <Dialog open={!!resetUser} onOpenChange={(o) => !o && setResetUser(null)}>

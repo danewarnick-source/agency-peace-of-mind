@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, KeyRound, Mail, ShieldPlus } from "lucide-react";
+import { Copy, KeyRound, Mail, Plus, ShieldPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createEmployeeManually } from "@/lib/employees.functions";
@@ -9,6 +9,7 @@ import { createInvitation, resendInvitation } from "@/lib/invitations.functions"
 import { interpretInviteSendResult } from "@/lib/invite-send-result";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
+import { uniqueHireEmails } from "@/lib/employee-roster";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
 import {
   normalizeConfig,
   WORKER_TYPE_OPTIONS,
@@ -25,11 +25,57 @@ import {
 
 type Role = "admin" | "manager" | "employee";
 
+type HireDraft = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: Role;
+  hireDate: string;
+  staffType: string[];
+  department: string;
+  employeeId: string;
+  workerType: string;
+  customFieldValues: Record<string, unknown>;
+};
+
 type CreatedEmployee = {
+  draftId: string;
   userId: string;
+  name: string;
   email: string;
   password: string;
+  role: Role;
 };
+
+function newDraftId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function emptyDraft(): HireDraft {
+  return {
+    id: newDraftId(),
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    role: "employee",
+    hireDate: "",
+    staffType: [],
+    department: "",
+    employeeId: "",
+    workerType: "",
+    customFieldValues: {},
+  };
+}
+
+function fieldId(name: string, index: number): string {
+  return index === 0 ? name : `${name}_${index}`;
+}
 
 export function AddEmployeeWizard({
   open,
@@ -48,33 +94,15 @@ export function AddEmployeeWizard({
   const resendInviteFn = useServerFn(resendInvitation);
 
   const [step, setStep] = useState<"details" | "access">("details");
-  const [created, setCreated] = useState<CreatedEmployee | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<Role>("employee");
-  const [requiresDeescalation, setRequiresDeescalation] = useState(true);
-  const [requiresAbi, setRequiresAbi] = useState(true);
-  const [staffType, setStaffType] = useState<string[]>([]);
-  const [department, setDepartment] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
-  const [workerType, setWorkerType] = useState("");
-  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
-
-  const resetOptional = () => {
-    setStaffType([]);
-    setDepartment("");
-    setEmployeeId("");
-    setWorkerType("");
-    setCustomFieldValues({});
-    setRequiresDeescalation(true);
-    setRequiresAbi(true);
-    setRole("employee");
-  };
+  const [drafts, setDrafts] = useState<HireDraft[]>(() => [emptyDraft()]);
+  const [created, setCreated] = useState<CreatedEmployee[]>([]);
+  const [shownPasswords, setShownPasswords] = useState<Set<string>>(() => new Set());
 
   const resetAll = () => {
     setStep("details");
-    setCreated(null);
-    setShowPassword(false);
-    resetOptional();
+    setDrafts([emptyDraft()]);
+    setCreated([]);
+    setShownPasswords(new Set());
   };
 
   const { data: staffIntakeConfig } = useQuery({
@@ -93,82 +121,87 @@ export function AddEmployeeWizard({
     },
   });
 
-  const { data: tracks } = useQuery({
-    enabled: !!organizationId && open,
-    queryKey: ["tracks-mini", organizationId],
-    queryFn: async () => {
-      const { data } = await supabase.from("training_tracks").select("id, name").eq("is_published", true);
-      return data ?? [];
-    },
-  });
+  const patchDraft = (id: string, patch: Partial<HireDraft>) => {
+    setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  };
 
   const createMutation = useMutation({
-    mutationFn: async (input: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone: string;
-      role: Role;
-      startDate: string;
-      endDate: string;
-      trackIds: string[];
-      password: string;
-    }) => {
+    mutationFn: async (rows: HireDraft[]) => {
       if (!organizationId) throw new Error("No organization selected.");
-      if (input.startDate && input.endDate && input.endDate < input.startDate) {
-        throw new Error("End date must be on or after Start date.");
+      const dup = uniqueHireEmails(rows.map((r) => r.email));
+      if (dup) throw new Error(`${dup} is listed more than once.`);
+
+      const made: CreatedEmployee[] = [];
+      const errors: string[] = [];
+      for (const row of rows) {
+        const password = generateTempPassword();
+        try {
+          const res = await createManual({
+            data: {
+              organizationId,
+              firstName: row.firstName.trim(),
+              lastName: row.lastName.trim(),
+              email: row.email.trim(),
+              phone: row.phone.trim(),
+              temporaryPassword: password,
+              role: row.role,
+              hireDate: row.hireDate,
+              startDate: row.hireDate,
+              trackIds: [],
+              requiresDeescalation: false,
+              requiresAbi: false,
+              staffType: row.staffType,
+              department: row.department,
+              employeeId: row.employeeId,
+              workerType: row.workerType,
+              customFieldValues: row.customFieldValues,
+            },
+          });
+          made.push({
+            draftId: row.id,
+            userId: res?.userId || "",
+            name: `${row.firstName.trim()} ${row.lastName.trim()}`.trim(),
+            email: row.email.trim(),
+            password,
+            role: row.role,
+          });
+        } catch (e) {
+          const who = `${row.firstName.trim()} ${row.lastName.trim()}`.trim() || row.email.trim();
+          errors.push(`${who}: ${e instanceof Error ? e.message : "Could not create."}`);
+        }
       }
-      return await createManual({
-        data: {
-          organizationId,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          phone: input.phone,
-          temporaryPassword: input.password,
-          role: input.role,
-          hireDate: input.startDate,
-          startDate: input.startDate,
-          endDate: input.endDate,
-          trackIds: input.trackIds,
-          requiresDeescalation,
-          requiresAbi,
-          staffType,
-          department,
-          employeeId,
-          workerType,
-          customFieldValues,
-        },
-      });
+      if (!made.length) {
+        throw new Error(errors.join(" ") || "Could not create employees.");
+      }
+      return { made, errors };
     },
-    onSuccess: (res, vars) => {
-      toast.success("Employee file created");
-      setCreated({
-        userId: res?.userId || "",
-        email: vars.email,
-        password: vars.password,
-      });
+    onSuccess: ({ made, errors }) => {
+      if (errors.length) {
+        toast.warning(`Created ${made.length}. ${errors.join(" ")}`);
+      } else {
+        toast.success(made.length === 1 ? "Employee file created" : `${made.length} employee files created`);
+      }
+      setCreated(made);
       setStep("access");
-      resetOptional();
       qc.invalidateQueries({ queryKey: ["members"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async () => {
-      if (!organizationId || !created?.email) throw new Error("No organization selected.");
+    mutationFn: async (row: CreatedEmployee) => {
+      if (!organizationId) throw new Error("No organization selected.");
       const site_origin = resolveAuthOrigin();
-      const email = created.email.trim().toLowerCase();
+      const email = row.email.trim().toLowerCase();
       // Same rail as Pending invitations → Resend (createInvitation / resendInvitation).
       // inviteStaffMembers is a different RPC that can resolve undefined; do not read `.sent` on it.
       try {
         const raw = await createInviteFn({
-          data: { organization_id: organizationId, email, role, site_origin },
+          data: { organization_id: organizationId, email, role: row.role, site_origin },
         });
         const out = interpretInviteSendResult(raw);
         if (out.rpc_failure) throw new Error(out.message);
-        return out;
+        return { out, email: row.email };
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (!/pending invitation already exists/i.test(msg)) throw e;
@@ -186,12 +219,12 @@ export function AddEmployeeWizard({
         });
         const out = interpretInviteSendResult(raw);
         if (out.rpc_failure) throw new Error(out.message);
-        return out;
+        return { out, email: row.email };
       }
     },
-    onSuccess: (out) => {
+    onSuccess: ({ out, email }) => {
       if (out.email_sent) {
-        toast.success(`Invite emailed to ${out.email ?? created?.email ?? "the employee"}.`);
+        toast.success(`Invite emailed to ${out.email ?? email}.`);
       } else if (out.email_error) {
         toast.warning(
           `Invitation created, but the email couldn't be sent (${out.email_error}). Share the join link from Pending invitations.`,
@@ -206,10 +239,25 @@ export function AddEmployeeWizard({
   });
 
   const finish = (goToProfile: boolean) => {
-    const id = created?.userId;
+    const id = created.length === 1 ? created[0]?.userId : "";
     onOpenChange(false);
     resetAll();
     if (goToProfile && id) window.location.href = `/dashboard/employees/${id}?tab=record`;
+  };
+
+  const submitDetails = () => {
+    if (!organizationId) {
+      toast.error("No organization selected.");
+      return;
+    }
+    const missing = drafts.find((d) =>
+      !d.firstName.trim() || !d.lastName.trim() || !d.email.trim() || !d.phone.trim() || !d.hireDate,
+    );
+    if (missing) {
+      toast.error("Each employee needs a first name, last name, email, phone, and hire date.");
+      return;
+    }
+    createMutation.mutate(drafts);
   };
 
   return (
@@ -232,127 +280,41 @@ export function AddEmployeeWizard({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!organizationId) {
-                  toast.error("No organization selected.");
-                  return;
-                }
-                const fd = new FormData(e.currentTarget);
-                createMutation.mutate({
-                  firstName: String(fd.get("first_name") || "").trim(),
-                  lastName: String(fd.get("last_name") || "").trim(),
-                  email: String(fd.get("email") || "").trim(),
-                  phone: String(fd.get("phone") || "").trim(),
-                  role,
-                  startDate: String(fd.get("hire_date") || ""),
-                  endDate: String(fd.get("end_date") || ""),
-                  trackIds: (fd.getAll("track_ids") as string[]).filter(Boolean),
-                  password: generateTempPassword(),
-                });
+                submitDetails();
               }}
               className="grid gap-4"
             >
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="first_name">First name</Label>
-                  <Input id="first_name" name="first_name" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="last_name">Last name</Label>
-                  <Input id="last_name" name="last_name" required />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">
-                  Email address · used for sign-in <span className="text-destructive">*</span>
-                </Label>
-                <Input id="email" name="email" type="email" required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Phone number</Label>
-                <Input id="phone" name="phone" type="tel" required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="hire_date">
-                    Hire date <span className="text-destructive">*</span>
-                  </Label>
-                  <Input id="hire_date" name="hire_date" type="date" required />
-                  <p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="end_date">End date (optional)</Label>
-                  <Input id="end_date" name="end_date" type="date" />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                  <SelectTrigger id="role"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <OptionalIntakeFields
-                config={staffIntakeConfig}
-                staffType={staffType}
-                onStaffTypeChange={setStaffType}
-                department={department}
-                onDepartmentChange={setDepartment}
-                employeeId={employeeId}
-                onEmployeeIdChange={setEmployeeId}
-                workerType={workerType}
-                onWorkerTypeChange={setWorkerType}
-                customFieldValues={customFieldValues}
-                onCustomFieldValuesChange={setCustomFieldValues}
-                onOpenSettings={onOpenSettings}
-              />
-
-              <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Behavior-related training requirements
-                </p>
-                <TrainingRequirementField
-                  label="De-escalation training"
-                  hint="Typically required for staff assigned to a behavior-coded client (BC1/2/3) or a client with a Behavior Support Plan."
-                  value={requiresDeescalation}
-                  onChange={setRequiresDeescalation}
-                  atRisk={false}
-                  warningText=""
+              {drafts.map((draft, index) => (
+                <HireDraftFields
+                  key={draft.id}
+                  draft={draft}
+                  index={index}
+                  showHeader={drafts.length > 1}
+                  canRemove={drafts.length > 1}
+                  staffIntakeConfig={staffIntakeConfig}
+                  onOpenSettings={onOpenSettings}
+                  onChange={(patch) => patchDraft(draft.id, patch)}
+                  onRemove={() => setDrafts((prev) => prev.filter((d) => d.id !== draft.id))}
                 />
-                <TrainingRequirementField
-                  label="ABI training"
-                  hint="Typically required for staff assigned to a client with an ABI (acquired brain injury) designation."
-                  value={requiresAbi}
-                  onChange={setRequiresAbi}
-                  atRisk={false}
-                  warningText=""
-                />
-              </div>
-
-              {!!tracks?.length && (
-                <div className="grid gap-2">
-                  <Label>Assigned training tracks</Label>
-                  <div className="grid max-h-40 gap-1 overflow-y-auto rounded-md border border-border p-2 text-sm">
-                    {tracks.map((t) => (
-                      <label key={t.id} className="flex items-center gap-2">
-                        <input type="checkbox" name="track_ids" value={t.id} className="rounded" />
-                        {t.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDrafts((prev) => [...prev, emptyDraft()])}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add another employee
+              </Button>
               <DialogFooter>
                 <Button
                   type="submit"
                   disabled={createMutation.isPending || !organizationId}
                   className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
                 >
-                  {createMutation.isPending ? "Creating…" : "Create employee"}
+                  {createMutation.isPending
+                    ? "Creating…"
+                    : drafts.length === 1
+                      ? "Create employee"
+                      : `Create ${drafts.length} employees`}
                 </Button>
               </DialogFooter>
             </form>
@@ -362,51 +324,35 @@ export function AddEmployeeWizard({
             <DialogHeader>
               <DialogTitle>How should they sign in?</DialogTitle>
               <DialogDescription>
-                The employee file is complete. Send a join email, or copy a temporary password for same-day access.
+                {created.length === 1
+                  ? "The employee file is complete. Send a join email, or copy a temporary password for same-day access."
+                  : "Each file is complete. Send a join email or copy a temporary password per person — invites are not sent unless you choose to."}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3">
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-                <div className="text-xs text-muted-foreground">Login</div>
-                <code className="block truncate">{created?.email}</code>
-              </div>
-              <Button
-                type="button"
-                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
-                disabled={inviteMutation.isPending}
-                onClick={() => inviteMutation.mutate()}
-              >
-                <Mail className="mr-2 h-4 w-4" />
-                {inviteMutation.isPending ? "Sending…" : "Send invite email"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setShowPassword(true)}>
-                <KeyRound className="mr-2 h-4 w-4" /> Show temporary password
-              </Button>
-              {showPassword && created && (
-                <div className="grid gap-2 rounded-md border border-border p-3">
-                  <div className="text-xs text-muted-foreground">Temporary password · shown once</div>
-                  <div className="flex gap-2">
-                    <code className="flex-1 rounded bg-secondary p-2 text-sm">{created.password}</code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(created.password);
-                        toast.success("Copied");
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">They will be asked to change this on first sign-in.</p>
-                </div>
-              )}
+              {created.map((row) => (
+                <AccessCard
+                  key={row.draftId}
+                  row={row}
+                  showName={created.length > 1}
+                  showPassword={shownPasswords.has(row.draftId)}
+                  inviting={inviteMutation.isPending && inviteMutation.variables?.draftId === row.draftId}
+                  onInvite={() => inviteMutation.mutate(row)}
+                  onShowPassword={() =>
+                    setShownPasswords((prev) => {
+                      const next = new Set(prev);
+                      next.add(row.draftId);
+                      return next;
+                    })
+                  }
+                />
+              ))}
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
               <Button type="button" variant="ghost" onClick={() => finish(false)}>
                 Skip for now
               </Button>
-              <Button type="button" onClick={() => finish(true)}>
+              <Button type="button" onClick={() => finish(created.length === 1)}>
                 Done
               </Button>
             </DialogFooter>
@@ -414,6 +360,182 @@ export function AddEmployeeWizard({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AccessCard({
+  row,
+  showName,
+  showPassword,
+  inviting,
+  onInvite,
+  onShowPassword,
+}: {
+  row: CreatedEmployee;
+  showName: boolean;
+  showPassword: boolean;
+  inviting: boolean;
+  onInvite: () => void;
+  onShowPassword: () => void;
+}) {
+  return (
+    <div className="grid gap-3 rounded-md border border-border p-3">
+      {showName && <p className="text-sm font-medium">{row.name}</p>}
+      <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+        <div className="text-xs text-muted-foreground">Login</div>
+        <code className="block truncate">{row.email}</code>
+      </div>
+      <Button
+        type="button"
+        className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
+        disabled={inviting}
+        onClick={onInvite}
+      >
+        <Mail className="mr-2 h-4 w-4" />
+        {inviting ? "Sending…" : "Send invite email"}
+      </Button>
+      <Button type="button" variant="outline" onClick={onShowPassword}>
+        <KeyRound className="mr-2 h-4 w-4" /> Show temporary password
+      </Button>
+      {showPassword && (
+        <div className="grid gap-2 rounded-md border border-border p-3">
+          <div className="text-xs text-muted-foreground">Temporary password · shown once</div>
+          <div className="flex gap-2">
+            <code className="flex-1 rounded bg-secondary p-2 text-sm">{row.password}</code>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void navigator.clipboard.writeText(row.password);
+                toast.success("Copied");
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">They will be asked to change this on first sign-in.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HireDraftFields({
+  draft,
+  index,
+  showHeader,
+  canRemove,
+  staffIntakeConfig,
+  onOpenSettings,
+  onChange,
+  onRemove,
+}: {
+  draft: HireDraft;
+  index: number;
+  showHeader: boolean;
+  canRemove: boolean;
+  staffIntakeConfig: StaffIntakeFieldsConfig | undefined;
+  onOpenSettings: () => void;
+  onChange: (patch: Partial<HireDraft>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className={showHeader ? "grid gap-4 rounded-md border border-border p-3" : "grid gap-4"}>
+      {showHeader && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Employee {index + 1}
+          </p>
+          {canRemove && (
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={onRemove}>
+              <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
+            </Button>
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-2">
+          <Label htmlFor={fieldId("first_name", index)}>First name</Label>
+          <Input
+            id={fieldId("first_name", index)}
+            value={draft.firstName}
+            onChange={(e) => onChange({ firstName: e.target.value })}
+            required
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={fieldId("last_name", index)}>Last name</Label>
+          <Input
+            id={fieldId("last_name", index)}
+            value={draft.lastName}
+            onChange={(e) => onChange({ lastName: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={fieldId("email", index)}>
+          Email address · used for sign-in <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id={fieldId("email", index)}
+          type="email"
+          value={draft.email}
+          onChange={(e) => onChange({ email: e.target.value })}
+          required
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={fieldId("phone", index)}>Phone number</Label>
+        <Input
+          id={fieldId("phone", index)}
+          type="tel"
+          value={draft.phone}
+          onChange={(e) => onChange({ phone: e.target.value })}
+          required
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={fieldId("hire_date", index)}>
+          Hire date <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id={fieldId("hire_date", index)}
+          type="date"
+          value={draft.hireDate}
+          onChange={(e) => onChange({ hireDate: e.target.value })}
+          required
+        />
+        <p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={fieldId("role", index)}>Role</Label>
+        <Select value={draft.role} onValueChange={(v) => onChange({ role: v as Role })}>
+          <SelectTrigger id={fieldId("role", index)}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="employee">Employee</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <OptionalIntakeFields
+        config={staffIntakeConfig}
+        staffType={draft.staffType}
+        onStaffTypeChange={(staffType) => onChange({ staffType })}
+        department={draft.department}
+        onDepartmentChange={(department) => onChange({ department })}
+        employeeId={draft.employeeId}
+        onEmployeeIdChange={(employeeId) => onChange({ employeeId })}
+        workerType={draft.workerType}
+        onWorkerTypeChange={(workerType) => onChange({ workerType })}
+        customFieldValues={draft.customFieldValues}
+        onCustomFieldValuesChange={(customFieldValues) => onChange({ customFieldValues })}
+        onOpenSettings={onOpenSettings}
+        idSuffix={index === 0 ? "" : `-${index}`}
+      />
+    </div>
   );
 }
 
@@ -433,6 +555,7 @@ function OptionalIntakeFields({
   workerType, onWorkerTypeChange,
   customFieldValues, onCustomFieldValuesChange,
   onOpenSettings,
+  idSuffix = "",
 }: {
   config: StaffIntakeFieldsConfig | undefined;
   staffType: string[];
@@ -446,6 +569,7 @@ function OptionalIntakeFields({
   customFieldValues: Record<string, unknown>;
   onCustomFieldValuesChange: (v: Record<string, unknown>) => void;
   onOpenSettings: () => void;
+  idSuffix?: string;
 }) {
   if (!config) return null;
 
@@ -529,9 +653,9 @@ function OptionalIntakeFields({
 
       {config.employee_id.enabled && (
         <div className="grid gap-2">
-          <Label htmlFor="employee_id">Employee ID (optional)</Label>
+          <Label htmlFor={`employee_id${idSuffix}`}>Employee ID (optional)</Label>
           <Input
-            id="employee_id"
+            id={`employee_id${idSuffix}`}
             value={employeeId}
             onChange={(e) => onEmployeeIdChange(e.target.value)}
           />
@@ -554,20 +678,20 @@ function OptionalIntakeFields({
 
       {atHireCustomFields.map((field) => (
         <div key={field.id} className="grid gap-2">
-          <Label htmlFor={`cf-${field.id}`} className="flex items-center gap-2">
+          <Label htmlFor={`cf-${field.id}${idSuffix}`} className="flex items-center gap-2">
             {field.name}
             <Badge variant="outline" className="text-[10px]">Custom</Badge>
           </Label>
           {field.type === "text" && (
             <Input
-              id={`cf-${field.id}`}
+              id={`cf-${field.id}${idSuffix}`}
               value={(customFieldValues[field.id] as string) ?? ""}
               onChange={(e) => setCustomFieldValue(field.id, e.target.value)}
             />
           )}
           {field.type === "date" && (
             <Input
-              id={`cf-${field.id}`}
+              id={`cf-${field.id}${idSuffix}`}
               type="date"
               value={(customFieldValues[field.id] as string) ?? ""}
               onChange={(e) => setCustomFieldValue(field.id, e.target.value)}
@@ -575,7 +699,7 @@ function OptionalIntakeFields({
           )}
           {field.type === "number" && (
             <Input
-              id={`cf-${field.id}`}
+              id={`cf-${field.id}${idSuffix}`}
               type="number"
               value={(customFieldValues[field.id] as string) ?? ""}
               onChange={(e) => setCustomFieldValue(field.id, e.target.value)}

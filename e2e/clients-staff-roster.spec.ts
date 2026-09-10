@@ -131,6 +131,13 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("heading", { name: /Team members/i })).toBeVisible({
       timeout: 20_000,
     });
+    await expect(page.getByRole("button", { name: /^Active$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Inactive$/i })).toBeVisible();
+    await expect(rosterName(page, "Jake Probert")).toBeVisible();
+    await page.getByRole("button", { name: /^Inactive$/i }).click();
+    await expect(page.getByText(/No deactivated employees/i).first()).toBeVisible();
+    await expect(rosterName(page, "Jake Probert")).toHaveCount(0);
+    await page.getByRole("button", { name: /^Active$/i }).click();
     await expect(rosterName(page, "Jake Probert")).toBeVisible();
     await expect(rosterName(page, "Harvey Alisa")).toBeVisible();
     await expect(rosterName(page, "Tom Jones")).toBeVisible();
@@ -166,6 +173,10 @@ test.describe("Clients + Staff roster — mocked admin", () => {
 
     await page.getByRole("button", { name: /^Add employee$/i }).click();
     await expect(page.getByRole("heading", { name: /Add employee/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Add another employee/i })).toBeVisible();
+    await expect(page.getByLabel(/End date/i)).toHaveCount(0);
+    await expect(page.getByText(/Assigned training tracks/i)).toHaveCount(0);
+    await expect(page.getByText(/Behavior-related training/i)).toHaveCount(0);
     await page.locator("#first_name").fill("Sep");
     await page.locator("#last_name").fill("Tester");
     await page.locator("#email").fill("sep1.tester@example.test");

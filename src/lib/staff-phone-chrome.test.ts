@@ -23,6 +23,32 @@ describe("resetStaffPhoneScroll", () => {
   it("accepts a null scroller", () => {
     resetStaffPhoneScroll(null);
   });
+
+  it("zeros every known app scroller when the explicit ref is null", () => {
+    const staff = { scrollTop: 320, scrollLeft: 4 };
+    const admin = { scrollTop: 880, scrollLeft: 9 };
+    const prev = globalThis.document;
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        querySelectorAll: (sel: string) => {
+          assert.match(sel, /data-staff-phone-scroller/);
+          assert.match(sel, /data-dashboard-scroller/);
+          return [staff, admin];
+        },
+        scrollingElement: { scrollTop: 12, scrollLeft: 0 },
+        documentElement: { scrollTop: 12, scrollLeft: 0 },
+        body: { scrollTop: 12, scrollLeft: 0 },
+      },
+    });
+    try {
+      resetStaffPhoneScroll(null);
+      assert.equal(staff.scrollTop, 0);
+      assert.equal(admin.scrollTop, 0);
+    } finally {
+      Object.defineProperty(globalThis, "document", { configurable: true, value: prev });
+    }
+  });
 });
 
 describe("staffMainBottomPadCss", () => {

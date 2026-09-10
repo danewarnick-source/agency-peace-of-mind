@@ -79,21 +79,21 @@ export function dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn(
   );
 }
 
+const APP_SCROLLER_SELECTOR = "[data-staff-phone-scroller], [data-dashboard-scroller]";
+
+function zeroScroller(el: { scrollTop: number; scrollLeft: number }): void {
+  el.scrollTop = 0;
+  el.scrollLeft = 0;
+}
+
 export function resetStaffPhoneScroll(scroller: HTMLElement | null): void {
-  if (scroller) {
-    scroller.scrollTop = 0;
-    scroller.scrollLeft = 0;
-  }
+  if (scroller) zeroScroller(scroller);
   if (typeof document !== "undefined") {
+    document.querySelectorAll<HTMLElement>(APP_SCROLLER_SELECTOR).forEach(zeroScroller);
     const scrolling = document.scrollingElement ?? document.documentElement;
-    scrolling.scrollTop = 0;
-    scrolling.scrollLeft = 0;
-    document.documentElement.scrollTop = 0;
-    document.documentElement.scrollLeft = 0;
-    if (document.body) {
-      document.body.scrollTop = 0;
-      document.body.scrollLeft = 0;
-    }
+    zeroScroller(scrolling);
+    zeroScroller(document.documentElement);
+    if (document.body) zeroScroller(document.body);
   }
   if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
     window.scrollTo(0, 0);

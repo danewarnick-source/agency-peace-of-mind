@@ -5,8 +5,10 @@ import {
   hasValidObligationEvidence,
   dueLabel,
   liveObligationTitle,
+  missingPersonnelCsv,
   obligationFileStatus,
   obligationFileStatusLabel,
+  statusForObligationInstance,
 } from "./staff-obligation-files.ts";
 
 const now = new Date("2026-09-10T12:00:00.000Z");
@@ -148,6 +150,60 @@ describe("Admin employee profile lock", () => {
   });
 });
 
+describe("statusForObligationInstance", () => {
+  it("matches the per-person On file / Due soon / Missing engine", () => {
+    assert.equal(
+      statusForObligationInstance({
+        instanceStatus: "completed",
+        dueAt: "2026-09-01T00:00:00.000Z",
+        now,
+      }),
+      "on_file",
+    );
+    assert.equal(
+      statusForObligationInstance({
+        instanceStatus: "pending",
+        dueAt: "2026-09-14T12:00:00.000Z",
+        now,
+      }),
+      "due_soon",
+    );
+    assert.equal(
+      statusForObligationInstance({
+        instanceStatus: "pending",
+        dueAt: "2026-12-01T00:00:00.000Z",
+        completion: { nectar_validation_status: "failed" },
+        now,
+      }),
+      "missing",
+    );
+  });
+});
+
+describe("missingPersonnelCsv", () => {
+  it("exports missing items without inventing Have", () => {
+    const csv = missingPersonnelCsv([
+      {
+        full_name: "Jordan Lee",
+        role: "employee",
+        job_title: "DSP",
+        service_codes: ["HHS", "DSI"],
+        missing: 2,
+        due_soon: 1,
+        on_file: 4,
+        missing_items: [
+          { title: "CPR certification", due_at: "2026-08-01T00:00:00.000Z" },
+          { title: "Code of Conduct", due_at: "2026-09-01T00:00:00.000Z" },
+        ],
+      },
+    ]);
+    assert.match(csv, /Jordan Lee/);
+    assert.match(csv, /HHS DSI/);
+    assert.match(csv, /CPR certification; Code of Conduct/);
+    assert.doesNotMatch(csv, /Have/);
+  });
+});
+
 describe("Staff personnel file page lock", () => {
   it("renames the staff surface and keeps 30-day course or upload on one card", () => {
     const src = readFileSync(
@@ -167,5 +223,34 @@ describe("Staff personnel file page lock", () => {
       "utf8",
     );
     assert.doesNotMatch(src, /key: "driving_record"/);
+  });
+});
+
+describe("Org-wide Personnel file lock", () => {
+  it("adds an Admin sidebar item and dedicated route", () => {
+    const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
+    assert.match(nav, /to: "\/dashboard\/personnel-file", label: "Personnel file"/);
+    const route = readFileSync(
+      new URL("../routes/dashboard.personnel-file.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(route, /createFileRoute\("\/dashboard\/personnel-file"\)/);
+    assert.match(route, /Personnel file — Provider Interface/);
+    assert.match(route, /OrgPersonnelFileMatrix/);
+    assert.doesNotMatch(route, /EVV/);
+    assert.doesNotMatch(route, /HRC/);
+  });
+
+  it("deletes the leftover open-every-profile HR matrix", () => {
+    const hrAdmin = readFileSync(new URL("../routes/dashboard.hr-admin.tsx", import.meta.url), "utf8");
+    assert.doesNotMatch(hrAdmin, /HrComplianceMatrix/);
+    assert.doesNotMatch(hrAdmin, /getHrAdminRollup/);
+    assert.match(hrAdmin, /to="\/dashboard\/personnel-file"/);
+    const matrixFns = readFileSync(
+      new URL("./hr-staff.functions.ts", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(matrixFns, /getHrComplianceMatrix/);
+    assert.doesNotMatch(matrixFns, /getHrAdminRollup/);
   });
 });

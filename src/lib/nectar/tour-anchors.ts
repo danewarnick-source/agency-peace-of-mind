@@ -21,6 +21,7 @@ export const TOUR_ANCHORS: TourAnchor[] = [
   { id: "nav.billing", label: "Billing", route: "/dashboard/billing", description: "Billing forms, 520 generation, and exports.", surface: "admin" },
   { id: "nav.scheduling", label: "Scheduling", route: "/dashboard/scheduling", description: "Publish and edit staff shifts on the calendar.", surface: "admin" },
   { id: "nav.employees", label: "Employees", route: "/dashboard/employees", description: "Staff roster and profiles.", surface: "admin" },
+  { id: "nav.personnel-file", label: "Personnel file", route: "/dashboard/personnel-file", description: "Org-wide staff file status — missing, due soon, and on file.", surface: "admin" },
   { id: "nav.clients", label: "Clients", route: "/dashboard/clients", description: "Client profiles, demographics and documents.", surface: "admin" },
   { id: "nav.teams", label: "Teams & Homes", route: "/dashboard/teams", description: "Team and home assignments.", surface: "admin" },
   { id: "nav.pba-ledger", label: "PBA Trust Ledger", route: "/dashboard/pba-ledger", description: "Client personal-budget accounts and audit samples.", surface: "admin" },

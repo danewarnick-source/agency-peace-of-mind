@@ -34,6 +34,7 @@ ADMIN AREA (admin/manager/super_admin):
 - /dashboard/pba-ledger — PBA Trust Ledger: client personal-budget accounts, deposits, withdrawals, audit samples.
 - /dashboard/scheduling — Scheduling: publish/edit staff shifts on a calendar.
 - /dashboard/employees — Employees: staff roster, profiles, pay rates, certifications, role assignments.
+- /dashboard/personnel-file — Personnel file: org-wide staff file status (missing / due soon / on file). Opens each employee Personnel file.
 - /dashboard/clients — Clients: client profiles, demographics, medications, documents, custom fields.
 - /dashboard/teams — Teams & Homes: org structure, host-home sites, team membership.
 - /dashboard/assignments — Caseload Assignment Center: per staff × client × service-code toggles.

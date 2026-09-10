@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAddonForOrg } from "@/lib/entitlements.server";
+import { loadOrgPersonnelFileIndex } from "@/lib/personnel-file-matrix.functions";
 
 /**
  * Internal Audit (QA / audit-prep) — Foundation: NECTAR.
@@ -287,6 +288,40 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             asOf: todayIso(),
           });
         }
+      }
+
+      const personnel = await loadOrgPersonnelFileIndex(
+        supabase,
+        orgId,
+        staffSampleSet ? Array.from(staffSampleSet) : data.staffId ? [data.staffId] : null,
+      );
+      for (const row of personnel.staff) {
+        if (!inScopeStaff(row.staff_id)) continue;
+        if (row.missing === 0 && row.due_soon === 0) continue;
+        const missingTitles = row.missing_items.slice(0, 4).map((i) => i.title);
+        const extra = row.missing_items.length - missingTitles.length;
+        const detailParts = [
+          row.missing > 0 ? `${row.missing} missing` : null,
+          row.due_soon > 0 ? `${row.due_soon} due soon` : null,
+          `${row.on_file} on file`,
+        ].filter(Boolean);
+        findings.push({
+          id: `personnel-file-${row.staff_id}`,
+          area: "staff_certifications",
+          severity: row.missing > 0 ? "critical" : "attention",
+          title: `${row.full_name} personnel file`,
+          detail:
+            `${detailParts.join("; ")}` +
+            (missingTitles.length
+              ? ` — ${missingTitles.join("; ")}${extra > 0 ? ` (+${extra} more)` : ""}`
+              : ""),
+          subjectKind: "staff",
+          subjectId: row.staff_id,
+          subjectName: row.full_name,
+          fixHref: `/dashboard/employees/${row.staff_id}?tab=personnel`,
+          fixLabel: "Open personnel file",
+          asOf: todayIso(),
+        });
       }
     }
 

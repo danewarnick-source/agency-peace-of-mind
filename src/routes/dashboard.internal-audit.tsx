@@ -42,8 +42,42 @@ import { SamplePicker } from "@/components/internal-audit/sample-picker";
 import { toast } from "sonner";
 
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const AUDIT_AREAS = [
+  "documentation",
+  "daily_logs",
+  "evv_timesheets",
+  "billing",
+  "staff_certifications",
+  "requirements_engine",
+  "external_attestations",
+] as const;
+
+type InternalAuditSearch = {
+  staffIds?: string;
+  area?: FindingArea;
+};
+
+function parseInternalAuditSearch(s: Record<string, unknown>): InternalAuditSearch {
+  const rawIds = typeof s.staffIds === "string" ? s.staffIds : "";
+  const staffIds = rawIds
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => UUID_RE.test(id))
+    .join(",");
+  const areaRaw = typeof s.area === "string" ? s.area : "";
+  const area = (AUDIT_AREAS as readonly string[]).includes(areaRaw)
+    ? (areaRaw as FindingArea)
+    : undefined;
+  return {
+    ...(staffIds ? { staffIds } : {}),
+    ...(area ? { area } : {}),
+  };
+}
+
 export const Route = createFileRoute("/dashboard/internal-audit")({
   head: () => ({ meta: [{ title: "Internal Audit — NECTAR — Provider Interface" }] }),
+  validateSearch: parseInternalAuditSearch,
   component: () => (
     <RequirePermission perm="view_analytics">
       <FeatureGate featureKey="state_audit">
@@ -84,6 +118,7 @@ const SEVERITY_BADGE: Record<Severity, { label: string; cls: string; Icon: typeo
 export function InternalAuditPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
+  const search = Route.useSearch();
   const { hasAddon } = useEntitlements();
   const auditEntitled = hasAddon("internal_audit");
   const { data: caseload } = useCaseload();
@@ -91,13 +126,15 @@ export function InternalAuditPage() {
   const listStaff = useServerFn(listAuditableStaff);
 
   const [clientId, setClientId] = useState<string>("all");
-  const [area, setArea] = useState<string>("all");
+  const [area, setArea] = useState<string>(search.area ?? "all");
   const [serviceCode, setServiceCode] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [sampleClientIds, setSampleClientIds] = useState<string[]>([]);
-  const [sampleStaffIds, setSampleStaffIds] = useState<string[]>([]);
+  const [sampleStaffIds, setSampleStaffIds] = useState<string[]>(() =>
+    search.staffIds ? search.staffIds.split(",").filter(Boolean) : [],
+  );
   const [targetClientCount, setTargetClientCount] = useState<string>("");
   const [targetStaffCount, setTargetStaffCount] = useState<string>("");
 

@@ -103,4 +103,12 @@ describe("app and edge From rails", () => {
       assert.doesNotMatch(src, /HIVE State Audit <onboarding@resend\.dev>/);
     }
   });
+
+  it("send-email uses invoke-body from and does not read RESEND_FROM (app/Lambda owns the mailbox)", () => {
+    const src = readFileSync(new URL("../../supabase/functions/send-email/index.ts", import.meta.url), "utf8");
+    assert.doesNotMatch(src, /Deno\.env\.get\("RESEND_FROM"\)/);
+    assert.doesNotMatch(src, /Deno\.env\.get\("EMAIL_FROM"\)/);
+    assert.match(src, /bodyFrom|body\.from/);
+    assert.match(src, /RESEND_API_KEY/);
+  });
 });

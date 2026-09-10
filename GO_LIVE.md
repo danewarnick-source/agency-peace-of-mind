@@ -142,7 +142,7 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 | `SUPABASE_SERVICE_ROLE_KEY` | Login username lookup, create-employee, many server fns |
 | `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, daily-log coach |
 | `RESEND_API_KEY` on `send-email` / `auth-send-email` | Invite / notification / auth email |
-| `RESEND_FROM` or `EMAIL_FROM` (optional) | From mailbox. Default `noreply@providerinterface.com`. Do not use `onboarding@resend.dev`. |
+| `RESEND_FROM` or `EMAIL_FROM` (optional) | **App / Lambda** From mailbox (`managedFromAddress()`). Default `noreply@providerinterface.com`. `send-email` does **not** read this — it uses the invoke `from` body. See [Invite email ops](#invite-email-ops-hive-platform). |
 | `STRIPE_SECRET_KEY` / training webhook secret | HIVE Training checkout |
 | `NECTAR_CRON_SECRET` / `CRON_SHARED_SECRET` | Scheduled NECTAR jobs |
 | `PUBLIC_APP_URL` / `SITE_URL` | Invite links, emails |
@@ -153,6 +153,28 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 **MFA:** disabled on purpose (`src/routes/__root.tsx`, `src/routes/mfa-setup.tsx`). Do not re-enable for this test.
 
 **`must_change_password`:** enforced at **router root** (`__root.tsx`), not only inside the dashboard. June finding **fixed**. New manual staff **will** hit `/reset-password` on first login. That is correct.
+
+### Invite email ops (Hive-Platform)
+
+Invite-by-email writes the pending invite first, then calls `supabase.functions.invoke("send-email")`. There is **no** `send-invite` function. Live Hive-Platform (`dhrrukdcigiiqksibdfb`) returned **HTTP 404** on `/functions/v1/send-email` on 2026-09-09 — the function source is in this repo but was never deployed. Until Core does the steps below, **Copy link** from the pending list still works and is the supported workaround. Do not paste API keys into chat or git.
+
+Dane’s invite-email checklist (employee invites use `send-email` only):
+
+1. **Deploy `send-email`** (today’s toast is a 404 — the function is not on Hive-Platform). From repo root:
+
+```bash
+supabase functions deploy send-email --project-ref dhrrukdcigiiqksibdfb
+```
+
+2. **Edge secret on `send-email`: `RESEND_API_KEY`.** Dashboard → Project Settings → Edge Functions → Secrets (type it there; never commit or paste into chat). Vault currently does not have this. CLI: `supabase secrets set RESEND_API_KEY --project-ref dhrrukdcigiiqksibdfb`. The Edge function does **not** read `RESEND_FROM`.
+
+3. **App / Lambda `RESEND_FROM` (or `EMAIL_FROM`)** = a mailbox on a verified domain, e.g. `noreply@providerinterface.com`. Server fns put that in the invoke `from` body. If unset, code already sends `noreply@providerinterface.com`.
+
+4. **Resend → verify `providerinterface.com`.** Domains → add → DNS records → wait until **Verified**. Unverified domain → Resend non-2xx → Edge non-2xx. Do not use `onboarding@resend.dev`.
+
+5. **Prove it:** Employees → Invite by email, or Settings → Email → Send a test. Until then, **Copy link**. True North reply-to is already `admin@tnsutah.com`. No PHI in invite mail.
+
+Auth mail is a **separate** rail (`auth-send-email`): deploy that function only for password-reset/signup, and set `RESEND_API_KEY`, `SEND_EMAIL_HOOK_SECRET`, `SUPABASE_URL`, plus optional `RESEND_FROM`/`EMAIL_FROM`. Wire Authentication → Hooks → Send Email to that function.
 
 ### 1.6 Hypotheses this audit discarded
 
@@ -274,7 +296,7 @@ Today is **Thursday Aug 27**. Test is **Tuesday Sep 1**.
 3. In Supabase/Lovable: org not `locked_at`; `is_demo` badge expected or not; `nectar` / `hive_training` / `state_audit` on or off for TNS.
 4. Settings → DHHS Provider ID + EVV vendor name.
 5. Confirm Bedrock on the deploy that will be tested **if** Smart Import / Ask NECTAR are in scope. If not configured, **cut those from the Tuesday script** rather than debugging live.
-6. Confirm `RESEND_API_KEY` only if you insist on invite email; **still use Add manually**.
+6. Invite-by-email needs `send-email` **deployed** on Hive-Platform plus Resend secrets — see [Invite email ops](#invite-email-ops-hive-platform). Until then, **Copy link** or **Add manually**.
 7. Do **not** turn on policy `gate_app_access` for all staff.
 
 ### Friday 28 — Admin data path (MUST)

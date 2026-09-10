@@ -49,10 +49,6 @@ function liveAdminOrNull(): AdminClient | null {
   }
 }
 
-export function getSupabaseAdminOrNull(): AdminClient | null {
-  return liveAdminOrNull();
-}
-
 function requireLive(): AdminClient {
   const live = liveAdminOrNull();
   if (!live) {

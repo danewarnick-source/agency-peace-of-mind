@@ -149,50 +149,6 @@ export function getPublicRuntimeBlob(): HiveRuntimeBlob {
   };
 }
 
-function trimEnv(value: unknown): string {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-function firstNamedEnv(
-  env: Record<string, string | undefined>,
-  names: readonly string[],
-): string {
-  for (const name of names) {
-    const value = trimEnv(env[name]);
-    if (value) return value;
-  }
-  return "";
-}
-
-/** Existing Vercel / Vite names on Hive-Platform, then Lovable / Next aliases. */
-export const SUPABASE_PUBLISHABLE_URL_NAMES = [
-  "VITE_SUPABASE_URL",
-  "SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_URL",
-] as const;
-
-export const SUPABASE_PUBLISHABLE_KEY_NAMES = [
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_PUBLISHABLE_KEY",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-] as const;
-
-/**
- * Publishable URL + anon key from a process.env-like record.
- * Prefers the Vercel names already set on Hive-Platform
- * (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
- */
-export function readPublishableSupabaseEnv(
-  env: Record<string, string | undefined> = typeof process !== "undefined" ? process.env : {},
-): { url: string; key: string } | null {
-  const url = firstNamedEnv(env, SUPABASE_PUBLISHABLE_URL_NAMES);
-  const key = firstNamedEnv(env, SUPABASE_PUBLISHABLE_KEY_NAMES);
-  if (!url || !key) return null;
-  return { url, key };
-}
-
 /**
  * URL + publishable key for constructing the existing supabase-js client.
  * When AWS is fully gated on and live Supabase keys are absent, returns a

@@ -1020,7 +1020,7 @@ function UnmatchedRow({
         </div>
       </div>
       <div className="mt-2 text-[11px] text-muted-foreground">
-        This flow never creates new staff or clients. If the person truly doesn't exist yet, skip the row, add them through the regular Client or Employee Smart Import, then re-import the leftover rows.
+        This flow never creates new staff or clients. If the person truly doesn't exist yet, skip the row, add them through Client Smart Import or the Employees roster, then re-import the leftover rows.
       </div>
     </div>
   );

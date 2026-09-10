@@ -1,7 +1,16 @@
 // Client CSV template for Smart Import (client mode). Columns match the
 // heuristic mapper in smart-import.functions.ts — no NECTAR required.
 import Papa from "papaparse";
-import { triggerCsvDownload } from "@/lib/staff-import-template";
+
+function triggerCsvDownload(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export const CLIENT_TEMPLATE_HEADERS = [
   "first_name",

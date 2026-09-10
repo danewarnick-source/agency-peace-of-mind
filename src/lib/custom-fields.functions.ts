@@ -27,49 +27,6 @@ async function assertOrgMember(
   if (!data) throw new Error("Forbidden: not a member of this organization");
 }
 
-export const getCustomFields = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({
-      organizationId: z.string().uuid(),
-      entityKind: Kind,
-      entityId: z.string().uuid(),
-    }).parse(d)
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    if (!supabase || !userId) return [];
-    await assertOrgMember(supabase, userId, data.organizationId);
-
-    const { data: defs, error: defsErr } = await supabase
-      .from("custom_field_definitions")
-      .select("id, field_key, field_label, data_type, source, section")
-      .eq("organization_id", data.organizationId)
-      .eq("entity_kind", data.entityKind)
-      .order("created_at", { ascending: true });
-    if (defsErr) throw new Error(defsErr.message);
-
-    const { data: vals, error: valsErr } = await supabase
-      .from("custom_field_values")
-      .select("definition_id, value_text, value_number, value_boolean, value_date")
-      .eq("organization_id", data.organizationId)
-      .eq("entity_kind", data.entityKind)
-      .eq("entity_id", data.entityId);
-    if (valsErr) throw new Error(valsErr.message);
-
-    const valMap = new Map((vals ?? []).map((v: any) => [v.definition_id, v]));
-    return (defs ?? []).map((d: any) => ({
-      id: d.id,
-      field_key: d.field_key,
-      field_label: d.field_label,
-      data_type: d.data_type as "text" | "number" | "boolean" | "date",
-      source: (d.source ?? "manual") as "manual" | "pcsp",
-      section: (d.section ?? "identity") as
-        | "identity" | "care_plan" | "billing" | "files" | "operations" | "compliance",
-      value: valMap.get(d.id) ?? null,
-    }));
-  });
-
 export const setCustomFieldValue = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>

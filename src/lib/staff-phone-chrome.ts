@@ -19,6 +19,8 @@ export const STAFF_PHONE_MQ = "(max-width: 767px)";
 export const STAFF_TAB_BAR_PX = 56;
 /** Clocked-in strip height (timer + CLOCK OUT). */
 export const STAFF_CLOCK_BAR_PX = 56;
+/** Air below the last card so it is not flush against chrome. */
+export const STAFF_SCROLL_END_PAD_PX = 20;
 
 /** Offset from the screen bottom to the top of the tab bar. */
 export const STAFF_TAB_BAR_OFFSET_CSS =
@@ -27,6 +29,16 @@ export const STAFF_TAB_BAR_OFFSET_CSS =
 /** Offset from the screen bottom to the top of the clocked-in bar. */
 export const STAFF_CLOCK_BAR_OFFSET_CSS =
   `calc(${STAFF_TAB_BAR_PX}px + env(safe-area-inset-bottom, 0px))`;
+
+/**
+ * Staff tabs + clock bar are `position: absolute` over the flex column.
+ * `flex-1` on <main> therefore paints under them. Always reserve the tab
+ * row (and the clock strip when it is up) plus iOS safe-area.
+ */
+export function staffMainBottomPadCss(clockBarVisible: boolean): string {
+  const chromePx = STAFF_TAB_BAR_PX + (clockBarVisible ? STAFF_CLOCK_BAR_PX : 0);
+  return `calc(${chromePx}px + ${STAFF_SCROLL_END_PAD_PX}px + env(safe-area-inset-bottom, 0px))`;
+}
 
 export function isStaffPhoneViewport(): boolean {
   return typeof window !== "undefined" && window.matchMedia(STAFF_PHONE_MQ).matches;
@@ -71,6 +83,17 @@ export function resetStaffPhoneScroll(scroller: HTMLElement | null): void {
   if (scroller) {
     scroller.scrollTop = 0;
     scroller.scrollLeft = 0;
+  }
+  if (typeof document !== "undefined") {
+    const scrolling = document.scrollingElement ?? document.documentElement;
+    scrolling.scrollTop = 0;
+    scrolling.scrollLeft = 0;
+    document.documentElement.scrollTop = 0;
+    document.documentElement.scrollLeft = 0;
+    if (document.body) {
+      document.body.scrollTop = 0;
+      document.body.scrollLeft = 0;
+    }
   }
   if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
     window.scrollTo(0, 0);

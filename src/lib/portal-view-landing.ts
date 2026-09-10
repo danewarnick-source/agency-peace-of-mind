@@ -141,6 +141,23 @@ export function nextPortalViewAfterLogin(input: {
   return landing.persistView ?? input.storedView;
 }
 
+/** Company Admin KPI home + staff caseload home share this path. */
+export const COMPANY_PORTAL_HOME = "/dashboard";
+/** Executive Command Center only — never the Admin View landing. */
+export const EXEC_PORTAL_HOME = "/dashboard/hive-exec";
+
+/**
+ * Where Portal View should navigate after a switch.
+ * Admin View → data-driven Admin Home (`/dashboard`), not Command Center.
+ * Staff View (and staff_mobile preview) → caseload home (`/dashboard`).
+ */
+export function resolvePortalSwitcherPath(
+  view: PortalView,
+): typeof COMPANY_PORTAL_HOME | typeof EXEC_PORTAL_HOME {
+  if (view === "hive_exec") return EXEC_PORTAL_HOME;
+  return COMPANY_PORTAL_HOME;
+}
+
 export const ROLE_ENTRY_HOME: Record<string, string> = {
   super_admin: "/dashboard/hive-exec",
   admin: "/dashboard",

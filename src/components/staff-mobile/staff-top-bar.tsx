@@ -20,7 +20,11 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
 import { PiMark } from "@/components/pi-landing/pi-mark";
-import { preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
+import {
+  preventSheetDismissForPortalViewMenu,
+  resolvePortalSwitcherPath,
+} from "@/lib/portal-view-landing";
+import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
 
 export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
   const { user } = useAuth();
@@ -98,7 +102,12 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
                 </label>
                 <PortalViewSwitcher
                   value={view === "hive_exec" || view === "state_preview" ? "staff" : view}
-                  onChange={(v) => setView(v)}
+                  onChange={(v) => {
+                    setView(v);
+                    setOpen(false);
+                    resetStaffPhoneScroll(null);
+                    void navigate({ to: resolvePortalSwitcherPath(v) });
+                  }}
                   triggerClassName="h-12 border-white/15 bg-white/[0.06] text-white"
                   options={[
                     { value: "staff", label: "Staff View" },

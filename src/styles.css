@@ -389,6 +389,21 @@
 .pt-safe { padding-top: env(safe-area-inset-top); }
 
 /*
+ * Admin / desktop nested <main> (data-dashboard-scroller). Staff phones
+ * reserve tab + clock chrome in StaffMobileShell via staffMainBottomPadCss.
+ * On phones this clears Safari's bottom chrome + the home indicator so the
+ * last list card is reachable.
+ */
+@media (max-width: 767px) {
+  [data-dashboard-scroller] {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  [data-dashboard-scroller][data-immersive] {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/*
  * Public marketing hamburger (landing + SiteHeader).
  * Own compositing layer so iOS Safari does not drop taps on an SVG child
  * inside a backdrop-filter sticky bar. Opaque fill is on the button itself.

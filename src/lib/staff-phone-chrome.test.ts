@@ -3,10 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  STAFF_CLOCK_BAR_PX,
+  STAFF_TAB_BAR_PX,
   dashboardLayoutHasHookAfterBootstrapReturn,
   dashboardLayoutUnmountsDuplicateOutletBeforeBootstrapReturn,
   resetStaffPhoneScroll,
   shouldUnmountDuplicateStaffOutlet,
+  staffMainBottomPadCss,
 } from "./staff-phone-chrome.ts";
 
 describe("resetStaffPhoneScroll", () => {
@@ -19,6 +22,21 @@ describe("resetStaffPhoneScroll", () => {
 
   it("accepts a null scroller", () => {
     resetStaffPhoneScroll(null);
+  });
+});
+
+describe("staffMainBottomPadCss", () => {
+  it("always reserves the tab bar plus safe-area, even when not clocked in", () => {
+    const idle = staffMainBottomPadCss(false);
+    assert.match(idle, new RegExp(`${STAFF_TAB_BAR_PX}px`));
+    assert.match(idle, /safe-area-inset-bottom/);
+    assert.doesNotMatch(idle, new RegExp(`${STAFF_TAB_BAR_PX + STAFF_CLOCK_BAR_PX}px`));
+  });
+
+  it("adds the clocked-in strip on top of the tab bar", () => {
+    const clocked = staffMainBottomPadCss(true);
+    assert.match(clocked, new RegExp(`${STAFF_TAB_BAR_PX + STAFF_CLOCK_BAR_PX}px`));
+    assert.match(clocked, /safe-area-inset-bottom/);
   });
 });
 
@@ -114,6 +132,15 @@ describe("staff phone leftover search + tab scroll (source)", () => {
     assert.match(dash, /shouldUnmountDuplicateStaffOutlet/);
   });
 
+  it("preview frame uses the same tab-clearing bottom pad as the live shell", () => {
+    const preview = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/staff-mobile-preview-frame.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(preview, /staffMainBottomPadCss/);
+    assert.doesNotMatch(preview, /pb-\[calc\(5rem\+env\(safe-area-inset-bottom/);
+  });
+
   it("staff shell resets the inner scroller on route change", () => {
     const shell = readFileSync(
       fileURLToPath(new URL("../components/staff-mobile/staff-mobile-shell.tsx", import.meta.url)),
@@ -126,6 +153,12 @@ describe("staff phone leftover search + tab scroll (source)", () => {
     assert.match(shell, /resetStaffPhoneScroll/);
     assert.match(shell, /useLayoutEffect/);
     assert.match(shell, /data-staff-phone-scroller/);
+    assert.match(shell, /staffMainBottomPadCss/);
+    assert.doesNotMatch(
+      shell,
+      /pb-\[calc\(1\.5rem\+env\(safe-area-inset-bottom/,
+      "idle pad must include the tab bar, not only 1.5rem + safe-area",
+    );
     assert.match(tabs, /to: "\/dashboard"/);
     assert.match(tabs, /to: "\/dashboard\/schedule"/);
   });

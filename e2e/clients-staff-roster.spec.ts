@@ -133,6 +133,9 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     });
     await expect(page.getByRole("button", { name: /^Active$/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Inactive$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Upload roster/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Smart Import/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Import CSV/i })).toHaveCount(0);
     await expect(rosterName(page, "Jake Probert")).toBeVisible();
     await page.getByRole("button", { name: /^Inactive$/i }).click();
     await expect(page.getByText(/No deactivated employees/i).first()).toBeVisible();

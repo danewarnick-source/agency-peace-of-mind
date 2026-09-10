@@ -5,8 +5,10 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import {
   companyAdminSwitchAccessibleName,
   isCompanyAdminRole,
+  resolvePortalSwitcherPath,
   STAFF_VIEW_ACCESSIBLE_NAME,
 } from "@/lib/portal-view-landing";
+import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
 
 /**
  * Visible escape hatch off Command Center onto the company portal.
@@ -31,7 +33,8 @@ export function OpenCompanyViews({
 
   const go = (view: "admin" | "staff") => {
     setView(view);
-    void navigate({ to: "/dashboard" });
+    resetStaffPhoneScroll(null);
+    void navigate({ to: resolvePortalSwitcherPath(view) });
   };
 
   const btn = compact

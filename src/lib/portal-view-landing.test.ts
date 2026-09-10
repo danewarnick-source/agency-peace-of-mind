@@ -7,6 +7,7 @@ import {
   isPortalViewMenuEventTarget,
   nextPortalViewAfterLogin,
   preventSheetDismissForPortalViewMenu,
+  resolvePortalSwitcherPath,
   resolvePostLoginLanding,
   resolveRoleEntryLanding,
   STAFF_VIEW_ACCESSIBLE_NAME,
@@ -98,6 +99,36 @@ describe("resolvePostLoginLanding — do not force hive_exec", () => {
     });
     assert.equal(landing.path, "/dashboard");
     assert.equal(landing.persistView, null);
+  });
+});
+
+describe("resolvePortalSwitcherPath", () => {
+  it("Admin View lands on KPI Admin Home, not Command Center", () => {
+    assert.equal(resolvePortalSwitcherPath("admin"), "/dashboard");
+    assert.notEqual(resolvePortalSwitcherPath("admin"), "/dashboard/hive-exec");
+  });
+
+  it("Staff View lands on caseload home", () => {
+    assert.equal(resolvePortalSwitcherPath("staff"), "/dashboard");
+    assert.equal(resolvePortalSwitcherPath("staff_mobile"), "/dashboard");
+  });
+
+  it("Executive Command Center is the only hive-exec landing", () => {
+    assert.equal(resolvePortalSwitcherPath("hive_exec"), "/dashboard/hive-exec");
+    assert.equal(resolvePortalSwitcherPath("state_preview"), "/dashboard");
+  });
+
+  it("dashboard and staff top bar navigate via resolvePortalSwitcherPath", () => {
+    const dash = readFileSync(fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url)), "utf8");
+    const staff = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/staff-top-bar.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(dash, /resolvePortalSwitcherPath/);
+    assert.match(dash, /resetStaffPhoneScroll/);
+    assert.match(dash, /data-dashboard-scroller/);
+    assert.match(staff, /resolvePortalSwitcherPath/);
+    assert.match(staff, /resetStaffPhoneScroll/);
   });
 });
 

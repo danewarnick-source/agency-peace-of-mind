@@ -7,7 +7,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -71,6 +71,7 @@ import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 import {
   STAFF_PHONE_MQ,
+  resetStaffPhoneScroll,
   shouldUnmountDuplicateStaffOutlet,
 } from "@/lib/staff-phone-chrome";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
@@ -105,7 +106,11 @@ import { confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
-import { OPEN_DASHBOARD_MENU_EVENT, preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
+import {
+  OPEN_DASHBOARD_MENU_EVENT,
+  preventSheetDismissForPortalViewMenu,
+  resolvePortalSwitcherPath,
+} from "@/lib/portal-view-landing";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { AWS_DB_ERROR_EVENT } from "@/lib/aws/exec-http";
 import {
@@ -1000,7 +1005,8 @@ function DashboardLayout() {
                 <BillingBanner organizationId={org.organization_id} isAdmin />
               )}
 
-              <main
+              <DashboardMain
+                immersive={immersiveAdminHome}
                 className={
                   immersiveAdminHome
                     ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-0"
@@ -1043,7 +1049,7 @@ function DashboardLayout() {
                 ) : hideDuplicateStaffOutlet ? null : (
                   <Outlet />
                 )}
-              </main>
+              </DashboardMain>
             </div>
           </div>
         </div>
@@ -1086,6 +1092,40 @@ function CompanyClientsBridge({
   );
 }
 
+/**
+ * Admin / desktop nested scroller. Staff phones use StaffMobileShell instead.
+ * Resets to top on route change. iOS safe-area is applied via styles.css
+ * on [data-dashboard-scroller].
+ */
+function DashboardMain({
+  immersive,
+  className,
+  style,
+  children,
+}: {
+  immersive: boolean;
+  className: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    resetStaffPhoneScroll(mainRef.current);
+  }, [pathname]);
+  return (
+    <main
+      ref={mainRef}
+      data-dashboard-scroller=""
+      data-immersive={immersive ? "" : undefined}
+      className={className}
+      style={style}
+    >
+      {children}
+    </main>
+  );
+}
+
 function SidebarBody({
   user,
   role,
@@ -1123,6 +1163,7 @@ function SidebarBody({
   const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, d.id !== initialActiveDomain])),
   );
+  const navigate = useNavigate();
   const lastActiveDomain = useRef<string | null>(initialActiveDomain);
   const toggleDomain = (id: string) => setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
   const { capabilities: execCaps } = useExecCapabilities();
@@ -1182,7 +1223,12 @@ function SidebarBody({
           </label>
           <PortalViewSwitcher
             value={rawView}
-            onChange={(v) => setView(v)}
+            onChange={(v) => {
+              setView(v);
+              onNavigate?.();
+              resetStaffPhoneScroll(null);
+              void navigate({ to: resolvePortalSwitcherPath(v) });
+            }}
             options={[
               { value: "staff", label: "Staff View" },
               ...(isAdminCapable

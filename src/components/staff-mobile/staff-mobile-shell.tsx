@@ -6,7 +6,7 @@ import { ActiveShiftBar } from "./active-shift-bar";
 import { CapThresholdModal } from "./cap-threshold-modal";
 import { MobileShellProvider, useMobileShellContainer } from "./mobile-shell-context";
 import { useActiveShiftBarVisible } from "@/hooks/use-active-shift-bar";
-import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
+import { resetStaffPhoneScroll, staffMainBottomPadCss } from "@/lib/staff-phone-chrome";
 
 /**
  * Mobile-only chrome for the staff portal. The shell is a fixed-viewport
@@ -63,12 +63,9 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
         className={
           isAskNectar
             ? "flex-1 overflow-hidden overscroll-none"
-            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${
-                barVisible
-                  ? "pb-[calc(1.25rem+7rem+env(safe-area-inset-bottom,0px))]"
-                  : "pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]"
-              }`
+            : "flex-1 overflow-y-auto overscroll-contain px-4 pt-5"
         }
+        style={isAskNectar ? undefined : { paddingBottom: staffMainBottomPadCss(barVisible) }}
       >
         {children}
       </main>

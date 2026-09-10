@@ -10,7 +10,7 @@ import {
   MobileShellProvider,
   useMobileShellContainer,
 } from "./mobile-shell-context";
-import { resetStaffPhoneScroll } from "@/lib/staff-phone-chrome";
+import { resetStaffPhoneScroll, staffMainBottomPadCss } from "@/lib/staff-phone-chrome";
 
 const DEVICES = [
   { id: "se", label: "iPhone SE", w: 375, h: 667 },
@@ -117,21 +117,16 @@ function FrameScreen({
     >
       <div className="absolute inset-0 flex flex-col">
         <StaffTopBar title={title} framed />
-        {/* Reserve space for the "Clocked in" bar (~56px) when it's visible
-            so page content never hides behind it. Bottom tabs already
-            accounted for via pb-20. */}
+        {/* Tabs + clock bar are absolute. staffMainBottomPadCss clears both. */}
         <main
           ref={mainRef}
           data-staff-phone-scroller
           className={
             isAskNectar
               ? "flex-1 overflow-hidden bg-[#f7f8fb]"
-              : `flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 py-4 ${
-                  barVisible
-                    ? "pb-[calc(1.25rem+7rem+env(safe-area-inset-bottom,0px))]"
-                    : "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]"
-                }`
+              : "flex-1 overflow-y-auto overscroll-contain bg-[#f7f8fb] px-3 pt-4"
           }
+          style={isAskNectar ? undefined : { paddingBottom: staffMainBottomPadCss(barVisible) }}
         >
           {children}
         </main>

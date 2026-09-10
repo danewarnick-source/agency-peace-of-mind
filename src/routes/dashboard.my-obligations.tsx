@@ -845,12 +845,14 @@ function MyObligationsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <StaffPageHeader
-        eyebrow="Personnel file"
-        eyebrowIcon={ClipboardList}
-        title="Personnel file"
-        subtitle="Discrete dues on your file — On file, Missing, or Due soon."
-      />
+      <div className="max-md:hidden">
+        <StaffPageHeader
+          eyebrow="Personnel file"
+          eyebrowIcon={ClipboardList}
+          title="Personnel file"
+          subtitle="Discrete dues on your file — On file, Missing, or Due soon."
+        />
+      </div>
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {(

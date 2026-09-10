@@ -202,7 +202,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <DialogHeader>
           <DialogTitle>Upload the PCSP first</DialogTitle>
           <DialogDescription>
-            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Client file.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -299,7 +299,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
 
       {!pcspReady && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-          Upload a PCSP to get started — this training is built from the PCSP. Publishing and editing are disabled until a PCSP is on file (add it from the client's Files tab).
+          Upload a PCSP to get started — this training is built from the PCSP. Publishing and editing are disabled until a PCSP is on file (add it from the client's Client file).
         </div>
       )}
 

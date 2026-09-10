@@ -55,6 +55,7 @@ const AUDIT_AREAS = [
 
 type InternalAuditSearch = {
   staffIds?: string;
+  clientIds?: string;
   area?: FindingArea;
 };
 
@@ -65,12 +66,19 @@ function parseInternalAuditSearch(s: Record<string, unknown>): InternalAuditSear
     .map((id) => id.trim())
     .filter((id) => UUID_RE.test(id))
     .join(",");
+  const rawClientIds = typeof s.clientIds === "string" ? s.clientIds : "";
+  const clientIds = rawClientIds
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => UUID_RE.test(id))
+    .join(",");
   const areaRaw = typeof s.area === "string" ? s.area : "";
   const area = (AUDIT_AREAS as readonly string[]).includes(areaRaw)
     ? (areaRaw as FindingArea)
     : undefined;
   return {
     ...(staffIds ? { staffIds } : {}),
+    ...(clientIds ? { clientIds } : {}),
     ...(area ? { area } : {}),
   };
 }
@@ -131,7 +139,9 @@ export function InternalAuditPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
-  const [sampleClientIds, setSampleClientIds] = useState<string[]>([]);
+  const [sampleClientIds, setSampleClientIds] = useState<string[]>(() =>
+    search.clientIds ? search.clientIds.split(",").filter(Boolean) : [],
+  );
   const [sampleStaffIds, setSampleStaffIds] = useState<string[]>(() =>
     search.staffIds ? search.staffIds.split(",").filter(Boolean) : [],
   );

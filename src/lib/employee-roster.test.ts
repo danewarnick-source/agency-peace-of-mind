@@ -74,6 +74,7 @@ describe("Employees list source lock", () => {
     assert.match(src, /deleteEntity/);
     assert.match(src, /Inactive/);
     assert.match(src, /EmployeeRosterUploadWizard/);
+    assert.match(src, /upload/);
     assert.doesNotMatch(src, /Smart Import/);
     assert.doesNotMatch(src, /Import CSV/);
     assert.doesNotMatch(src, /mode: ["']employee["']/);

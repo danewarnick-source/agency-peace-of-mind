@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,9 @@ import { PersonAvatar } from "@/components/person/person-avatar";
 import type { Position } from "@/lib/employee-positions";
 
 export const Route = createFileRoute("/dashboard/employees/")({
+  validateSearch: (s: Record<string, unknown>): { upload?: boolean } => ({
+    upload: s.upload === true || s.upload === 1 || s.upload === "1" || s.upload === "true",
+  }),
   component: () => (
     <RequirePermission perm="view_staff_records">
       <EmployeesPage />
@@ -56,7 +59,11 @@ export function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const search = useSearch({ strict: false }) as { upload?: boolean };
+  const [uploadOpen, setUploadOpen] = useState(() => search.upload === true);
+  useEffect(() => {
+    if (search.upload) setUploadOpen(true);
+  }, [search.upload]);
   const [rosterTab, setRosterTab] = useState<EmployeeRosterTab>("active");
   const [deleteTarget, setDeleteTarget] = useState<{ userId: string; name: string } | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");

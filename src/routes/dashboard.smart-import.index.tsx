@@ -1,4 +1,8 @@
-import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch, Link, redirect } from "@tanstack/react-router";
+import {
+  employeeSmartImportRedirect,
+  shouldBlockEmployeeSmartImport,
+} from "@/lib/employee-smart-import-block";
 import { useCallback, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,8 +25,6 @@ import {
 } from "@/lib/smart-import.functions";
 import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/timesheets-import-wizard";
 import { DailyNotesImportWizard } from "@/components/smart-import/daily-notes/daily-notes-import-wizard";
-import { normalizeConfig } from "@/components/hr/staff-fields-panel";
-import { buildStaffTemplateCsv, triggerCsvDownload } from "@/lib/staff-import-template";
 import { downloadClientTemplate } from "@/lib/client-import-template";
 import { smartImportNeedsAi } from "@/lib/smart-import-ai-gate";
 
@@ -31,6 +33,11 @@ const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets"
 export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),
   validateSearch: (s) => SearchSchema.parse(s),
+  beforeLoad: ({ search }) => {
+    if (shouldBlockEmployeeSmartImport(search.mode)) {
+      throw redirect(employeeSmartImportRedirect());
+    }
+  },
   component: () => (
     <RequirePermission perm="view_staff_records">
       <SmartImportPage />
@@ -207,26 +214,6 @@ function SmartImportPage() {
   const runExtraction = useServerFn(runSmartExtraction);
   const getSummary = useServerFn(getSmartImportSummary);
 
-  const staffIntakeConfigQuery = useQuery({
-    queryKey: ["staff-intake-fields-config", org?.organization_id],
-    enabled: !!org?.organization_id && mode === "employee",
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("organizations")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("feature_config" as any)
-        .eq("id", org!.organization_id)
-        .maybeSingle();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return normalizeConfig((data as any)?.feature_config?.staff_intake_fields);
-    },
-  });
-
-  const downloadStaffTemplate = () => {
-    if (!staffIntakeConfigQuery.data) return;
-    triggerCsvDownload(buildStaffTemplateCsv(staffIntakeConfigQuery.data), "staff-import-template.csv");
-  };
-
   const onAddFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
     const next: FileChip[] = [];
@@ -302,10 +289,16 @@ function SmartImportPage() {
   const process = useMutation({
     mutationFn: async () => {
       if (!org?.organization_id) throw new Error("No organization");
+      if (shouldBlockEmployeeSmartImport(mode)) {
+        navigate(employeeSmartImportRedirect());
+        return;
+      }
       setProgress("Creating import job…");
-      const { jobId: newJobId } = await createJob({
+      const created = await createJob({
         data: { organizationId: org.organization_id, mode },
       });
+      const newJobId = created?.jobId;
+      if (!newJobId) throw new Error("Could not create import job.");
       setJobId(newJobId);
 
       // Upload + record each file
@@ -444,7 +437,7 @@ function SmartImportPage() {
 
       {/* Mode switch */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-1 w-fit">
-        {(["client", "employee", "timesheets", "daily_notes"] as Mode[]).map((m) => (
+        {(["client", "timesheets", "daily_notes"] as Mode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -455,7 +448,6 @@ function SmartImportPage() {
             }`}
           >
             {m === "client" ? "Client"
-              : m === "employee" ? "Employee"
               : m === "timesheets" ? "Historical timesheets"
               : "Historical daily notes"}
           </button>
@@ -464,22 +456,6 @@ function SmartImportPage() {
 
       {mode === "timesheets" && !jobId && <TimesheetsImportWizard />}
       {mode === "daily_notes" && !jobId && <DailyNotesImportWizard />}
-
-      {!jobId && mode === "employee" && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-          <div className="text-sm text-muted-foreground">
-            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields. CSV import does not need NECTAR and does not send invite email — you invite after the import succeeds.
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={downloadStaffTemplate}
-            disabled={!staffIntakeConfigQuery.data}
-          >
-            <Download className="mr-2 h-4 w-4" /> Download staff template
-          </Button>
-        </div>
-      )}
 
       {!jobId && mode === "client" && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">

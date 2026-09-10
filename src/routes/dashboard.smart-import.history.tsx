@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { listImportJobs, discardImportJob } from "@/lib/smart-import-history.functions";
+import { employeeSmartImportRedirect } from "@/lib/employee-smart-import-block";
 
 export const Route = createFileRoute("/dashboard/smart-import/history")({
   head: () => ({ meta: [{ title: "Smart Import — History" }] }),
@@ -140,7 +141,10 @@ function HistoryPage() {
                     {(j.status === "draft" || j.status === "in_review" || j.status === "extracting") && (
                       <>
                         <Button size="sm" variant="default"
-                          onClick={() => navigate({ to: "/dashboard/smart-import/$jobId/review", params: { jobId: j.id } })}>
+                          onClick={() => {
+                            if (j.mode === "employee") void navigate(employeeSmartImportRedirect());
+                            else void navigate({ to: "/dashboard/smart-import/$jobId/review", params: { jobId: j.id } });
+                          }}>
                           <RotateCcw className="mr-1 h-3 w-3" /> Resume
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setConfirming(j)}>
@@ -153,7 +157,10 @@ function HistoryPage() {
                     )}
                     {j.status === "committed" && (
                       <Button size="sm" variant="outline"
-                        onClick={() => navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId: j.id } })}>
+                        onClick={() => {
+                          if (j.mode === "employee") void navigate(employeeSmartImportRedirect());
+                          else void navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId: j.id } });
+                        }}>
                         <Eye className="mr-1 h-3 w-3" /> View audit
                       </Button>
                     )}

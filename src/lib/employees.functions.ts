@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { onStaffHiredInternal } from "@/lib/staff-assignment-hooks.functions";
+import { resolveAccountUsername } from "@/lib/account-username";
 
 const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
 
@@ -25,6 +26,7 @@ export const CreateEmployeeInput = z.object({
   employeeId: z.string().trim().max(80).optional().or(z.literal("")),
   workerType: z.string().trim().max(80).optional().or(z.literal("")),
   customFieldValues: z.record(z.string(), z.unknown()).optional().default({}),
+  username: z.string().trim().max(254).optional().or(z.literal("")),
 });
 
 export type HireEmployeeInput = z.infer<typeof CreateEmployeeInput>;
@@ -44,7 +46,7 @@ async function assertOrgManager(actorId: string, orgId: string) {
   }
 }
 
-/** Shared hire path for Add employee and Smart Import. Never sends email. */
+/** Shared hire path for Add employee and roster upload. Never sends email. */
 export async function hireEmployeeInternal(
   data: HireEmployeeInput,
   actorUserId: string,
@@ -141,7 +143,18 @@ export async function hireEmployeeInternal(
       requires_abi: data.requiresAbi,
     };
     if (data.workerType) profileRow.worker_type = data.workerType;
-    if (created) profileRow.must_change_password = true;
+    if (created) {
+      profileRow.must_change_password = true;
+      profileRow.username = resolveAccountUsername({
+        username: data.username,
+        email: effectiveEmail,
+      });
+    } else if (data.username?.trim()) {
+      profileRow.username = resolveAccountUsername({
+        username: data.username,
+        email: effectiveEmail,
+      });
+    }
     if (Object.keys(customAttributes).length) profileRow.custom_attributes = customAttributes;
 
     const { error: profErr } = await supabaseAdmin.from("profiles").upsert(
@@ -211,6 +224,174 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
     await assertOrgManager(context.userId, data.organizationId);
     const hired = await hireEmployeeInternal(data, context.userId, "manual_admin");
     return { userId: hired.userId, email: hired.email };
+  });
+
+const RosterApplyInput = z.object({
+  organizationId: z.string().uuid(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(255),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  role: RoleEnum,
+  department: z.string().trim().max(120).optional().or(z.literal("")),
+  hireDate: z.string().optional().or(z.literal("")),
+  username: z.string().trim().max(254).optional().or(z.literal("")),
+  usernameProvided: z.boolean().optional().default(false),
+  mode: z.enum(["add_new", "add_and_update", "update_only"]),
+  temporaryPassword: z.string().min(8).max(128).optional().or(z.literal("")),
+});
+
+export type RosterApplyResult = {
+  userId: string;
+  email: string;
+  action: "created" | "updated" | "skipped";
+  reason: string | null;
+};
+
+async function updateExistingRosterMember(
+  data: z.infer<typeof RosterApplyInput>,
+  userId: string,
+  inOrg: boolean,
+): Promise<void> {
+  const email = data.email.trim().toLowerCase();
+  const profilePatch: Record<string, unknown> = {
+    first_name: data.firstName,
+    last_name: data.lastName,
+    full_name: `${data.firstName} ${data.lastName}`.trim(),
+  };
+  if (data.phone?.trim()) profilePatch.phone = data.phone.trim();
+  if (data.department?.trim()) profilePatch.department = data.department.trim();
+  if (data.hireDate) {
+    profilePatch.hire_date = data.hireDate;
+    profilePatch.start_date = data.hireDate;
+  }
+  if (data.usernameProvided && data.username?.trim()) {
+    profilePatch.username = resolveAccountUsername({
+      username: data.username,
+      email,
+    });
+  }
+  const { error: profErr } = await supabaseAdmin
+    .from("profiles")
+    .update(profilePatch as any)
+    .eq("id", userId);
+  if (profErr) throw new Error(profErr.message);
+
+  if (inOrg) {
+    const { error: memErr } = await supabaseAdmin
+      .from("organization_members")
+      .update({
+        role: data.role,
+        job_title: data.department || null,
+      })
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", userId);
+    if (memErr) throw new Error(memErr.message);
+    return;
+  }
+
+  const { error: memErr } = await supabaseAdmin.from("organization_members").upsert({
+    organization_id: data.organizationId,
+    user_id: userId,
+    role: data.role,
+    job_title: data.department || null,
+    active: true,
+  }, { onConflict: "organization_id,user_id" });
+  if (memErr) throw new Error(memErr.message);
+}
+
+/** Template upload: create / update / skip. Never sends email or hire-pack on update. */
+export const applyEmployeeRosterRow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => RosterApplyInput.parse(d))
+  .handler(async ({ data, context }): Promise<RosterApplyResult> => {
+    const empty: RosterApplyResult = { userId: "", email: data.email.trim().toLowerCase(), action: "skipped", reason: "Not signed in." };
+    if (!context.userId) return empty;
+    await assertOrgManager(context.userId, data.organizationId);
+
+    const email = data.email.trim().toLowerCase();
+    const { data: existingProf } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    let inOrg = false;
+    if (existingProf?.id) {
+      const { data: mem } = await supabaseAdmin
+        .from("organization_members")
+        .select("id")
+        .eq("user_id", existingProf.id)
+        .eq("organization_id", data.organizationId)
+        .maybeSingle();
+      inOrg = !!mem;
+    }
+
+    if (existingProf?.id) {
+      if (data.mode === "add_new") {
+        return { userId: existingProf.id, email, action: "skipped", reason: "Already on file." };
+      }
+      if (data.mode === "update_only" && !inOrg) {
+        return { userId: existingProf.id, email, action: "skipped", reason: "Not on this roster." };
+      }
+      await updateExistingRosterMember(data, existingProf.id, inOrg);
+      return { userId: existingProf.id, email, action: "updated", reason: null };
+    }
+
+    if (data.mode === "update_only") {
+      return { userId: "", email, action: "skipped", reason: "Not on this roster." };
+    }
+
+    const password = data.temporaryPassword?.trim();
+    if (!password) throw new Error("A temporary password is required to create a new employee.");
+    try {
+      const hired = await hireEmployeeInternal(
+        {
+          organizationId: data.organizationId,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email,
+          phone: data.phone ?? "",
+          temporaryPassword: password,
+          role: data.role,
+          department: data.department ?? "",
+          hireDate: data.hireDate ?? "",
+          startDate: data.hireDate ?? "",
+          username: data.username ?? "",
+          trackIds: [],
+          requiresDeescalation: false,
+          requiresAbi: false,
+          staffType: [],
+          customFieldValues: {},
+        },
+        context.userId,
+        "manual_admin",
+      );
+      return { userId: hired.userId, email: hired.email, action: hired.created ? "created" : "updated", reason: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (/already exists/i.test(msg)) {
+        if (data.mode === "add_new") {
+          return { userId: "", email, action: "skipped", reason: "Already on file." };
+        }
+        const { data: again } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .ilike("email", email)
+          .maybeSingle();
+        if (again?.id) {
+          const { data: mem } = await supabaseAdmin
+            .from("organization_members")
+            .select("id")
+            .eq("user_id", again.id)
+            .eq("organization_id", data.organizationId)
+            .maybeSingle();
+          await updateExistingRosterMember(data, again.id, !!mem);
+          return { userId: again.id, email, action: "updated", reason: null };
+        }
+      }
+      throw e;
+    }
   });
 
 const ResetInput = z.object({

@@ -7,6 +7,7 @@ import {
   UserCheck, FilePlus, FileQuestion, Pencil, Loader2, Users, ChevronRight,
   Link2, Inbox, Info, Send,
 } from "lucide-react";
+import { employeeSmartImportRedirect } from "@/lib/employee-smart-import-block";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -116,6 +117,11 @@ function ReviewPage() {
   const [discardOpen, setDiscardOpen] = useState(false);
   const navigate = useNavigate();
   const mode = (job.data?.job?.mode ?? "client") as "employee" | "client";
+  useEffect(() => {
+    if (job.data?.job?.mode === "employee") {
+      void navigate(employeeSmartImportRedirect());
+    }
+  }, [job.data?.job?.mode, navigate]);
   const commitCtx = useCompleteSetup({ jobId, mode, onSelectSubject: setSelectedId });
 
   // Auto-select first unfinished subject
@@ -128,6 +134,9 @@ function ReviewPage() {
 
   if (job.isLoading) return <div className="text-sm text-muted-foreground">Loading review…</div>;
   if (job.isError || !job.data) return <div className="text-sm text-destructive">Failed to load job.</div>;
+  if (job.data.job.mode === "employee") {
+    return <p className="text-sm text-muted-foreground">Staff roster upload moved to Employees.</p>;
+  }
 
   const subjects = (job.data.subjects ?? []) as SubjectRow[];
   const total = subjects.length;

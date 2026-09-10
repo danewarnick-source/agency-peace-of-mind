@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/employee-roster";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 import { AddEmployeeButton, AddEmployeeWizard } from "@/components/employees/add-employee-wizard";
+import { EmployeeRosterUploadButton, EmployeeRosterUploadWizard } from "@/components/employees/employee-roster-upload-wizard";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings, FileSpreadsheet, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
+import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, MoreHorizontal, Ban, ExternalLink, Settings, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
 import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -37,12 +38,13 @@ import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-b
 import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 
 import { RequirePermission } from "@/components/rbac-guard";
-// CSV Import and Smart Import both open the existing Smart Import wizard.
-// CSV/Excel is heuristic (no Bedrock). PDFs still go through NECTAR.
 import { PersonAvatar } from "@/components/person/person-avatar";
 import type { Position } from "@/lib/employee-positions";
 
 export const Route = createFileRoute("/dashboard/employees/")({
+  validateSearch: (s: Record<string, unknown>): { upload?: boolean } => ({
+    upload: s.upload === true || s.upload === 1 || s.upload === "1" || s.upload === "true",
+  }),
   component: () => (
     <RequirePermission perm="view_staff_records">
       <EmployeesPage />
@@ -57,6 +59,11 @@ export function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const search = useSearch({ strict: false }) as { upload?: boolean };
+  const [uploadOpen, setUploadOpen] = useState(() => search.upload === true);
+  useEffect(() => {
+    if (search.upload) setUploadOpen(true);
+  }, [search.upload]);
   const [rosterTab, setRosterTab] = useState<EmployeeRosterTab>("active");
   const [deleteTarget, setDeleteTarget] = useState<{ userId: string; name: string } | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
@@ -291,17 +298,7 @@ export function EmployeesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link to="/dashboard/smart-import" search={{ mode: "employee" }}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/dashboard/smart-import" search={{ mode: "employee" }}>
-              <Sparkles className="mr-2 h-4 w-4" /> Smart Import
-            </Link>
-          </Button>
-
+          <EmployeeRosterUploadButton onClick={() => setUploadOpen(true)} disabled={!org} />
           <AddEmployeeButton onClick={() => setAddOpen(true)} disabled={!org} />
           <Button variant="outline" onClick={() => setStaffFieldsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" /> Settings
@@ -669,6 +666,11 @@ export function EmployeesPage() {
         onOpenChange={setAddOpen}
         organizationId={org?.organization_id ?? null}
         onOpenSettings={() => setStaffFieldsOpen(true)}
+      />
+      <EmployeeRosterUploadWizard
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        organizationId={org?.organization_id ?? null}
       />
 
       <Dialog

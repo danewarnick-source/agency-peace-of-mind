@@ -96,12 +96,14 @@ export function AddEmployeeWizard({
   const [step, setStep] = useState<"details" | "access">("details");
   const [drafts, setDrafts] = useState<HireDraft[]>(() => [emptyDraft()]);
   const [created, setCreated] = useState<CreatedEmployee[]>([]);
+  const [inviteIds, setInviteIds] = useState<Set<string>>(() => new Set());
   const [shownPasswords, setShownPasswords] = useState<Set<string>>(() => new Set());
 
   const resetAll = () => {
     setStep("details");
     setDrafts([emptyDraft()]);
     setCreated([]);
+    setInviteIds(new Set());
     setShownPasswords(new Set());
   };
 
@@ -182,6 +184,7 @@ export function AddEmployeeWizard({
         toast.success(made.length === 1 ? "Employee file created" : `${made.length} employee files created`);
       }
       setCreated(made);
+      setInviteIds(new Set());
       setStep("access");
       qc.invalidateQueries({ queryKey: ["members"] });
     },
@@ -189,49 +192,55 @@ export function AddEmployeeWizard({
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (row: CreatedEmployee) => {
+    mutationFn: async (targets: CreatedEmployee[]) => {
       if (!organizationId) throw new Error("No organization selected.");
       const site_origin = resolveAuthOrigin();
-      const email = row.email.trim().toLowerCase();
+      const results: string[] = [];
       // Same rail as Pending invitations → Resend (createInvitation / resendInvitation).
       // inviteStaffMembers is a different RPC that can resolve undefined; do not read `.sent` on it.
-      try {
-        const raw = await createInviteFn({
-          data: { organization_id: organizationId, email, role: row.role, site_origin },
-        });
-        const out = interpretInviteSendResult(raw);
-        if (out.rpc_failure) throw new Error(out.message);
-        return { out, email: row.email };
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        if (!/pending invitation already exists/i.test(msg)) throw e;
-        const { data: pending, error } = await supabase
-          .from("invitations")
-          .select("id")
-          .eq("organization_id", organizationId)
-          .eq("email", email)
-          .eq("status", "pending")
-          .maybeSingle();
-        if (error) throw new Error(error.message);
-        if (!pending?.id) throw e;
-        const raw = await resendInviteFn({
-          data: { organization_id: organizationId, invitation_id: pending.id, site_origin },
-        });
-        const out = interpretInviteSendResult(raw);
-        if (out.rpc_failure) throw new Error(out.message);
-        return { out, email: row.email };
+      for (const row of targets) {
+        const email = row.email.trim().toLowerCase();
+        try {
+          let raw: unknown;
+          try {
+            raw = await createInviteFn({
+              data: { organization_id: organizationId, email, role: row.role, site_origin },
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "";
+            if (!/pending invitation already exists/i.test(msg)) throw e;
+            const { data: pending, error } = await supabase
+              .from("invitations")
+              .select("id")
+              .eq("organization_id", organizationId)
+              .eq("email", email)
+              .eq("status", "pending")
+              .maybeSingle();
+            if (error) throw new Error(error.message);
+            if (!pending?.id) throw e;
+            raw = await resendInviteFn({
+              data: { organization_id: organizationId, invitation_id: pending.id, site_origin },
+            });
+          }
+          const out = interpretInviteSendResult(raw);
+          if (out.rpc_failure) throw new Error(out.message);
+          results.push(
+            out.email_sent
+              ? `Invite emailed to ${out.email ?? email}.`
+              : out.email_error
+                ? `Invitation created for ${email}, but the email couldn't be sent (${out.email_error}).`
+                : `${email}: ${out.message}`,
+          );
+        } catch (e) {
+          results.push(`${email}: ${e instanceof Error ? e.message : "Invite failed."}`);
+        }
       }
+      return results;
     },
-    onSuccess: ({ out, email }) => {
-      if (out.email_sent) {
-        toast.success(`Invite emailed to ${out.email ?? email}.`);
-      } else if (out.email_error) {
-        toast.warning(
-          `Invitation created, but the email couldn't be sent (${out.email_error}). Share the join link from Pending invitations.`,
-        );
-      } else {
-        toast.warning(out.message);
-      }
+    onSuccess: (results) => {
+      const failed = results.some((r) => !/^Invite emailed/.test(r));
+      if (failed) toast.warning(results.join(" · "));
+      else toast.success(results.join(" · "));
       qc.invalidateQueries({ queryKey: ["invites"] });
       qc.invalidateQueries({ queryKey: ["invitations"] });
     },
@@ -322,11 +331,9 @@ export function AddEmployeeWizard({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>How should they sign in?</DialogTitle>
+              <DialogTitle>Send invites?</DialogTitle>
               <DialogDescription>
-                {created.length === 1
-                  ? "The employee file is complete. Send a join email, or copy a temporary password for same-day access."
-                  : "Each file is complete. Send a join email or copy a temporary password per person — invites are not sent unless you choose to."}
+                Check who should get a join email. Nothing is sent unless you choose it.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3">
@@ -334,10 +341,16 @@ export function AddEmployeeWizard({
                 <AccessCard
                   key={row.draftId}
                   row={row}
-                  showName={created.length > 1}
+                  checked={inviteIds.has(row.draftId)}
                   showPassword={shownPasswords.has(row.draftId)}
-                  inviting={inviteMutation.isPending && inviteMutation.variables?.draftId === row.draftId}
-                  onInvite={() => inviteMutation.mutate(row)}
+                  onCheckedChange={(next) => {
+                    setInviteIds((prev) => {
+                      const copy = new Set(prev);
+                      if (next) copy.add(row.draftId);
+                      else copy.delete(row.draftId);
+                      return copy;
+                    });
+                  }}
                   onShowPassword={() =>
                     setShownPasswords((prev) => {
                       const next = new Set(prev);
@@ -350,10 +363,18 @@ export function AddEmployeeWizard({
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
               <Button type="button" variant="ghost" onClick={() => finish(false)}>
-                Skip for now
+                Don&apos;t invite yet
               </Button>
-              <Button type="button" onClick={() => finish(created.length === 1)}>
-                Done
+              <Button
+                type="button"
+                disabled={!inviteIds.size || inviteMutation.isPending || !organizationId}
+                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
+                onClick={() => inviteMutation.mutate(created.filter((row) => inviteIds.has(row.draftId)))}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                {inviteMutation.isPending
+                  ? "Sending…"
+                  : `Send ${inviteIds.size} invite${inviteIds.size === 1 ? "" : "s"}`}
               </Button>
             </DialogFooter>
           </>
@@ -365,35 +386,27 @@ export function AddEmployeeWizard({
 
 function AccessCard({
   row,
-  showName,
+  checked,
   showPassword,
-  inviting,
-  onInvite,
+  onCheckedChange,
   onShowPassword,
 }: {
   row: CreatedEmployee;
-  showName: boolean;
+  checked: boolean;
   showPassword: boolean;
-  inviting: boolean;
-  onInvite: () => void;
+  onCheckedChange: (checked: boolean) => void;
   onShowPassword: () => void;
 }) {
   return (
     <div className="grid gap-3 rounded-md border border-border p-3">
-      {showName && <p className="text-sm font-medium">{row.name}</p>}
-      <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-        <div className="text-xs text-muted-foreground">Login</div>
-        <code className="block truncate">{row.email}</code>
-      </div>
-      <Button
-        type="button"
-        className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
-        disabled={inviting}
-        onClick={onInvite}
-      >
-        <Mail className="mr-2 h-4 w-4" />
-        {inviting ? "Sending…" : "Send invite email"}
-      </Button>
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={checked}
+          onCheckedChange={(v) => onCheckedChange(v === true)}
+        />
+        <span className="font-medium">{row.name}</span>
+        <code className="truncate text-xs text-muted-foreground">{row.email}</code>
+      </label>
       <Button type="button" variant="outline" onClick={onShowPassword}>
         <KeyRound className="mr-2 h-4 w-4" /> Show temporary password
       </Button>

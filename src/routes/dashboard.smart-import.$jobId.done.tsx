@@ -20,6 +20,7 @@ import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
 import { SetupChecklist } from "@/components/clients/setup-checklist";
 import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
 import { EmployeeInviteSummary } from "@/components/smart-import/employee-invite-summary";
+import { employeeSmartImportRedirect } from "@/lib/employee-smart-import-block";
 import { useCurrentOrg } from "@/hooks/use-org";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
@@ -149,6 +150,12 @@ function DonePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, runState, jobId]);
 
+  useEffect(() => {
+    if (q.data?.job?.mode === "employee") {
+      void navigate(employeeSmartImportRedirect());
+    }
+  }, [q.data?.job?.mode, navigate]);
+
   // §5 — On full success this page is not the admin's destination. As soon
   // as the readout shows every subject committed, route to the directory.
   useEffect(() => {
@@ -157,12 +164,12 @@ function DonePage() {
     const committed = subjects.filter((s) => s.committed);
     if (committed.length !== subjects.length) return;
     const mode = q.data?.job?.mode;
+    if (mode === "employee") return;
     if (mode === "client" && committed.length === 1 && committed[0].record_id) {
       navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committed[0].record_id } }).catch(() => navigate({ to: "/dashboard/clients" }));
     } else if (mode === "client") {
       navigate({ to: "/dashboard/clients" });
     }
-    // Employee jobs stay here so the admin can invite from the summary.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.data?.subjects, q.data?.job?.mode]);
 
@@ -181,6 +188,9 @@ function DonePage() {
 
   if (q.isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
   if (q.isError || !q.data) return <div className="text-sm text-destructive">Failed to load readout.</div>;
+  if (q.data.job.mode === "employee") {
+    return <p className="text-sm text-muted-foreground">Staff roster upload moved to Employees.</p>;
+  }
 
   const { job, subjects, audit } = q.data;
   const committedCount = subjects.filter((s) => s.committed).length;

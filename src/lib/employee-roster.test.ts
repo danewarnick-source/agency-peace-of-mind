@@ -57,6 +57,8 @@ describe("Add employee wizard source lock", () => {
     assert.match(src, /Add another employee/);
     assert.match(src, /createInvitation/);
     assert.match(src, /interpretInviteSendResult/);
+    assert.match(src, /invite yet/);
+    assert.match(src, /Checkbox/);
     assert.doesNotMatch(src, /inviteStaffMembers\(/);
     assert.doesNotMatch(src, /Hive Platform/);
     assert.doesNotMatch(src, /[\u{1F300}-\u{1FAFF}]/u);
@@ -71,6 +73,11 @@ describe("Employees list source lock", () => {
     assert.match(src, /restoreEntity/);
     assert.match(src, /deleteEntity/);
     assert.match(src, /Inactive/);
+    assert.match(src, /EmployeeRosterUploadWizard/);
+    assert.match(src, /upload/);
+    assert.doesNotMatch(src, /Smart Import/);
+    assert.doesNotMatch(src, /Import CSV/);
+    assert.doesNotMatch(src, /mode: ["']employee["']/);
     assert.doesNotMatch(src, /Hive Platform/);
     assert.doesNotMatch(src, /toggleActiveMutation/);
   });

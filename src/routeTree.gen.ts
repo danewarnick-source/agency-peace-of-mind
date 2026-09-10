@@ -104,6 +104,7 @@ import { Route as DashboardAuthoritativeSourcesRouteImport } from './routes/dash
 import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
+import { Route as DashboardAgencyDocumentsRouteImport } from './routes/dashboard.agency-documents'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as AuditPortalSetPasswordRouteImport } from './routes/audit-portal.set-password'
 import { Route as AuditPortalPackageIdRouteImport } from './routes/audit-portal.$packageId'
@@ -720,6 +721,12 @@ const DashboardAskNectarRoute = DashboardAskNectarRouteImport.update({
   path: '/ask-nectar',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAgencyDocumentsRoute =
+  DashboardAgencyDocumentsRouteImport.update({
+    id: '/agency-documents',
+    path: '/agency-documents',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const CertificateCodeRoute = CertificateCodeRouteImport.update({
   id: '/certificate/$code',
   path: '/certificate/$code',
@@ -1460,6 +1467,7 @@ export interface FileRoutesByFullPath {
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/agency-documents': typeof DashboardAgencyDocumentsRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
@@ -1682,6 +1690,7 @@ export interface FileRoutesByTo {
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/agency-documents': typeof DashboardAgencyDocumentsRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
@@ -1900,6 +1909,7 @@ export interface FileRoutesById {
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
+  '/dashboard/agency-documents': typeof DashboardAgencyDocumentsRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
   '/dashboard/audit': typeof DashboardAuditRoute
@@ -2125,6 +2135,7 @@ export interface FileRouteTypes {
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
+    | '/dashboard/agency-documents'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
@@ -2347,6 +2358,7 @@ export interface FileRouteTypes {
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
+    | '/dashboard/agency-documents'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
@@ -2564,6 +2576,7 @@ export interface FileRouteTypes {
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
+    | '/dashboard/agency-documents'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
     | '/dashboard/audit'
@@ -3476,6 +3489,13 @@ declare module '@tanstack/react-router' {
       path: '/ask-nectar'
       fullPath: '/dashboard/ask-nectar'
       preLoaderRoute: typeof DashboardAskNectarRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/agency-documents': {
+      id: '/dashboard/agency-documents'
+      path: '/agency-documents'
+      fullPath: '/dashboard/agency-documents'
+      preLoaderRoute: typeof DashboardAgencyDocumentsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/certificate/$code': {
@@ -4665,6 +4685,7 @@ const DashboardCoursesCourseIdRouteWithChildren =
   )
 
 interface DashboardRouteChildren {
+  DashboardAgencyDocumentsRoute: typeof DashboardAgencyDocumentsRoute
   DashboardAskNectarRoute: typeof DashboardAskNectarRoute
   DashboardAssignmentsRoute: typeof DashboardAssignmentsRoute
   DashboardAuditRoute: typeof DashboardAuditRoute
@@ -4764,6 +4785,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAgencyDocumentsRoute: DashboardAgencyDocumentsRoute,
   DashboardAskNectarRoute: DashboardAskNectarRoute,
   DashboardAssignmentsRoute: DashboardAssignmentsRoute,
   DashboardAuditRoute: DashboardAuditRoute,

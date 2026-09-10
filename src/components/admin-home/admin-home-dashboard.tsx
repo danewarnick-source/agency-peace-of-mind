@@ -478,7 +478,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                       style={{ borderBottom: `1px solid ${PI_THEME.hairlines.faint}` }}
                     >
                       <Link
-                        to="/dashboard/company-obligations"
+                        to="/dashboard/agency-documents"
                         className="flex cursor-pointer items-start justify-between gap-3 py-2.5 transition"
                       >
                         <div className="min-w-0">

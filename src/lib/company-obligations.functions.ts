@@ -1424,7 +1424,7 @@ export async function notifyObligationManagersInternal(
     urgency,
     title,
     body,
-    link_to: "/dashboard/company-obligations",
+    link_to: "/dashboard/agency-documents",
     related_id: instanceId,
     related_type: "company_obligation_instance",
     recurrence_key: recurrenceKeyBase ? `${recurrenceKeyBase}_${recipientId}` : null,
@@ -2496,8 +2496,8 @@ export const pauseObligationsForArchivedForm = createServerFn({ method: "POST" }
         title: "Obligation paused — linked form archived",
         body:
           `${list.length} obligation(s) were paused because their linked form '${formName}' was archived: ${titles}. ` +
-          `Edit each obligation in Company Obligations to restore it.`,
-        link_to: "/dashboard/company-obligations",
+          `Edit each duty in Agency documents to restore it.`,
+        link_to: "/dashboard/agency-documents",
       }));
       const { error: notifErr } = await supabase.from("notifications").insert(rows);
       if (notifErr) throw new Error(notifErr.message);
@@ -2834,7 +2834,7 @@ export const recordCompletion = createServerFn({ method: "POST" })
           body:
             `${staffName} uploaded evidence for "${ob.title}" but NECTAR could not verify it: ` +
             `${validation.reasons.join("; ")}. An admin can manually confirm the upload.`,
-          link_to: "/dashboard/company-obligations",
+          link_to: "/dashboard/agency-documents",
           related_id: data.instanceId,
           related_type: "company_obligation_instance",
         }));

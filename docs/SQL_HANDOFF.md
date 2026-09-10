@@ -6,6 +6,50 @@ it worked before moving on.
 
 ---
 
+## ACTION — Agency documents standing rows (2026-09-10) — Core flag
+
+**No new tables.** Agency documents reads `company_obligations` + instances
+(scope `org`). App bootstrap (`STANDING_SOW_DUTIES`) inserts missing titles
+the next time an org opens a mutating register path. Orgs that already
+bootstrapped need these six titles inserted if they are absent.
+
+Do **not** mix `agency_policies` / `source = 'provider'` into this pack.
+Those are Company policies (internal) and stay off Practice Audit DSPD rows.
+
+Clear the editor, paste:
+
+```sql
+SELECT o.organization_id,
+       string_agg(o.title, ' | ' ORDER BY o.title)
+         FILTER (
+           WHERE o.title IN (
+             'Utah Department of Commerce — Entity Standing',
+             'DHHS Code of Conduct — Posted',
+             'Business Associate Agreements — On File',
+             'Large-Loan Disclosure Process',
+             'Incident Reporting Process',
+             'HIPAA Notice of Privacy Practices'
+           )
+         ) AS agency_doc_new_titles
+FROM public.company_obligations o
+WHERE o.scope = 'org'
+GROUP BY o.organization_id
+ORDER BY o.organization_id;
+```
+
+**What you'll see:** one row per org. Empty `agency_doc_new_titles` means Core
+should seed the six titles for that org (same columns as existing standing
+SOW org rows: `cadence = per_event`, `evidence_type = upload`,
+`assignee_role = admin_only`, `scope = org`). App-side bootstrap will also
+insert them when `ensureStandingDutiesInternal` runs.
+
+Existing titles already on Agency document cards (insurance, Medicaid
+enrollment / USTEPS, OL licenses, Host Home cert, PPS foster, life safety,
+board, COI, continuity, personnel+operating, HRP, no-gifts, discharge, IQM)
+do not need a new table.
+
+---
+
 ## ACTION — Admin Home welcome dismissal column (2026-09-05)
 
 **Run this on Hive-Platform.** Additive only. App reads

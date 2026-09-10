@@ -101,8 +101,8 @@ function HireDatesPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1">
-            <Link to="/dashboard/company-obligations">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Back to Compliance
+            <Link to="/dashboard/personnel-file">
+              <ArrowLeft className="mr-1 h-4 w-4" /> Back to Personnel file
             </Link>
           </Button>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">

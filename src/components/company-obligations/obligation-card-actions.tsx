@@ -132,7 +132,7 @@ function DirectCompletionActions({
           <p className="text-xs text-amber-800">
             No published form is linked yet — staff cannot complete this duty.
           </p>
-          <a href={`/dashboard/company-obligations#obligation-${obligation.id}`}>
+          <a href={`/dashboard/personnel-file`}>
             <Button size="sm" variant="outline">
               Attach a form →
             </Button>

@@ -750,6 +750,43 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/listPendingClientSubjects/i.test(fn)) return { items: [], jobs: {} };
   if (/listOrgPersonnelFileMatrix/i.test(fn)) return [];
   if (/listOrgPersonnelFilePack/i.test(fn)) return [];
+  if (/listAgencyDocuments/i.test(fn)) {
+    return {
+      cards: [
+        {
+          key: "insurance",
+          title: "Insurance",
+          layer: "flag",
+          status: "missing",
+          dueAt: null,
+          obligationId: null,
+          instanceId: null,
+          evidencePath: null,
+          evidenceFilename: null,
+          evidenceType: "upload",
+          attestationText: null,
+          coreSeedNeeded: true,
+        },
+        {
+          key: "coi",
+          title: "COI policy",
+          layer: "encoded",
+          status: "missing",
+          dueAt: null,
+          obligationId: null,
+          instanceId: null,
+          evidencePath: null,
+          evidenceFilename: null,
+          evidenceType: "upload",
+          attestationText: null,
+          coreSeedNeeded: false,
+        },
+      ],
+      counts: { missing: 2, due_soon: 0, on_file: 0 },
+      codes: ["HHS"],
+    };
+  }
+  if (/listAgencyPolicies|listPolicyJobCodeOptions/i.test(fn)) return [];
   if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
   if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
   if (/saveDailyRecord/i.test(fn)) {

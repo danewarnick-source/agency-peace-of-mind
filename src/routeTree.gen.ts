@@ -4966,20 +4966,6 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
-interface TrainingRouteChildren {
-  TrainingConfirmRoute: typeof TrainingConfirmRoute
-  TrainingCourseRoute: typeof TrainingCourseRoute
-}
-
-const TrainingRouteChildren: TrainingRouteChildren = {
-  TrainingConfirmRoute: TrainingConfirmRoute,
-  TrainingCourseRoute: TrainingCourseRoute,
-}
-
-const TrainingRouteWithChildren = TrainingRoute._addFileChildren(
-  TrainingRouteChildren,
-)
-
 interface DemoRouteChildren {
   DemoARoute: typeof DemoARoute
   DemoBRoute: typeof DemoBRoute
@@ -4995,6 +4981,20 @@ const DemoRouteChildren: DemoRouteChildren = {
 }
 
 const DemoRouteWithChildren = DemoRoute._addFileChildren(DemoRouteChildren)
+
+interface TrainingRouteChildren {
+  TrainingConfirmRoute: typeof TrainingConfirmRoute
+  TrainingCourseRoute: typeof TrainingCourseRoute
+}
+
+const TrainingRouteChildren: TrainingRouteChildren = {
+  TrainingConfirmRoute: TrainingConfirmRoute,
+  TrainingCourseRoute: TrainingCourseRoute,
+}
+
+const TrainingRouteWithChildren = TrainingRoute._addFileChildren(
+  TrainingRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,

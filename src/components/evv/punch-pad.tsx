@@ -2169,7 +2169,7 @@ export function PunchPad({
                 to="/dashboard/my-obligations"
                 className="inline-flex items-center rounded-md border border-[#1A2B47]/30 px-2.5 py-1 text-xs font-semibold text-[#1A2B47] hover:bg-white"
               >
-                My Obligations
+                Personnel file
               </Link>
             </div>
           </div>

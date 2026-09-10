@@ -448,23 +448,9 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       requires_expiration_date: false,
     },
   },
-  {
-    key: "driving_record",
-    title: "Driving Record",
-    due_days: 30,
-    tracks_expiration: false,
-    default_validity_months: null,
-    conditional: "all",
-    category: "Employment Documents (Upon Hire)",
-    auto_complete_on_upload: true,
-    hint: "Motor vehicle record on file. Presence-only — no expiration tracking.",
-    validation: {
-      cert_type_label: "Driving Record",
-      required_keyword_groups: [],
-      requires_completion_date: false,
-      requires_expiration_date: false,
-    },
-  },
+  // driving_record is NOT an all-staff baseline. The live duty is
+  // "Driving Record — On File (Transporting Staff)" on the personnel file,
+  // narrowed to staff who transport. Do not re-add a universal HR card.
   {
     key: "hsq_cleaning_training",
     title: "HSQ — Clean, Sanitary & Safe Environment Training",

@@ -1573,7 +1573,7 @@ export type StaffObligationFileRow = MyObligationInstanceRow & {
 
 /**
  * Admin/manager list of one staffer's obligation instances — same register
- * as the compliance matrix / My Obligations, plus that staffer's latest
+ * as the compliance matrix / personnel file, plus that staffer's latest
  * completion row. No new tables.
  */
 export const listStaffObligationInstances = createServerFn({ method: "POST" })
@@ -3246,7 +3246,7 @@ export const remindOutstandingAssignees = createServerFn({ method: "POST" })
       urgency,
       title: `${ob.title} requires your attention`,
       body:
-        `${inst.period_key}. Please complete this in your My Obligations page.` +
+        `${inst.period_key}. Please complete this on your personnel file.` +
         `${ob.description ? " " + ob.description.slice(0, 120) : ""}`,
       link_to: "/dashboard/my-obligations",
       related_id: data.instanceId,

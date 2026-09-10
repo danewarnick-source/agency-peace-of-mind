@@ -153,7 +153,7 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("tab", { name: /^Profile$/i })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole("tab", { name: /Obligations & files/i })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Personnel file/i })).toBeVisible();
     await expect(page.getByRole("tab", { name: /^Permissions$/i })).toBeVisible();
     await expect(page.getByText(/admin|employee|manager/i).first()).toBeVisible();
     await assertPageNotBlank(page, "staff profile");

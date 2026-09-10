@@ -381,7 +381,7 @@ export function InHiveCoursePlayer({
           <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" asChild>
             <Link to="/dashboard/my-obligations">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              My Compliance
+              Personnel file
             </Link>
           </Button>
         )}
@@ -590,8 +590,8 @@ function ExamPane({
             {hideObligation
               ? " Course complete."
               : certificateIssued
-                ? " This obligation is complete when the course is recorded."
-                : " Finish every topic on the checklist, then record the obligation."}
+                ? " This card is On file when the course is recorded."
+                : " Finish every topic on the checklist, then record it on your personnel file."}
           </p>
           {certificate && (
             <InHiveCertificate record={certificate} issued={certificateIssued} />
@@ -603,7 +603,7 @@ function ExamPane({
           </div>
           {!alreadyComplete && !hideObligation && certificateIssued && (
             <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
-              Record on My Compliance
+              Record on personnel file
             </Button>
           )}
         </CardContent>

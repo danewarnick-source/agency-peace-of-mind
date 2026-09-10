@@ -181,7 +181,7 @@ function StaffView() {
   }, [navigate]);
   return (
     <p className="text-sm text-muted-foreground">
-      Assigned training is on My Obligations. You cannot shop a catalog.
+      Assigned training is on your personnel file. You cannot shop a catalog.
     </p>
   );
 }
@@ -966,7 +966,7 @@ function Storefront({
       {
         type: "thirty_day" as const,
         title: "30-day orientation",
-        blurb: "In-platform Essential Training from My Obligations. A purchased 30-day or pack seat unlocks the course for that staff. True North Supports is never charged. Not an external class.",
+        blurb: "In-platform Essential Training from the personnel file. A purchased 30-day or pack seat unlocks the course for that staff. True North Supports is never charged. Not an external class.",
       },
     ] as const
   ).map((card) => {

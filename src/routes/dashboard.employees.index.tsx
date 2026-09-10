@@ -11,7 +11,6 @@ import { archiveEntity, deleteEntity, restoreEntity } from "@/lib/lifecycle.func
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
-import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
 import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
 import {
   countEmployeesOnRosterTab,
@@ -19,7 +18,6 @@ import {
   isEmployeeOnActiveRoster,
   type EmployeeRosterTab,
 } from "@/lib/employee-roster";
-import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 import { AddEmployeeButton, AddEmployeeWizard } from "@/components/employees/add-employee-wizard";
 import { EmployeeRosterUploadButton, EmployeeRosterUploadWizard } from "@/components/employees/employee-roster-upload-wizard";
 
@@ -71,42 +69,7 @@ export function EmployeesPage() {
   const [tempPassword, setTempPassword] = useState(() => generateTempPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string; newStaffId?: string } | null>(null);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
-  const [compliancePanelStaff, setCompliancePanelStaff] = useState<{ id: string; name: string; isNew?: boolean } | null>(null);
   const [staffFieldsOpen, setStaffFieldsOpen] = useState(false);
-
-  const fetchMatrix = useServerFn(getHrComplianceMatrix);
-  const { data: complianceMatrix } = useQuery({
-    enabled: !!org,
-    queryKey: ["hr-matrix", org?.organization_id],
-    queryFn: () => fetchMatrix({ data: { organization_id: org!.organization_id } }),
-  });
-
-  // Derive per-staff compliance summary from the org-level matrix (single fetch, not N+1)
-  const complianceByStaff = useMemo(() => {
-    const matrix = complianceMatrix;
-    if (!matrix) return new Map<string, { overdue: number; expiring: number; pending: number }>();
-    const today = Date.now();
-    const in60Ms = today + 60 * 86_400_000;
-    const result = new Map<string, { overdue: number; expiring: number; pending: number }>();
-    for (const staff of matrix.staff) {
-      let overdueCount = 0;
-      let expiringCount = 0;
-      let pendingCount = 0;
-      for (const req of matrix.requirements) {
-        const cell = staff.cells[req.requirement_id];
-        if (!cell || cell.applicable === false) continue;
-        const status = cell.status as string;
-        const expMs = cell.expires_at ? new Date(cell.expires_at as string).getTime() : null;
-        const isExpired = status === "expired" || (expMs !== null && expMs < today);
-        const isSoon = expMs !== null && expMs >= today && expMs <= in60Ms;
-        if (isExpired) overdueCount++;
-        else if (isSoon) expiringCount++;
-        else if (status !== "complete" && status !== "waived") pendingCount++;
-      }
-      result.set(staff.staff_id, { overdue: overdueCount, expiring: expiringCount, pending: pendingCount });
-    }
-    return result;
-  }, [complianceMatrix]);
 
   const resetPwFn = useServerFn(adminResetEmployeePassword);
   const resendInviteFn = useServerFn(resendInvitation);
@@ -506,11 +469,6 @@ export function EmployeesPage() {
                 const openProfile = () => {
                   void navigate({ to: "/dashboard/employees/$staffId", params: { staffId: m.user_id } });
                 };
-                const compliance = complianceByStaff.get(m.user_id);
-                const hasOverdue = (compliance?.overdue ?? 0) > 0;
-                const hasExpiring = (compliance?.expiring ?? 0) > 0;
-                const hasPending = (compliance?.pending ?? 0) > 0;
-                const needsAction = hasOverdue || hasExpiring || hasPending;
                 return (
                   <tr
                     key={m.id}
@@ -565,30 +523,21 @@ export function EmployeesPage() {
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap w-[280px]" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex items-center gap-1">
-                        {/* Compliance badge — tappable, opens checklist panel */}
-                        {compliance !== undefined && (
-                          <button
-                            type="button"
-                            className={
-                              "rounded-full px-2 py-0.5 text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 " +
-                              (hasOverdue
-                                ? "hive-status-danger"
-                                : hasExpiring || hasPending
-                                  ? "bg-[var(--hive-gold-soft)] text-[var(--hive-on-gold)]"
-                                  : "hive-status-active")
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCompliancePanelStaff({ id: m.user_id, name });
-                            }}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          asChild
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Link
+                            to="/dashboard/employees/$staffId"
+                            params={{ staffId: m.user_id }}
+                            search={{ tab: "personnel" }}
                           >
-                            {hasOverdue
-                              ? `${compliance.overdue} overdue`
-                              : needsAction
-                                ? `${(compliance.expiring + compliance.pending)} needed`
-                                : "Complete"}
-                          </button>
-                        )}
+                            Personnel file
+                          </Link>
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -817,16 +766,6 @@ export function EmployeesPage() {
         />
       )}
 
-      {org && compliancePanelStaff && (
-        <StaffCompliancePanel
-          open={!!compliancePanelStaff}
-          onOpenChange={(v) => !v && setCompliancePanelStaff(null)}
-          organizationId={org.organization_id}
-          staffId={compliancePanelStaff.id}
-          staffName={compliancePanelStaff.name}
-          isNewEmployee={compliancePanelStaff.isNew}
-        />
-      )}
     </div>
   );
 }

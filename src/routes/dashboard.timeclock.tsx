@@ -42,7 +42,7 @@ function TimeClockPage() {
             <GraduationCap className="h-4 w-4" />
           </span>
           <span className="min-w-0">
-            <span className="block text-xs font-semibold text-foreground">My Obligations</span>
+            <span className="block text-xs font-semibold text-foreground">Personnel file</span>
             <span className="block text-[10px] text-muted-foreground">Assigned training and forms</span>
           </span>
         </Link>

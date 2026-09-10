@@ -256,7 +256,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/my-obligations", label: "My Compliance", icon: ClipboardList },
+  { to: "/dashboard/my-obligations", label: "Personnel file", icon: ClipboardList },
   {
     to: "/dashboard/my-historical-records",
     label: "Historical Records",

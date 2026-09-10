@@ -159,7 +159,7 @@ function ClientTrainingViewer() {
           <span>{(error as Error).message}</span>
         </div>
         <Button variant="outline" size="sm" onClick={backToObligations}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Back to My Obligations
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back to personnel file
         </Button>
       </div>
     );
@@ -170,7 +170,7 @@ function ClientTrainingViewer() {
       <div className="p-6 space-y-3">
         <p className="text-sm text-muted-foreground">No published {typeLabel.toLowerCase()} training is available for this client yet.</p>
         <Button variant="outline" size="sm" onClick={backToObligations}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Back to My Obligations
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back to personnel file
         </Button>
       </div>
     );
@@ -188,7 +188,7 @@ function ClientTrainingViewer() {
         <div className="flex items-start justify-between gap-3">
           <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
             <Link to="/dashboard/my-obligations">
-              <ArrowLeft className="mr-1 h-4 w-4" /> My Obligations
+              <ArrowLeft className="mr-1 h-4 w-4" /> Personnel file
             </Link>
           </Button>
         </div>
@@ -227,7 +227,7 @@ function ClientTrainingViewer() {
                 </Button>
               )}
               <Button onClick={backToObligations}>
-                Back to My Obligations
+                Back to personnel file
               </Button>
             </div>
           </div>

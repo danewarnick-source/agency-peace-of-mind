@@ -84,7 +84,7 @@ export function OtherAssignmentsReminder() {
           <div className="mt-3">
             <Button asChild size="sm" variant={hasSafety ? "destructive" : "default"}>
               <Link to="/dashboard/my-obligations">
-                Open My Obligations <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                Open personnel file <ChevronRight className="ml-1 h-3.5 w-3.5" />
               </Link>
             </Button>
           </div>

@@ -39,7 +39,21 @@ export function obligationFileStatus(args: {
   return "missing";
 }
 
-/** Live obligation title — same substitution the compliance / My Obligations views use. */
+/** Relative due copy for a personnel-file item. Overdue is still Missing in status. */
+export function dueLabel(dueAt: string, now: Date = new Date()): { text: string; overdue: boolean } {
+  const due = new Date(dueAt);
+  const diffMs = due.getTime() - now.getTime();
+  if (diffMs < 0) {
+    const od = Math.max(1, Math.ceil(Math.abs(diffMs) / 86_400_000));
+    return { text: `Missing — ${od} day${od === 1 ? "" : "s"} ago`, overdue: true };
+  }
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days === 0) return { text: "Due today", overdue: false };
+  if (days === 1) return { text: "Due in 1 day", overdue: false };
+  return { text: `Due in ${days} days`, overdue: false };
+}
+
+/** Live item title — same substitution the compliance / personnel-file views use. */
 export function liveObligationTitle(
   title: string,
   scope: string,

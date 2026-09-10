@@ -57,7 +57,7 @@ export const PUBLIC_TRAINING_ALA_CARTE: readonly PublicTrainingAlaCarteItem[] = 
     sku: "thirty_day",
     name: "30-day orientation",
     priceCents: TRAINING_PRICE_CENTS.thirty_day,
-    sub: "In-platform course from My Obligations",
+    sub: "In-platform course from the personnel file",
   },
 ];
 

@@ -36,7 +36,7 @@ function parseCompanyObligationsSearch(s: Record<string, unknown>): CompanyOblig
 }
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
-  head: () => ({ meta: [{ title: "Obligations — Provider Interface" }] }),
+  head: () => ({ meta: [{ title: "Compliance — Provider Interface" }] }),
   validateSearch: parseCompanyObligationsSearch,
   component: CompanyObligationsPage,
 });
@@ -57,7 +57,7 @@ function CompanyObligationsPage() {
   if (!org || !canAccess) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-        You do not have permission to view obligations.
+        You do not have permission to view compliance.
       </div>
     );
   }

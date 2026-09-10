@@ -29,12 +29,12 @@ import { StaffProfileIdentity } from "@/components/employees/staff-profile-ident
 import { StaffObligationsFilesTab } from "@/components/employees/staff-obligations-files-tab";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
 
-const PROFILE_TABS = ["profile", "obligations", "permissions", "activity"] as const;
+const PROFILE_TABS = ["profile", "personnel", "permissions", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
-type SearchTab = ProfileTab | "record";
+type SearchTab = ProfileTab | "record" | "obligations";
 
 function resolveTab(tab: SearchTab | undefined): ProfileTab {
-  if (tab === "record") return "obligations";
+  if (tab === "record" || tab === "obligations") return "personnel";
   if (tab && (PROFILE_TABS as readonly string[]).includes(tab)) return tab;
   return "profile";
 }
@@ -42,7 +42,10 @@ function resolveTab(tab: SearchTab | undefined): ProfileTab {
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   validateSearch: (s: Record<string, unknown>): { tab?: SearchTab; override_perm?: Permission } => {
     const out: { tab?: SearchTab; override_perm?: Permission } = {};
-    if (typeof s.tab === "string" && (s.tab === "record" || (PROFILE_TABS as readonly string[]).includes(s.tab))) {
+    if (
+      typeof s.tab === "string" &&
+      (s.tab === "record" || s.tab === "obligations" || (PROFILE_TABS as readonly string[]).includes(s.tab))
+    ) {
       out.tab = s.tab as SearchTab;
     }
     if (typeof s.override_perm === "string" && (ALL_PERMISSIONS as readonly string[]).includes(s.override_perm)) {
@@ -175,7 +178,7 @@ function StaffProfilePage() {
       >
         <TabsList className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start overflow-x-auto">
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="obligations">Obligations & files</TabsTrigger>
+          <TabsTrigger value="personnel">Personnel file</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           {showPermissionsTab && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
@@ -197,7 +200,7 @@ function StaffProfilePage() {
           </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="obligations" className="mt-4 space-y-6">
+        <TabsContent value="personnel" className="mt-4 space-y-6">
           <StaffObligationsFilesTab
             organizationId={orgId}
             staffId={staffId}

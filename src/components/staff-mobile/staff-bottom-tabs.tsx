@@ -21,7 +21,7 @@ const TABS: StaffTab[] = [
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, exact: false, code: "schedule", feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck, exact: false, code: "logs" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, exact: false, code: "nectar", feature: "nectar" },
-  { to: "/dashboard/my-obligations", label: "Obligations", icon: ClipboardCheck, exact: false, code: "obligations" },
+  { to: "/dashboard/my-obligations", label: "Personnel file", icon: ClipboardCheck, exact: false, code: "obligations" },
 ];
 
 export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
@@ -78,7 +78,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                     <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                     {t.code === "obligations" && obligationAttention > 0 && (
                       <span
-                        aria-label={`${obligationAttention} obligations need attention`}
+                        aria-label={`${obligationAttention} personnel file items need attention`}
                         className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hive-danger)] px-1 text-[9px] font-bold leading-none text-white"
                       >
                         {obligationAttention > 99 ? "99+" : obligationAttention}

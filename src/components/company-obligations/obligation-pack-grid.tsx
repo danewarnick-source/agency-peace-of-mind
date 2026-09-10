@@ -126,7 +126,7 @@ export function ObligationPackGrid({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-[var(--hive-text)]">Obligations</h2>
+          <h2 className="text-base font-semibold text-[var(--hive-text)]">Compliance</h2>
           <p className="mt-0.5 max-w-xl text-sm text-[var(--hive-text-muted)]">
             Packs across the top. Staff down the left. Required cells are green or red; optional
             cells stay quiet.

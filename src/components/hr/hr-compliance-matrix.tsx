@@ -20,10 +20,8 @@ function formatHireDate(d: string | null): string {
 }
 
 /**
- * Org-wide staff roster (formerly the HR Compliance Matrix). Compliance
- * status now lives entirely in Company Obligations — this view is just
- * "who's on staff and when they were hired," with a link out per staffer
- * to their obligations.
+ * Org-wide staff roster (formerly the HR Compliance Matrix). Status
+ * now lives on each staff member's personnel file.
  */
 export function HrComplianceMatrix({
   organizationId,
@@ -103,7 +101,7 @@ export function HrComplianceMatrix({
         <div>
           <CardTitle className="text-base">Staff Roster</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Compliance status now lives in Company Obligations — use the link per staffer to review it.
+            Status lives on each staff member&apos;s personnel file.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -129,7 +127,7 @@ export function HrComplianceMatrix({
                   Staff
                 </th>
                 <th className="border-b border-border px-3 py-2 text-left font-medium">Hire date</th>
-                <th className="border-b border-border px-3 py-2 text-left font-medium">Obligations</th>
+                <th className="border-b border-border px-3 py-2 text-left font-medium">Personnel file</th>
               </tr>
             </thead>
             <tbody>
@@ -168,10 +166,10 @@ function BandRows({ band }: { band: { key: string; label: string; staff: HrMatri
           </td>
           <td className="border-b border-border px-3 py-1.5">
             <a
-              href={`/dashboard/my-obligations?staff=${s.staff_id}`}
+              href={`/dashboard/employees/${s.staff_id}?tab=personnel`}
               className="text-sm font-medium text-[var(--hive-ink)] hover:underline"
             >
-              View obligations →
+              Open personnel file
             </a>
           </td>
         </tr>

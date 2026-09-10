@@ -267,10 +267,10 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
       to: "/dashboard/hub/documentation", search: { tab: "records", focus: "doc-gaps" },
     },
     {
-      icon: BadgeCheck, label: "Staff obligations", value: metrics.creds,
+      icon: BadgeCheck, label: "Personnel file", value: metrics.creds,
       nextAction: staffGaps
         ? `Complete ${staffGaps} item${staffGaps === 1 ? "" : "s"}`
-        : "Open Obligations",
+        : "Open Compliance",
       to: "/dashboard/company-obligations",
     },
     {

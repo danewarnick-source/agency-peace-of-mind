@@ -41,7 +41,7 @@ const STAFF_NAV: { label: string; icon: LucideIcon }[] = [
   { label: "My Caseload", icon: LayoutDashboard },
   { label: "Schedule", icon: CalendarDays },
   { label: "Daily Logs", icon: ClipboardCheck },
-  { label: "My Compliance", icon: ClipboardList },
+  { label: "Personnel file", icon: ClipboardList },
   { label: "Nectar", icon: Sparkles },
 ];
 
@@ -114,7 +114,7 @@ export function FrameComplianceTraining() {
         <h3 className="text-[12px] font-semibold text-[var(--hive-text)]">Compliance register</h3>
       </div>
       <div className="mb-2 flex flex-wrap gap-1 border-b border-[var(--hive-border)] pb-1.5">
-        {["Obligations", "Utah pack", "Authoritative Sources", "Action Required"].map((tab, i) => (
+        {["Compliance", "Utah pack", "Authoritative Sources", "Action Required"].map((tab, i) => (
           <span
             key={tab}
             className={`px-2 py-1 text-[10px] font-medium ${

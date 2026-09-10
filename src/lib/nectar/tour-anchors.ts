@@ -39,11 +39,11 @@ export const TOUR_ANCHORS: TourAnchor[] = [
   { id: "nav.home", label: "My Caseload", route: "/dashboard", description: "Your assigned people. Host-home (HHS) names open the daily note. Time-clock codes open Punch pad.", surface: "staff" },
   { id: "nav.schedule", label: "Schedule", route: "/dashboard/schedule", description: "Today and upcoming scheduled shifts.", surface: "staff" },
   { id: "nav.daily-logs", label: "Daily Logs", route: "/dashboard/daily-logs", description: "Host-home and RP5 daily progress notes.", surface: "staff" },
-  { id: "nav.my-obligations", label: "My Compliance", route: "/dashboard/my-obligations", description: "Trainings, policies, and other items you still owe.", surface: "staff" },
+  { id: "nav.my-obligations", label: "Personnel file", route: "/dashboard/my-obligations", description: "Trainings, policies, and other items you still owe.", surface: "staff" },
   { id: "nav.my-historical-records", label: "Historical Records", route: "/dashboard/my-historical-records", description: "Past notes and timesheets brought over for you to review.", surface: "staff" },
   { id: "nav.my-time-corrections", label: "My Time Corrections", route: "/dashboard/my-time-corrections", description: "Correction requests you sent to a supervisor.", surface: "staff" },
   { id: "nav.ask-nectar", label: "Ask NECTAR", route: "/dashboard/ask-nectar", description: "Ask NECTAR a staff question about your shift, caseload, or a form.", surface: "staff" },
-  { id: "nav.courses", label: "My Obligations", route: "/dashboard/my-obligations", description: "Assigned trainings and forms — staff only complete what is already on My Obligations.", surface: "staff" },
+  { id: "nav.courses", label: "Personnel file", route: "/dashboard/my-obligations", description: "Assigned trainings and forms — staff only complete what is already on the personnel file.", surface: "staff" },
   { id: "nav.hive-training", label: "Training", route: "/dashboard/hive-training", description: "Admin class roster, locked seat prices, and Internal trainings (agency policy binder).", surface: "admin" },
 
   // Staff page CTAs

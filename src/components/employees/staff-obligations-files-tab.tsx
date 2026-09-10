@@ -175,7 +175,7 @@ export function StaffObligationsFilesTab({
 
   const openView = (row: FileRow) => {
     if (!row.evidencePath) {
-      toast.error("No file on this obligation yet.");
+      toast.error("No file on this item yet.");
       return;
     }
     setViewIds([row.instance.id]);
@@ -185,7 +185,7 @@ export function StaffObligationsFilesTab({
   const viewSelected = () => {
     const withFiles = selectedRows.filter((r) => r.evidencePath);
     if (!withFiles.length) {
-      toast.error("Select obligations that have a file on record.");
+      toast.error("Select items that have a file on record.");
       return;
     }
     setViewIds(withFiles.map((r) => r.instance.id));
@@ -195,7 +195,7 @@ export function StaffObligationsFilesTab({
   const printPack = async () => {
     const pack = (selectedRows.length ? selectedRows : rows).filter((r) => r.evidencePath);
     if (!pack.length) {
-      toast.error("Select obligations that have a file on record.");
+      toast.error("Select items that have a file on record.");
       return;
     }
     try {
@@ -217,7 +217,7 @@ export function StaffObligationsFilesTab({
         })
         .join("");
       win.document.write(
-        `<!doctype html><html><head><title>Obligation files</title></head><body>${body}</body></html>`,
+        `<!doctype html><html><head><title>Personnel file</title></head><body>${body}</body></html>`,
       );
       win.document.close();
       win.focus();
@@ -232,9 +232,9 @@ export function StaffObligationsFilesTab({
 
   const uploadMut = useMutation({
     mutationFn: async () => {
-      if (!targetInstance) throw new Error("Choose an obligation.");
+      if (!targetInstance) throw new Error("Choose a personnel file item.");
       if (attestationBlocked) {
-        throw new Error("This obligation requires the staff member to attest themselves.");
+        throw new Error("This item requires the staff member to attest themselves.");
       }
       if (!uploadFile) throw new Error("Choose a file to upload.");
       const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -256,7 +256,7 @@ export function StaffObligationsFilesTab({
       });
     },
     onSuccess: () => {
-      toast.success("Evidence saved to this obligation.");
+      toast.success("Evidence saved to this personnel file item.");
       setUploadOpen(false);
       setUploadFile(null);
       qc.invalidateQueries({ queryKey: ["staff-obligation-files", organizationId, staffId] });
@@ -267,12 +267,12 @@ export function StaffObligationsFilesTab({
   });
 
   if (listQ.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading obligations…</p>;
+    return <p className="text-sm text-muted-foreground">Loading personnel file…</p>;
   }
   if (listQ.error) {
     return (
       <p className="text-sm text-rose-700">
-        {listQ.error instanceof Error ? listQ.error.message : "Could not load obligations."}
+        {listQ.error instanceof Error ? listQ.error.message : "Could not load this personnel file."}
       </p>
     );
   }
@@ -295,7 +295,7 @@ export function StaffObligationsFilesTab({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No obligations assigned to this staff member.</p>
+        <p className="text-sm text-muted-foreground">Nothing on this personnel file yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
@@ -305,10 +305,10 @@ export function StaffObligationsFilesTab({
                   <Checkbox
                     checked={rows.length > 0 && selected.size === rows.length}
                     onCheckedChange={(v) => toggleAll(!!v)}
-                    aria-label="Select all obligations"
+                    aria-label="Select all personnel file items"
                   />
                 </th>
-                <th className="px-3 py-2 text-left">Obligation</th>
+                <th className="px-3 py-2 text-left">Item</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Due</th>
                 <th className="px-3 py-2 text-right"> </th>
@@ -360,15 +360,15 @@ export function StaffObligationsFilesTab({
           <DialogHeader>
             <DialogTitle>{targetInstance?.status === "on_file" ? "Replace evidence" : "Upload evidence"}</DialogTitle>
             <DialogDescription>
-              File attaches to this staff member’s existing obligation — the same record as the compliance matrix.
+              File attaches to this staff member’s existing personnel file item — the same record as the compliance matrix.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Obligation</Label>
+              <Label>Personnel file item</Label>
               <Select value={uploadInstanceId ?? ""} onValueChange={(v) => setUploadInstanceId(v || null)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose an obligation…" />
+                  <SelectValue placeholder="Choose an item…" />
                 </SelectTrigger>
                 <SelectContent>
                   {rows.map((r) => (
@@ -381,7 +381,7 @@ export function StaffObligationsFilesTab({
             </div>
             {attestationBlocked ? (
               <p className="text-sm text-amber-900">
-                This obligation requires the staff member to attest themselves. Evidence cannot be filed here.
+                This item requires the staff member to attest themselves. Evidence cannot be filed here.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -422,7 +422,7 @@ export function StaffObligationsFilesTab({
             ) : guessIsImage(viewing?.evidenceFilename ?? null) ? (
               <img src={viewUrl} alt="" className="max-h-[70vh] w-full object-contain" />
             ) : (
-              <iframe title="Obligation evidence" src={viewUrl} className="h-[70vh] w-full border-0" />
+              <iframe title="Personnel file evidence" src={viewUrl} className="h-[70vh] w-full border-0" />
             )}
           </div>
           <DialogFooter className="gap-2 sm:justify-between">

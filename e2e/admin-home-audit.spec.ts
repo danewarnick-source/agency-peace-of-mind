@@ -176,7 +176,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     page,
   }) => {
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
@@ -223,20 +223,20 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     page,
   }) => {
     await page.goto("/dashboard/my-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /My Obligations/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Personnel file/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Company requirements assigned to you/i)).toBeVisible();
+    await expect(page.getByText(/Discrete dues on your file/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
     await assertNoCrash(page, "my-obligations");
     await shot(page, "my-obligations");
 
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /My Obligations/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /Personnel file/i })).toHaveCount(0);
   });
 
   test("Command center and NECTAR focus banners do not error", async ({ page }) => {
@@ -338,9 +338,9 @@ test.describe("Permission wall — DSP vs admin", () => {
     await shot(page, "dsp-home");
 
     await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    const wall = page.getByText(/You do not have permission to view obligations/i);
+    const wall = page.getByText(/You do not have permission to view compliance/i);
     await expect(wall.last()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: /^Obligations$/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toHaveCount(0);
     await shot(page, "dsp-company-obligations-wall");
 
     await page.goto("/dashboard/command-center", { waitUntil: "domcontentloaded" });

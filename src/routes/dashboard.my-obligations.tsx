@@ -19,8 +19,12 @@ import {
 } from "@/lib/company-obligations.functions";
 import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
 import { toDisplayNameCase } from "@/lib/person-name";
-import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
+import {
+  dueLabel,
+  obligationFileStatus,
+  obligationFileStatusLabel,
+} from "@/lib/staff-obligation-files";
 import {
   IN_HIVE_COURSE_EVIDENCE,
   inHiveCourseIdForTitle,
@@ -44,7 +48,7 @@ import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
-  head: () => ({ meta: [{ title: "My obligations — Provider Interface" }] }),
+  head: () => ({ meta: [{ title: "Personnel file — Provider Interface" }] }),
   component: MyObligationsPage,
 });
 
@@ -259,15 +263,20 @@ function OpenCard({
     ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation =
     ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
+  const isThirtyDay = courseId === "thirty-day";
   const canSubmit =
-    ob.evidence_type === "form" ? true : (!needsUpload || !!file) && (!needsAttestation || checked);
+    ob.evidence_type === "form"
+      ? true
+      : isThirtyDay && file
+        ? true
+        : (!needsUpload || !!file) && (!needsAttestation || checked);
 
   const submit = async () => {
     setBusy(true);
     try {
       let uploadPath: string | null = null;
       let uploadFilename: string | null = null;
-      if (needsUpload && file) {
+      if ((needsUpload || isThirtyDay) && file) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${orgId}/${ob.id}/${instance.id}/${crypto.randomUUID()}-${safeName}`;
         const { error: upErr } = await supabase.storage
@@ -281,11 +290,11 @@ function OpenCard({
         data: {
           organizationId: orgId,
           instanceId: instance.id,
-          evidenceTypeUsed: ob.evidence_type,
+          evidenceTypeUsed: isThirtyDay && file ? "upload" : ob.evidence_type,
           uploadPath,
           uploadFilename,
-          attestationSignedAt: needsAttestation ? new Date().toISOString() : null,
-          attestationTextSnapshot: needsAttestation ? ob.attestation_text : null,
+          attestationSignedAt: needsAttestation && !isThirtyDay ? new Date().toISOString() : null,
+          attestationTextSnapshot: needsAttestation && !isThirtyDay ? ob.attestation_text : null,
           notes: notes.trim() || null,
         },
       });
@@ -356,9 +365,13 @@ function OpenCard({
             <p
               className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
             >
-              {due.overdue
-                ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`
-                : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}
+              {`${obligationFileStatusLabel(
+                obligationFileStatus({
+                  instanceStatus: instance.status,
+                  dueAt: instance.due_at,
+                  hasValidEvidence: false,
+                }),
+              )} — ${due.text}`}
             </p>
           ) : (
             <p className="mt-1 text-sm text-muted-foreground">
@@ -369,32 +382,73 @@ function OpenCard({
 
       <div className="mt-3 space-y-2">
         {courseId ? (
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-sm font-medium">In-platform course</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Open the course from here. Finish each topic, then pass the competency exam (80%,
-              three tries). Completing the exam greens this obligation.
-            </p>
-            {courseProgress && courseProgress.total > 0 ? (
-              <p className="mt-1 text-sm font-medium">
-                {staffCourseProgressLabel(courseProgress.completed, courseProgress.total)}
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <p className="text-sm font-medium">In-platform course</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Open the course from here. Finish each topic, then pass the competency exam (80%,
+                three tries). Completing the exam marks this same card On file.
               </p>
+              {courseProgress && courseProgress.total > 0 ? (
+                <p className="mt-1 text-sm font-medium">
+                  {staffCourseProgressLabel(courseProgress.completed, courseProgress.total)}
+                </p>
+              ) : null}
+              <Link
+                to="/dashboard/my-obligations/course/$instanceId"
+                params={{ instanceId: instance.id }}
+              >
+                <Button size="sm" className="mt-2 min-h-[44px]">
+                  {hasCourseProgress ? "Pick up where you left off" : "Open course"}
+                </Button>
+              </Link>
+            </div>
+            {courseId === "thirty-day" ? (
+              <div className="rounded-lg border border-dashed border-border p-3">
+                <p className="text-sm font-medium">Or upload a certificate</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  A certificate upload clears this same 30-day card. You do not need both.
+                </p>
+                <div className="mt-2 flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-3 py-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[44px] shrink-0 gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {file ? "Change file" : "Choose file"}
+                  </Button>
+                  <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    {file ? (
+                      <span className="block truncate text-foreground">{file.name}</span>
+                    ) : (
+                      <span>No file selected</span>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Button className="min-h-[44px]" disabled={!file || busy} onClick={submit}>
+                    {busy ? "Saving…" : "Save to this card"}
+                  </Button>
+                </div>
+              </div>
             ) : null}
-            <Link
-              to="/dashboard/my-obligations/course/$instanceId"
-              params={{ instanceId: instance.id }}
-            >
-              <Button size="sm" className="mt-2 min-h-[44px]">
-                {hasCourseProgress ? "Pick up where you left off" : "Open course"}
-              </Button>
-            </Link>
           </div>
         ) : formKind && instance.client_id ? (
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-sm font-medium">Form</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Open and complete this form from here. Your existing attestation is saved to this
-              obligation.
+              same card.
             </p>
             <Link
               to="/dashboard/client-training/$clientId"
@@ -433,7 +487,7 @@ function OpenCard({
               </p>
             )}
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Once you submit the form, this obligation will automatically close.
+              Once you submit the form, this card is marked On file.
             </p>
           </div>
         ) : (
@@ -674,7 +728,7 @@ function MyObligationsPage() {
     return m;
   }, [myCompletions]);
 
-  const [tab, setTab] = useState<"all" | "due_soon" | "overdue" | "completed">("all");
+  const [tab, setTab] = useState<"all" | "missing" | "due_soon" | "on_file">("all");
 
   // A completion whose NECTAR validation failed stays out of "Completed" —
   // the instance was never closed and an admin still needs to confirm it.
@@ -750,24 +804,33 @@ function MyObligationsPage() {
 
   const overlayDue = overlayOpen.filter((o) => !o.done);
   const overlayDone = overlayOpen.filter((o) => o.done);
-  const dueSoon = open.filter(
-    (i) => obligationIsRequired(i.obligation) && !dueLabel(i.due_at).overdue,
-  );
-  const overdue = open.filter(
-    (i) => obligationIsRequired(i.obligation) && dueLabel(i.due_at).overdue,
-  );
+  const fileStatusOf = (i: MyObligationInstanceRow) =>
+    obligationFileStatus({
+      instanceStatus: i.status,
+      dueAt: i.due_at,
+      hasValidEvidence: false,
+    });
+  const dueSoon = open.filter((i) => fileStatusOf(i) === "due_soon");
+  const missing = open.filter((i) => fileStatusOf(i) === "missing");
   const openCount = open.length + overlayDue.length;
-  const completedCount = completed.length + overlayDone.length;
+  const onFileCount = completed.length + overlayDone.length;
 
   const shown =
     tab === "all"
-      ? open
+      ? [...open, ...completed]
       : tab === "due_soon"
         ? dueSoon
-        : tab === "overdue"
-          ? overdue
+        : tab === "missing"
+          ? missing
           : completed;
-  const shownOverlay = tab === "completed" ? overlayDone : tab === "overdue" ? [] : overlayDue;
+  const shownOverlay =
+    tab === "on_file"
+      ? overlayDone
+      : tab === "due_soon"
+        ? []
+        : tab === "all"
+          ? [...overlayDue, ...overlayDone]
+          : overlayDue;
 
   const onCompleted = () => {
     qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
@@ -776,22 +839,26 @@ function MyObligationsPage() {
     qc.invalidateQueries({ queryKey: ["in-hive-progress"] });
   };
 
+  if (!user || !orgId) {
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+
   return (
     <div className="w-full space-y-6">
       <StaffPageHeader
-        eyebrow="Compliance"
+        eyebrow="Personnel file"
         eyebrowIcon={ClipboardList}
-        title="My Obligations"
-        subtitle="Company requirements assigned to you."
+        title="Personnel file"
+        subtitle="Discrete dues on your file — On file, Missing, or Due soon."
       />
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {(
           [
-            ["all", `All (${openCount})`],
-            ["due_soon", `Due soon (${dueSoon.length + overlayDue.length})`],
-            ["overdue", `Overdue (${overdue.length})`],
-            ["completed", `Completed (${completedCount})`],
+            ["all", `All (${openCount + onFileCount})`],
+            ["missing", `Missing (${missing.length + overlayDue.length})`],
+            ["due_soon", `Due soon (${dueSoon.length})`],
+            ["on_file", `On file (${onFileCount})`],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -817,13 +884,13 @@ function MyObligationsPage() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : instances.length === 0 && overlayOpen.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No obligations assigned yet. Check with your administrator.
+          Nothing on your personnel file yet. Check with your administrator.
         </div>
       ) : shown.length === 0 && shownOverlay.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           {unlinkedFormCount > 0 ? (
             "No duties you can complete yet."
-          ) : tab === "completed" && thirtyDayOpen ? (
+          ) : tab === "on_file" && thirtyDayOpen ? (
             <div className="space-y-3">
               <p>
                 {staffCompletedTabEmptyCopy({
@@ -863,7 +930,7 @@ function MyObligationsPage() {
                 !!inst.client_id &&
                 formDoneByClientKind.has(`${inst.client_id}:${formKind}`);
               if (
-                tab === "completed" ||
+                tab === "on_file" ||
                 inst.status === "completed" ||
                 inst.status === "waived" ||
                 formAlreadyDone ||
@@ -890,7 +957,7 @@ function MyObligationsPage() {
 
             // Group scope='staff_per_client' instances (e.g. multiple
             // client-specific trainings) by client name so staff see all
-            // their per-client obligations for one client together.
+            // their per-client cards for one client together.
             type Group = {
               key: string;
               clientLabel: string | null;

@@ -124,7 +124,7 @@ export function HeroPhone({ className = "" }: { className?: string }) {
             { icon: CalendarDays, label: "Schedule", on: false },
             { icon: ClipboardCheck, label: "Daily Logs", on: false },
             { icon: Sparkles, label: "Ask Nectar", on: false },
-            { icon: ClipboardList, label: "Obligations", on: false },
+            { icon: ClipboardList, label: "Personnel", on: false },
             { icon: GraduationCap, label: "Trainings", on: false },
           ].map(({ icon: Icon, label, on }) => (
             <div

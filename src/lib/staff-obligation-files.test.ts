@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   hasValidObligationEvidence,
+  dueLabel,
   liveObligationTitle,
   obligationFileStatus,
   obligationFileStatusLabel,
@@ -112,17 +113,27 @@ describe("liveObligationTitle", () => {
   });
 });
 
+describe("dueLabel", () => {
+  it("labels past dues as Missing, not Overdue", () => {
+    const label = dueLabel("2026-09-01T00:00:00.000Z", now);
+    assert.equal(label.overdue, true);
+    assert.match(label.text, /Missing/);
+    assert.doesNotMatch(label.text, /Overdue/);
+  });
+});
+
 describe("Admin employee profile lock", () => {
   it("keeps only the four tabs and drops junk surfaces", () => {
     const src = readFileSync(
       new URL("../routes/dashboard.employees.$staffId.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(src, /Obligations & files/);
+    assert.match(src, /Personnel file/);
     assert.match(src, /value="profile"/);
-    assert.match(src, /value="obligations"/);
+    assert.match(src, /value="personnel"/);
     assert.match(src, /value="permissions"/);
     assert.match(src, /value="activity"/);
+    assert.doesNotMatch(src, /Obligations & files/);
     assert.doesNotMatch(src, /Document Vault/);
     assert.doesNotMatch(src, /Staff record/);
     assert.doesNotMatch(src, /Suggested CE/);
@@ -134,5 +145,27 @@ describe("Admin employee profile lock", () => {
     assert.doesNotMatch(src, /Have/);
     assert.doesNotMatch(src, /CustomAttributesSection/);
     assert.doesNotMatch(src, /LifecyclePanel/);
+  });
+});
+
+describe("Staff personnel file page lock", () => {
+  it("renames the staff surface and keeps 30-day course or upload on one card", () => {
+    const src = readFileSync(
+      new URL("../routes/dashboard.my-obligations.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(src, /title="Personnel file"/);
+    assert.match(src, /Or upload a certificate/);
+    assert.match(src, /A certificate upload clears this same 30-day card/);
+    assert.doesNotMatch(src, /title="My Obligations"/);
+    assert.doesNotMatch(src, /My Compliance/);
+  });
+
+  it("does not assign an all-staff driving_record baseline", () => {
+    const src = readFileSync(
+      new URL("./staff-training-requirements.ts", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(src, /key: "driving_record"/);
   });
 });

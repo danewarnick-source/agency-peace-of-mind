@@ -8,6 +8,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { requirePermission } from "@/lib/require-permission";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ALL_PERMISSIONS, PERMISSION_LABEL, type Permission } from "@/lib/rbac";
+import { planStaffPermissionWrites } from "@/lib/staff-permission-toggles";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -38,7 +39,7 @@ async function fetchName(supabase: AnySupabase, userId: string): Promise<string>
   return data?.full_name ?? "Unknown";
 }
 
-async function writeAuditLog(entry: {
+type PermissionAuditEntry = {
   organizationId: string;
   changedByUserId: string;
   changedByName: string;
@@ -55,8 +56,10 @@ async function writeAuditLog(entry: {
   previousValue?: boolean | null;
   newValue?: boolean | null;
   reason?: string | null;
-}): Promise<void> {
-  await supabaseAdmin.from("permission_audit_log").insert({
+};
+
+function auditRow(entry: PermissionAuditEntry) {
+  return {
     organization_id: entry.organizationId,
     changed_by_user_id: entry.changedByUserId,
     changed_by_name: entry.changedByName,
@@ -68,7 +71,17 @@ async function writeAuditLog(entry: {
     previous_value: entry.previousValue ?? null,
     new_value: entry.newValue ?? null,
     reason: entry.reason ?? null,
-  });
+  };
+}
+
+async function writeAuditLogs(entries: PermissionAuditEntry[]): Promise<void> {
+  if (!entries.length) return;
+  const { error } = await supabaseAdmin.from("permission_audit_log").insert(entries.map(auditRow));
+  if (error) throw new Error(error.message);
+}
+
+async function writeAuditLog(entry: PermissionAuditEntry): Promise<void> {
+  await writeAuditLogs([entry]);
 }
 
 // ─── setRolePermission ──────────────────────────────────────────────────
@@ -293,6 +306,10 @@ const PROFILE_OVERRIDE_REASON = "Set from employee profile";
 /**
  * Persist per-person permission toggles. Matching the role default removes
  * the override; differing from it writes an individual grant/deny.
+ *
+ * Writes are planned in memory and applied as one select + batched
+ * upsert/delete/audit. Do not restore a per-toggle DB loop — that path
+ * 504'd behind CloudFront on live (Reese #283 E2E).
  */
 export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -301,7 +318,9 @@ export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
       .object({
         organizationId: z.string().uuid(),
         targetUserId: z.string().uuid(),
-        toggles: z.array(z.object({ permission: PermissionEnum, granted: z.boolean() })),
+        toggles: z
+          .array(z.object({ permission: PermissionEnum, granted: z.boolean() }))
+          .max(ALL_PERMISSIONS.length),
       })
       .parse(i),
   )
@@ -327,72 +346,87 @@ export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
       (roleRows ?? []).map((r: { permission: string; enabled: boolean }) => [r.permission, !!r.enabled]),
     );
 
+    const { data: existingRows, error: existingErr } = await supabase
+      .from("user_permission_overrides")
+      .select("permission, granted")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", data.targetUserId);
+    if (existingErr) throw new Error(existingErr.message);
+
+    const existingGranted = new Map<string, boolean>(
+      (existingRows ?? []).map((r: { permission: string; granted: boolean }) => [r.permission, !!r.granted]),
+    );
+    const plan = planStaffPermissionWrites({
+      toggles: data.toggles,
+      roleGranted,
+      existingGranted,
+    });
+
+    if (!plan.upserts.length && !plan.deletes.length) {
+      return { success: true, changed: 0 };
+    }
+
     const changedByName = await fetchName(supabase, userId);
     const targetName = await fetchName(supabase, data.targetUserId);
 
-    for (const toggle of data.toggles) {
-      const matchesRole = (roleGranted.get(toggle.permission) ?? false) === toggle.granted;
-      const { data: existing } = await supabase
+    if (plan.deletes.length) {
+      const { error } = await supabase
         .from("user_permission_overrides")
-        .select("granted")
+        .delete()
         .eq("organization_id", data.organizationId)
         .eq("user_id", data.targetUserId)
-        .eq("permission", toggle.permission)
-        .maybeSingle();
+        .in(
+          "permission",
+          plan.deletes.map((d) => d.permission),
+        );
+      if (error) throw new Error(error.message);
+    }
 
-      if (matchesRole) {
-        if (!existing) continue;
-        const { error } = await supabase
-          .from("user_permission_overrides")
-          .delete()
-          .eq("organization_id", data.organizationId)
-          .eq("user_id", data.targetUserId)
-          .eq("permission", toggle.permission);
-        if (error) throw new Error(error.message);
-        await writeAuditLog({
-          organizationId: data.organizationId,
-          changedByUserId: userId,
-          changedByName,
-          changeType: "individual_override_removed",
-          targetUserId: data.targetUserId,
-          targetUserName: targetName,
-          permission: toggle.permission,
-          previousValue: existing.granted ?? null,
-          newValue: null,
-          reason: PROFILE_OVERRIDE_REASON,
-        });
-        continue;
-      }
-
+    if (plan.upserts.length) {
       const { error } = await supabase.from("user_permission_overrides").upsert(
-        {
+        plan.upserts.map((u) => ({
           organization_id: data.organizationId,
           user_id: data.targetUserId,
-          permission: toggle.permission,
-          granted: toggle.granted,
+          permission: u.permission,
+          granted: u.granted,
           granted_by: userId,
           granted_by_name: changedByName,
           reason: PROFILE_OVERRIDE_REASON,
           expires_at: null,
-        },
+        })),
         { onConflict: "organization_id,user_id,permission" },
       );
       if (error) throw new Error(error.message);
-      await writeAuditLog({
+    }
+
+    await writeAuditLogs([
+      ...plan.deletes.map((d) => ({
         organizationId: data.organizationId,
         changedByUserId: userId,
         changedByName,
-        changeType: toggle.granted ? "individual_override_granted" : "individual_override_denied",
+        changeType: "individual_override_removed" as const,
         targetUserId: data.targetUserId,
         targetUserName: targetName,
-        permission: toggle.permission,
-        previousValue: existing?.granted ?? null,
-        newValue: toggle.granted,
+        permission: d.permission,
+        previousValue: d.previousValue,
+        newValue: null,
         reason: PROFILE_OVERRIDE_REASON,
-      });
-    }
+      })),
+      ...plan.upserts.map((u) => ({
+        organizationId: data.organizationId,
+        changedByUserId: userId,
+        changedByName,
+        changeType: u.changeType,
+        targetUserId: data.targetUserId,
+        targetUserName: targetName,
+        permission: u.permission,
+        previousValue: u.previousValue,
+        newValue: u.granted,
+        reason: PROFILE_OVERRIDE_REASON,
+      })),
+    ]);
 
-    return { success: true };
+    return { success: true, changed: plan.upserts.length + plan.deletes.length };
   });
 
 /** Remove every individual override so the staffer falls back to role defaults. */
@@ -424,21 +458,23 @@ export const resetStaffPermissionOverrides = createServerFn({ method: "POST" })
       .eq("user_id", data.targetUserId);
     if (error) throw new Error(error.message);
 
-    const changedByName = await fetchName(supabase, userId);
-    const targetName = await fetchName(supabase, data.targetUserId);
-    for (const row of existing ?? []) {
-      await writeAuditLog({
-        organizationId: data.organizationId,
-        changedByUserId: userId,
-        changedByName,
-        changeType: "individual_override_removed",
-        targetUserId: data.targetUserId,
-        targetUserName: targetName,
-        permission: row.permission,
-        previousValue: row.granted ?? null,
-        newValue: null,
-        reason: "Reset to role defaults",
-      });
+    if (existing?.length) {
+      const changedByName = await fetchName(supabase, userId);
+      const targetName = await fetchName(supabase, data.targetUserId);
+      await writeAuditLogs(
+        existing.map((row: { permission: string; granted: boolean }) => ({
+          organizationId: data.organizationId,
+          changedByUserId: userId,
+          changedByName,
+          changeType: "individual_override_removed" as const,
+          targetUserId: data.targetUserId,
+          targetUserName: targetName,
+          permission: row.permission,
+          previousValue: row.granted ?? null,
+          newValue: null,
+          reason: "Reset to role defaults",
+        })),
+      );
     }
 
     return { success: true };

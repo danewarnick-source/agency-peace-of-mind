@@ -18,6 +18,7 @@ import {
   resetStaffPermissionOverrides,
   saveStaffPermissionToggles,
 } from "@/lib/permissions.functions";
+import { staffPermissionMutationErrorMessage } from "@/lib/staff-permission-toggles";
 
 export function StaffPermissionsTab({
   organizationId,
@@ -58,14 +59,19 @@ export function StaffPermissionsTab({
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (!effective) throw new Error("Permissions are still loading");
+      const toggles = ALL_PERMISSIONS.filter(
+        (permission) => draft[permission] !== !!effective.resolved[permission]?.granted,
+      ).map((permission) => ({
+        permission,
+        granted: !!draft[permission],
+      }));
+      if (!toggles.length) return;
       await saveFn({
         data: {
           organizationId,
           targetUserId: staffId,
-          toggles: ALL_PERMISSIONS.map((permission) => ({
-            permission,
-            granted: !!draft[permission],
-          })),
+          toggles,
         },
       });
     },
@@ -73,7 +79,8 @@ export function StaffPermissionsTab({
       toast.success("Permissions saved");
       qc.invalidateQueries({ queryKey: ["effective-permissions", organizationId, staffId] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not save permissions"),
+    onError: (e) =>
+      toast.error(staffPermissionMutationErrorMessage(e, "Could not save permissions")),
   });
 
   const resetMut = useMutation({
@@ -84,7 +91,8 @@ export function StaffPermissionsTab({
       toast.success("Reset to role defaults");
       qc.invalidateQueries({ queryKey: ["effective-permissions", organizationId, staffId] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not reset permissions"),
+    onError: (e) =>
+      toast.error(staffPermissionMutationErrorMessage(e, "Could not reset permissions")),
   });
 
   if (isLoading || !effective) {

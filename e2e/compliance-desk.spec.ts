@@ -69,14 +69,14 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     await shot(page, "01-pending-review");
   });
 
-  test("header CTAs: Utah CSV dialog opens (no submit), Master Ledger present, Company obligations navigates", async ({
+  test("header CTAs: Utah CSV dialog opens (no submit), Master Ledger present, Agency documents navigates", async ({
     page,
   }) => {
     await openDesk(page);
 
     await expect(page.getByRole("button", { name: /Export Utah DHHS EVV CSV/i }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Export Master Agency Ledger CSV/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Company obligations/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Agency documents/i })).toBeVisible();
 
     await page.getByRole("button", { name: /Export Utah DHHS EVV CSV/i }).first().click();
     const utahDialog = page.getByRole("dialog").filter({ hasText: /Export Utah DHHS EVV CSV/i });
@@ -88,8 +88,8 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     });
     await expect(utahDialog).toHaveCount(0);
 
-    await page.getByRole("button", { name: /Company obligations/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
+    await page.getByRole("button", { name: /Agency documents/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/agency-documents/, { timeout: 15_000 });
   });
 
   test("Pending Review: EVV vs non-EVV tables, expand, GPS map, geofence reason, approve present, edit dialog (no save)", async ({

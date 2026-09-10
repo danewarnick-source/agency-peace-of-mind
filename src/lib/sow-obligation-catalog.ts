@@ -942,6 +942,83 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     evidence_standard:
       "DSPD Google Form submission (persons served, community-setting stability %, QI activities).",
   },
+  {
+    title: "Utah Department of Commerce — Entity Standing",
+    citation: "Practice Audit — agency standing",
+    category: "licensing",
+    fulfillment: "external",
+    fulfillment_note:
+      "Issued by the Utah Department of Commerce. Upload current entity-standing proof. There is no SOW anniversary.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current Utah Department of Commerce entity standing.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "DHHS Code of Conduct — Posted",
+    citation: "CST 76",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Site posting of the DHHS Code of Conduct. Separate from the signed staff copy on the personnel file.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Photo or attestation that the current DHHS Code of Conduct is posted.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Business Associate Agreements — On File",
+    citation: "HIPAA — BAA",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Vendor BAAs for PHI. This is not the Provider Interface signup BAA.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current BAAs for vendors that handle PHI.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Large-Loan Disclosure Process",
+    citation: "DHHS91172 SOW §1.28(7)(G)",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written disclosure process for contractor-to-Person loans of $2,000 or more. Live loan records stay in Client loans.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Written large-loan disclosure process.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Incident Reporting Process",
+    citation: "DHHS91172 SOW §1.27",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written incident reporting process. Live incident records stay in Incidents.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Written incident reporting process.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "HIPAA Notice of Privacy Practices",
+    citation: "HIPAA — NPP",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note: "Keep the current Notice of Privacy Practices on file.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current HIPAA Notice of Privacy Practices.",
+    calendar_is_reminder_only: true,
+  },
 ];
 
 const BY_TITLE = new Map(SOW_ENTRIES.map((e) => [e.title, e]));

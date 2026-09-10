@@ -65,16 +65,16 @@ const BASE_WEIGHTS: Record<HealthMetricKey, number> = {
 };
 
 const LINKS: Record<HealthMetricKey, string> = {
-  staff_obligations: "/dashboard/company-obligations",
+  staff_obligations: "/dashboard/personnel-file",
   evv_documentation: "/dashboard/compliance-desk",
   daily_progress_notes: "/dashboard/hub/documentation",
   medication_records: "/dashboard/hub/documentation?tab=medications",
   incident_documentation: "/dashboard/hub/documentation?tab=incidents",
-  upi_attestations: "/dashboard/company-obligations?tab=action-required",
+  upi_attestations: "/dashboard/summaries",
   hrc_documentation: "/dashboard/hub/documentation?tab=hrc",
   behavior_support: "/dashboard/hub/documentation?tab=behavior",
   client_record_completeness: "/dashboard/hub/clients",
-  client_specific_training: "/dashboard/company-obligations",
+  client_specific_training: "/dashboard/personnel-file",
   policy_acknowledgments: "/dashboard/settings",
   hhs_host_home: "/dashboard/hub/documentation?tab=hhs",
   billing_accuracy: "/dashboard/hub/documentation?tab=billing",

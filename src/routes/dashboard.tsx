@@ -295,7 +295,7 @@ const ADMIN_NAV: NavItem[] = [
     feature: "pcsp",
   },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
+  { to: "/dashboard/agency-documents", label: "Agency documents", icon: FolderArchive },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   {
     to: "/dashboard/hub/finances",
@@ -1433,7 +1433,7 @@ function SidebarBody({
                   className="h-4 w-4"
                 />
                 <span className="flex-1">{item.label}</span>
-                {item.to === "/dashboard/company-obligations" &&
+                {item.to === "/dashboard/personnel-file" &&
                   !complianceQueueLoading &&
                   complianceActionCount > 0 && (
                     <span

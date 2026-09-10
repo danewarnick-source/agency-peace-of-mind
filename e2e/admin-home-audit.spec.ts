@@ -172,51 +172,36 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await shot(page, "admin-home-cta-staff");
   });
 
-  test("Company obligations pack grid: locked tabs, staff rows, green/red cells", async ({
+  test("Agency documents: flags, encoded cards, Company policies sub-tab", async ({
     page,
   }) => {
-    await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toBeVisible({
+    await page.goto("/dashboard/agency-documents", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /^Agency documents$/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Credentials/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Client/i })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Company policies/i })).toBeVisible();
+    await expect(page.getByText(/Insurance/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/COI policy/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
+    await assertNoCrash(page, "agency documents");
+    await shot(page, "agency-documents");
 
-    await expect(page.getByText(/Code of Conduct/i).first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Jordan Lee/i).first()).toBeVisible();
-
-    await page.getByRole("button", { name: /Credentials/i }).click();
-    await expect(page.getByText(/CPR \/ First Aid|30-day orientation/i).first()).toBeVisible({
+    await page.getByRole("tab", { name: /Company policies/i }).click();
+    await expect(page.getByRole("heading", { name: /^Company policies$/i })).toBeVisible({
       timeout: 10_000,
     });
-
-    await page.getByRole("button", { name: /^Client$/i }).click();
-    await expect(page.getByText(/Client-specific training/i).first()).toBeVisible({
-      timeout: 10_000,
-    });
-
-    const search = page.getByPlaceholder(/search staff/i);
-    if (await search.isVisible().catch(() => false)) {
-      await search.fill("Jordan");
-      await expect(page.getByText(/Jordan Lee/i).first()).toBeVisible();
-      await search.fill("");
-    }
-
-    await expect(page.getByRole("button", { name: /Add pack/i })).toBeVisible();
-    await assertNoCrash(page, "company obligations");
-    await shot(page, "company-obligations");
+    await expect(page.getByRole("button", { name: /Template: Cell phone use/i })).toBeVisible();
+    await shot(page, "company-policies");
   });
 
-  test("Deadlines route lands on Action Required without crashing", async ({ page }) => {
+  test("Deadlines route lands on Personnel file without crashing", async ({ page }) => {
     await page.goto("/dashboard/deadlines", { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
-    await expect(page.url()).toMatch(/tab=action-required/);
-    await expect(page.getByRole("tab", { name: /Action Required/i })).toBeVisible({
+    await expect(page).toHaveURL(/\/dashboard\/personnel-file/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Personnel file/i })).toBeVisible({
       timeout: 15_000,
     });
     await assertNoCrash(page, "deadlines redirect");
-    await shot(page, "deadlines-action-required");
+    await shot(page, "deadlines-personnel-file");
   });
 
   test("My obligations is a different staff page; admin still sees company register", async ({
@@ -231,12 +216,12 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await assertNoCrash(page, "my-obligations");
     await shot(page, "my-obligations");
 
-    await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toBeVisible({
+    await page.goto("/dashboard/agency-documents", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /^Agency documents$/i })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole("button", { name: /Onboarding/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Personnel file/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^Personnel file$/i })).toHaveCount(0);
   });
 
   test("Command center and NECTAR focus banners do not error", async ({ page }) => {
@@ -334,13 +319,13 @@ test.describe("Permission wall — DSP vs admin", () => {
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^Compliance$/ })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^Agency documents$/ })).toHaveCount(0);
     await shot(page, "dsp-home");
 
-    await page.goto("/dashboard/company-obligations", { waitUntil: "domcontentloaded" });
-    const wall = page.getByText(/You do not have permission to view compliance/i);
+    await page.goto("/dashboard/agency-documents", { waitUntil: "domcontentloaded" });
+    const wall = page.getByText(/You do not have permission to view agency documents/i);
     await expect(wall.last()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: /^Compliance$/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^Agency documents$/i })).toHaveCount(0);
     await shot(page, "dsp-company-obligations-wall");
 
     await page.goto("/dashboard/command-center", { waitUntil: "domcontentloaded" });

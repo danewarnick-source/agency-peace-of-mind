@@ -838,6 +838,9 @@ function serverFnName(url: string, postText: string): string | null {
     "attachExistingToPack",
     "deleteCustomPack",
     "listCompanyObligations",
+    "listAgencyDocuments",
+    "listAgencyPolicies",
+    "listPolicyJobCodeOptions",
     "listDeadlineObligationInstances",
     "listMyObligationInstances",
     "getMyEntitlements",
@@ -1121,6 +1124,45 @@ function serverFnResult(
       return { ok: true, obligationId: OB_CONDUCT_ID };
     case "listCompanyObligations":
       return fx.obligations;
+    case "listAgencyDocuments":
+      return {
+        cards: [
+          {
+            key: "insurance",
+            title: "Insurance",
+            layer: "flag",
+            status: "missing",
+            dueAt: null,
+            obligationId: null,
+            instanceId: null,
+            evidencePath: null,
+            evidenceFilename: null,
+            evidenceType: "upload",
+            attestationText: null,
+            coreSeedNeeded: true,
+          },
+          {
+            key: "coi",
+            title: "COI policy",
+            layer: "encoded",
+            status: "missing",
+            dueAt: null,
+            obligationId: null,
+            instanceId: null,
+            evidencePath: null,
+            evidenceFilename: null,
+            evidenceType: "upload",
+            attestationText: null,
+            coreSeedNeeded: false,
+          },
+        ],
+        counts: { missing: 2, due_soon: 0, on_file: 0 },
+        codes: ["HHS", "SLN"],
+      };
+    case "listAgencyPolicies":
+      return [];
+    case "listPolicyJobCodeOptions":
+      return [];
     case "listDeadlineObligationInstances":
       return deadlineItems(fx);
     case "listMyObligationInstances":

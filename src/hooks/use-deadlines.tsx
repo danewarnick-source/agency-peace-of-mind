@@ -70,10 +70,13 @@ function fmtMonth(yyyyMm: string): string {
   return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
 }
 
-/** Admin always lands on the register card. Staff go fill a form or My Compliance. */
+/** Admin lands on Agency documents for org duties, Personnel file for staff dues. */
 export function obligationHref(row: DeadlineObligationItem, isAdminRole: boolean): string {
   if (isAdminRole) {
-    return `/dashboard/company-obligations?obligation=${row.obligation_id}`;
+    if (row.scope === "org") {
+      return `/dashboard/agency-documents`;
+    }
+    return `/dashboard/personnel-file`;
   }
   if (row.evidence_type === "form" && row.linked_form_id) {
     return `/dashboard/forms/${row.linked_form_id}/fill?obligation_instance=${row.instance_id}`;

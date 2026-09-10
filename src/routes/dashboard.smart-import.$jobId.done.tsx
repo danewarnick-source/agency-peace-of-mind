@@ -19,9 +19,7 @@ import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-histo
 import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
 import { SetupChecklist } from "@/components/clients/setup-checklist";
 import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
-import { EmployeeInviteSummary } from "@/components/smart-import/employee-invite-summary";
 import { employeeSmartImportRedirect } from "@/lib/employee-smart-import-block";
-import { useCurrentOrg } from "@/hooks/use-org";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
@@ -49,7 +47,6 @@ function describeUndo(r: unknown): string {
 function DonePage() {
   const { jobId } = Route.useParams();
   const navigate = useNavigate();
-  const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const search = (typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null);
   // TanStack's typed search serializes "1" as the JSON string `"1"`, so the
@@ -254,9 +251,8 @@ function DonePage() {
             </Button>
           )}
           <Button asChild variant="outline">
-            <Link to={job.mode === "client" ? "/dashboard/clients" : "/dashboard/employees"}>
-
-              <Users className="mr-2 h-4 w-4" /> Open {job.mode === "client" ? "clients" : "employees"}
+            <Link to="/dashboard/clients">
+              <Users className="mr-2 h-4 w-4" /> Open clients
             </Link>
           </Button>
           <Button onClick={() => navigate({ to: "/dashboard/smart-import" })}>
@@ -270,13 +266,6 @@ function DonePage() {
         </div>
       </div>
 
-
-      {job.mode === "employee" && q.data.invite_summary && (
-        <EmployeeInviteSummary
-          organizationId={org?.organization_id ?? null}
-          summary={q.data.invite_summary}
-        />
-      )}
 
       {/* Readiness / gap readout per subject */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -307,13 +296,7 @@ function DonePage() {
                     ) : (
                       <Badge variant="outline" className="text-amber-600">not committed</Badge>
                     )}
-                    {s.subject_type === "employee" && s.staff_training ? (
-                      <span className="text-muted-foreground">
-                        {s.staff_training.required} required · {s.staff_training.conditional_active} conditional active · {s.staff_training.decisions_needed} decisions needed
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
-                    )}
+                    <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
                   </div>
                 </div>
                 {s.gaps.length > 0 && (
@@ -334,23 +317,12 @@ function DonePage() {
                 )}
                 {s.record_id && (
                   <div className="mt-2 text-xs">
-                    {s.subject_type === "employee" ? (
-                      <Link
-                        to="/dashboard/employees/$staffId"
-                        params={{ staffId: s.record_id }}
-                        search={{ tab: "record" }}
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        Review <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    ) : (
-                      <Link
-                        to="/dashboard/clients"
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        Open profile <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    )}
+                    <Link
+                      to="/dashboard/clients"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      Open profile <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </div>
                 )}
                 {s.record_id && s.subject_type === "client" && s.committed && (

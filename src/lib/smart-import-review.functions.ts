@@ -635,57 +635,6 @@ export const setSubjectReady = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- Cert document: upload (sets Verified) or admin sign-off (Provisional) ----------
-const UpsertCert = z.object({
-  subjectId: z.string().uuid(),
-  cert_key: z.string().min(1).max(120),
-  storage_path: z.string().optional(),
-  file_name: z.string().optional(),
-  expiry_date: z.string().optional(), // ISO date
-  state: z.enum(["unverified", "verified", "provisional"]),
-  notes: z.string().max(500).optional(),
-});
-export const upsertCertDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => UpsertCert.parse(i))
-  .handler(async ({ data, context }) => {
-    if (!context.supabase || !context.userId) return { ok: false };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = context.supabase as any;
-    const { data: subj } = await sb.from("import_subjects").select("import_job_id, org_id").eq("id", data.subjectId).single();
-    if (!subj) throw new Error("Subject not found");
-
-    const { data: existing } = await sb.from("import_cert_documents")
-      .select("id").eq("import_subject_id", data.subjectId).eq("cert_key", data.cert_key).maybeSingle();
-
-    const row = {
-      import_job_id: subj.import_job_id,
-      import_subject_id: data.subjectId,
-      org_id: subj.org_id,
-      cert_key: data.cert_key,
-      state: data.state,
-      storage_path: data.storage_path ?? null,
-      file_name: data.file_name ?? null,
-      expiry_date: data.expiry_date ?? null,
-      notes: data.notes ?? null,
-      signed_off_by: data.state === "provisional" ? context.userId : null,
-      signed_off_at: data.state === "provisional" ? new Date().toISOString() : null,
-    };
-    if (existing) await sb.from("import_cert_documents").update(row).eq("id", existing.id);
-    else await sb.from("import_cert_documents").insert(row);
-
-    await sb.from("import_audit").insert({
-      import_job_id: subj.import_job_id,
-      org_id: subj.org_id,
-      subject_id: data.subjectId,
-      item: `Cert ${data.cert_key} → ${data.state}`,
-      traces_to: data.state === "verified" ? "source" : "admin_override",
-      actor: context.userId,
-      action: "cert_update",
-    });
-    return { ok: true };
-  });
-
 // ---------- Answer a NECTAR question ----------
 const AnswerQ = z.object({ questionId: z.string().uuid(), answer: z.string().max(2000) });
 export const answerNectarQuestion = createServerFn({ method: "POST" })

@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, Upload, ShieldCheck,
+  ArrowLeft, CheckCircle2, AlertTriangle, Sparkles, ShieldCheck,
   UserCheck, FilePlus, FileQuestion, Pencil, Loader2, Users, ChevronRight,
   Link2, Inbox, Info, Send,
 } from "lucide-react";
@@ -16,12 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
-  setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
+  setSubjectReady, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, submitForSetup,
   saveBillingCodeRow, saveManualReviewRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
@@ -92,8 +91,6 @@ const CLIENT_FIELDS = [
   "bsp_status","plan_year","disability_category","staff_ratio","housing_voucher","preferred_living","preferred_activities","roommates","personal_belongings_inventory",
   "pcsp_goal","client_medication","pcsp_has_medications",
 ];
-const EMPLOYEE_FIELDS = ["full_name","first_name","last_name","email","phone","position","hire_date","team_name"];
-
 type SubjectRow = {
   id: string; display_name: string; subject_type: "client" | "employee";
   match_status: "new" | "matched_existing" | "ambiguous";
@@ -635,11 +632,11 @@ function SubjectReview({
   if (q.isLoading) return <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading…</div>;
   if (q.isError || !q.data) return <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">Failed to load subject.</div>;
 
-  const { subject, fields, unfiled, certs, questions, matched } = q.data;
+  const { subject, fields, unfiled, questions, matched } = q.data;
   const tenant = (q.data as { tenant?: { codesHeld: string[]; names: string[] } }).tenant ?? { codesHeld: [], names: [] };
   const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[]; overrides?: Record<string, boolean> } }).validation;
   const mergeFlags = (q.data as { mergeFlags?: Array<Record<string, string | number | boolean | null>> }).mergeFlags ?? [];
-  const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
+  const targetFields = CLIENT_FIELDS;
   const canMarkReady = !validation || validation.ok;
 
   const askCount = (questions as Array<{ answer: string | null }>).filter((qq) => !qq.answer).length;
@@ -650,23 +647,16 @@ function SubjectReview({
     (i) => !validationOverrides[i.key] && !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
   );
   const issueCount = visibleIssues.length;
-  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = jobMode === "client"
-    ? [
-        { id: "person", label: "Person & contacts" },
-        { id: "health", label: "Health & medical" },
-        { id: "medications", label: "Medications / MAR" },
-        { id: "goals", label: "PCSP goals" },
-        { id: "services", label: "Services" },
-        { id: "plan", label: "Unmatched notes", badge: extraCount || undefined },
-        { id: "staff", label: "Staff & training" },
-        { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
-      ]
-    : [
-        { id: "person", label: "Person & contacts" },
-        { id: "services", label: "Role & team" },
-        { id: "staff", label: "Certs & training" },
-        { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
-      ];
+  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
+    { id: "person", label: "Person & contacts" },
+    { id: "health", label: "Health & medical" },
+    { id: "medications", label: "Medications / MAR" },
+    { id: "goals", label: "PCSP goals" },
+    { id: "services", label: "Services" },
+    { id: "plan", label: "Unmatched notes", badge: extraCount || undefined },
+    { id: "staff", label: "Staff & training" },
+    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+  ];
   const activeIdx = steps.findIndex((s) => s.id === step);
 
   return (
@@ -702,7 +692,6 @@ function SubjectReview({
         matched={matched}
         decision={subject.review_decision}
         tenant={tenant}
-        certs={certs}
         questions={questions}
         unfiled={unfiled}
         jobId={jobId}
@@ -725,8 +714,8 @@ function SubjectReview({
 
 // ---------------------------- SubjectWizard ----------------------------
 // Presentational wrapper: groups existing review panels into a guided
-// step rail. Reuses every existing piece (PlacementLineup, CertsPanel,
-// QuestionsPanel, UnfiledPanel, ProvisioningPanel) — no new server fns,
+// step rail. Reuses every existing piece (PlacementLineup, QuestionsPanel,
+// UnfiledPanel, ProvisioningPanel) — no new server fns,
 // no rebuilt fields, no separate commit path.
 const PERSON_FIELDS_SET = new Set([
   "first_name","last_name","full_name","date_of_birth","phone","address","mailing_address","medicaid_id",
@@ -751,7 +740,7 @@ type WizardStepId = "person" | "health" | "medications" | "goals" | "services" |
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
-  certs, questions, unfiled, jobId, subjects, assignments, step, setStep, steps, onChanged,
+  questions, unfiled, jobId, subjects, assignments, step, setStep, steps, onChanged,
   commit, commitPending, commitDisabled, commitReason,
 }: {
   subjectId: string;
@@ -761,7 +750,6 @@ function SubjectWizard({
   matched: Record<string, string | null> | null;
   decision: SubjectRow["review_decision"];
   tenant: TenantIdentity;
-  certs: Array<{ id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null }>;
   questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
   unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
   jobId: string;
@@ -839,16 +827,12 @@ function SubjectWizard({
         </div>
       )}
       {step === "staff" && (
-        jobMode === "employee" ? (
-          <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
-        ) : (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
-              Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
-            </div>
-            <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
+        <div className="space-y-3">
+          <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
+            Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
           </div>
-        )
+          <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
+        </div>
       )}
       {step === "review" && (
         <div className="space-y-3">
@@ -2712,99 +2696,6 @@ function FieldRowEditor({
           <X className="h-4 w-4" />
         </Button>
       )}
-    </div>
-  );
-}
-
-// ---------------------------- CertsPanel ----------------------------
-const DEFAULT_CERTS = ["cpr_first_aid", "medication_admin", "tb_screening", "background_check"];
-function CertsPanel({
-  subjectId, certs, onChanged,
-}: { subjectId: string; certs: Array<{ id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null }>; onChanged: () => void }) {
-  const known = new Set(certs.map((c) => c.cert_key));
-  const all = [...DEFAULT_CERTS, ...certs.map((c) => c.cert_key).filter((k) => !DEFAULT_CERTS.includes(k))];
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="mb-2 text-sm font-semibold">Certs & training documents</div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Upload the document → <strong>Verified</strong>. Admin sign-off without a doc → <strong>Provisional</strong> (reminder runs in Requirements until on file).
-        Renewal alerts reuse the existing Requirements system.
-      </p>
-      <div className="space-y-2">
-        {all.map((key) => {
-          const existing = certs.find((c) => c.cert_key === key);
-          return <CertRow key={key} subjectId={subjectId} certKey={key} existing={existing} onChanged={onChanged} hint={!known.has(key) ? "Default cert" : undefined} />;
-        })}
-      </div>
-    </div>
-  );
-}
-function CertRow({
-  subjectId, certKey, existing, onChanged, hint,
-}: {
-  subjectId: string; certKey: string;
-  existing: { id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null } | undefined;
-  onChanged: () => void; hint?: string;
-}) {
-  const { jobId } = Route.useParams();
-  const upsert = useServerFn(upsertCertDocument);
-  const [uploading, setUploading] = useState(false);
-
-  const state = existing?.state ?? "unverified";
-  const badge = state === "verified"
-    ? <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Verified</Badge>
-    : state === "provisional"
-      ? <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400">Provisional · reminder</Badge>
-      : <Badge variant="outline">Unverified</Badge>;
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const path = `cert/${jobId}/${subjectId}/${certKey}-${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
-      const { error: upErr } = await supabase.storage.from("import-documents").upload(path, file, { upsert: false });
-      if (upErr) throw new Error(upErr.message);
-      // crude expiry inference: try to parse a date in the filename
-      const dateMatch = file.name.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
-      const expiry = dateMatch ? dateMatch[1].replace(/\//g, "-") : undefined;
-      await upsert({ data: { subjectId, cert_key: certKey, storage_path: path, file_name: file.name, expiry_date: expiry, state: "verified" } });
-      toast.success(`${certKey} verified`);
-      onChanged();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  const signOff = useMutation({
-    mutationFn: () => upsert({ data: { subjectId, cert_key: certKey, state: "provisional", notes: "Admin sign-off; document pending" } }),
-    onSuccess: () => { toast.success("Marked provisional — reminder set"); onChanged(); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <div className="text-sm font-medium">{certKey.replace(/_/g, " ")}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-          {badge}
-          {existing?.file_name && <span className="truncate">{existing.file_name}</span>}
-          {existing?.expiry_date && <span>· expires {existing.expiry_date}</span>}
-          {hint && !existing && <span>· {hint}</span>}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-          Upload
-          <input type="file" className="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={handleUpload} disabled={uploading} />
-        </label>
-        <Button size="sm" variant="outline" onClick={() => signOff.mutate()} disabled={signOff.isPending || state === "provisional"}>
-          Admin sign-off
-        </Button>
-      </div>
     </div>
   );
 }

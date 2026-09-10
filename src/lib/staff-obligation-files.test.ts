@@ -132,5 +132,7 @@ describe("Admin employee profile lock", () => {
     assert.doesNotMatch(src, /StaffDeadlinesList/);
     assert.doesNotMatch(src, /EmployeeDocumentsCard/);
     assert.doesNotMatch(src, /Have/);
+    assert.doesNotMatch(src, /CustomAttributesSection/);
+    assert.doesNotMatch(src, /LifecyclePanel/);
   });
 });

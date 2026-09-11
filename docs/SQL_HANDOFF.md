@@ -4910,3 +4910,18 @@ The in-Hive 30-day course reuses existing:
 Certificate is rendered from topic progress + exam — it does **not** write `hive_training_certificates` (that table is leftover LMS).
 
 If a later change needs schema, add an idempotent migration and a new ACTION block here. Do not apply destructive SQL.
+
+---
+
+## NO SQL — Person-centered foundations in-app (2026-09-11)
+
+**Do not run SQL for this feature.** No migration, no RLS change, no new tables, no Core bulk RLS.
+
+Course id `pi-person-centered-foundations` reuses existing:
+
+- `training_topic_progress` / `training_completions` (UUID namespace course byte `03` so 30-day `01` and ABI `02` stay stable)
+- hire-level obligation title `Person-Centered Thinking and Practices Training` (already seeded)
+- `company_obligation_instances` via existing `recordCompletion` only when `PCT_COURSE_FULFILLS_OBLIGATION` is flipped on
+- Upload on the same staff-file card remains the SOW evidence path until that flag is released
+
+Answer keys stay in `src/lib/person-centered-training-content.json` and are scored only in `src/lib/in-hive-training-pct.functions.ts`.

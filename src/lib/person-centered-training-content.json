@@ -1,0 +1,433 @@
+{
+  "id": "pi-person-centered-foundations",
+  "version": "1.0-demo",
+  "title": "Person-centered thinking in everyday support",
+  "passScore": 12,
+  "estimatedMinutes": 35,
+  "sources": [
+    {
+      "id": "overview",
+      "title": "NCAPPS: About the initiative",
+      "url": "https://ncapps.acl.gov/about-ncapps.html",
+      "note": "Thinking, planning, and practice; initiative supported by ACL and CMS."
+    },
+    {
+      "id": "domains",
+      "title": "Five Competency Domains for Person-Centered Planning, v2 (2023)",
+      "url": "https://ncapps.acl.gov/docs/Resources/V2%20NCAPPS%20Five%20Competency%20Domains%20for%20Person-Centered%20Planning%20(508).pdf",
+      "note": "Five domains inform this course; this introductory course does not establish facilitator competency."
+    },
+    {
+      "id": "toolkit",
+      "title": "Provider Agency Toolkit for Self-Determination",
+      "url": "https://ncapps.acl.gov/docs/Resources/NCAPPS%20Human%20Services%20Provider%20Agency%20Toolkit%20for%20Self-Determination.pdf",
+      "note": "Daily choices, supported decisions, and provider practices."
+    },
+    {
+      "id": "approach",
+      "title": "Choosing the Approach that Works for the Person",
+      "url": "https://ncapps.acl.gov/docs/Resources/NCAPPS%20Person-Centered%20Planning%20Choosing%20the%20Approach%20that%20Works%20for%20the%20Person%20Accessible.pdf",
+      "note": "Adapt the planning process to the person and the purpose."
+    },
+    {
+      "id": "plans",
+      "title": "Promising Practices for Person-Centered Plans (revised March 2025)",
+      "url": "https://ncapps.acl.gov/docs/Resources/NCAPPS%20Promising%20Practices%20for%20Person-Centered%20Plans%20revised%20202503.pdf",
+      "note": "Accessible language, person-directed documentation, and follow-through."
+    },
+    {
+      "id": "utah",
+      "title": "Utah DSPD: Person-Centered Planning",
+      "url": "https://dspd.utah.gov/resources/person-centered-planning/",
+      "note": "Utah resources place the person’s interests, talents, and expertise at the center."
+    }
+  ],
+  "lessons": [
+    {
+      "id": "start",
+      "title": "Start with the person",
+      "kicker": "01 / THE FOUNDATION",
+      "minutes": 5,
+      "objective": "Recognize the difference between learning about a person, planning with them, and supporting their choices.",
+      "intro": "A completed schedule can still be a day someone did not choose. Start with the life they want to live.",
+      "source": "overview",
+      "principles": [
+        [
+          "What NCAPPS is",
+          "The National Center on Advancing Person-Centered Practices and Systems helps improve how services support people’s goals and choices. It is an initiative, not a single required training method."
+        ],
+        [
+          "Thinking → planning → practice",
+          "Thinking guides how you listen. Planning identifies the person’s goals and chosen supports. Practice is how those commitments show up in everyday support."
+        ]
+      ],
+      "scene": "“Everyone is going bowling. I wanted to work on my bike.”",
+      "context": "Meet Jordan, a fictional person receiving support. The outing is organized and staffed, but nobody asked Jordan what mattered today.",
+      "takeaway": "Ask: “What would make today a good day for you?” Then explore how available support can help. Be honest about limits and work on alternatives together.",
+      "question": "What is the strongest first response to Jordan?",
+      "options": [
+        "Explain that bowling was already scheduled.",
+        "Ask about the bike project and explore available support together.",
+        "Mark Jordan as refusing the activity."
+      ],
+      "correct": 1,
+      "feedback": [
+        "An organized schedule does not tell you whether the activity reflects Jordan’s goals.",
+        "This begins with Jordan’s priorities and turns listening into a practical conversation.",
+        "A refusal label misses the preference Jordan has clearly expressed."
+      ]
+    },
+    {
+      "id": "whole",
+      "title": "See the whole person",
+      "kicker": "02 / STRENGTHS & IDENTITY",
+      "minutes": 5,
+      "objective": "Ask about strengths, routines, identity, and communication without making assumptions.",
+      "intro": "A support need is one part of a person’s life. It does not describe their humor, relationships, skills, or ambitions.",
+      "source": "domains",
+      "principles": [
+        [
+          "Learn before interpreting",
+          "Ask what the person enjoys, what they do well, and what support works for them. Check your assumptions about language, culture, identity, and family roles."
+        ],
+        [
+          "Make space for communication",
+          "Offer the person’s preferred communication method and time to respond. Speech is not the only way to communicate. Ask the person how they want to be described."
+        ]
+      ],
+      "scene": "“Maya is quiet, so her sister usually answers.”",
+      "context": "Maya uses a communication tablet. At a planning conversation, the team moves to the next topic before she finishes entering a response.",
+      "takeaway": "Pause. Address Maya directly, make her device available, and allow response time. Include her chosen supporters without replacing her voice.",
+      "question": "What should the team change first?",
+      "options": [
+        "Ask Maya’s sister to summarize everything more quickly.",
+        "Remove all supporters from the meeting.",
+        "Slow down and support Maya’s own communication."
+      ],
+      "correct": 2,
+      "feedback": [
+        "Efficiency should not erase Maya’s input.",
+        "Chosen supporters can help; the problem is speaking over Maya.",
+        "The process should make Maya’s participation possible."
+      ]
+    },
+    {
+      "id": "choice",
+      "title": "Support real choices",
+      "kicker": "03 / CHOICE & CONTROL",
+      "minutes": 6,
+      "objective": "Offer understandable options and respond to risk without taking over ordinary decisions.",
+      "intro": "Support means helping someone understand and act on choices—including choices you would not make yourself.",
+      "source": "toolkit",
+      "principles": [
+        [
+          "Explain the real options",
+          "Discuss likely benefits, concerns, and available supports in a way the person understands. A choice between two staff preferences may exclude what the person actually wants."
+        ],
+        [
+          "Address risk with the person",
+          "Explore reasonable supports and the person’s existing plan. A staff concern alone is not authority to impose a new restriction. Escalate unresolved concerns through the appropriate planning process."
+        ]
+      ],
+      "scene": "“I want to try the bus to the library.”",
+      "context": "Jordan has not used this route before. There is no immediate danger. A staff member suggests banning bus trips because getting lost is possible.",
+      "takeaway": "Explore a supported route practice, accessible directions, and a check-in option with Jordan and the appropriate team. Follow authorized safety supports; use emergency procedures for immediate danger.",
+      "question": "Which response best supports Jordan’s choice?",
+      "options": [
+        "Discuss the route and agree on appropriate support through the person’s plan.",
+        "Ban public transit for everyone.",
+        "Send Jordan alone immediately to prove independence."
+      ],
+      "correct": 0,
+      "feedback": [
+        "This addresses the concern while preserving Jordan’s goal and participation.",
+        "A blanket ban substitutes staff control for individualized support.",
+        "Respecting choice does not mean withdrawing needed support."
+      ]
+    },
+    {
+      "id": "community",
+      "title": "Build a life beyond services",
+      "kicker": "04 / CONNECTION & BELONGING",
+      "minutes": 5,
+      "objective": "Distinguish simply attending a place from participating in a personally meaningful role.",
+      "intro": "Being in the community is a starting point. Belonging includes people who know you and opportunities you care about.",
+      "source": "utah",
+      "principles": [
+        [
+          "Follow interests and talents",
+          "Ask where the person wants to contribute, learn, work, or connect. The person is the expert on what is meaningful to them."
+        ],
+        [
+          "Turn an interest into an opportunity",
+          "A group outing may work for some people. Also explore individual opportunities connected to the person’s goals. Do not assume the same activity fits everyone."
+        ]
+      ],
+      "scene": "“I like fixing things. I don’t just want to watch.”",
+      "context": "Jordan visits a community bike workshop. Staff report a successful outing, but Jordan wants to learn a repair skill and get to know the people there.",
+      "takeaway": "With Jordan’s agreement, ask the workshop about a beginner session and any needed support. Success could be learning a skill and deciding whether to return—not just minutes spent outside.",
+      "question": "Which outcome best reflects Jordan’s stated interest?",
+      "options": [
+        "The van arrived on time.",
+        "Jordan tried a repair task and chose whether to attend again.",
+        "Everyone stayed for the same amount of time."
+      ],
+      "correct": 1,
+      "feedback": [
+        "Transport supports the opportunity, but it is not the person’s desired outcome.",
+        "This reflects Jordan’s interest, participation, and decision.",
+        "Equal time does not establish meaningful participation."
+      ]
+    },
+    {
+      "id": "team",
+      "title": "Keep the person in the conversation",
+      "kicker": "05 / PARTNERSHIP",
+      "minutes": 5,
+      "objective": "Adapt a planning conversation to the person and manage disagreement without displacing them.",
+      "intro": "The best meeting format is one that helps the person take part. Finishing the form is not the purpose of the conversation.",
+      "source": "approach",
+      "principles": [
+        [
+          "Fit the process to the person",
+          "Ask about timing, location, communication, and who the person wants involved. Planning approaches can vary with the person’s circumstances and purpose."
+        ],
+        [
+          "Make disagreements visible",
+          "Return to the person’s wishes, clarify each concern, and identify a next step together. Do not quietly record the loudest person’s preference as agreement."
+        ]
+      ],
+      "scene": "“They decided before I got there.”",
+      "context": "A team wants to discuss Maya’s work goals. They settle on a program first, then ask Maya to approve the completed plan.",
+      "takeaway": "Reopen the conversation with Maya. Explain options accessibly and ask what she wants to explore. Clarify any legal representative’s actual role without treating it as permission to ignore Maya.",
+      "question": "What makes the planning process person-centered?",
+      "options": [
+        "The team uses the same worksheet for every person.",
+        "The person signs after professionals have decided.",
+        "The person helps direct the conversation and explores options with chosen support."
+      ],
+      "correct": 2,
+      "feedback": [
+        "A consistent form can help records, but cannot guarantee participation.",
+        "A signature alone does not show that the person directed planning.",
+        "The person’s involvement shapes the process and the decisions."
+      ]
+    },
+    {
+      "id": "follow",
+      "title": "Make the plan show up tomorrow",
+      "kicker": "06 / DOCUMENTATION & FOLLOW-THROUGH",
+      "minutes": 5,
+      "objective": "Write an observable, respectful note and identify who will follow up on the person’s goal.",
+      "intro": "A good note helps the next staff member understand what the person chose, what support happened, and what needs attention.",
+      "source": "plans",
+      "principles": [
+        [
+          "Describe what happened",
+          "Use the person’s preferred language and distinguish what they said from what staff observed. Record support and response without labels that substitute judgment for facts."
+        ],
+        [
+          "Close the loop",
+          "Connect the note to the person’s goal. Identify the agreed next step and responsible person. Share changing preferences through the appropriate plan-review process."
+        ]
+      ],
+      "scene": "“Jordan was noncompliant with the outing.”",
+      "context": "That note leaves out the bike project, Jordan’s request, and the support offered. The next staff member may repeat the same mismatch.",
+      "takeaway": "Example: “Jordan said, ‘I want to fix my bike.’ Staff explored options with Jordan, who chose to call the workshop. Sam will help with the agreed call Friday.” Record only events that actually happened.",
+      "question": "What is the best follow-up when a person’s goal changes?",
+      "options": [
+        "Document their expressed preference and bring it into the appropriate planning process.",
+        "Keep the old goal until the annual meeting regardless of the change.",
+        "Rewrite the authorized service plan alone."
+      ],
+      "correct": 0,
+      "feedback": [
+        "A living plan should respond to the person. Staff contribute observations and follow the proper review process.",
+        "Waiting can leave support disconnected from the person’s current life.",
+        "Daily staff should not independently change authorizations or act beyond their role."
+      ]
+    }
+  ],
+  "quiz": [
+    {
+      "id": "q01",
+      "lesson": "start",
+      "q": "What does NCAPPS stand for?",
+      "options": [
+        "National Council for Approved Provider Safety",
+        "National Center on Advancing Person-Centered Practices and Systems",
+        "National Certification for Agency Planning and Personnel Services"
+      ],
+      "correct": 1,
+      "why": "NCAPPS supports person-centered systems and practices; its name does not describe a staff certification."
+    },
+    {
+      "id": "q02",
+      "lesson": "start",
+      "q": "Which example shows person-centered practice?",
+      "options": [
+        "Staff support a person’s chosen activity using the supports discussed with them.",
+        "A person-centered policy is filed but never used.",
+        "Staff choose all goals before the person arrives."
+      ],
+      "correct": 0,
+      "why": "Practice is the day-to-day action that makes the person’s goals and choices real."
+    },
+    {
+      "id": "q03",
+      "lesson": "whole",
+      "q": "A person needs extra time to use a communication device. What should you do?",
+      "options": [
+        "Skip their response if the meeting runs long.",
+        "Assume a supporter’s answer is the same as theirs.",
+        "Allow time and use the person’s preferred communication support."
+      ],
+      "correct": 2,
+      "why": "Communication support enables the person’s own participation."
+    },
+    {
+      "id": "q04",
+      "lesson": "whole",
+      "q": "You are unsure how someone wants their disability described. What is the best approach?",
+      "options": [
+        "Always choose whichever term staff prefer.",
+        "Ask the person about their preference.",
+        "Avoid speaking to the person about identity."
+      ],
+      "correct": 1,
+      "why": "Respect includes learning how the person wants to be described."
+    },
+    {
+      "id": "q05",
+      "lesson": "choice",
+      "q": "A person wants to try an unfamiliar activity with a manageable concern and no immediate danger. What comes first?",
+      "options": [
+        "Ban it because staff feel worried.",
+        "Remove all support to demonstrate choice.",
+        "Discuss the concern and possible supports with the person through the appropriate process."
+      ],
+      "correct": 2,
+      "why": "Support informed choice and address concerns without imposing an unapproved restriction."
+    },
+    {
+      "id": "q06",
+      "lesson": "choice",
+      "q": "Which is the most meaningful choice?",
+      "options": [
+        "The person explores understandable options, including their own preference, with needed support.",
+        "The person selects one of two activities chosen only for staff convenience.",
+        "The person is told what was selected for them."
+      ],
+      "correct": 0,
+      "why": "Real choice involves information, relevant alternatives, and support to express a preference."
+    },
+    {
+      "id": "q07",
+      "lesson": "community",
+      "q": "A person wants friendships through a hobby. What is the strongest indicator of progress?",
+      "options": [
+        "The outing lasted two hours.",
+        "The group followed its route.",
+        "The person connected with others around the hobby and wants to return."
+      ],
+      "correct": 2,
+      "why": "The outcome should relate to the person’s goal, not only attendance or logistics."
+    },
+    {
+      "id": "q08",
+      "lesson": "community",
+      "q": "Two people receiving the same service prefer different activities. What should staff do?",
+      "options": [
+        "Require identical activities to be fair.",
+        "Explore individual opportunities and needed support with each person.",
+        "Ask the louder person to choose for both."
+      ],
+      "correct": 1,
+      "why": "Shared service categories do not make people’s interests identical."
+    },
+    {
+      "id": "q09",
+      "lesson": "team",
+      "q": "Who should help shape who participates in a person-centered planning conversation?",
+      "options": [
+        "The person, with needed support and appropriate attention to authorized representative roles.",
+        "Only the provider’s scheduler.",
+        "Only the staff member completing the form."
+      ],
+      "correct": 0,
+      "why": "The person should help direct planning, including chosen supporters; actual legal roles must be respected."
+    },
+    {
+      "id": "q10",
+      "lesson": "team",
+      "q": "Team members disagree with the person’s goal. What is the best next step?",
+      "options": [
+        "Record the majority opinion as the person’s preference.",
+        "Return to the person’s wishes, clarify concerns, and identify a supported next step.",
+        "End the discussion and leave the person out."
+      ],
+      "correct": 1,
+      "why": "Disagreement should be explored transparently with the person instead of erasing their preference."
+    },
+    {
+      "id": "q11",
+      "lesson": "follow",
+      "q": "Which note provides the most useful information?",
+      "options": [
+        "Maya was difficult today.",
+        "Maya had a good shift.",
+        "Maya asked to take a break; staff offered a quiet space, and she chose to return after ten minutes."
+      ],
+      "correct": 2,
+      "why": "The note describes a request, support, and observable response. Write this only if it occurred."
+    },
+    {
+      "id": "q12",
+      "lesson": "follow",
+      "q": "A person no longer wants the goal in their current plan. What should staff do?",
+      "options": [
+        "Record their preference and seek review through the appropriate planning process.",
+        "Wait silently until next year.",
+        "Independently change service authorizations."
+      ],
+      "correct": 0,
+      "why": "Staff should help the plan respond to the person while staying within their role."
+    },
+    {
+      "id": "q13",
+      "lesson": "team",
+      "q": "A completed plan has a signature but the person was excluded from decisions. What does the signature prove?",
+      "options": [
+        "The process was person-centered.",
+        "It does not by itself establish that the person directed the planning.",
+        "The person no longer needs to be consulted."
+      ],
+      "correct": 1,
+      "why": "A signature alone cannot substitute for meaningful participation."
+    },
+    {
+      "id": "q14",
+      "lesson": "follow",
+      "q": "Which next step is easiest to follow through on?",
+      "options": [
+        "Someone should support community involvement.",
+        "Improve independence sometime.",
+        "With Jordan’s agreement, Sam will help call the bike workshop Friday and check what Jordan wants next."
+      ],
+      "correct": 2,
+      "why": "The step names an action, responsible support, time, and the person’s involvement."
+    },
+    {
+      "id": "q15",
+      "lesson": "choice",
+      "q": "What does respecting choice mean when support is needed?",
+      "options": [
+        "Help the person understand options and use appropriate supports while keeping them involved.",
+        "Agree with every request without discussing support or safety.",
+        "Allow choices only when staff would choose the same thing."
+      ],
+      "correct": 0,
+      "why": "Person-centered support combines participation, understandable information, and appropriate assistance."
+    }
+  ]
+}

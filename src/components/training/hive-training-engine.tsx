@@ -2004,6 +2004,7 @@ export function TrainingModule({
   onStepChange,
   hideAllTopics = false,
   onFinished,
+  endAfterSteps = false,
 }: {
   topic: Topic;
   onExit: () => void;
@@ -2018,15 +2019,19 @@ export function TrainingModule({
   hideAllTopics?: boolean;
   /** Course path: after the complete slide, go to the next topic. */
   onFinished?: () => void;
+  /** PCT path: intro + lessons only, then onFinished (server grades the check). */
+  endAfterSteps?: boolean;
 }) {
   // In read-only review mode, skip the attest + complete steps. The staff
   // member can re-read lessons but their record never changes.
   const baseSteps: Step[] = topic.steps || [];
   const flow: ({ type: "intro" } | Step | { type: "attest" } | { type: "complete" })[] = readOnly
     ? [{ type: "intro" }, ...baseSteps]
-    : skipAttest
-      ? [{ type: "intro" }, ...baseSteps, { type: "complete" }]
-      : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
+    : endAfterSteps
+      ? [{ type: "intro" }, ...baseSteps]
+      : skipAttest
+        ? [{ type: "intro" }, ...baseSteps, { type: "complete" }]
+        : [{ type: "intro" }, ...baseSteps, { type: "attest" }, { type: "complete" }];
   const checks = baseSteps.filter(s => s.type === "check").length;
   const lessons = baseSteps.filter(s => s.type === "lesson").length;
   const scenarios = baseSteps.filter(s => s.type === "scenario").length;
@@ -2239,6 +2244,8 @@ export function TrainingModule({
               <button style={btn("out")} onClick={back}>Back</button>
               {i < flow.length - 1 ? (
                 <button style={btn("pri")} onClick={next}>Continue</button>
+              ) : endAfterSteps && !readOnly ? (
+                <button style={btn("pri")} onClick={() => onFinished?.()}>Continue to knowledge check</button>
               ) : (
                 <button style={btn("pri")} onClick={onExit}>Done reviewing</button>
               )}

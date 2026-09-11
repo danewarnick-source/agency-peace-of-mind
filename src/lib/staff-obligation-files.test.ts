@@ -241,6 +241,7 @@ describe("Staff staff-file page lock", () => {
     assert.match(src, /title="Staff file"/);
     assert.match(src, /Or upload a certificate/);
     assert.match(src, /A certificate upload clears this same 30-day card/);
+    assert.match(src, /A certificate upload clears this same hire-level PCT card/);
     assert.doesNotMatch(src, /title="My Obligations"/);
     assert.doesNotMatch(src, /My Compliance/);
   });

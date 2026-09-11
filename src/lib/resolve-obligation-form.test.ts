@@ -44,6 +44,14 @@ describe("resolveObligationFormId", () => {
       }),
       false,
     );
+    assert.equal(
+      isUnlinkedFormDuty({
+        evidence_type: "form",
+        linked_form_id: null,
+        title: "Person-Centered Thinking and Practices Training",
+      }),
+      false,
+    );
   });
 
   it("does not hide per-client training forms that have no company form UUID", () => {

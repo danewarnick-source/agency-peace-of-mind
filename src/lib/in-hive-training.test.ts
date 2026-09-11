@@ -27,6 +27,7 @@ import {
   firstIncompleteTopicIndex,
   formatExamExportCsv,
   appendExamResetNote,
+  inHiveCourseFulfillsObligation,
   inHiveCourseIdForTitle,
   inHiveExamRef,
   inHiveProgressRef,
@@ -46,6 +47,8 @@ import {
   type ExamQuestion,
 } from "./in-hive-training.ts";
 import { examQuestionsFor } from "./in-hive-training-exams.ts";
+import { PCT_COURSE_ID, PCT_OBLIGATION_TITLE } from "./in-hive-training-pct.ts";
+import { PCT_CLIENT_OBLIGATION_TITLE } from "./client-form-obligations.ts";
 
 const Q: ExamQuestion[] = [
   {
@@ -76,6 +79,8 @@ describe("inHiveCourseIdForTitle", () => {
     assert.equal(inHiveCourseIdForTitle(ABI_OBLIGATION_TITLE), "abi");
     assert.equal(inHiveCourseIdForTitle("ABI Training — extra"), "abi");
     assert.equal(inHiveCourseIdForTitle("CPR/First Aid Certification — Initial"), null);
+    assert.equal(inHiveCourseIdForTitle(PCT_OBLIGATION_TITLE), PCT_COURSE_ID);
+    assert.equal(inHiveCourseIdForTitle(PCT_CLIENT_OBLIGATION_TITLE), null);
   });
 });
 
@@ -99,6 +104,9 @@ describe("progress refs", () => {
     assert.notEqual(inHiveRefUuid("thirty-day", "A"), inHiveRefUuid("abi", "A"));
     assert.equal(inHiveRefUuid("thirty-day", "PG"), "a11ce000-1e8f-4000-8000-000000010101");
     assert.notEqual(inHiveRefUuid("thirty-day", "PG"), inHiveRefUuid("thirty-day", "A"));
+    assert.equal(inHiveRefUuid(PCT_COURSE_ID, "A"), "a11ce000-1e8f-4000-8000-000000000341");
+    assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "A"), inHiveRefUuid("abi", "A"));
+    assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "__exam__"), inHiveRefUuid("abi", "__exam__"));
   });
 });
 
@@ -130,6 +138,7 @@ describe("exam coverage", () => {
       thirty.every((q) => q.sowCite.startsWith("1.8(4)") || q.sowCite.startsWith("SAS")),
     );
     assert.ok(abi.every((q) => q.sowCite.startsWith("1.8(8)")));
+    assert.equal(examQuestionsFor(PCT_COURSE_ID).length, 0);
   });
 });
 
@@ -397,6 +406,10 @@ describe("staff obligations course progress", () => {
   it("lists all 30 orientation codes and labels partial progress", () => {
     assert.equal(topicCodesForCourse("thirty-day").length, 30);
     assert.equal(topicCodesForCourse("abi").length, 6);
+    assert.equal(topicCodesForCourse(PCT_COURSE_ID).length, 6);
+    assert.equal(inHiveCourseFulfillsObligation("thirty-day"), true);
+    assert.equal(inHiveCourseFulfillsObligation("abi"), true);
+    assert.equal(inHiveCourseFulfillsObligation(PCT_COURSE_ID), false);
     assert.equal(staffCourseProgressLabel(19, 30), "19 of 30 topics passed");
     assert.equal(staffCourseProgressLabel(0, 30), "0 of 30 topics passed");
   });

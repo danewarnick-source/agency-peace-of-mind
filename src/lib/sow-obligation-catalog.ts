@@ -139,7 +139,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Staff training in person-centered thinking — separate from the Person-Centered Thinking profile completed with each client. Upload the training record in HIVE.",
+      "Hire-level in-platform course (Person-centered thinking in everyday support) plus upload. NCAPPS-informed Provider Interface education — not official NCAPPS. Separate from the per-client Person-Centered Thinking form. Until release control is flipped, a certificate upload is the SOW evidence path.",
     due_rule: { kind: "days_after_hire", days: 90 },
     owner: "staff",
     service_codes: [],

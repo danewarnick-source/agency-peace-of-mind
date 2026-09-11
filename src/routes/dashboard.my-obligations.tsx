@@ -27,11 +27,13 @@ import {
 } from "@/lib/staff-obligation-files";
 import {
   IN_HIVE_COURSE_EVIDENCE,
+  inHiveCourseFulfillsObligation,
   inHiveCourseIdForTitle,
   staffCompletedTabEmptyCopy,
   staffCourseProgressLabel,
   topicCodesForCourse,
 } from "@/lib/in-hive-training";
+import { PCT_COURSE_ID } from "@/lib/in-hive-training-pct";
 import {
   completedCodesFromProgress,
   loadInHiveCourseProgress,
@@ -264,10 +266,11 @@ function OpenCard({
   const needsAttestation =
     ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
   const isThirtyDay = courseId === "thirty-day";
+  const showUploadAlternative = courseId === "thirty-day" || courseId === PCT_COURSE_ID;
   const canSubmit =
     ob.evidence_type === "form"
       ? true
-      : isThirtyDay && file
+      : showUploadAlternative && file
         ? true
         : (!needsUpload || !!file) && (!needsAttestation || checked);
 
@@ -276,7 +279,7 @@ function OpenCard({
     try {
       let uploadPath: string | null = null;
       let uploadFilename: string | null = null;
-      if ((needsUpload || isThirtyDay) && file) {
+      if ((needsUpload || showUploadAlternative) && file) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${orgId}/${ob.id}/${instance.id}/${crypto.randomUUID()}-${safeName}`;
         const { error: upErr } = await supabase.storage
@@ -290,7 +293,7 @@ function OpenCard({
         data: {
           organizationId: orgId,
           instanceId: instance.id,
-          evidenceTypeUsed: isThirtyDay && file ? "upload" : ob.evidence_type,
+          evidenceTypeUsed: showUploadAlternative && file ? "upload" : ob.evidence_type,
           uploadPath,
           uploadFilename,
           attestationSignedAt: needsAttestation && !isThirtyDay ? new Date().toISOString() : null,
@@ -386,8 +389,9 @@ function OpenCard({
             <div className="rounded-lg border border-border bg-muted/30 p-3">
               <p className="text-sm font-medium">In-platform course</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Open the course from here. Finish each topic, then pass the competency exam (80%,
-                three tries). Completing the exam marks this same card On file.
+                {courseId === PCT_COURSE_ID && !inHiveCourseFulfillsObligation(courseId)
+                  ? "Open the course from here. Finish each topic, then pass the competency exam (12 of 15, three tries). Until release, a certificate upload is what clears this SOW card."
+                  : "Open the course from here. Finish each topic, then pass the competency exam (80%, three tries). Completing the exam marks this same card On file."}
               </p>
               {courseProgress && courseProgress.total > 0 ? (
                 <p className="mt-1 text-sm font-medium">
@@ -403,11 +407,13 @@ function OpenCard({
                 </Button>
               </Link>
             </div>
-            {courseId === "thirty-day" ? (
+            {showUploadAlternative ? (
               <div className="rounded-lg border border-dashed border-border p-3">
                 <p className="text-sm font-medium">Or upload a certificate</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  A certificate upload clears this same 30-day card. You do not need both.
+                  {courseId === PCT_COURSE_ID
+                    ? "A certificate upload clears this same hire-level PCT card. The in-platform course does not yet mark the SOW card On file."
+                    : "A certificate upload clears this same 30-day card. You do not need both."}
                 </p>
                 <div className="mt-2 flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-3 py-2">
                   <Button
@@ -680,8 +686,19 @@ function MyObligationsPage() {
       ) ?? null,
     [instances],
   );
+  const pctOpen = useMemo(
+    () =>
+      instances.find(
+        (row) =>
+          inHiveCourseIdForTitle(row.obligation.title) === PCT_COURSE_ID &&
+          row.status !== "completed" &&
+          row.status !== "waived",
+      ) ?? null,
+    [instances],
+  );
   const thirtyDayCodes = useMemo(() => topicCodesForCourse("thirty-day"), []);
   const abiCodes = useMemo(() => topicCodesForCourse("abi"), []);
+  const pctCodes = useMemo(() => topicCodesForCourse(PCT_COURSE_ID), []);
   const thirtyProgressQ = useQuery({
     queryKey: ["in-hive-progress", user?.id, "thirty-day"],
     enabled: !!user && !!thirtyDayOpen,
@@ -691,6 +708,11 @@ function MyObligationsPage() {
     queryKey: ["in-hive-progress", user?.id, "abi"],
     enabled: !!user && !!abiOpen,
     queryFn: () => loadInHiveCourseProgress(user!.id, "abi", abiCodes),
+  });
+  const pctProgressQ = useQuery({
+    queryKey: ["in-hive-progress", user?.id, PCT_COURSE_ID],
+    enabled: !!user && !!pctOpen,
+    queryFn: () => loadInHiveCourseProgress(user!.id, PCT_COURSE_ID, pctCodes),
   });
   const courseProgressByInstance = useMemo(() => {
     const m = new Map<string, { completed: number; total: number }>();
@@ -702,8 +724,22 @@ function MyObligationsPage() {
       const done = completedCodesFromProgress(abiCodes, abiProgressQ.data ?? {});
       m.set(abiOpen.id, { completed: done.size, total: abiCodes.length });
     }
+    if (pctOpen) {
+      const done = completedCodesFromProgress(pctCodes, pctProgressQ.data ?? {});
+      m.set(pctOpen.id, { completed: done.size, total: pctCodes.length });
+    }
     return m;
-  }, [abiCodes, abiOpen, abiProgressQ.data, thirtyDayCodes, thirtyDayOpen, thirtyProgressQ.data]);
+  }, [
+    abiCodes,
+    abiOpen,
+    abiProgressQ.data,
+    pctCodes,
+    pctOpen,
+    pctProgressQ.data,
+    thirtyDayCodes,
+    thirtyDayOpen,
+    thirtyProgressQ.data,
+  ]);
 
   const instanceIds = useMemo(() => instances.map((i) => i.id), [instances]);
   const { data: myCompletions = [] } = useQuery({

@@ -303,10 +303,6 @@ export const onClientDutyFactsChanged = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
-    await reevaluateStaffAssignedToClientInternal(
-      supabase,
-      data.organizationId,
-      data.clientId,
-    );
+    await reevaluateStaffAssignedToClientInternal(supabase, data.organizationId, data.clientId);
     return { ok: true };
   });

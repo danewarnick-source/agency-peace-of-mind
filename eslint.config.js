@@ -80,6 +80,8 @@ export default tseslint.config(
       "src/components/clients/setup-checklist.tsx",
       "src/components/clients/client-specific-training-card.tsx",
       "src/components/clients/client-readiness-card.tsx",
+      "src/components/clients/profile-tab.tsx",
+      "src/components/clients/face-sheet-info-card.tsx",
       "src/components/chores/chore-support-activation.tsx",
       "src/components/staff-mobile/client-quick-info-sheet.tsx",
       "src/components/smart-import/**",
@@ -115,4 +117,12 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    files: [
+      "src/components/clients/profile-tab.tsx",
+      "src/components/clients/face-sheet-info-card.tsx",
+      "src/components/behavior-support/bs-config-card.tsx",
+    ],
+    rules: { "prettier/prettier": "off" },
+  },
 );

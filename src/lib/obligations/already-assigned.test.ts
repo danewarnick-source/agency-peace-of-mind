@@ -20,8 +20,16 @@ describe("Already assigned strip", () => {
       {
         now: NOW,
         obligations: [
-          { id: "ob-cpr", title: "CPR/First Aid Certification — Renewal", key: "cpr_first_aid_renewal" },
-          { id: "ob-bg", title: "Background Screening — Annual", key: "background_screening_annual" },
+          {
+            id: "ob-cpr",
+            title: "CPR/First Aid Certification — Renewal",
+            key: "cpr_first_aid_renewal",
+          },
+          {
+            id: "ob-bg",
+            title: "Background Screening — Annual",
+            key: "background_screening_annual",
+          },
           { id: "ob-30", title: "30-Day New Hire Orientation Training", key: "orientation_30_day" },
         ],
         instances: [
@@ -66,11 +74,19 @@ describe("Already assigned strip", () => {
 
   it("treats cert-expiration and hire-anniversary clocks as renewals", () => {
     assert.equal(
-      isRenewalClock({ id: "1", title: "CPR/First Aid Certification — Renewal", key: "cpr_first_aid_renewal" }),
+      isRenewalClock({
+        id: "1",
+        title: "CPR/First Aid Certification — Renewal",
+        key: "cpr_first_aid_renewal",
+      }),
       true,
     );
     assert.equal(
-      isRenewalClock({ id: "2", title: "30-Day New Hire Orientation Training", key: "orientation_30_day" }),
+      isRenewalClock({
+        id: "2",
+        title: "30-Day New Hire Orientation Training",
+        key: "orientation_30_day",
+      }),
       false,
     );
   });

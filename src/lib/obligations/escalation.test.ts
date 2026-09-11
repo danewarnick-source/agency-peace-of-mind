@@ -523,11 +523,7 @@ describe("automation heartbeat job log", () => {
     assert.equal(store[0]?.recurrence_key, "automation_heartbeat");
     assert.equal(store[0]?.body, "ok");
     assert.ok(store[0]?.dismissed_at);
-    const resolved = await resolveStaleEscalations(
-      supabase,
-      TNS_ORG_ID,
-      new Set(["other"]),
-    );
+    const resolved = await resolveStaleEscalations(supabase, TNS_ORG_ID, new Set(["other"]));
     assert.equal(resolved, 0);
   });
 });

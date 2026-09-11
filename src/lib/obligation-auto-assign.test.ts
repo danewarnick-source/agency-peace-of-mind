@@ -61,6 +61,32 @@ describe("hire auto-assign", () => {
       "utf8",
     );
     assert.match(nightly, /persistAutomationHeartbeat/);
+    const pcspWriter = readFileSync(
+      fileURLToPath(new URL("./company-obligations.functions.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(pcspWriter, /reevaluateStaffAssignedToClientInternal/);
+    const importWriter = readFileSync(
+      fileURLToPath(new URL("./smart-import-commit.functions.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(importWriter, /reevaluateStaffAssignedToClientInternal/);
+    assert.match(hireHook, /onClientDutyFactsChanged/);
+    const profileTab = readFileSync(
+      fileURLToPath(new URL("../components/clients/profile-tab.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(profileTab, /onClientDutyFactsChanged/);
+    const faceSheet = readFileSync(
+      fileURLToPath(new URL("../components/clients/face-sheet-info-card.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(faceSheet, /onClientDutyFactsChanged/);
+    const bsConfig = readFileSync(
+      fileURLToPath(new URL("../components/behavior-support/bs-config-card.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(bsConfig, /onClientDutyFactsChanged/);
   });
 
   it("uses existing due windows (30 / 90 / 180) instead of a second cadence", () => {

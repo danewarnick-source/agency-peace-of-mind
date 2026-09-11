@@ -43,10 +43,7 @@ export const REMEDIATION_PLAN_STATUSES = [
 
 export type RemediationPlanStatus = (typeof REMEDIATION_PLAN_STATUSES)[number];
 
-export const OPEN_REMEDIATION_STATUSES: RemediationPlanStatus[] = [
-  "draft",
-  "awaiting_approval",
-];
+export const OPEN_REMEDIATION_STATUSES: RemediationPlanStatus[] = ["draft", "awaiting_approval"];
 
 export type RemediationPlanRow = {
   id: string;
@@ -243,11 +240,7 @@ export async function ensurePlansFromHits(
   for (const hit of hits) {
     const kind = kindFromEscalationTrigger(hit.trigger, hit.obligationKey);
     if (!kind) continue;
-    if (
-      kind !== "solo_lapse" &&
-      kind !== "scheduled_while_lapsed" &&
-      kind !== "license_risk"
-    ) {
+    if (kind !== "solo_lapse" && kind !== "scheduled_while_lapsed" && kind !== "license_risk") {
       continue;
     }
     const row = {
@@ -322,13 +315,7 @@ export async function applyRemediationPlanOutcomes(
 
   for (const plan of open) {
     if (plan.instance_id && completedIds.has(plan.instance_id)) {
-      await markPlanOutcome(
-        supabase,
-        plan.id,
-        "completed",
-        "completed",
-        "Instance completed.",
-      );
+      await markPlanOutcome(supabase, plan.id, "completed", "completed", "Instance completed.");
       summary.completed += 1;
       summary.resolvedNotifications += await resolveEscalationsForPlan(
         supabase,
@@ -418,11 +405,13 @@ export async function hasActiveSoloOverride(
     if (tableMissing(error.message)) return false;
     throw new Error(error.message);
   }
-  return ((data ?? []) as Array<{
-    expires_at: string | null;
-    obligation_key: string | null;
-    gap_key: string | null;
-  }>).some(
+  return (
+    (data ?? []) as Array<{
+      expires_at: string | null;
+      obligation_key: string | null;
+      gap_key: string | null;
+    }>
+  ).some(
     (row) =>
       (row.obligation_key === obligationKey || row.gap_key === obligationKey) &&
       overrideIsActive(row.expires_at, now),

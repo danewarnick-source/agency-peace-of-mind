@@ -22,9 +22,17 @@ async function logRoleChange(
   },
 ) {
   const [{ data: changedBy }, { data: target }] = await Promise.all([
-    supabase.from("org_member_directory").select("full_name").eq("id", params.changedByUserId).maybeSingle(),
+    supabase
+      .from("org_member_directory")
+      .select("full_name")
+      .eq("id", params.changedByUserId)
+      .maybeSingle(),
     params.targetUserId
-      ? supabase.from("org_member_directory").select("full_name").eq("id", params.targetUserId).maybeSingle()
+      ? supabase
+          .from("org_member_directory")
+          .select("full_name")
+          .eq("id", params.targetUserId)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   await supabaseAdmin.from("role_change_audit_log").insert({
@@ -68,7 +76,7 @@ async function assertCanManage(
   if (!isAdmin && !isExec) {
     console.error(
       `[SECURITY] Unauthorized role management attempt — user ${userId} ` +
-      `attempted to manage roles in org ${orgId} without admin privileges`,
+        `attempted to manage roles in org ${orgId} without admin privileges`,
     );
     try {
       await supabaseAdmin.from("role_change_audit_log").insert({
@@ -124,9 +132,7 @@ export const listTeamAccess = createServerFn({ method: "GET" })
         full_name: p?.full_name ?? null,
         role: m.role,
         display_role_label:
-          isHive && role === "super_admin"
-            ? ROLE_LABEL.super_admin
-            : ROLE_LABEL[role] ?? m.role,
+          isHive && role === "super_admin" ? ROLE_LABEL.super_admin : (ROLE_LABEL[role] ?? m.role),
         grants: {
           staff: true,
           admin: m.role === "admin",
@@ -140,22 +146,27 @@ export const listTeamAccess = createServerFn({ method: "GET" })
 export const setMemberGrants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      membership_id: z.string().uuid(),
-      target_user_id: z.string().uuid(),
-      grants: z.object({
-        admin: z.boolean(),
-        company_executive: z.boolean(),
-        hive_executive: z.boolean(),
-      }).optional(),
-      // Set the organization_members.role column directly instead of via the
-      // admin boolean above — used by pages that expose the full role list
-      // (manager, committee_member, etc), not just the admin/employee toggle.
-      explicit_role: RoleEnum.optional(),
-    }).refine((d) => d.grants || d.explicit_role, {
-      message: "Either grants or explicit_role is required",
-    }).parse(d),
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        membership_id: z.string().uuid(),
+        target_user_id: z.string().uuid(),
+        grants: z
+          .object({
+            admin: z.boolean(),
+            company_executive: z.boolean(),
+            hive_executive: z.boolean(),
+          })
+          .optional(),
+        // Set the organization_members.role column directly instead of via the
+        // admin boolean above — used by pages that expose the full role list
+        // (manager, committee_member, etc), not just the admin/employee toggle.
+        explicit_role: RoleEnum.optional(),
+      })
+      .refine((d) => d.grants || d.explicit_role, {
+        message: "Either grants or explicit_role is required",
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -174,7 +185,9 @@ export const setMemberGrants = createServerFn({ method: "POST" })
     // via hive_executives, not organization_members.role.
     if (data.explicit_role) {
       if ((data.explicit_role as string) === "super_admin") {
-        throw new Error("super_admin is not assignable. Hive executives are granted through hive_executives.");
+        throw new Error(
+          "super_admin is not assignable. Hive executives are granted through hive_executives.",
+        );
       }
       if (cur.role === "super_admin") {
         return { ok: true };
@@ -201,11 +214,7 @@ export const setMemberGrants = createServerFn({ method: "POST" })
       });
       if (data.target_user_id) {
         try {
-          await reevaluateStaffDutiesInternal(
-            supabase,
-            data.organization_id,
-            data.target_user_id,
-          );
+          await reevaluateStaffDutiesInternal(supabase, data.organization_id, data.target_user_id);
         } catch (e) {
           console.warn("[obligations] role-change reevaluate failed:", e);
         }
@@ -243,12 +252,14 @@ export const setMemberGrants = createServerFn({ method: "POST" })
 export const inviteTeamMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      email: z.string().trim().toLowerCase().email().max(255),
-      role: InviteRoleEnum.optional(),
-      grant_admin: z.boolean().optional(),
-    }).parse(d),
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        email: z.string().trim().toLowerCase().email().max(255),
+        role: InviteRoleEnum.optional(),
+        grant_admin: z.boolean().optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -305,10 +316,12 @@ const PAGE_SIZE = 50;
 export const listRoleChangeAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      page: z.number().int().min(0).default(0),
-    }).parse(d),
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        page: z.number().int().min(0).default(0),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }): Promise<{ rows: RoleChangeAuditRow[]; hasMore: boolean }> => {
     const { supabase, userId } = context;
@@ -319,7 +332,9 @@ export const listRoleChangeAuditLog = createServerFn({ method: "GET" })
     const to = from + PAGE_SIZE - 1;
     const { data: rows, error } = await supabase
       .from("role_change_audit_log")
-      .select("id, created_at, changed_by_name, target_user_name, previous_role, new_role, change_method")
+      .select(
+        "id, created_at, changed_by_name, target_user_name, previous_role, new_role, change_method",
+      )
       .eq("organization_id", data.organization_id)
       .order("created_at", { ascending: false })
       .range(from, to);

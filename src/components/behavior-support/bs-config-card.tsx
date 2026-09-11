@@ -140,7 +140,8 @@ export function BehaviorSupportConfigCard({
       qc.invalidateQueries({ queryKey: ["behavior_support_clients", clientId] });
       toast.success("Behavior Support configuration saved.");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to save configuration."),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Failed to save configuration."),
   });
 
   if (bscLoading) {

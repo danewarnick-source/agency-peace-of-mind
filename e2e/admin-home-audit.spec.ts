@@ -8,11 +8,7 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
-import {
-  installHiveMocks,
-  screenshotPath,
-  TNS_ORG_ID,
-} from "./helpers/admin-home-mock";
+import { installHiveMocks, screenshotPath, TNS_ORG_ID } from "./helpers/admin-home-mock";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -43,18 +39,21 @@ async function dumpPage(page: Page, label: string) {
       hasAuth: !!localStorage.getItem("sb-mmknqtdrefbzwfdtykza-auth-token"),
     }))
     .catch(() => null);
-  // eslint-disable-next-line no-console
+
   console.log(`[e2e dump ${label}]`, info);
 }
 
 async function assertNoCrash(page: Page, label: string) {
   const url = page.url();
-  const body = (await page.locator("body").innerText().catch(() => "")) ?? "";
+  const body =
+    (await page
+      .locator("body")
+      .innerText()
+      .catch(() => "")) ?? "";
   expect(body.length, `Blank page on ${label} (${url})`).toBeGreaterThan(20);
-  expect(
-    body,
-    `Crash shell on ${label} (${url})`,
-  ).not.toMatch(/Something went wrong in the dashboard shell/i);
+  expect(body, `Crash shell on ${label} (${url})`).not.toMatch(
+    /Something went wrong in the dashboard shell/i,
+  );
   const crash = page.getByRole("heading", { name: /something went wrong/i });
   await expect(crash, `Unhandled error heading on ${label}`).toHaveCount(0);
 }
@@ -102,22 +101,36 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("link", { name: /^Records review$/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^Records review$/i })).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^State Audit$/i })).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByRole("link", { name: /^Command center$/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByRole("link", { name: /^Records review$/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByRole("link", { name: /^Compliance desk$/i }),
+    ).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^State Audit$/i })).toHaveCount(
+      0,
+    );
     await expect(page.locator("aside").getByRole("link", { name: /^Reports$/i })).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /Agency Command Center/i })).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByRole("link", { name: /Agency Command Center/i }),
+    ).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
     await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: "Provider Interface" })).toBeVisible();
+    await expect(
+      page.locator("aside").getByRole("link", { name: "Provider Interface" }),
+    ).toBeVisible();
     await expect(page.getByTestId("admin-home-welcome")).toHaveCount(0);
     await assertNoCrash(page, "admin home");
     await shot(page, "admin-home");
   });
 
-  test("This Week plan dialogs cover license, standing, overdue, and due-soon", async ({ page }) => {
+  test("This Week plan dialogs cover license, standing, overdue, and due-soon", async ({
+    page,
+  }) => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     const week = page.getByTestId("this-week");
     await expect(week).toBeVisible({ timeout: 25_000 });
@@ -145,7 +158,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await week.getByRole("button", { name: "Read and sign" }).click();
     const standingDlg = page.getByRole("dialog", { name: /Standing record plan/i });
     await expect(standingDlg).toBeVisible();
-    await standingDlg.locator("#standing-record-plan").fill("Write the discharge procedure and file it this week.");
+    await standingDlg
+      .locator("#standing-record-plan")
+      .fill("Write the discharge procedure and file it this week.");
     await standingDlg.locator("#standing-record-due").fill("2026-09-25");
     await shot(page, "this-week-standing-plan-dialog");
     await standingDlg.getByRole("button", { name: "Submit plan" }).click();
@@ -154,7 +169,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await week.getByRole("button", { name: "Log a plan" }).click();
     const overdueDlg = page.getByRole("dialog", { name: /Overdue obligation plan/i });
     await expect(overdueDlg).toBeVisible();
-    await overdueDlg.locator("#overdue-obligation-plan").fill("Schedule the CE course and close the clock.");
+    await overdueDlg
+      .locator("#overdue-obligation-plan")
+      .fill("Schedule the CE course and close the clock.");
     await shot(page, "this-week-overdue-plan-dialog");
     await overdueDlg.getByRole("button", { name: "Record plan" }).click();
     await expect(overdueDlg).toBeHidden();
@@ -167,8 +184,12 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(banner).toBeVisible({ timeout: 25_000 });
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toBeVisible();
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible();
-    await expect(banner.getByRole("button", { name: /Skip — take me to my dashboard/i })).toBeVisible();
-    await expect(banner.getByText(/You're set up\. This banner will close itself\./i)).toBeVisible();
+    await expect(
+      banner.getByRole("button", { name: /Skip — take me to my dashboard/i }),
+    ).toBeVisible();
+    await expect(
+      banner.getByText(/You're set up\. This banner will close itself\./i),
+    ).toBeVisible();
     await expect(banner.getByRole("button", { name: /Go to my dashboard/i })).toBeVisible();
     const box = await banner.boundingBox();
     expect(box?.height ?? 999, "desktop banner stays near 280px").toBeLessThanOrEqual(300);
@@ -179,7 +200,6 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible();
     await assertNoCrash(page, "admin home after skip welcome");
   });
-
 
   test("This week at 1280 is a single 820 column with Review day", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -235,9 +255,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await shot(page, "admin-home-cta-staff");
   });
 
-  test("Agency file: flags, encoded cards, Company policies sub-tab", async ({
-    page,
-  }) => {
+  test("Agency file: flags, encoded cards, Company policies sub-tab", async ({ page }) => {
     await page.goto("/dashboard/agency-documents", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/dashboard\/compliance/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: /^Agency file$/i })).toBeVisible({
@@ -273,11 +291,16 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
   }) => {
     await page.goto("/dashboard/my-obligations", { waitUntil: "domcontentloaded" });
     await expect(
-      page.getByRole("heading", { name: /My tasks/i }).filter({ visible: true }).first(),
+      page
+        .getByRole("heading", { name: /My tasks/i })
+        .filter({ visible: true })
+        .first(),
     ).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Your submissions and certificates stay in your staff file/i)).toBeVisible();
+    await expect(
+      page.getByText(/Your submissions and certificates stay in your staff file/i),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
     await assertNoCrash(page, "my-obligations");
     await shot(page, "my-obligations");
@@ -320,9 +343,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     page,
   }) => {
     await page.goto("/dashboard/internal-audit", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.getByText(/Internal Audit|is locked|Access denied/i).first(),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Internal Audit|is locked|Access denied/i).first()).toBeVisible({
+      timeout: 20_000,
+    });
     await assertNoCrash(page, "internal-audit");
     await shot(page, "internal-audit");
 
@@ -379,11 +402,15 @@ test.describe("Permission wall — DSP vs admin", () => {
     await expect(page.locator("aside").getByRole("link", { name: /^My Caseload$/ })).toBeVisible({
       timeout: 25_000,
     });
-    await expect(page.getByRole("banner").getByRole("heading", { name: /My Caseload/i })).toBeVisible();
+    await expect(
+      page.getByRole("banner").getByRole("heading", { name: /My Caseload/i }),
+    ).toBeVisible();
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
-    await expect(page.locator("aside").getByRole("link", { name: /^Agency documents$/ })).toHaveCount(0);
+    await expect(
+      page.locator("aside").getByRole("link", { name: /^Agency documents$/ }),
+    ).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Compliance$/ })).toHaveCount(0);
     await shot(page, "dsp-home");
 

@@ -964,14 +964,15 @@ async function commitClient(
       } catch (err) {
         gaps.push(`Support Strategies clock warning: ${(err as Error).message}`);
       }
-      try {
-        await reevaluateStaffAssignedToClientInternal(sb, orgId, recordId);
-      } catch (err) {
-        console.warn("[obligations] import client duty reevaluate failed:", err);
-      }
     }
   } catch (err) {
     gaps.push(`PCSP carry-over warning: ${(err as Error).message}`);
+  }
+
+  try {
+    await reevaluateStaffAssignedToClientInternal(sb, orgId, recordId);
+  } catch (err) {
+    console.warn("[obligations] import client duty reevaluate failed:", err);
   }
 
   return recordId;

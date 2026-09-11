@@ -3683,14 +3683,9 @@ export const onPcspActivated = createServerFn({ method: "POST" })
       return { ok: false };
     }
     try {
-      const { reevaluateStaffAssignedToClientInternal } = await import(
-        "@/lib/staff-assignment-hooks.functions"
-      );
-      await reevaluateStaffAssignedToClientInternal(
-        supabase,
-        data.organizationId,
-        data.clientId,
-      );
+      const { reevaluateStaffAssignedToClientInternal } =
+        await import("@/lib/staff-assignment-hooks.functions");
+      await reevaluateStaffAssignedToClientInternal(supabase, data.organizationId, data.clientId);
     } catch (e) {
       console.warn("[obligations] PCSP duty reevaluate failed:", e);
     }

@@ -1,0 +1,70 @@
+/* DecisionCard anatomy — same measurements every breakpoint. Colors via inline PI_THEME. */
+
+.act {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 12px;
+  border-left-width: 4px;
+  list-style: none;
+}
+
+.act-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.act-headline {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.act-pill {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.act-why {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.act-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  font-size: 12px;
+}
+
+.act-btn {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 12px;
+  border-radius: 8px;
+  min-height: 44px;
+}
+
+.act-done {
+  opacity: 0.5;
+}
+
+.quiet-line {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  border-radius: 10px;
+}

@@ -43,9 +43,17 @@ async function openDesk(page: Page) {
   });
   await expect(page.getByTestId("compliance-tab-pending")).toBeVisible({ timeout: 15_000 });
   // Org membership has resolved when the Utah export CTA is enabled.
-  await expect(
-    page.getByRole("button", { name: /Export Utah DHHS EVV CSV/i }).first(),
-  ).toBeEnabled({ timeout: 20_000 });
+  const exportBtn = page.getByRole("button", { name: /Export Utah DHHS EVV CSV/i }).first();
+  try {
+    await expect(exportBtn).toBeEnabled({ timeout: 12_000 });
+  } catch {
+    // Cold harness / JWT race — one reload only. Do not rewrite EVV.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("e2e-compliance-desk-harness")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(exportBtn).toBeEnabled({ timeout: 20_000 });
+  }
 }
 
 async function openTab(page: Page, id: string) {

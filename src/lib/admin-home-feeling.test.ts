@@ -108,17 +108,27 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.doesNotMatch(dash, /hash="obligations"/);
     assert.doesNotMatch(dash, /hash="due"/);
     assert.doesNotMatch(dash, /hash="recommendations"/);
-    assert.match(dash, /to="\/dashboard\/compliance"/);
-    assert.match(dash, /to="\/dashboard\/hub\/employees"/);
-    assert.match(dash, /to="\/dashboard\/hub\/clients"/);
-    assert.match(dash, /to="\/dashboard\/compliance-desk"/);
-    assert.match(dash, /Records review/);
+    assert.doesNotMatch(dash, /Compliance by area/);
+    assert.doesNotMatch(dash, /lg:grid-cols-2/);
+    assert.doesNotMatch(dash, /PowerLink/);
+    assert.doesNotMatch(dash, /Records review/);
     assert.doesNotMatch(dash, /Compliance desk/);
     assert.match(dash, /ThisWeekPlanCards/);
-    assert.match(dash, /fontSize: 12/);
+    assert.match(dash, /Generate my DSPD review/);
+    assert.match(dash, /listPackWhatChanged/);
+    assert.match(dash, /home-column/);
     assert.match(dash, /PI_THEME\.c50/);
-    assert.match(dash, /PI_THEME\.gold/);
     assert.match(dash, /AdminHomeWelcome/);
+  });
+
+  it("does not load instance or client rows for dead Home KPI tiles", () => {
+    const hook = read("../components/admin-home/use-admin-home-data.ts");
+    assert.doesNotMatch(hook, /\.from\(/);
+    assert.doesNotMatch(hook, /useQuery/);
+    assert.doesNotMatch(hook, /adminHomeInstancesQueryKey|adminHomeClientsQueryKey/);
+    assert.doesNotMatch(hook, /deriveAdminHome/);
+    assert.match(hook, /sessionFirstName/);
+    assert.match(hook, /formatDenverLongDate/);
   });
 });
 

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { DecisionCard } from "@/components/compliance/decision-card";
 import { LicenseRiskPlanDialog } from "@/components/compliance/license-risk-plan-dialog";
 import { OverdueObligationPlanDialog } from "@/components/compliance/overdue-obligation-plan-dialog";
 import { StandingRecordPlanDialog } from "@/components/compliance/standing-record-plan-dialog";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { isAdminLevelRole } from "@/lib/obligations/escalation";
 import { kindFromEscalationTrigger } from "@/lib/obligations/remediation";
@@ -13,50 +15,45 @@ import {
   getThisWeekForUser,
   reviewRemediationPlan,
 } from "@/lib/obligations/remediation.functions";
-import type { Decision, ThisWeekItem } from "@/lib/obligations/this-week.functions";
+import {
+  decorateDecision,
+  emptyQuietLine,
+  formatQuietLine,
+  rollupDecisions,
+  sortThisWeekItems,
+  type Decision,
+  type QuietLine,
+  type ThisWeekItem,
+  type ThisWeekResult,
+} from "@/lib/obligations/this-week.functions";
 import { PI_THEME } from "@/lib/pi-theme";
+import "./decision-card.css";
+
+/** PlanCard shim — keep 30 days while callers move to DecisionCard. */
+export { DecisionCard as PlanCard } from "@/components/compliance/decision-card";
 
 type PlanDialogKind = "license" | "standing" | "overdue";
 
-function urgencyBar(urgency: Decision["urgency"]): string {
-  if (urgency === "critical") return PI_THEME.red;
-  if (urgency === "high") return PI_THEME.amber;
-  return PI_THEME.ok;
-}
-
-export function kindLabel(item: Decision): string {
-  if (item.planKind === "solo_lapse") return "Solo lapse";
-  if (item.planKind === "scheduled_while_lapsed") return "Scheduled while lapsed";
-  if (item.planKind === "license_risk") return "License / repayment";
-  if (item.planKind === "standing_missing") return "Standing record";
-  if (item.planKind === "overdue") return "Overdue plan";
-  if (item.source === "nectar_proposed") return "Proposed requirement";
-  switch (item.trigger) {
-    case "half_window_not_started":
-      return "Due soon";
-    case "overdue":
-      return "Overdue";
-    case "would_create_finding_if_scheduled":
-      return "Scheduling risk";
-    case "license_or_repayment_risk":
-      return "License / repayment";
-    case "standing_record_missing_30d":
-      return "Standing record";
-    default:
-      if (process.env.NODE_ENV !== "production") {
-        throw new Error(`Unknown this-week trigger: ${String(item.trigger ?? item.source)}`);
-      }
-      return "This week";
-  }
-}
+const HOME_CARD_CAP = 3;
 
 export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   if (item.planId) return null;
-  if (item.trigger === "license_or_repayment_risk") return "license";
-  if (item.trigger === "standing_record_missing_30d") return "standing";
-  if (item.trigger === "half_window_not_started" || item.trigger === "overdue") {
+  if (item.action?.kind === "log_renewal" || item.trigger === "license_or_repayment_risk") {
+    return "license";
+  }
+  if (item.action?.kind === "read_and_sign" || item.trigger === "standing_record_missing_30d") {
+    return "standing";
+  }
+  if (
+    item.action?.kind === "log_plan" ||
+    item.trigger === "half_window_not_started" ||
+    item.trigger === "overdue"
+  ) {
     if (item.planKind === "solo_lapse") return null;
-    if (kindFromEscalationTrigger(item.trigger, item.obligationKey) === "solo_lapse") {
+    if (
+      item.trigger &&
+      kindFromEscalationTrigger(item.trigger, item.obligationKey) === "solo_lapse"
+    ) {
       return null;
     }
     return "overdue";
@@ -64,93 +61,48 @@ export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   return null;
 }
 
-function PlanCard({
-  item,
-  canReview,
-  onReview,
-  reviewing,
-  onLogPlan,
-}: {
-  item: Decision;
-  canReview: boolean;
-  onReview: (planId: string, decision: "approved" | "rejected") => void;
-  reviewing: boolean;
-  onLogPlan: (kind: PlanDialogKind, item: Decision) => void;
-}) {
-  const logKind = logPlanDialogKind(item);
-  return (
-    <li
-      className="rounded-lg p-3 pl-3"
-      style={{
-        background: PI_THEME.heroTileBg,
-        border: `1px solid ${PI_THEME.hairlines.faint}`,
-        borderLeft: `4px solid ${urgencyBar(item.urgency)}`,
-      }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div
-            className="text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: PI_THEME.c50 }}
-          >
-            {kindLabel(item)}
-          </div>
-          <div className="mt-0.5 truncate text-sm font-medium" style={{ color: PI_THEME.cream }}>
-            {item.title}
-          </div>
-          <p className="mt-1 text-xs" style={{ color: PI_THEME.c50 }}>
-            {item.body}
-          </p>
-          <p className="mt-1 text-xs" style={{ color: PI_THEME.c70 }}>
-            {item.consequence}
-          </p>
-        </div>
-        {item.dueAt ? (
-          <div className="shrink-0 text-xs tabular-nums" style={{ color: PI_THEME.c50 }}>
-            {item.dueAt.slice(0, 10)}
-          </div>
-        ) : null}
-      </div>
-      {canReview && item.planId ? (
-        <div className="mt-3 flex gap-2">
-          <Button
-            size="sm"
-            disabled={reviewing}
-            onClick={() => onReview(item.planId!, "approved")}
-          >
-            Approve plan
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={reviewing}
-            onClick={() => onReview(item.planId!, "rejected")}
-          >
-            Reject
-          </Button>
-        </div>
-      ) : null}
-      {!item.planId && logKind ? (
-        <div className="mt-3 flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => onLogPlan(logKind, item)}>
-            {logKind === "standing" ? "Edit the starter / log a plan" : "Log a plan"}
-          </Button>
-        </div>
-      ) : null}
-    </li>
-  );
+function asWeek(data: unknown): { items: Decision[]; quiet: QuietLine } {
+  if (!data) return { items: [], quiet: emptyQuietLine() };
+  if (Array.isArray(data)) {
+    return {
+      items: data.filter((i): i is Decision => i.kind === "decision"),
+      quiet: emptyQuietLine(),
+    };
+  }
+  if (typeof data !== "object") return { items: [], quiet: emptyQuietLine() };
+  const rec = data as { items?: Decision[]; quiet?: QuietLine; result?: unknown };
+  const inner = rec.result ?? rec;
+  if (Array.isArray(inner)) {
+    return {
+      items: inner.filter((i): i is Decision => i.kind === "decision"),
+      quiet: emptyQuietLine(),
+    };
+  }
+  if (inner && typeof inner === "object") {
+    const week = inner as ThisWeekResult;
+    return {
+      items: week.items ?? [],
+      quiet: week.quiet ?? emptyQuietLine(),
+    };
+  }
+  return { items: [], quiet: emptyQuietLine() };
 }
 
 export function ThisWeekPlanCards() {
   const { data: org } = useCurrentOrg();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const loadWeek = useServerFn(getThisWeekForUser);
   const review = useServerFn(reviewRemediationPlan);
   const [openKind, setOpenKind] = useState<PlanDialogKind | null>(null);
   const [activeItem, setActiveItem] = useState<Decision | null>(null);
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
   const orgId = org?.organization_id ?? null;
-  const canManage = org ? isAdminLevelRole(org.role) || org.role === "manager" || org.role === "program_manager" : false;
+  const canManage = org
+    ? isAdminLevelRole(org.role) || org.role === "manager" || org.role === "program_manager"
+    : false;
+  const viewerId = user?.id ?? null;
 
   const q = useQuery({
     enabled: !!orgId && canManage,
@@ -160,7 +112,7 @@ export function ThisWeekPlanCards() {
   });
 
   const reviewMut = useMutation({
-    mutationFn: (input: { planId: string; decision: "approved" | "rejected" }) => {
+    mutationFn: (input: { planId: string; decision: "approved" | "rejected"; id: string }) => {
       if (!orgId) throw new Error("No active organization");
       return review({
         data: {
@@ -170,8 +122,9 @@ export function ThisWeekPlanCards() {
         },
       });
     },
-    onSuccess: () => {
+    onSuccess: (_ok, input) => {
       toast.success("Plan updated.");
+      setDoneIds((prev) => new Set(prev).add(input.id));
       void qc.invalidateQueries({ queryKey: ["this-week-plans", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -179,64 +132,77 @@ export function ThisWeekPlanCards() {
 
   if (!orgId || !canManage) return null;
 
-  const items = (q.data ?? []).filter((i): i is Decision => i.kind === "decision");
-  if (q.isLoading) {
-    return (
-      <section data-testid="this-week" className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
-        <p className="text-sm" style={{ color: PI_THEME.c50 }}>
-          Loading decisions.
-        </p>
-      </section>
-    );
-  }
-  if (q.isError) {
-    return (
-      <section data-testid="this-week" className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
-        <p className="text-sm" style={{ color: PI_THEME.c50 }}>
-          Could not load this week.
-        </p>
-      </section>
-    );
-  }
-  if (items.length === 0) {
-    return (
-      <section data-testid="this-week" className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
-        <p className="text-sm" style={{ color: PI_THEME.c50 }}>
-          No manager decisions waiting.
-        </p>
-      </section>
-    );
-  }
+  const week = asWeek(q.data);
+  const items = sortThisWeekItems(
+    rollupDecisions(week.items).map((d) => decorateDecision(d, { viewerUserId: viewerId })),
+  );
+  const visible = items.slice(0, HOME_CARD_CAP);
+  const extra = Math.max(0, items.length - HOME_CARD_CAP);
+  const quietText = formatQuietLine(week.quiet);
+
+  const countLine =
+    items.length === 0
+      ? "Nothing needs you this week."
+      : `${items.length} decision${items.length === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
 
   return (
-    <section data-testid="this-week" className="space-y-2">
-      <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-        This week
-      </h2>
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <PlanCard
-            key={item.id}
-            item={item}
-            canReview={!!item.planId}
-            reviewing={reviewMut.isPending}
-            onReview={(planId, decision) => reviewMut.mutate({ planId, decision })}
-            onLogPlan={(kind, next) => {
-              setActiveItem(next);
-              setOpenKind(kind);
-            }}
-          />
-        ))}
-      </ul>
+    <section data-testid="this-week" className="space-y-4">
+      <div>
+        <h2 className="text-[22px] font-semibold leading-tight" style={{ color: PI_THEME.cream }}>
+          This week
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: PI_THEME.c50 }}>
+          {q.isLoading ? "Loading decisions." : q.isError ? "Could not load this week." : countLine}
+        </p>
+      </div>
+      {!q.isLoading && !q.isError && items.length > 0 ? (
+        <ul className="flex flex-col gap-3">
+          {visible.map((item) => (
+            <DecisionCard
+              key={item.id}
+              item={item}
+              done={doneIds.has(item.id)}
+              reviewing={reviewMut.isPending}
+              viewerUserId={viewerId}
+              onAction={(kind, decision) => {
+                if (kind === "approve_plan") {
+                  if (!item.planId) return;
+                  reviewMut.mutate({
+                    planId: item.planId,
+                    decision: decision === "rejected" ? "rejected" : "approved",
+                    id: item.id,
+                  });
+                  return;
+                }
+                const logKind = logPlanDialogKind(item);
+                if (!logKind) return;
+                setActiveItem(item);
+                setOpenKind(logKind);
+              }}
+            />
+          ))}
+        </ul>
+      ) : null}
+      {extra > 0 ? (
+        <Link
+          to="/dashboard/compliance"
+          className="inline-flex text-sm font-medium hover:underline"
+          style={{ color: PI_THEME.gold }}
+        >
+          {extra} more this week →
+        </Link>
+      ) : null}
+      <div
+        data-testid="quiet-line"
+        className="quiet-line"
+        style={{
+          background: PI_THEME.c04,
+          color: PI_THEME.c50,
+          border: `1px solid ${PI_THEME.hairlines.faint}`,
+        }}
+      >
+        {quietText}
+      </div>
       {activeItem ? (
         <>
           <LicenseRiskPlanDialog
@@ -272,6 +238,10 @@ export function ThisWeekPlanCards() {
   );
 }
 
-export function thisWeekDecisionCount(items: ThisWeekItem[] | undefined): number {
-  return (items ?? []).filter((i) => i.kind === "decision").length;
+export function thisWeekDecisionCount(
+  items: ThisWeekItem[] | ThisWeekResult | undefined,
+): number {
+  if (!items) return 0;
+  if (Array.isArray(items)) return items.filter((i) => i.kind === "decision").length;
+  return items.items.length;
 }

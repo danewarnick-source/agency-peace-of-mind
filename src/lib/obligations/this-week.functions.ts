@@ -7,7 +7,7 @@ import {
   loadEvaluateInput,
   pickAdminLevelRecipient,
   type EscalationHit,
-  type EscalationUrgency,
+  type EvaluateInput,
   type OrgMemberRow,
 } from "./escalation.ts";
 import {
@@ -16,60 +16,53 @@ import {
   pickPlanOwner,
   planOwnerLabel,
   urgencyForPlan,
-  type RemediationPlanKind,
 } from "./remediation.ts";
+import { addDaysYmd, denverYmd } from "../admin-home-data.ts";
+import { sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
 import { evvStaffIdsForScope, resolveScopeFromSnapshot } from "./scope.ts";
+import {
+  buildQuietLine,
+  decorateDecision,
+  lastSundayLabel,
+  rollupDecisions,
+  sortThisWeekItems,
+  type Decision,
+  type QuietLine,
+  type QuietSummary,
+  type ThisWeekItem,
+  type ThisWeekResult,
+} from "./this-week.ts";
+
+export type {
+  Decision,
+  DecisionAction,
+  DecisionActionKind,
+  DecorateDecisionCtx,
+  QuietLine,
+  QuietSummary,
+  ThisWeekItem,
+  ThisWeekResult,
+} from "./this-week.ts";
+export {
+  buildQuietLine,
+  decorateDecision,
+  emptyQuietLine,
+  formatQuietLine,
+  hasForbiddenDecisionCopy,
+  HEADLINE_VERB_RE,
+  humanDue,
+  rollupDecisions,
+  sortThisWeekItems,
+} from "./this-week.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
-export type Decision = {
-  kind: "decision";
-  id: string;
-  title: string;
-  body: string;
-  urgency: EscalationUrgency;
-  dueAt: string | null;
-  ownerUserId: string | null;
-  ownerLabel: string;
-  consequence: string;
-  source: "remediation_plan" | "escalation" | "standing_missing" | "nectar_proposed";
-  trigger?: EscalationHit["trigger"];
-  instanceId?: string | null;
-  obligationId?: string | null;
-  obligationKey?: string | null;
-  subjectName?: string | null;
-  planId?: string | null;
-  planKind?: RemediationPlanKind | null;
-};
-
-export type QuietSummary = {
-  kind: "quiet_summary";
-  id: string;
-  title: string;
-  body: string;
-  count: number;
-  urgency: EscalationUrgency;
-  dueAt: string | null;
-  source: "evv_needs_review" | "org_profile_facts";
-};
-
-export type ThisWeekItem = Decision | QuietSummary;
-
-const URGENCY_ORDER: Record<EscalationUrgency, number> = {
-  critical: 0,
-  high: 1,
-  normal: 2,
-};
-
-export function sortThisWeekItems(items: ThisWeekItem[]): ThisWeekItem[] {
-  return [...items].sort((a, b) => {
-    const u = URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency];
-    if (u !== 0) return u;
-    const ad = a.dueAt ? new Date(a.dueAt).getTime() : Number.POSITIVE_INFINITY;
-    const bd = b.dueAt ? new Date(b.dueAt).getTime() : Number.POSITIVE_INFINITY;
-    return ad - bd;
-  });
+function isStandingCatalogKey(key: string | null | undefined): boolean {
+  if (!key) return false;
+  const entry = sowCatalogEntryByKey(key);
+  if (!entry) return false;
+  return entry.fulfillment === "standing" || entry.category === "standing_records";
 }
 
 function tableMissing(message: string | undefined): boolean {
@@ -171,23 +164,23 @@ async function loadEvvNeedsReviewCount(
   if (staffIdsInScope && staffIdsInScope.length === 0) return null;
   let q = supabase
     .from("evv_timesheets")
-    .select("id, staff_id")
+    .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("review_status", "needs_review");
   if (staffIdsInScope) q = q.in("staff_id", staffIdsInScope);
-  const { data, error } = await q;
+  const { count, error } = await q;
   if (error) {
     if (tableMissing(error.message)) return null;
     throw new Error(error.message);
   }
-  const count = (data ?? []).length;
-  if (count === 0) return null;
+  const n = count ?? 0;
+  if (n === 0) return null;
   return {
     kind: "quiet_summary",
     id: `evv_needs_review:${organizationId}`,
     title: "EVV timesheets need review",
-    body: `${count} timesheet${count === 1 ? "" : "s"} in scope marked needs_review.`,
-    count,
+    body: `${n} timesheet${n === 1 ? "" : "s"} in scope marked needs_review.`,
+    count: n,
     urgency: "normal",
     dueAt: null,
     source: "evv_needs_review",
@@ -212,13 +205,72 @@ function standingMissingForAdmin(
   return out;
 }
 
+const NOTES_WINDOW_DAYS = 7;
+
+async function loadQuietCounts(
+  supabase: AnySupabase,
+  orgId: string,
+  input: EvaluateInput,
+  evvNeedsReview: number,
+  now: Date,
+): Promise<QuietLine> {
+  const obligationsSatisfied = input.instances.filter(
+    (i) => i.status === "completed" || !!i.completed_at,
+  ).length;
+
+  let standingCurrent = 0;
+  for (const ob of input.obligations) {
+    if (!isStandingCatalogKey(ob.key)) continue;
+    if (input.obligationHasEvidence[ob.id]) standingCurrent += 1;
+  }
+
+  const notesSince = addDaysYmd(denverYmd(now), -(NOTES_WINDOW_DAYS - 1));
+  const notesBase = () =>
+    supabase
+      .from("daily_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .gte("log_date", notesSince);
+
+  const [totalRes, passedRes, reviewRes] = await Promise.all([
+    notesBase(),
+    notesBase().eq("ai_compliance_status", "Verified"),
+    supabase
+      .from("evv_timesheets")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .or("review_status.eq.approved,reconciliation_status.eq.accepted"),
+  ]);
+
+  // daily_logs.ai_compliance_status is the live Nectar column. Fail open on
+  // a missing table / column so Home still renders.
+  const notesTotal = totalRes.error ? 0 : (totalRes.count ?? 0);
+  const notesPassed = passedRes.error ? 0 : (passedRes.count ?? 0);
+  const recordsReviewCleared = reviewRes.error ? 0 : (reviewRes.count ?? 0);
+
+  return buildQuietLine({
+    obligationsSatisfied,
+    notesPassed,
+    notesTotal,
+    standingCurrent,
+    recordsReviewCleared,
+    evvReconciledThrough: evvNeedsReview === 0 ? lastSundayLabel() : null,
+  });
+}
+
+function finalizeDecisions(raw: Decision[], userId: string, now: Date): Decision[] {
+  return sortThisWeekItems(
+    rollupDecisions(raw).map((d) => decorateDecision(d, { now, viewerUserId: userId })),
+  );
+}
+
 export async function getThisWeek(
   supabase: AnySupabase,
   orgId: string,
   userId: string,
   now: Date = new Date(),
-): Promise<ThisWeekItem[]> {
-  const items: ThisWeekItem[] = [];
+): Promise<ThisWeekResult> {
+  const raw: Decision[] = [];
 
   const { data: membership, error: memErr } = await supabase
     .from("organization_members")
@@ -248,20 +300,20 @@ export async function getThisWeek(
     input.members as OrgMemberRow[],
     now,
   );
-  items.push(...planDecisions.filter((d) => d.ownerUserId === userId));
+  raw.push(...planDecisions.filter((d) => d.ownerUserId === userId));
 
   // 2. Escalation triggers true AND resolveRecipient = this user.
   for (const hit of hits) {
     if (hit.recipientUserId !== userId) continue;
-    items.push(hitToDecision(hit));
+    raw.push(hitToDecision(hit));
   }
 
   // 3. Standing missing, admin-level (already in hits; keep explicit for the brief).
   if (adminLevel) {
     const standing = standingMissingForAdmin(hits, userId, true);
-    const have = new Set(items.filter((i) => i.kind === "decision").map((i) => i.id));
+    const have = new Set(raw.map((i) => i.id));
     for (const d of standing) {
-      if (!have.has(d.id)) items.push(d);
+      if (!have.has(d.id)) raw.push(d);
     }
   }
 
@@ -269,24 +321,25 @@ export async function getThisWeek(
   if (adminLevel) {
     const adminId = pickAdminLevelRecipient(input.members as OrgMemberRow[]);
     if (adminId === userId) {
-      items.push(...(await loadProposedNectarRequirements(supabase, orgId, adminId)));
+      raw.push(...(await loadProposedNectarRequirements(supabase, orgId, adminId)));
     }
   }
 
-  // 5. Unanswered org-profile facts (Step 5). Admin-level only.
+  // 5. Org-profile facts stay loadable (source org_profile_facts). They are
+  // not Home cards — QuietSummary is rolled into QuietLine, not the queue.
   if (adminLevel) {
     const facts = await loadOrgFacts(supabase, orgId);
-    if (facts) {
-      const card = unansweredFactsQuietSummary(orgId, facts);
-      if (card) items.push(card);
-    }
+    if (facts) unansweredFactsQuietSummary(orgId, facts);
   }
 
-  // 6. evv_timesheets needs_review in scope — count only.
+  // 6. evv_timesheets needs_review in scope — QuietLine, not a card.
   const evv = await loadEvvNeedsReviewCount(supabase, orgId, evvStaffIdsForScope(viewerScope));
-  if (evv) items.push(evv);
+  const quiet = await loadQuietCounts(supabase, orgId, input, evv?.count ?? 0, now);
 
-  return sortThisWeekItems(items);
+  return {
+    items: finalizeDecisions(raw, userId, now),
+    quiet,
+  };
 }
 
 /** Test helper: build This Week from already-evaluated hits + extras. */

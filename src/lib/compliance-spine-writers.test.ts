@@ -96,7 +96,7 @@ describe("Compliance spine — parallel writers killed", () => {
     assert.match(note, /Do not DROP tables\. Do not run Soft SQL for this change/);
     assert.doesNotMatch(note.slice(0, 1800), /DROP TABLE/);
     const step7 = read(
-      "../../supabase/migrations/20260911170000_nectar_requirement_catalog_relation.sql",
+      "../../supabase/migrations/20260911130000_nectar_requirement_catalog_relation.sql",
     );
     assert.doesNotMatch(step7, /DROP TABLE/);
     assert.match(step7, /catalog_relation/);

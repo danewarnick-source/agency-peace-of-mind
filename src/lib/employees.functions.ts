@@ -2,7 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { onStaffHiredInternal } from "@/lib/staff-assignment-hooks.functions";
+import {
+  onStaffHiredInternal,
+  reevaluateStaffDutiesInternal,
+} from "@/lib/staff-assignment-hooks.functions";
 import { resolveAccountUsername } from "@/lib/account-username";
 
 const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
@@ -27,6 +30,7 @@ export const CreateEmployeeInput = z.object({
   workerType: z.string().trim().max(80).optional().or(z.literal("")),
   customFieldValues: z.record(z.string(), z.unknown()).optional().default({}),
   username: z.string().trim().max(254).optional().or(z.literal("")),
+  managerId: z.string().uuid().nullable().optional(),
 });
 
 export type HireEmployeeInput = z.infer<typeof CreateEmployeeInput>;
@@ -175,6 +179,7 @@ export async function hireEmployeeInternal(
       role: data.role,
       job_title: data.department || null,
       active: true,
+      ...(data.managerId !== undefined ? { manager_id: data.managerId } : {}),
     }, { onConflict: "organization_id,user_id" });
     if (memErr) throw new Error(memErr.message);
 
@@ -287,6 +292,11 @@ async function updateExistingRosterMember(
       .eq("organization_id", data.organizationId)
       .eq("user_id", userId);
     if (memErr) throw new Error(memErr.message);
+    try {
+      await reevaluateStaffDutiesInternal(supabaseAdmin, data.organizationId, userId);
+    } catch (e) {
+      console.warn("[obligations] roster role reevaluate failed:", e);
+    }
     return;
   }
 
@@ -298,6 +308,11 @@ async function updateExistingRosterMember(
     active: true,
   }, { onConflict: "organization_id,user_id" });
   if (memErr) throw new Error(memErr.message);
+  try {
+    await reevaluateStaffDutiesInternal(supabaseAdmin, data.organizationId, userId);
+  } catch (e) {
+    console.warn("[obligations] roster membership reevaluate failed:", e);
+  }
 }
 
 /** Template upload: create / update / skip. Never sends email or hire-pack on update. */

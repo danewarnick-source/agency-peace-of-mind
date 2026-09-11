@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  buildQuietLine,
   decorateDecision,
   FORBIDDEN_DECISION_STRINGS,
   hasForbiddenDecisionCopy,
@@ -223,6 +224,20 @@ describe("rollupDecisions", () => {
     assert.equal(rolled[0]?.count, 4);
     const decorated = decorateDecision(rolled[0]!, { now: NOW });
     assert.match(decorated.headline ?? "", /Renew 4 overdue licenses|Renew 4 OL licenses/);
+  });
+});
+
+describe("assignment gaps are not a clean QuietLine", () => {
+  it("adds a high-signal segment when evaluation is incomplete", () => {
+    const quiet = buildQuietLine({ evaluationIncomplete: true });
+    assert.ok(quiet.segments.some((s) => /not a clean compliance result/.test(s)));
+  });
+
+  it("names assignment_gaps as a QuietSummary source in the type module", () => {
+    const src = readFileSync(new URL("./this-week.ts", import.meta.url), "utf8");
+    assert.match(src, /assignment_gaps/);
+    const io = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
+    assert.match(io, /unansweredDutyQuietSummary/);
   });
 });
 

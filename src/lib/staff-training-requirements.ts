@@ -546,10 +546,11 @@ export function parseBaselineId(id: string): string | null {
 
 export interface ApplicabilityContext {
   hireDate: Date | null;
-  requiresDeescalation: boolean;
-  requiresAbi: boolean;
-  /** Service codes the staffer is currently assigned to (from their active caseload). */
-  assignedCodes?: string[];
+  /** Null = unanswered. Never coerce unanswered to not-applicable. */
+  requiresDeescalation: boolean | null;
+  requiresAbi: boolean | null;
+  /** Null/undefined = assignments unknown. Empty array = known none. */
+  assignedCodes?: string[] | null;
   now?: Date;
 }
 
@@ -559,12 +560,13 @@ export function isBaselineApplicable(
   ctx: ApplicabilityContext,
 ): boolean {
   if (t.conditional === "all") return true;
-  if (t.conditional === "behavior") return ctx.requiresDeescalation;
-  if (t.conditional === "abi") return ctx.requiresAbi;
+  if (t.conditional === "behavior") return ctx.requiresDeescalation !== false;
+  if (t.conditional === "abi") return ctx.requiresAbi !== false;
   if (t.conditional === "codes") {
     const codes = t.applies_to_codes ?? [];
     if (codes.length === 0) return false;
-    const assigned = (ctx.assignedCodes ?? []).map((c) => c.toUpperCase());
+    if (ctx.assignedCodes == null) return true;
+    const assigned = ctx.assignedCodes.map((c) => c.toUpperCase());
     return codes.some((c) => assigned.includes(c.toUpperCase()));
   }
   if (t.conditional === "after_year_one") {

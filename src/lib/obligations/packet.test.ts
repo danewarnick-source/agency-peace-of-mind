@@ -15,6 +15,10 @@ import {
   type PacketClock,
 } from "./packet.ts";
 import { allSowCatalogEntries, sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
+import {
+  UNKNOWN_STAFF_DUTY_FACTS,
+  type StaffDutyFacts,
+} from "./duty-applicability.ts";
 
 const VIEWER = "55555555-5555-5555-5555-555555555555";
 const STAFF = "11111111-1111-1111-1111-111111111111";
@@ -329,5 +333,65 @@ describe("Step 6 locks", () => {
     assert.doesNotMatch(staff, /[\u{1F300}-\u{1FAFF}]/u);
     assert.doesNotMatch(client, /[\u{1F300}-\u{1FAFF}]/u);
     assert.doesNotMatch(agency, /[\u{1F300}-\u{1FAFF}]/u);
+  });
+});
+
+describe("staff duty facts on packets", () => {
+  const office: StaffDutyFacts = {
+    staffId: STAFF,
+    role: "admin",
+    assignmentsKnown: true,
+    assignedClientIds: [],
+    assignedServiceCodes: [],
+    transportsKnown: true,
+    isTransporter: false,
+    abiCaseloadKnown: true,
+    hasAbiCaseload: false,
+    requiresAbi: false,
+    behaviorCaseloadKnown: true,
+    hasBehaviorCaseload: false,
+    requiresDeescalation: false,
+    managerIdKnown: true,
+    managerId: null,
+  };
+
+  it("hides DSP hire clocks for office staff and keeps unanswered visible", () => {
+    const hidden = buildPacket({
+      organizationId: TNS_ORG_ID,
+      subject: "staff",
+      subjectId: STAFF,
+      viewerUserId: VIEWER,
+      scope: orgWideResolvedScope(TNS_ORG_ID, VIEWER),
+      facts: TNS_FACTS,
+      staffDutyFacts: office,
+      clocks: [
+        clock({
+          obligationKey: "cpr_first_aid_initial",
+          title: "CPR/First Aid Certification — Initial",
+        }),
+      ],
+      now: NOW,
+    });
+    assert.ok(hidden.hiddenKeys.includes("cpr_first_aid_initial"));
+    assert.equal(
+      hidden.items.some((i) => i.obligationKey === "cpr_first_aid_initial"),
+      false,
+    );
+
+    const unknown = buildPacket({
+      organizationId: TNS_ORG_ID,
+      subject: "staff",
+      subjectId: STAFF,
+      viewerUserId: VIEWER,
+      scope: orgWideResolvedScope(TNS_ORG_ID, VIEWER),
+      facts: TNS_FACTS,
+      staffDutyFacts: { staffId: STAFF, ...UNKNOWN_STAFF_DUTY_FACTS },
+      clocks: [],
+      now: NOW,
+    });
+    const cpr = unknown.items.find((i) => i.obligationKey === "cpr_first_aid_initial");
+    assert.ok(cpr);
+    assert.equal(cpr.status, "unanswered");
+    assert.equal(cpr.applies, true);
   });
 });

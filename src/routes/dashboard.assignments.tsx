@@ -19,7 +19,10 @@ import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle, ShieldA
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.functions";
-import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
+import {
+  onStaffAssignmentCreated,
+  onStaffAssignmentRemoved,
+} from "@/lib/staff-assignment-hooks.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — Provider Interface" }] }),
@@ -49,6 +52,7 @@ function AssignmentsPage() {
   const qc = useQueryClient();
   const [staffId, setStaffId] = useState("");
   const assignmentHookFn = useServerFn(onStaffAssignmentCreated);
+  const assignmentRemovedFn = useServerFn(onStaffAssignmentRemoved);
 
   const { data: staff } = useQuery({
     enabled: !!org,
@@ -158,6 +162,13 @@ function AssignmentsPage() {
           .delete()
           .in("id", toDelete);
         if (error) throw error;
+        try {
+          await assignmentRemovedFn({
+            data: { organizationId: org.organization_id, staffId },
+          });
+        } catch (e) {
+          console.warn("[obligations] assignment remove reevaluate failed:", e);
+        }
       }
 
       for (const row of toUpsert) {

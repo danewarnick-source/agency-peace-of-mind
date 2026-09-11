@@ -132,9 +132,10 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
       const hire = p.hire_date ? new Date(p.hire_date) : null;
       const ctx = {
         hireDate: hire,
-        requiresDeescalation: !!p.requires_deescalation,
-        requiresAbi: !!p.requires_abi,
-        assignedCodes: codesByStaff.get(p.id) ?? [],
+        requiresDeescalation:
+          typeof p.requires_deescalation === "boolean" ? p.requires_deescalation : null,
+        requiresAbi: typeof p.requires_abi === "boolean" ? p.requires_abi : null,
+        assignedCodes: codesByStaff.has(p.id) ? (codesByStaff.get(p.id) ?? []) : [],
       };
       const trainings: StaffTrainingStatus[] = BASELINE_STAFF_TRAININGS
         .filter((t: BaselineTraining) => isBaselineApplicable(t, ctx))

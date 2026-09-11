@@ -1774,23 +1774,20 @@ export const getDoneReadout = createServerFn({ method: "POST" })
           (prof?.start_date as string | null) ?? (prof?.hire_date as string | null) ?? null;
         const ctx = {
           hireDate: hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null,
-          requiresDeescalation: (prof?.requires_deescalation as boolean | undefined) !== false,
-          requiresAbi: (prof?.requires_abi as boolean | undefined) !== false,
-          // The import doesn't wire service-code assignments, so imported
-          // staff_type values (e.g. "SLN, HHS") stand in for assigned codes —
-          // same trigger logic getStaffChecklist uses once codes are assigned.
-          assignedCodes: ((prof?.staff_type_keys as string[] | null) ?? []).map((c) =>
-            c.toUpperCase(),
-          ),
+          requiresDeescalation:
+            typeof prof?.requires_deescalation === "boolean" ? prof.requires_deescalation : null,
+          requiresAbi: typeof prof?.requires_abi === "boolean" ? prof.requires_abi : null,
+          // Import has not confirmed staff_assignments yet — unknown, not N/A.
+          assignedCodes: null,
         };
         const applicable = BASELINE_STAFF_TRAININGS.filter((t) => isBaselineApplicable(t, ctx));
         const required = applicable.filter((t) => t.conditional === "all").length;
-        const conditionalActive = applicable.filter((t) => t.conditional !== "all").length;
-        // "codes"-conditional trainings NECTAR couldn't confirm from the
-        // import alone — an admin still has to assign real service codes to
-        // decide whether these apply.
+        const conditionalActive = applicable.filter(
+          (t) => t.conditional !== "all" && t.conditional !== "codes",
+        ).length;
+        // Codes-conditional trainings stay unanswered until staff_assignments exist.
         const decisionsNeeded = BASELINE_STAFF_TRAININGS.filter(
-          (t) => t.conditional === "codes" && !isBaselineApplicable(t, ctx),
+          (t) => t.conditional === "codes",
         ).length;
         staffTraining = {
           required,

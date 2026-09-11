@@ -246,12 +246,9 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       (prof?.hire_date as string | null) ??
       null;
     const hireDate = hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null;
-    // Explicit, provider-decided setting only — no auto-detection from client
-    // caseload. Defaults to Required at the DB level.
     const requiresDeescalation =
-      (prof?.requires_deescalation as boolean | undefined) !== false;
-    const requiresAbi =
-      (prof?.requires_abi as boolean | undefined) !== false;
+      typeof prof?.requires_deescalation === "boolean" ? prof.requires_deescalation : null;
+    const requiresAbi = typeof prof?.requires_abi === "boolean" ? prof.requires_abi : null;
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);

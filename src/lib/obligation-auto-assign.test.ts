@@ -32,7 +32,8 @@ describe("hire auto-assign", () => {
       fileURLToPath(new URL("./staff-assignment-hooks.functions.ts", import.meta.url)),
       "utf8",
     );
-    assert.match(hireHook, /titleGroupsForHire\(\)/);
+    assert.match(hireHook, /reevaluateStaffDutiesInternal/);
+    assert.doesNotMatch(hireHook, /titleGroupsForHire\(\)/);
     assert.doesNotMatch(hireHook, /PCT_HIRE_COURSE_TITLE/);
   });
 

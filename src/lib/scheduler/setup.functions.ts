@@ -4,7 +4,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { onStaffAssignmentCreatedInternal } from "@/lib/staff-assignment-hooks.functions";
+import {
+  onStaffAssignmentCreatedInternal,
+  onStaffAssignmentRemovedInternal,
+} from "@/lib/staff-assignment-hooks.functions";
 import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -239,6 +242,13 @@ export const addStaffToClientCode = createServerFn({ method: "POST" })
       .update({ service_codes: next })
       .eq("id", (existing as { id: string }).id);
     if (uErr) throw uErr;
+    await onStaffAssignmentCreatedInternal(
+      supabase,
+      data.organization_id,
+      data.staff_id,
+      data.client_id,
+      next ?? [],
+    );
     return { ok: true };
   });
 
@@ -294,6 +304,7 @@ export const removeStaffFromClientCode = createServerFn({ method: "POST" })
         .eq("id", id);
       if (uErr) throw uErr;
     }
+    await onStaffAssignmentRemovedInternal(supabase, data.organization_id, data.staff_id);
     return { ok: true };
   });
 

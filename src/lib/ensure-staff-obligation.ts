@@ -9,7 +9,7 @@
 
 import { hireDueDaysForTitle } from "./obligation-auto-assign.ts";
 import { addDaysUTC, endOfDayUTC, formatShort } from "./obligation-due-dates.ts";
-import { obligationCreatesInstances } from "./sow-obligation-catalog.ts";
+import { obligationCreatesInstances, sowCatalogEntryByKey } from "./sow-obligation-catalog.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -58,6 +58,32 @@ export async function findObligationByTitles(
     if (hit) return hit;
   }
   return rows[0] ?? null;
+}
+
+export async function findObligationByKey(
+  supabase: AnySupabase,
+  organizationId: string,
+  key: string,
+): Promise<FoundObligation | null> {
+  if (!key) return null;
+  const query = supabase
+    .from("company_obligations")
+    .select("id, title, key, disposition, source")
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .eq("key", key)
+    .maybeSingle();
+  let { data, error } = await query;
+  if (error && /column|schema cache|key|disposition|state_code/i.test(error.message)) {
+    const title = sowCatalogEntryByKey(key)?.title;
+    if (!title) return null;
+    return findObligationByTitles(supabase, organizationId, [title]);
+  }
+  if (error) throw new Error(error.message);
+  if (data) return data as FoundObligation;
+  const title = sowCatalogEntryByKey(key)?.title;
+  if (title) return findObligationByTitles(supabase, organizationId, [title]);
+  return null;
 }
 
 export async function ensureOpenStaffObligationInternal(
@@ -117,6 +143,18 @@ export async function ensureOpenStaffObligationInternal(
     { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
   );
   return { id: inserted.id as string };
+}
+
+export async function ensureOpenStaffObligationByKeyInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  key: string,
+  staff: EnsureStaff,
+  opts?: { dueDays?: number; periodPrefix?: string },
+): Promise<{ id: string } | null> {
+  const ob = await findObligationByKey(supabase, organizationId, key);
+  if (!ob) return null;
+  return ensureOpenStaffObligationInternal(supabase, organizationId, [ob.title], staff, opts);
 }
 
 export async function loadStaffForEnsure(

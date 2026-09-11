@@ -68,7 +68,7 @@ export type QuietSummary = {
   count: number;
   urgency: EscalationUrgency;
   dueAt: string | null;
-  source: "evv_needs_review" | "org_profile_facts";
+  source: "evv_needs_review" | "org_profile_facts" | "assignment_gaps";
 };
 
 export type ThisWeekItem = Decision | QuietSummary;
@@ -135,6 +135,8 @@ export function buildQuietLine(counts: {
   standingCurrent?: number;
   recordsReviewCleared?: number;
   evvReconciledThrough?: string | null;
+  assignmentGaps?: number;
+  evaluationIncomplete?: boolean;
 }): QuietLine {
   const obligationsSatisfied = Math.max(0, counts.obligationsSatisfied ?? 0);
   const notesPassed = Math.max(0, counts.notesPassed ?? 0);
@@ -142,7 +144,16 @@ export function buildQuietLine(counts: {
   const standingCurrent = Math.max(0, counts.standingCurrent ?? 0);
   const recordsReviewCleared = Math.max(0, counts.recordsReviewCleared ?? 0);
   const evvReconciledThrough = counts.evvReconciledThrough ?? null;
+  const assignmentGaps = Math.max(0, counts.assignmentGaps ?? 0);
+  const evaluationIncomplete = counts.evaluationIncomplete === true;
   const segments: string[] = [];
+  if (evaluationIncomplete) {
+    segments.push("Duty evaluation incomplete — this is not a clean compliance result");
+  } else if (assignmentGaps > 0) {
+    segments.push(
+      `${assignmentGaps} assignment gap${assignmentGaps === 1 ? "" : "s"} still open — not a clean compliance result`,
+    );
+  }
   if (obligationsSatisfied > 0) {
     segments.push(
       `${obligationsSatisfied} obligation${obligationsSatisfied === 1 ? "" : "s"} satisfied by normal operations`,

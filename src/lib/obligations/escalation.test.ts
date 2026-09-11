@@ -218,6 +218,35 @@ describe("evaluator fixtures (TNS)", () => {
     assert.notEqual(standing?.consequence, standing?.message);
   });
 
+  it("skips staff clocks that duty facts mark does_not_apply", () => {
+    const input = baseInput();
+    input.staffDutyFactsById = {
+      [STAFF]: {
+        staffId: STAFF,
+        role: "admin",
+        assignmentsKnown: true,
+        assignedClientIds: [],
+        assignedServiceCodes: [],
+        transportsKnown: true,
+        isTransporter: false,
+        abiCaseloadKnown: true,
+        hasAbiCaseload: false,
+        requiresAbi: false,
+        behaviorCaseloadKnown: true,
+        hasBehaviorCaseload: false,
+        requiresDeescalation: false,
+        managerIdKnown: true,
+        managerId: null,
+      },
+    };
+    const hits = evaluateEscalations(input);
+    assert.equal(
+      hits.some((h) => h.obligationKey === "cpr_first_aid_initial"),
+      false,
+    );
+    assert.ok(hits.some((h) => h.obligationKey === "hhs_home_cert_annual"));
+  });
+
   it("writes a distinct consequence per trigger and never restates the message", () => {
     const vars = {
       due: "2026-10-01",

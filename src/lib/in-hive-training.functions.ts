@@ -232,7 +232,9 @@ export async function insertInHiveExamAttempt(args: {
   const title =
     args.courseId === "thirty-day"
       ? "30-day orientation competency exam"
-      : "ABI competency exam";
+      : args.courseId === "abi"
+        ? "ABI competency exam"
+        : "Person-centered thinking competency exam";
   const { error } = await (supabase as any).from("training_completions").insert({
     user_id: args.userId,
     topic_kind: IN_HIVE_PROGRESS_KIND,

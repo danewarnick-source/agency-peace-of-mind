@@ -17,6 +17,7 @@ import {
   EXAM_PASS_RATIO,
   IN_HIVE_COURSE_EVIDENCE,
   completedCodesFromProgress,
+  inHiveCourseFulfillsObligation,
   planThirtyDayWrites,
   shouldPersistTopicStep,
   topicChecklistLabel,
@@ -35,6 +36,19 @@ import {
   type InHiveCourseId,
   type SegmentProof,
 } from "@/lib/in-hive-training";
+import { ANNUAL_CE_COURSE_ID } from "@/lib/in-hive-training-annual-ce";
+import {
+  PCT_COURSE_ID,
+  pctTopicsFromPublic,
+  type PctPublicLesson,
+  type PctPublicQuizItem,
+} from "@/lib/in-hive-training-pct";
+import {
+  getPctCoursePublic,
+  getPctExamPublic,
+  gradePctFormativeFn,
+  submitPctExamFn,
+} from "@/lib/in-hive-training-pct.functions";
 import { InHiveCertificate } from "@/components/training/in-hive-certificate";
 import {
   insertInHiveCourseCertificate,
@@ -66,8 +80,11 @@ type Props = {
   organizationName?: string;
 };
 
-function topicsForCourse(courseId: InHiveCourseId): Topic[] {
-  return courseId === "thirty-day" ? thirtyDayTopicsInSowOrder() : ABI_TOPICS;
+function topicsForCourse(courseId: InHiveCourseId, pctLessons: PctPublicLesson[] | undefined): Topic[] {
+  if (courseId === "thirty-day") return thirtyDayTopicsInSowOrder();
+  if (courseId === "abi") return ABI_TOPICS;
+  if (courseId === PCT_COURSE_ID) return pctTopicsFromPublic(pctLessons ?? []);
+  return [];
 }
 
 export function InHiveCoursePlayer({
@@ -85,19 +102,35 @@ export function InHiveCoursePlayer({
 }: Props) {
   const qc = useQueryClient();
   const recordFn = useServerFn(recordCompletion);
-  const topics = useMemo(() => topicsForCourse(courseId), [courseId]);
+  const loadPctCourse = useServerFn(getPctCoursePublic);
+  const loadPctExam = useServerFn(getPctExamPublic);
+  const gradePctCheck = useServerFn(gradePctFormativeFn);
+  const submitPctExam = useServerFn(submitPctExamFn);
+  const isPct = courseId === PCT_COURSE_ID;
+  const pctCourseQ = useQuery({
+    queryKey: ["pct-course-public"],
+    enabled: isPct,
+    queryFn: () => loadPctCourse(),
+  });
+  const topics = useMemo(
+    () => topicsForCourse(courseId, pctCourseQ.data?.lessons),
+    [courseId, pctCourseQ.data?.lessons],
+  );
   const questions = useMemo(() => examQuestionsFor(courseId), [courseId]);
   const topicCodes = useMemo(() => topics.map((t) => t.code), [topics]);
   const [activeCode, setActiveCode] = useState<string | "exam" | null>(null);
   const [localCompleted, setLocalCompleted] = useState<Set<string>>(() => new Set());
+  const [pctCheckOpen, setPctCheckOpen] = useState(false);
 
   const progressQ = useQuery({
     queryKey: ["in-hive-progress", userId, courseId],
+    enabled: topicCodes.length > 0,
     queryFn: () => loadInHiveCourseProgress(userId, courseId, topicCodes),
   });
 
   const examQ = useQuery({
     queryKey: ["in-hive-exam", userId, courseId, examResetAfterIso],
+    enabled: courseId !== ANNUAL_CE_COURSE_ID,
     queryFn: () => loadInHiveExamAttempts(userId, courseId, examResetAfterIso),
   });
 
@@ -117,8 +150,13 @@ export function InHiveCoursePlayer({
   useEffect(() => {
     if (activeCode !== null) return;
     if (!progressQ.isSuccess) return;
+    if (isPct && !pctCourseQ.isSuccess) return;
     setActiveCode(alreadyComplete || passed ? "exam" : firstOpen);
-  }, [activeCode, alreadyComplete, firstOpen, passed, progressQ.isSuccess]);
+  }, [activeCode, alreadyComplete, firstOpen, isPct, passed, pctCourseQ.isSuccess, progressQ.isSuccess]);
+
+  useEffect(() => {
+    setPctCheckOpen(false);
+  }, [activeCode]);
 
   const saveTopic = useMutation({
     mutationFn: saveInHiveTopicProgress,
@@ -172,7 +210,7 @@ export function InHiveCoursePlayer({
       examPassed: passedExam,
       topicCodes,
       completedCodes: codes,
-      skipObligation,
+      skipObligation: skipObligation || !inHiveCourseFulfillsObligation(courseId),
       alreadyComplete,
       segmentPassed: false,
     });
@@ -363,8 +401,32 @@ export function InHiveCoursePlayer({
     setActiveCode(next ? next.code : "exam");
   };
 
-  if (progressQ.isLoading || examQ.isLoading || activeCode === null) {
+  if (courseId === ANNUAL_CE_COURSE_ID) {
+    return (
+      <div className="rounded-xl border bg-card p-5 text-sm space-y-3">
+        <p className="font-medium">Coming soon</p>
+        <p className="text-muted-foreground">
+          The 12-hour continuing education course is not built yet. Upload certificates on this
+          staff-file card, or log hours in the CE ledger. This placeholder does not mark the card
+          On file.
+        </p>
+        <Button variant="outline" asChild>
+          <Link to="/dashboard/my-obligations">Back to staff file</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (
+    progressQ.isLoading ||
+    examQ.isLoading ||
+    activeCode === null ||
+    (isPct && (pctCourseQ.isLoading || !pctCourseQ.data))
+  ) {
     return <p className="text-sm text-muted-foreground p-4">Loading course…</p>;
+  }
+  if (isPct && pctCourseQ.isError) {
+    return <p className="text-sm text-muted-foreground p-4">Could not load this course. Refresh and try again.</p>;
   }
 
   const activeTopic = topics.find((t) => t.code === activeCode) ?? null;
@@ -392,6 +454,11 @@ export function InHiveCoursePlayer({
             {completedCodes.size} of {topics.length} topics done
             {passed ? " · exam passed" : locked ? " · exam locked" : ""}
           </p>
+          {isPct ? (
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              {pctCourseQ.data?.attribution}
+            </p>
+          ) : null}
         </div>
         <nav
           className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible"
@@ -460,21 +527,74 @@ export function InHiveCoursePlayer({
       </aside>
 
       <div className="min-w-0 flex-1">
-        {activeTopic && (
+        {activeTopic && isPct && !completedCodes.has(activeTopic.code) && pctCheckOpen ? (
+          <PctFormativeCheck
+            lesson={pctCourseQ.data?.lessons.find((l) => l.code === activeTopic.code) ?? null}
+            gradeCheck={gradePctCheck}
+            signedName={signedName}
+            signerEmail={signerEmail}
+            onPassed={() => {
+              setLocalCompleted((prev) => {
+                if (prev.has(activeTopic.code)) return prev;
+                const next = new Set(prev);
+                next.add(activeTopic.code);
+                return next;
+              });
+              void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
+              goNextAfterTopic(activeTopic.code);
+            }}
+          />
+        ) : null}
+        {activeTopic && !(isPct && !completedCodes.has(activeTopic.code) && pctCheckOpen) && (
           <TrainingModule
             key={`${activeTopic.code}-${completedCodes.has(activeTopic.code) ? "review" : "take"}`}
             topic={activeTopic}
             onExit={() => setActiveCode(passed || alreadyComplete ? "exam" : firstOpen)}
-            onFinished={() => goNextAfterTopic(activeTopic.code)}
+            onFinished={() => {
+              if (isPct && !completedCodes.has(activeTopic.code)) {
+                setPctCheckOpen(true);
+                return;
+              }
+              goNextAfterTopic(activeTopic.code);
+            }}
             onComplete={(payload) => onTopicComplete(activeTopic.code, payload)}
             skipAttest
+            endAfterSteps={isPct}
             hideAllTopics
             readOnly={completedCodes.has(activeTopic.code)}
             initialStep={completedCodes.has(activeTopic.code) ? 0 : resumeStep}
             onStepChange={(step) => onStepChange(activeTopic.code, step)}
           />
         )}
-        {activeCode === "exam" && (
+        {activeCode === "exam" && isPct && (
+          <PctExamPane
+            loadExam={loadPctExam}
+            submitExam={submitPctExam}
+            attempts={attempts}
+            locked={locked}
+            passed={passed}
+            alreadyComplete={alreadyComplete}
+            hideObligation={skipObligation || !inHiveCourseFulfillsObligation(courseId)}
+            examResetAfterIso={examResetAfterIso}
+            signedName={signedName}
+            signerEmail={signerEmail}
+            finishPending={finishCourse.isPending}
+            onMarkObligation={() => finishCourse.mutate()}
+            onSubmitted={async (examPassed) => {
+              void qc.invalidateQueries({ queryKey: ["in-hive-exam"] });
+              void qc.invalidateQueries({ queryKey: ["in-hive-progress", userId, courseId] });
+              if (examPassed && inHiveCourseFulfillsObligation(courseId) && !alreadyComplete) {
+                await markObligation();
+              }
+              void qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
+              void qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
+              void qc.invalidateQueries({ queryKey: ["obligation-instance-context"] });
+              void qc.invalidateQueries({ queryKey: ["obligation-pack-matrix"] });
+              void qc.invalidateQueries({ queryKey: ["company-obligations"] });
+            }}
+          />
+        )}
+        {activeCode === "exam" && !isPct && (
           <ExamPane
             title={examTitleFor(courseId)}
             questions={questions}
@@ -662,6 +782,290 @@ function ExamPane({
         </Button>
         <p className="text-[11px] text-muted-foreground">
           {EXAM_MAX_ATTEMPTS} attempts maximum. Results are saved on your staff file.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PctFormativeCheck({
+  lesson,
+  gradeCheck,
+  signedName,
+  signerEmail,
+  onPassed,
+}: {
+  lesson: PctPublicLesson | null;
+  gradeCheck: (args: {
+    data: {
+      lessonId: string;
+      chosenIndex: number;
+      signedName: string;
+      signerEmail: string | null;
+    };
+  }) => Promise<{ passed: boolean; feedback: string }>;
+  signedName: string;
+  signerEmail: string | null;
+  onPassed: () => void;
+}) {
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [passed, setPassed] = useState(false);
+  const grade = useMutation({
+    mutationFn: async (chosenIndex: number) => {
+      if (!lesson) throw new Error("This topic is missing.");
+      return gradeCheck({
+        data: { lessonId: lesson.id, chosenIndex, signedName, signerEmail },
+      });
+    },
+    onSuccess: (result) => {
+      setFeedback(result.feedback);
+      setPassed(result.passed);
+      if (result.passed) {
+        toast.success("Topic passed.");
+        onPassed();
+      } else {
+        toast.error("Try again.");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (!lesson) {
+    return <p className="text-sm text-muted-foreground p-4">This topic is missing.</p>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Knowledge check — {lesson.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm font-medium">{lesson.question}</p>
+        <div className="space-y-1.5">
+          {lesson.options.map((option, index) => (
+            <label
+              key={index}
+              className={cn(
+                "flex items-start gap-2 rounded-lg border p-2.5 text-sm cursor-pointer",
+                chosen === index && "border-primary bg-primary/5",
+              )}
+            >
+              <input
+                type="radio"
+                name={`pct-check-${lesson.id}`}
+                className="mt-1"
+                checked={chosen === index}
+                onChange={() => {
+                  setChosen(index);
+                  setFeedback(null);
+                }}
+              />
+              <span>
+                <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {option}
+              </span>
+            </label>
+          ))}
+        </div>
+        {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
+        <Button
+          disabled={chosen === null || grade.isPending || passed}
+          onClick={() => chosen !== null && grade.mutate(chosen)}
+        >
+          {grade.isPending ? "Checking…" : "Check answer"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PctExamPane({
+  loadExam,
+  submitExam,
+  attempts,
+  locked,
+  passed,
+  alreadyComplete,
+  hideObligation,
+  examResetAfterIso,
+  signedName,
+  signerEmail,
+  finishPending,
+  onMarkObligation,
+  onSubmitted,
+}: {
+  loadExam: () => Promise<PctPublicQuizItem[]>;
+  submitExam: (args: {
+    data: {
+      chosenById: Record<string, number>;
+      signedName: string;
+      signerEmail: string | null;
+      examResetAfterIso: string | null;
+    };
+  }) => Promise<{
+    passed: boolean;
+    correctCount: number;
+    total: number;
+    scorePct: number;
+    attempt: number;
+    locked: boolean;
+  }>;
+  attempts: ExamAttemptSnapshot[];
+  locked: boolean;
+  passed: boolean;
+  alreadyComplete: boolean;
+  hideObligation: boolean;
+  examResetAfterIso: string | null;
+  signedName: string;
+  signerEmail: string | null;
+  finishPending: boolean;
+  onMarkObligation: () => void;
+  onSubmitted: (examPassed: boolean) => void | Promise<void>;
+}) {
+  const quizQ = useQuery({
+    queryKey: ["pct-exam-public"],
+    queryFn: () => loadExam(),
+  });
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [shuffled, setShuffled] = useState<PctPublicQuizItem[]>([]);
+  useEffect(() => {
+    const items = quizQ.data ?? [];
+    setShuffled(
+      items.map((q) => ({
+        ...q,
+        options: shuffleCopy(q.options),
+      })),
+    );
+    setAnswers({});
+  }, [quizQ.data, attempts.length]);
+
+  const submit = useMutation({
+    mutationFn: () =>
+      submitExam({
+        data: {
+          chosenById: answers,
+          signedName,
+          signerEmail,
+          examResetAfterIso,
+        },
+      }),
+    onSuccess: async (result) => {
+      await onSubmitted(result.passed);
+      if (result.passed) toast.success(`Exam passed at ${result.scorePct}%.`);
+      else if (result.locked) toast.error("Three attempts used. An admin must reassign this exam.");
+      else toast.error(`Score ${result.scorePct}%. Need 12 of 15 to pass.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const last = attempts[attempts.length - 1];
+  const failedCount = attempts.filter((a) => !a.passed).length;
+  const triesLeft = remainingExamAttempts(failedCount, passed);
+
+  if (quizQ.isLoading) {
+    return <p className="text-sm text-muted-foreground p-4">Loading exam…</p>;
+  }
+  if (quizQ.isError || !quizQ.data?.length) {
+    return (
+      <p className="text-sm text-muted-foreground p-4">
+        Exam content is not available. Ask an administrator to attach the course JSON.
+      </p>
+    );
+  }
+
+  if (locked) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Exam locked</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            Three attempts were used without a passing score. An admin must reassign this exam
+            before you can try again.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (passed) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Exam passed</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            Score {last?.scorePct ?? "—"}%.
+            {hideObligation
+              ? " Course complete. A certificate upload is still what clears the hire-level SOW card until this course is released as contract evidence."
+              : " This card is On file when the course is recorded."}
+          </p>
+          {!alreadyComplete && !hideObligation && (
+            <Button variant="outline" disabled={finishPending} onClick={onMarkObligation}>
+              Record on staff file
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Person-centered thinking competency exam</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-sm text-muted-foreground">
+          12 of 15 to pass. {triesLeft} {triesLeft === 1 ? "try" : "tries"} left. No notes during
+          the test.
+        </p>
+        {shuffled.map((q, i) => (
+          <fieldset key={q.id} className="space-y-2">
+            <legend className="text-sm font-medium">
+              {i + 1}. {q.stem}
+            </legend>
+            <div className="space-y-1.5">
+              {q.options.map((text, oi) => {
+                const originalIndex = quizQ.data.find((item) => item.id === q.id)?.options.indexOf(text) ?? oi;
+                return (
+                  <label
+                    key={`${q.id}-${originalIndex}`}
+                    className={cn(
+                      "flex items-start gap-2 rounded-lg border p-2.5 text-sm cursor-pointer",
+                      answers[q.id] === originalIndex && "border-primary bg-primary/5",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={q.id}
+                      className="mt-1"
+                      checked={answers[q.id] === originalIndex}
+                      onChange={() =>
+                        setAnswers((prev) => ({ ...prev, [q.id]: originalIndex }))
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">{String.fromCharCode(65 + oi)}.</span> {text}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ))}
+        <Button
+          className="w-full sm:w-auto"
+          disabled={submit.isPending || Object.keys(answers).length < shuffled.length}
+          onClick={() => submit.mutate()}
+        >
+          {submit.isPending ? "Scoring…" : "Submit exam"}
+        </Button>
+        <p className="text-[11px] text-muted-foreground">
+          {EXAM_MAX_ATTEMPTS} attempts maximum. The server scores this exam. Results are saved on
+          your staff file.
         </p>
       </CardContent>
     </Card>

@@ -1,13 +1,35 @@
 /**
  * In-Hive staff courses opened from My Obligations.
- * 30-day orientation (SOW §1.8(4)(A)–(W)) and ABI (SOW §1.8(8)(A)–(F)).
+ * 30-day orientation (SOW §1.8(4)(A)–(W)), ABI (SOW §1.8(8)(A)–(F)),
+ * hire-level Person-centered foundations (NCAPPS-informed; not official NCAPPS),
+ * and the 12-hour CE placeholder (SOW §1.9 — no curriculum yet).
  * Progress uses existing training_topic_progress / training_completions.
  */
+
+import {
+  ANNUAL_CE_COURSE_FULFILLS_OBLIGATION,
+  ANNUAL_CE_COURSE_ID,
+  ANNUAL_CE_COURSE_TITLE,
+  ANNUAL_CE_IN_HIVE_COURSE_ENABLED,
+  isAnnualCeObligationTitle,
+} from "./in-hive-training-annual-ce.ts";
+import {
+  PCT_COURSE_FULFILLS_OBLIGATION,
+  PCT_COURSE_ID,
+  PCT_COURSE_TITLE,
+  PCT_IN_HIVE_COURSE_ENABLED,
+  PCT_TOPIC_CODES,
+  isPctHireObligationTitle,
+} from "./in-hive-training-pct.ts";
 
 export const THIRTY_DAY_OBLIGATION_TITLE = "30-Day New Hire Orientation Training";
 export const ABI_OBLIGATION_TITLE = "ABI Training — Before Working Alone";
 
-export type InHiveCourseId = "thirty-day" | "abi";
+export type InHiveCourseId =
+  | "thirty-day"
+  | "abi"
+  | typeof PCT_COURSE_ID
+  | typeof ANNUAL_CE_COURSE_ID;
 
 export const IN_HIVE_COURSE_EVIDENCE = "in_hive_course";
 
@@ -20,11 +42,20 @@ export function inHiveCourseIdForTitle(title: string): InHiveCourseId | null {
   const t = title.trim();
   if (t === THIRTY_DAY_OBLIGATION_TITLE) return "thirty-day";
   if (t === ABI_OBLIGATION_TITLE || t.startsWith("ABI Training")) return "abi";
+  if (PCT_IN_HIVE_COURSE_ENABLED && isPctHireObligationTitle(t)) return PCT_COURSE_ID;
+  if (ANNUAL_CE_IN_HIVE_COURSE_ENABLED && isAnnualCeObligationTitle(t)) return ANNUAL_CE_COURSE_ID;
   return null;
 }
 
 export function isInHiveCourseTitle(title: string): boolean {
   return inHiveCourseIdForTitle(title) !== null;
+}
+
+/** 30-day, ABI, and hire-level PCT close the SOW card. 12-hour placeholder does not. */
+export function inHiveCourseFulfillsObligation(courseId: InHiveCourseId): boolean {
+  if (courseId === PCT_COURSE_ID) return PCT_COURSE_FULFILLS_OBLIGATION;
+  if (courseId === ANNUAL_CE_COURSE_ID) return ANNUAL_CE_COURSE_FULFILLS_OBLIGATION;
+  return true;
 }
 
 export function inHiveProgressRef(courseId: InHiveCourseId, topicCode: string): string {
@@ -104,8 +135,15 @@ export const THIRTY_DAY_TOPIC_CITE: Record<string, string> = {
  * migration. Pattern: a11ce000-1e8f-4000-8000-00000000{course}{topic}.
  * Extra SAS topics use 00000001{course}{index} so A–W UUIDs never change.
  */
+const IN_HIVE_COURSE_BYTE: Record<InHiveCourseId, string> = {
+  "thirty-day": "01",
+  abi: "02",
+  [PCT_COURSE_ID]: "03",
+  [ANNUAL_CE_COURSE_ID]: "04",
+};
+
 export function inHiveRefUuid(courseId: InHiveCourseId, topicCode: string): string {
-  const courseByte = courseId === "thirty-day" ? "01" : "02";
+  const courseByte = IN_HIVE_COURSE_BYTE[courseId];
   if (topicCode === "__exam__") {
     return `a11ce000-1e8f-4000-8000-00000000${courseByte}ff`;
   }
@@ -198,7 +236,10 @@ export function planTopicProgressWrite(args: {
 }
 
 export function topicCodesForCourse(courseId: InHiveCourseId): string[] {
-  return courseId === "thirty-day" ? [...THIRTY_DAY_TOPIC_CODES] : "ABCDEF".split("");
+  if (courseId === "thirty-day") return [...THIRTY_DAY_TOPIC_CODES];
+  if (courseId === "abi") return "ABCDEF".split("");
+  if (courseId === PCT_COURSE_ID) return [...PCT_TOPIC_CODES];
+  return [];
 }
 
 export function staffCourseProgressLabel(completed: number, total: number): string {
@@ -528,15 +569,19 @@ function csvCell(value: string): string {
 }
 
 export function courseTitle(courseId: InHiveCourseId): string {
-  return courseId === "thirty-day"
-    ? "30-Day Essential Training"
-    : "ABI training — before working alone";
+  if (courseId === "thirty-day") return "30-Day Essential Training";
+  if (courseId === "abi") return "ABI training — before working alone";
+  if (courseId === ANNUAL_CE_COURSE_ID) return ANNUAL_CE_COURSE_TITLE;
+  return PCT_COURSE_TITLE;
 }
 
 export function courseCitation(courseId: InHiveCourseId): string {
-  return courseId === "thirty-day"
-    ? "DHHS91172 SOW §1.8(4)(A)–(W) plus SAS 30-day essential topics"
-    : "DHHS91172 SOW §1.8(8)(A)–(F)";
+  if (courseId === "thirty-day") {
+    return "DHHS91172 SOW §1.8(4)(A)–(W) plus SAS 30-day essential topics";
+  }
+  if (courseId === "abi") return "DHHS91172 SOW §1.8(8)(A)–(F)";
+  if (courseId === ANNUAL_CE_COURSE_ID) return "DHHS91172 SOW §1.9 — placeholder; upload remains the evidence path";
+  return "NCAPPS-informed Provider Interface education — not official NCAPPS. Hire-level only.";
 }
 
 export type CertificateTopicLine = {

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { ABI_OBLIGATION_TITLE, THIRTY_DAY_OBLIGATION_TITLE } from "./in-hive-training.ts";
 import { PCT_HIRE_COURSE_TITLE } from "./client-form-obligations.ts";
 import {
@@ -25,6 +27,13 @@ describe("hire auto-assign", () => {
       PCT_HIRE_COURSE_TITLE,
     ]);
     assert.equal(titleGroupsForHire().length, 5);
+    assert.ok(titleGroupsForHire().some((group) => group.includes(PCT_HIRE_COURSE_TITLE)));
+    const hireHook = readFileSync(
+      fileURLToPath(new URL("./staff-assignment-hooks.functions.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(hireHook, /titleGroupsForHire\(\)/);
+    assert.doesNotMatch(hireHook, /PCT_HIRE_COURSE_TITLE/);
   });
 
   it("uses existing due windows (30 / 90 / 180) instead of a second cadence", () => {

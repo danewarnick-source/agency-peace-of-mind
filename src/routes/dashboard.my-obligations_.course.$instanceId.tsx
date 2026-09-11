@@ -11,7 +11,8 @@ import {
   lastExamResetAt,
 } from "@/lib/in-hive-training";
 import { thirtyDayCourseAccessFn } from "@/lib/in-hive-training-access.functions";
-import { thirtyDayOrgIsComped } from "@/lib/in-hive-training-access";
+import { courseUsesTrainingSeat, thirtyDayOrgIsComped } from "@/lib/in-hive-training-access";
+import { ANNUAL_CE_COURSE_ID } from "@/lib/in-hive-training-annual-ce";
 import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ function InHiveCoursePage() {
 
   const accessQ = useQuery({
     queryKey: ["thirty-day-course-access", orgId, user?.id],
-    enabled: !!orgId && !!user && courseIdPreview === "thirty-day" && !orgComped,
+    enabled: !!orgId && !!user && courseUsesTrainingSeat(courseIdPreview) && !orgComped,
     queryFn: () => accessFn({ data: { organizationId: orgId! } }),
   });
 
@@ -106,7 +107,8 @@ function InHiveCoursePage() {
   const alreadyComplete =
     instance.status === "completed" || instance.status === "waived";
   const examResetAfterIso = lastExamResetAt(instance.admin_notes, user.id);
-  const needsPurchasedSeat = courseId === "thirty-day" && !orgComped;
+  const needsPurchasedSeat = courseUsesTrainingSeat(courseId) && !orgComped;
+  const isAnnualCePlaceholder = courseId === ANNUAL_CE_COURSE_ID;
   const accessBlocked =
     needsPurchasedSeat &&
     (accessQ.isError || (accessQ.isSuccess && accessQ.data && !accessQ.data.allowed));
@@ -117,7 +119,11 @@ function InHiveCoursePage() {
         eyebrow="Staff file"
         eyebrowIcon={ClipboardList}
         title={obligation.title}
-        subtitle="Complete each topic, then the competency exam. You can leave and pick up where you left off."
+        subtitle={
+          isAnnualCePlaceholder
+            ? "This 12-hour course is not built yet. Upload certificates on the staff-file card."
+            : "Complete each topic, then the competency exam. You can leave and pick up where you left off."
+        }
       />
       {needsPurchasedSeat && accessQ.isLoading ? (
         <p className="text-sm text-muted-foreground p-4">Checking training access…</p>
@@ -125,13 +131,13 @@ function InHiveCoursePage() {
         <div className="rounded-xl border bg-card p-5 text-sm space-y-3">
           <p className="font-medium">
             {accessQ.isError
-              ? "Could not confirm a 30-day training seat"
-              : "A 30-day training seat is required"}
+              ? "Could not confirm a training seat"
+              : "A training seat is required"}
           </p>
           <p className="text-muted-foreground">
             {accessQ.isError
               ? "Refresh and try again. If this continues, ask an admin to confirm your seat."
-              : "Paid agencies purchase the 30-day course ($75 per person) or the pack from Training. An admin assigns your name on the roster after checkout. True North Supports is never charged and does not need a purchased seat."}
+              : "Paid agencies purchase the 30-day course ($75 per person) or the pack from Training. That same seat unlocks 30-day orientation, Person-Centered Thinking, ABI, and the 12-hour CE placeholder. An admin assigns your name on the roster after checkout. True North Supports is never charged and does not need a purchased seat."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild>

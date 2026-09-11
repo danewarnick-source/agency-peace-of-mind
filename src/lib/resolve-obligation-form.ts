@@ -21,7 +21,11 @@ function isInHiveCourseTitle(title: string): boolean {
   return (
     t === "30-day new hire orientation training" ||
     t === "abi training — before working alone" ||
-    t.startsWith("abi training")
+    t.startsWith("abi training") ||
+    t === "person-centered thinking and practices training" ||
+    t === "annual 12-hour continuing education" ||
+    t.startsWith("annual 12-hour") ||
+    t.startsWith("annual 12 hour")
   );
 }
 

@@ -57,4 +57,15 @@ describe("clientFormKindForTitle", () => {
     assert.doesNotMatch(catalog, /title: "Person-Centered Thinking — \[Client Name\]"/);
     assert.match(catalog, /title: "Person-Centered Thinking and Practices Training"/);
   });
+
+  it("has no createPersonCenteredProfile server fn", () => {
+    const fns = readFileSync(
+      new URL("./client-specific-training.functions.ts", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(fns, /export const createPersonCenteredProfile/);
+    assert.doesNotMatch(fns, /training_type: "person_centered"/);
+    assert.match(fns, /getStaffClientSpecificTraining/);
+    assert.match(fns, /completeClientSpecificTraining/);
+  });
 });

@@ -6,6 +6,8 @@
  * Not SEI UPI support-strategy entry.
  */
 
+// person_centered stays on the union for retirement helpers/tests only.
+// clientFormKindForTitle never returns it. Do not treat it as a live form.
 export type ClientFormKind = "person_specific" | "support_strategies" | "person_centered";
 
 export const CLIENT_FORM_EVIDENCE = "form";

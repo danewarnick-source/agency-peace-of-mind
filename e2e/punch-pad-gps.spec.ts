@@ -122,12 +122,13 @@ test.describe("Admin home pin", () => {
     const pinHeading = page.getByTestId("home-location-section").getByRole("heading", { name: /Home location/i });
     await expect(pinHeading).toBeVisible({ timeout: 15_000 });
     await pinHeading.scrollIntoViewIfNeeded();
-    await expect(page.getByText(/Move the pin if this is the wrong house/i).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Save address & drop pin/i })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Use my current location/i }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /Guess pin from address/i })).toBeVisible();
+    await expect(page.getByText(/Move the pin if this is the wrong house/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Save address & drop pin/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Use my current location/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Guess pin from address/i })).toHaveCount(0);
+    await expect(page.getByTestId("geofence-radius-feet")).toBeVisible();
+    await expect(page.getByLabel(/Clock-in geofence radius/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Save address$/i })).toBeVisible();
     await expect(page.getByTestId("home-pin-map")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".leaflet-container")).toBeVisible({ timeout: 15_000 });
     await assertPageNotBlank(page, "home pin card");
@@ -136,12 +137,17 @@ test.describe("Admin home pin", () => {
     // Tap the map → draft pin (main admin correction, not GPS-at-the-house).
     await page.locator(".leaflet-container").click({ position: { x: 220, y: 160 } });
     const savePin = page.getByRole("button", { name: /Save this pin/i });
-    await expect(page.getByText(/The pin moved\. Save it so clock-in uses this house/i)).toBeVisible({
+    await expect(page.getByTestId("home-pin-moved-banner")).toBeVisible({
       timeout: 8_000,
     });
+    await expect(page.getByText(/The pin moved\. Save it so clock-in uses this house/i)).toBeVisible();
     await expect(savePin).toBeVisible();
     await savePin.scrollIntoViewIfNeeded();
     await shot(page, "home_pin_map_after_tap");
+    await savePin.click();
+    await expect(page.getByTestId("home-pin-moved-banner")).toHaveCount(0, { timeout: 8_000 });
+    await expect(page.getByText(/The pin moved\. Save it so clock-in uses this house/i)).toHaveCount(0);
+    await shot(page, "home_pin_map_after_save");
   });
 });
 

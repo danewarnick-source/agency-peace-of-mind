@@ -1,11 +1,11 @@
 // Admin Home location on the client profile.
-// Punch pad geofence compares live GPS to clients.home_latitude / home_longitude.
-// Leaflet JS is loaded after mount so SSR never evaluates `window`.
+// Punch pad geofence compares live GPS to clients.home_latitude / home_longitude
+// using clients.geofence_radius_feet (default 1000).
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, MapPin, Navigation, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  refreshClientHomePinFromAddress,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  saveClientGeofenceRadius,
   saveClientHomePin,
-  saveClientHomePinFromGps,
+  saveClientPhysicalAddress,
 } from "@/lib/home-pin.functions";
-import { waitForHighAccuracyPosition } from "@/lib/gps";
+import {
+  DEFAULT_GEOFENCE_RADIUS_FEET,
+  isHomePinDraftDirty,
+  resolveGeofenceRadiusFeet,
+} from "@/lib/geo";
 import "leaflet/dist/leaflet.css";
 
 type HomePinMapProps = {
@@ -27,19 +38,28 @@ type HomePinMapProps = {
   onPick: (lat: number, lng: number) => void;
 };
 
-function pinsDiffer(
-  a: { lat: number; lng: number } | null,
-  b: { lat: number; lng: number } | null,
-): boolean {
-  if (!a || !b) return a !== b;
-  return Math.abs(a.lat - b.lat) > 1e-6 || Math.abs(a.lng - b.lng) > 1e-6;
+type HomePinRow = {
+  physical_address: string | null;
+  home_latitude: number | null;
+  home_longitude: number | null;
+  geofence_radius_feet: number | null;
+};
+
+const RADIUS_PRESETS_FT = [100, 300, 1000, 1500] as const;
+
+function radiusLabel(feet: number): string {
+  const formatted = feet.toLocaleString();
+  if (feet === DEFAULT_GEOFENCE_RADIUS_FEET) {
+    return `${formatted} ft (default)`;
+  }
+  return `${formatted} ft`;
 }
 
 export function HomePinCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
-  const refreshFn = useServerFn(refreshClientHomePinFromAddress);
   const savePinFn = useServerFn(saveClientHomePin);
-  const gpsPinFn = useServerFn(saveClientHomePinFromGps);
+  const saveRadiusFn = useServerFn(saveClientGeofenceRadius);
+  const saveAddrFn = useServerFn(saveClientPhysicalAddress);
 
   const q = useQuery({
     queryKey: ["client-home-pin", clientId],
@@ -50,12 +70,7 @@ export function HomePinCard({ clientId }: { clientId: string }) {
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
-      return data as {
-        physical_address: string | null;
-        home_latitude: number | null;
-        home_longitude: number | null;
-        geofence_radius_feet: number | null;
-      } | null;
+      return data as HomePinRow | null;
     },
   });
 
@@ -82,13 +97,20 @@ export function HomePinCard({ clientId }: { clientId: string }) {
   const addr = address ?? q.data?.physical_address ?? "";
   const savedLat = q.data?.home_latitude;
   const savedLng = q.data?.home_longitude;
-  const radius = q.data?.geofence_radius_feet ?? 1000;
+  const radius = resolveGeofenceRadiusFeet(q.data?.geofence_radius_feet);
   const saved =
     typeof savedLat === "number" && typeof savedLng === "number"
       ? { lat: Number(savedLat), lng: Number(savedLng) }
       : null;
   const pin = draft ?? saved;
-  const dirty = pinsDiffer(draft, saved);
+  const dirty = isHomePinDraftDirty(draft, saved);
+  const addrDirty = address !== null && address.trim() !== (q.data?.physical_address ?? "").trim();
+
+  const radiusOptions = useMemo(() => {
+    const set = new Set<number>(RADIUS_PRESETS_FT);
+    set.add(radius);
+    return [...set].sort((a, b) => a - b);
+  }, [radius]);
 
   useEffect(() => {
     setDraft(null);
@@ -103,32 +125,14 @@ export function HomePinCard({ clientId }: { clientId: string }) {
 
   const saveAddr = useMutation({
     mutationFn: () =>
-      refreshFn({
+      saveAddrFn({
         data: { clientId, address: addr.trim() },
       }),
     onSuccess: (r) => {
-      toast.success(
-        r.updated
-          ? "Address saved. A pin was dropped from that address — move it if this is the wrong house."
-          : r.geocoded
-            ? "Address saved. Home pin already matches that address — move it if the house is off."
-            : "Address saved. Could not guess a street pin — drop one on the map or use current location at the house.",
-      );
+      toast.success("Address saved.");
       setAddress(null);
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const reGeocode = useMutation({
-    mutationFn: () => refreshFn({ data: { clientId } }),
-    onSuccess: (r) => {
-      toast.success(
-        r.updated
-          ? "Pin refreshed from the address. Move it if this is the wrong house."
-          : r.geocoded
-            ? "Pin already matches the address. Move it if the house is off."
-            : "Could not guess a street pin from the address. Drop one on the map.",
+      qc.setQueryData(["client-home-pin", clientId], (old: HomePinRow | null | undefined) =>
+        old ? { ...old, physical_address: r.address } : old,
       );
       invalidate();
     },
@@ -139,32 +143,42 @@ export function HomePinCard({ clientId }: { clientId: string }) {
     mutationFn: () => {
       if (!pin) throw new Error("Drop a pin on the house first.");
       return savePinFn({
-        data: { clientId, latitude: pin.lat, longitude: pin.lng },
+        data: {
+          clientId,
+          latitude: pin.lat,
+          longitude: pin.lng,
+          geofenceRadiusFeet: radius,
+        },
       });
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       toast.success("Home pin saved. Clock-in will use this house.");
+      qc.setQueryData(["client-home-pin", clientId], (old: HomePinRow | null | undefined) =>
+        old
+          ? {
+              ...old,
+              home_latitude: r.latitude,
+              home_longitude: r.longitude,
+              geofence_radius_feet: r.geofenceRadiusFeet ?? old.geofence_radius_feet,
+            }
+          : old,
+      );
       setDraft(null);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const fromGps = useMutation({
-    mutationFn: async () => {
-      const fix = await waitForHighAccuracyPosition(20_000);
-      return gpsPinFn({
-        data: {
-          clientId,
-          latitude: fix.lat,
-          longitude: fix.lng,
-          accuracyMeters: fix.acc,
-        },
-      });
-    },
-    onSuccess: () => {
-      toast.success("Home pin set from your current GPS.");
-      setDraft(null);
+  const saveRadius = useMutation({
+    mutationFn: (feet: number) =>
+      saveRadiusFn({
+        data: { clientId, geofenceRadiusFeet: feet },
+      }),
+    onSuccess: (r) => {
+      toast.success(`Clock-in radius set to ${r.geofenceRadiusFeet.toLocaleString()} ft.`);
+      qc.setQueryData(["client-home-pin", clientId], (old: HomePinRow | null | undefined) =>
+        old ? { ...old, geofence_radius_feet: r.geofenceRadiusFeet } : old,
+      );
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -176,57 +190,64 @@ export function HomePinCard({ clientId }: { clientId: string }) {
         <div className="flex items-start gap-2.5 border-b border-border/60 px-5 py-4">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold leading-tight">Home location</h3>
-            <p className="mt-1 text-sm font-medium text-foreground">
-              Move the pin if this is the wrong house.
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Saving the address drops a first-guess pin. Drag the house pin (or tap the map)
-              onto the actual house, then save. The green circle is the clock-in zone
-              ({radius.toLocaleString()} ft). Staff GPS is checked against this pin — not a live state feed.
-            </p>
           </div>
         </div>
 
         <div className="space-y-3 p-5">
           <div className="space-y-1">
             <Label htmlFor="home-pin-address" className="text-xs">Physical address</Label>
-            <Input
-              id="home-pin-address"
-              value={addr}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Street, City, ST ZIP"
-              disabled={q.isLoading}
-            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="home-pin-address"
+                value={addr}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street, City, ST ZIP"
+                disabled={q.isLoading}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => saveAddr.mutate()}
+                disabled={saveAddr.isPending || !addrDirty || !addr.trim()}
+              >
+                {saveAddr.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                Save address
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => saveAddr.mutate()}
-              disabled={saveAddr.isPending || !addr.trim()}
+          <div className="space-y-1">
+            <Label htmlFor="home-pin-radius" className="text-xs">
+              Clock-in geofence radius (feet)
+            </Label>
+            <Select
+              value={String(radius)}
+              onValueChange={(v) => {
+                const feet = Number(v);
+                if (!Number.isFinite(feet) || feet === radius) return;
+                saveRadius.mutate(feet);
+              }}
+              disabled={q.isLoading || saveRadius.isPending}
             >
-              {saveAddr.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1 h-3.5 w-3.5" />}
-              Save address &amp; drop pin
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => reGeocode.mutate()}
-              disabled={reGeocode.isPending || !addr.trim()}
-            >
-              {reGeocode.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
-              Guess pin from address
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => fromGps.mutate()}
-              disabled={fromGps.isPending}
-            >
-              {fromGps.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Navigation className="mr-1 h-3.5 w-3.5" />}
-              Use my current location
-            </Button>
+              <SelectTrigger
+                id="home-pin-radius"
+                className="max-w-xs"
+                data-testid="geofence-radius-feet"
+              >
+                <SelectValue placeholder={radiusLabel(DEFAULT_GEOFENCE_RADIUS_FEET)} />
+              </SelectTrigger>
+              <SelectContent>
+                {radiusOptions.map((feet) => (
+                  <SelectItem key={feet} value={String(feet)}>
+                    {radiusLabel(feet)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {saveRadius.isPending ? (
+              <p className="text-xs text-muted-foreground">Saving radius…</p>
+            ) : null}
           </div>
 
           {mapError ? (
@@ -247,7 +268,10 @@ export function HomePinCard({ clientId }: { clientId: string }) {
           )}
 
           {dirty ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 dark:bg-amber-950/30">
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 dark:bg-amber-950/30"
+              data-testid="home-pin-moved-banner"
+            >
               <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
                 The pin moved. Save it so clock-in uses this house.
               </p>
@@ -265,7 +289,7 @@ export function HomePinCard({ clientId }: { clientId: string }) {
             <p className="font-mono text-[11px] text-muted-foreground">
               {pin
                 ? `Saved pin: ${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`
-                : "No pin yet — save the address, tap the map, or use current location at the house."}
+                : "No pin yet — tap the map, then save."}
             </p>
           )}
         </div>

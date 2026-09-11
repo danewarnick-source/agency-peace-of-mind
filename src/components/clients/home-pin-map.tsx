@@ -9,7 +9,7 @@ import L from "leaflet";
 
 const houseIcon = L.divIcon({
   className: "evv-house-pin",
-  html: `<div style="background:#0f766e;color:#fff;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.35);border:2px solid #fff;cursor:grab;"><span style="transform:rotate(45deg);font-size:16px;">🏠</span></div>`,
+  html: `<div style="background:#0f766e;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.35);border:2px solid #fff;cursor:grab;"><span style="display:block;width:10px;height:10px;margin:11px auto 0;border-radius:50%;background:#fff;transform:rotate(45deg);"></span></div>`,
   iconSize: [36, 36],
   iconAnchor: [18, 36],
 });
@@ -68,11 +68,11 @@ export default function HomePinMap({
       className="relative overflow-hidden rounded-lg border border-border"
       style={{ height }}
     >
-      <div className="pointer-events-none absolute left-2 top-2 z-[1000] max-w-[90%] rounded-md border border-teal-700/20 bg-background/95 px-2.5 py-1.5 text-xs font-semibold text-teal-900 shadow-sm dark:text-teal-100">
-        {hasPin
-          ? "Move the pin if this is the wrong house"
-          : "Tap the map to drop a pin on the house"}
-      </div>
+      {!hasPin ? (
+        <div className="pointer-events-none absolute left-2 top-2 z-[1000] max-w-[90%] rounded-md border border-teal-700/20 bg-background/95 px-2.5 py-1.5 text-xs font-semibold text-teal-900 shadow-sm dark:text-teal-100">
+          Tap the map to drop a pin on the house
+        </div>
+      ) : null}
       <MapContainer
         key={hasPin ? "pinned" : "empty"}
         center={center}

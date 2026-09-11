@@ -4,6 +4,7 @@ import { z } from "zod";
 import { useCaseload } from "@/hooks/use-caseload";
 import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
+import { resolveGeofenceRadiusFeet } from "@/lib/geo";
 
 import { Badge } from "@/components/ui/badge";
 import { PunchPad } from "@/components/evv/punch-pad";
@@ -383,7 +384,7 @@ function ClientWorkspace() {
                     : undefined),
                 homeLat: client.home_latitude,
                 homeLng: client.home_longitude,
-                geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
+                geofenceRadiusFeet: resolveGeofenceRadiusFeet(client.geofence_radius_feet),
                 pcspGoals: client.pcsp_goals ?? [],
               }}
               presetServiceCode={effectivePresetCode}

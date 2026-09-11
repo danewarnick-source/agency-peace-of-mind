@@ -5,7 +5,10 @@ import {
   haversineFeet,
   homePinMismatchesGeocode,
   isGpsFixConfident,
+  isHomePinDraftDirty,
   pickBetterGpsFix,
+  resolveGeofenceRadiusFeet,
+  DEFAULT_GEOFENCE_RADIUS_FEET,
   HOME_PIN_MISMATCH_FEET,
   MAX_GPS_ACCURACY_METERS,
 } from "./geo.ts";
@@ -132,6 +135,50 @@ describe("evaluateGeofence", () => {
       radiusFeet: radius,
     });
     assert.equal(d.kind, "no_home_pin");
+  });
+
+  it("uses the per-client radius, not a hard-coded 1000 ft, for the same home pin", () => {
+    const live = offsetWestFeet(HOME, 400);
+    const tight = evaluateGeofence({
+      home: HOME,
+      live,
+      accuracyMeters: 12,
+      radiusFeet: 300,
+    });
+    const wide = evaluateGeofence({
+      home: HOME,
+      live,
+      accuracyMeters: 12,
+      radiusFeet: 1500,
+    });
+    assert.equal(tight.kind, "outside");
+    if (tight.kind === "outside") assert.equal(tight.limitFeet, 300);
+    assert.equal(wide.kind, "inside");
+    if (wide.kind === "inside") assert.equal(wide.limitFeet, 1500);
+  });
+});
+
+describe("isHomePinDraftDirty", () => {
+  it("is false after a successful save clears the draft", () => {
+    assert.equal(isHomePinDraftDirty(null, HOME), false);
+    assert.equal(isHomePinDraftDirty(null, null), false);
+  });
+
+  it("is true when the draft differs from the saved pin", () => {
+    assert.equal(isHomePinDraftDirty(offsetWestFeet(HOME, 80), HOME), true);
+    assert.equal(isHomePinDraftDirty(HOME, null), true);
+  });
+
+  it("is false when draft matches the saved pin", () => {
+    assert.equal(isHomePinDraftDirty(HOME, HOME), false);
+  });
+});
+
+describe("resolveGeofenceRadiusFeet", () => {
+  it("falls back to the product default of 1000 ft", () => {
+    assert.equal(resolveGeofenceRadiusFeet(null), DEFAULT_GEOFENCE_RADIUS_FEET);
+    assert.equal(resolveGeofenceRadiusFeet(0), DEFAULT_GEOFENCE_RADIUS_FEET);
+    assert.equal(resolveGeofenceRadiusFeet(300), 300);
   });
 });
 

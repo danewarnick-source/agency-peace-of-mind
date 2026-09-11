@@ -97,6 +97,18 @@ SELECT
 Human Rights Plan and housemate informed-choice are **derived** from
 `services_offered` (not extra columns).
 
+### Core notes (this Soft only)
+
+1. **Do not widen `organizations` UPDATE.** Live `admins update org` is
+   `has_org_role(..., 'admin')` only. This paste inherits that (no new
+   org policies). Manager / program_manager can write
+   `obligation_applicability` (`is_org_admin_or_manager`) but `fact_*`
+   saves from those roles will no-op until a later scoped write.
+2. **No seed / no TNS prefill.** Null = unanswered. Conditional duties
+   stay visible until recorded.
+3. **One Soft is enough.** No second paste. Policy/constraint
+   `DROP IF EXISTS` is re-paste safe only.
+
 ### Seed
 
 None. Orgs start unanswered. TNS is not pre-filled.

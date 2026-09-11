@@ -201,11 +201,13 @@ describe("getThisWeek scope wiring", () => {
 });
 
 describe("scope lock files", () => {
-  it("does not add org-profile facts to this-week (Step 5 stays parallel)", () => {
+  it("keeps Step 3 EVV staff filter and Step 5 org-profile facts together", () => {
     const src = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
-    assert.match(src, /Step 5 not built/);
-    assert.doesNotMatch(src, /loadUnansweredOrgProfile/);
     assert.match(src, /evvStaffIdsForScope/);
+    assert.match(src, /resolveScopeFromSnapshot/);
+    assert.match(src, /org_profile_facts/);
+    assert.match(src, /loadOrgFacts/);
+    assert.match(src, /unansweredFactsQuietSummary/);
   });
 
   it("migration is additive and has no DROP", () => {

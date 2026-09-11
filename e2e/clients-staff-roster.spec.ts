@@ -150,8 +150,25 @@ test.describe("Clients + Staff roster — mocked admin", () => {
         .getByText(/^employee$/i)
         .first(),
     ).toBeVisible();
+    await expect(page.locator("table").getByText(/^Last Login$/i)).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByRole("button", { name: /Caseload/i })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByRole("button", { name: /More actions/i })
+        .first(),
+    ).toBeVisible();
+    await expect(page.locator("table").getByRole("link", { name: /Staff file/i })).toHaveCount(0);
+    await expect(page.locator("table").getByRole("link", { name: /^View$/i })).toHaveCount(0);
+    await expect(page.locator("table").getByText("Aug 27, 2026").first()).toBeVisible();
 
-    await gotoAdmin(page, `/dashboard/employees/${STAFF.jake.id}`);
+    await rosterName(page, "Jake Probert").click();
+    await page.waitForURL(new RegExp(`/dashboard/employees/${STAFF.jake.id}`));
     await expect(page).toHaveURL(new RegExp(`/dashboard/employees/${STAFF.jake.id}`));
     await expect(page.getByTestId("staff-profile-page")).toHaveAttribute(
       "data-staff-id",

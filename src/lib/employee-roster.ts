@@ -57,3 +57,41 @@ export function uniqueHireEmails(emails: readonly string[]): string | null {
   }
   return null;
 }
+
+const ROSTER_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+};
+
+/** Same date style as the Employees roster Start date column. */
+export function formatRosterDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("en-US", ROSTER_DATE_FORMAT);
+}
+
+/**
+ * Last Login cell.
+ * Unknown / RPC missing / staff not in the result → em dash.
+ * Auth last_sign_in_at is null (known never) → Never.
+ */
+export function formatLastLogin(lastSignInAt: string | null | undefined, known: boolean): string {
+  if (!known) return "—";
+  if (!lastSignInAt) return "Never";
+  return formatRosterDate(lastSignInAt);
+}
+
+export function lastLoginByUserId(rows: unknown): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  if (!Array.isArray(rows)) return out;
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const rec = row as { user_id?: unknown; last_sign_in_at?: unknown };
+    if (typeof rec.user_id !== "string" || rec.user_id.length === 0) continue;
+    const at = rec.last_sign_in_at;
+    out.set(rec.user_id, typeof at === "string" && at.length > 0 ? at : null);
+  }
+  return out;
+}

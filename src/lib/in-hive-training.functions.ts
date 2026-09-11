@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/integrations/supabase/client";
 import {
   IN_HIVE_PROGRESS_KIND,
@@ -79,8 +80,7 @@ export async function hasAnyInHiveProgress(
     .in("ref_id", refs);
   if (error) throw error;
   return (data ?? []).some(
-    (row: { status?: string }) =>
-      row.status === "in_progress" || row.status === "completed",
+    (row: { status?: string }) => row.status === "in_progress" || row.status === "completed",
   );
 }
 

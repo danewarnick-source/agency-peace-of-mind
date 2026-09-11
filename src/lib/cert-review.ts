@@ -104,7 +104,9 @@ export function nectarReviewDisposition(args: {
     typeof args.confidence === "number" &&
     args.confidence < NECTAR_CERT_CONFIDENCE_FLOOR
   ) {
-    extraReasons.push("Nectar was not confident enough to accept this upload. An admin must review it.");
+    extraReasons.push(
+      "Nectar was not confident enough to accept this upload. An admin must review it.",
+    );
     return { status: "needs_review", holdOpen: true, extraReasons };
   }
 
@@ -117,7 +119,9 @@ export function nectarReviewDisposition(args: {
   }
 
   if (isUploadEvidenceType(args.evidenceTypeUsed) && !args.validationRan) {
-    extraReasons.push("This upload was not verified. It stays in review until an admin accepts it.");
+    extraReasons.push(
+      "This upload was not verified. It stays in review until an admin accepts it.",
+    );
     return { status: "needs_review", holdOpen: true, extraReasons };
   }
 
@@ -201,9 +205,7 @@ export function usesCertExpirationCadence(dueDayConfig: unknown): boolean {
 }
 
 /** Guard: a due date must come from a printed/confirmed expiration, not upload time. */
-export function renewalDueFromExpiration(
-  expiresOn: string | null | undefined,
-): string | null {
+export function renewalDueFromExpiration(expiresOn: string | null | undefined): string | null {
   return isIsoDay(expiresOn) ? expiresOn : null;
 }
 

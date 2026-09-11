@@ -72,7 +72,10 @@ export function obligationFileStatus(args: {
 }
 
 /** Relative due copy for a personnel-file item. Overdue is still Missing in status. */
-export function dueLabel(dueAt: string, now: Date = new Date()): { text: string; overdue: boolean } {
+export function dueLabel(
+  dueAt: string,
+  now: Date = new Date(),
+): { text: string; overdue: boolean } {
   const due = new Date(dueAt);
   const diffMs = due.getTime() - now.getTime();
   if (diffMs < 0) {

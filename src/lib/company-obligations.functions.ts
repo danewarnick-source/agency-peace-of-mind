@@ -2781,7 +2781,10 @@ export const recordCompletion = createServerFn({ method: "POST" })
     // instance — an admin must manually confirm before it counts. Notify
     // admins directly instead of going through the generic completion
     // notifier below.
-    if (validation.ran && (validation.status === "failed" || validation.status === "needs_review")) {
+    if (
+      validation.ran &&
+      (validation.status === "failed" || validation.status === "needs_review")
+    ) {
       const recipients = await resolveAdminRecipients(supabase, data.organizationId, ob);
       if (recipients.length) {
         const rows = recipients.map((recipientId) => ({

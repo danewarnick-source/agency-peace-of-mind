@@ -326,7 +326,10 @@ function OpenCard({
           reasons: validation.reasons,
         });
       }
-      if (validation?.ran && (validation.status === "failed" || validation.status === "needs_review")) {
+      if (
+        validation?.ran &&
+        (validation.status === "failed" || validation.status === "needs_review")
+      ) {
         toast.warning("Uploaded — awaiting review. This is not accepted yet.");
       } else {
         toast.success("Evidence submitted");
@@ -828,8 +831,7 @@ function MyObligationsPage() {
       if (kind && inst.client_id) covered.add(`${inst.client_id}:${kind}`);
       const formAlreadyDone =
         !!kind && !!inst.client_id && formDoneByClientKind.has(`${inst.client_id}:${kind}`);
-      const iCompleted =
-        inst.status === "completed" || inst.status === "waived" || formAlreadyDone;
+      const iCompleted = inst.status === "completed" || inst.status === "waived" || formAlreadyDone;
       if (iCompleted) {
         completed.push(inst);
         continue;
@@ -865,7 +867,7 @@ function MyObligationsPage() {
       }
     }
     return { open, completed, unlinkedFormCount, overlayOpen };
-  }, [instances, completionByInstance, clientTrainings, formDoneByClientKind]);
+  }, [instances, clientTrainings, formDoneByClientKind]);
 
   const overlayDue = overlayOpen.filter((o) => !o.done);
   const overlayDone = overlayOpen.filter((o) => o.done);

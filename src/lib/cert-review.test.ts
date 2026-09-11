@@ -154,7 +154,10 @@ describe("cert review rules", () => {
     );
     assert.equal(certReviewStatusLabel("awaiting_review"), "Awaiting review");
     assert.equal(
-      certReviewStatus({ nectarValidationStatus: "manually_confirmed", instanceStatus: "completed" }),
+      certReviewStatus({
+        nectarValidationStatus: "manually_confirmed",
+        instanceStatus: "completed",
+      }),
       "accepted",
     );
     assert.equal(

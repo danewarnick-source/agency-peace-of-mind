@@ -35,13 +35,12 @@ async function assertAdminOrManager(
   orgId: string,
   viewerId: string,
 ) {
-  const { data: isAdmin, error } = await supabase.rpc(
-    "is_org_admin_or_manager",
-    { _org: orgId, _user: viewerId },
-  );
+  const { data: isAdmin, error } = await supabase.rpc("is_org_admin_or_manager", {
+    _org: orgId,
+    _user: viewerId,
+  });
   if (error) throw new Error(error.message);
-  if (!isAdmin)
-    throw new Error("Forbidden: admin or manager role required");
+  if (!isAdmin) throw new Error("Forbidden: admin or manager role required");
 }
 
 /** Admin/manager OR — for trainings marked self_attest — the staffer themselves. */
@@ -106,8 +105,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       .select("full_name")
       .eq("id", data.staff_id)
       .maybeSingle();
-    const profileName: string | null =
-      (prof?.full_name as string | null) ?? null;
+    const profileName: string | null = (prof?.full_name as string | null) ?? null;
 
     // OCR — read expiration, name, cert type, completion date, and a short
     // text summary of what Nectar actually saw.
@@ -121,12 +119,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     let ocrError: string | null = null;
     if (data.run_ocr && !t.auto_complete_on_upload) {
       try {
-        const ocr = await runNectarCertOcr(
-          sb,
-          data.organization_id,
-          data.hr_document_id,
-          t,
-        );
+        const ocr = await runNectarCertOcr(sb, data.organization_id, data.hr_document_id, t);
         nectarExpires = ocr.expires_on;
         nectarConfidence = ocr.confidence;
         nectarName = ocr.name_on_certificate;
@@ -149,24 +142,14 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     if (t.auto_complete_on_upload) {
       // no-op: reasons stays empty, validation always passes.
     } else if (ocrFailed) {
-      reasons.push(
-        `Nectar could not read this certificate${ocrError ? ` (${ocrError})` : ""}.`,
-      );
+      reasons.push(`Nectar could not read this certificate${ocrError ? ` (${ocrError})` : ""}.`);
     } else {
       // Keyword groups
-      const summaryHaystack = (
-        (nectarSummary ?? "") +
-        " " +
-        (nectarCertType ?? "")
-      ).toLowerCase();
+      const summaryHaystack = ((nectarSummary ?? "") + " " + (nectarCertType ?? "")).toLowerCase();
       for (const group of t.validation.required_keyword_groups) {
-        const hit = group.any_of.some((kw) =>
-          summaryHaystack.includes(kw.toLowerCase()),
-        );
+        const hit = group.any_of.some((kw) => summaryHaystack.includes(kw.toLowerCase()));
         if (!hit) {
-          reasons.push(
-            `Missing ${group.label} (expected one of: ${group.any_of.join(", ")}).`,
-          );
+          reasons.push(`Missing ${group.label} (expected one of: ${group.any_of.join(", ")}).`);
         }
       }
       // Name check
@@ -186,15 +169,12 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       }
     }
 
-    const validationStatus: "passed" | "failed" =
-      reasons.length === 0 ? "passed" : "failed";
+    const validationStatus: "passed" | "failed" = reasons.length === 0 ? "passed" : "failed";
 
     // Compute effective dates only when validation passed.
     const today = new Date().toISOString().slice(0, 10);
     const completedDate =
-      validationStatus === "passed"
-        ? (nectarCompletedDate ?? data.completed_date ?? today)
-        : null;
+      validationStatus === "passed" ? (nectarCompletedDate ?? data.completed_date ?? today) : null;
     let expires: string | null = null;
     if (validationStatus === "passed") {
       // Printed/extracted expiration only. Never invent from upload or completion date.
@@ -225,8 +205,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       staff_id: data.staff_id,
       training_key: data.training_key,
       evidence_document_id: passedEvidenceId,
-      nectar_suggested_expires:
-        validationStatus === "passed" && nectarExpires !== null,
+      nectar_suggested_expires: validationStatus === "passed" && nectarExpires !== null,
       nectar_name_match: nameMatch,
       nectar_extracted_name: nectarName,
       nectar_extracted_cert_type: nectarCertType,
@@ -252,11 +231,9 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
       upsertRow.admin_signed_off_by = existing?.admin_signed_off_by ?? null;
     }
 
-    const { error } = await sb
-      .from("staff_baseline_training_completions")
-      .upsert(upsertRow, {
-        onConflict: "organization_id,staff_id,training_key",
-      });
+    const { error } = await sb.from("staff_baseline_training_completions").upsert(upsertRow, {
+      onConflict: "organization_id,staff_id,training_key",
+    });
     if (error) throw new Error(error.message);
 
     return {
@@ -279,11 +256,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
 /** Admin override of the expiration date (clears the "Nectar set this" flag). */
 export const setBaselineExpiration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    orgStaffKey
-      .extend({ expires_at: z.string().date().nullable() })
-      .parse(d),
-  )
+  .inputValidator((d) => orgStaffKey.extend({ expires_at: z.string().date().nullable() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return { ok: false };
@@ -311,16 +284,20 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertCanCompleteBaseline(sb, data.organization_id, userId, data.staff_id, data.training_key);
+    await assertCanCompleteBaseline(
+      sb,
+      data.organization_id,
+      userId,
+      data.staff_id,
+      data.training_key,
+    );
 
     const t = baselineByKey(data.training_key);
     const requiresUpload = t?.requires_upload !== false;
 
     const { data: row, error: rErr } = await sb
       .from("staff_baseline_training_completions")
-      .select(
-        "evidence_document_id, completed_date, nectar_validation_status",
-      )
+      .select("evidence_document_id, completed_date, nectar_validation_status")
       .eq("organization_id", data.organization_id)
       .eq("staff_id", data.staff_id)
       .eq("training_key", data.training_key)
@@ -336,23 +313,20 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
     }
 
     const completedDate =
-      (row?.completed_date as string | null) ??
-      new Date().toISOString().slice(0, 10);
+      (row?.completed_date as string | null) ?? new Date().toISOString().slice(0, 10);
 
-    const { error } = await sb
-      .from("staff_baseline_training_completions")
-      .upsert(
-        {
-          organization_id: data.organization_id,
-          staff_id: data.staff_id,
-          training_key: data.training_key,
-          admin_signed_off_at: new Date().toISOString(),
-          admin_signed_off_by: userId,
-          completed_date: completedDate,
-          completed_by: userId,
-        },
-        { onConflict: "organization_id,staff_id,training_key" },
-      );
+    const { error } = await sb.from("staff_baseline_training_completions").upsert(
+      {
+        organization_id: data.organization_id,
+        staff_id: data.staff_id,
+        training_key: data.training_key,
+        admin_signed_off_at: new Date().toISOString(),
+        admin_signed_off_by: userId,
+        completed_date: completedDate,
+        completed_by: userId,
+      },
+      { onConflict: "organization_id,staff_id,training_key" },
+    );
     if (error) throw new Error(error.message);
     return { ok: true };
   });

@@ -123,7 +123,11 @@ describe("hasValidObligationEvidence", () => {
 
   it("keeps a completed cycle as previous when a renewal instance is open", () => {
     const peers = [
-      { instanceId: "old", instanceStatus: "completed" as const, dueAt: "2026-01-01T00:00:00.000Z" },
+      {
+        instanceId: "old",
+        instanceStatus: "completed" as const,
+        dueAt: "2026-01-01T00:00:00.000Z",
+      },
       { instanceId: "next", instanceStatus: "pending" as const, dueAt: "2027-01-01T00:00:00.000Z" },
     ];
     assert.equal(

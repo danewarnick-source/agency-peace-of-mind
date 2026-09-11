@@ -110,8 +110,14 @@ describe("progress refs", () => {
     assert.equal(inHiveRefUuid(PCT_COURSE_ID, "A"), "a11ce000-1e8f-4000-8000-000000000341");
     assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "A"), inHiveRefUuid("abi", "A"));
     assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "__exam__"), inHiveRefUuid("abi", "__exam__"));
-    assert.equal(inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"), "a11ce000-1e8f-4000-8000-0000000004ff");
-    assert.notEqual(inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"), inHiveRefUuid(PCT_COURSE_ID, "__exam__"));
+    assert.equal(
+      inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"),
+      "a11ce000-1e8f-4000-8000-0000000004ff",
+    );
+    assert.notEqual(
+      inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"),
+      inHiveRefUuid(PCT_COURSE_ID, "__exam__"),
+    );
   });
 });
 
@@ -139,9 +145,7 @@ describe("exam coverage", () => {
     for (const letter of "ABCDEF") {
       assert.ok(abiLetters.has(letter), `missing ABI exam item for ${letter}`);
     }
-    assert.ok(
-      thirty.every((q) => q.sowCite.startsWith("1.8(4)") || q.sowCite.startsWith("SAS")),
-    );
+    assert.ok(thirty.every((q) => q.sowCite.startsWith("1.8(4)") || q.sowCite.startsWith("SAS")));
     assert.ok(abi.every((q) => q.sowCite.startsWith("1.8(8)")));
     assert.equal(examQuestionsFor(PCT_COURSE_ID).length, 0);
     assert.equal(examQuestionsFor(ANNUAL_CE_COURSE_ID).length, 0);
@@ -157,7 +161,10 @@ describe("shuffleCopy", () => {
       return n % 1;
     };
     const out = shuffleCopy(src, rng);
-    assert.deepEqual([...out].sort((a, b) => a - b), src);
+    assert.deepEqual(
+      [...out].sort((a, b) => a - b),
+      src,
+    );
     assert.notEqual(out[0], 1);
   });
 });
@@ -295,17 +302,35 @@ describe("segment gate", () => {
   it("keeps topic M diagnosis and ABI stems from a uniquely long correct choice", () => {
     assert.equal(
       correctChoiceIsUniquelyLongest([
-        { t: "Intellectual disability and acquired brain injury are two names for the same thing.", correct: false },
-        { t: "Intellectual disability starts before adulthood; acquired brain injury happens later.", correct: true },
-        { t: "Acquired brain injury is always mild; intellectual disability is always severe.", correct: false },
+        {
+          t: "Intellectual disability and acquired brain injury are two names for the same thing.",
+          correct: false,
+        },
+        {
+          t: "Intellectual disability starts before adulthood; acquired brain injury happens later.",
+          correct: true,
+        },
+        {
+          t: "Acquired brain injury is always mild; intellectual disability is always severe.",
+          correct: false,
+        },
       ]),
       false,
     );
     assert.equal(
       correctChoiceIsUniquelyLongest([
-        { t: "They will need the same supports because they share one diagnosis and label.", correct: false },
-        { t: "Their abilities and needs can differ a lot — learn each person as an individual.", correct: true },
-        { t: "Neither person will be able to communicate in any useful way on their own.", correct: false },
+        {
+          t: "They will need the same supports because they share one diagnosis and label.",
+          correct: false,
+        },
+        {
+          t: "Their abilities and needs can differ a lot — learn each person as an individual.",
+          correct: true,
+        },
+        {
+          t: "Neither person will be able to communicate in any useful way on their own.",
+          correct: false,
+        },
       ]),
       false,
     );
@@ -315,7 +340,10 @@ describe("segment gate", () => {
     assert.equal(
       correctChoiceIsUniquelyLongest([
         { t: "Short no", correct: false },
-        { t: "This correct option is much longer than the other two choices by design", correct: true },
+        {
+          t: "This correct option is much longer than the other two choices by design",
+          correct: true,
+        },
         { t: "Also short", correct: false },
       ]),
       true,
@@ -343,7 +371,10 @@ describe("segment gate", () => {
 
   it("keeps the certificate UUID distinct from exam and topic A", () => {
     assert.equal(inHiveRefUuid("thirty-day", "__cert__"), "a11ce000-1e8f-4000-8000-0000000001fe");
-    assert.notEqual(inHiveRefUuid("thirty-day", "__cert__"), inHiveRefUuid("thirty-day", "__exam__"));
+    assert.notEqual(
+      inHiveRefUuid("thirty-day", "__cert__"),
+      inHiveRefUuid("thirty-day", "__exam__"),
+    );
     assert.notEqual(inHiveRefUuid("thirty-day", "__cert__"), inHiveRefUuid("thirty-day", "A"));
   });
 });
@@ -359,7 +390,10 @@ describe("progress UI labels", () => {
       D: { status: nextTopicProgressStatus("completed", "in_progress"), position: 1 },
       E: { status: "in_progress", position: 2 },
     });
-    assert.equal(topicChecklistLabel(afterReview.has("D") ? "completed" : "in_progress"), "Success");
+    assert.equal(
+      topicChecklistLabel(afterReview.has("D") ? "completed" : "in_progress"),
+      "Success",
+    );
     assert.equal(topicChecklistLabel(afterReview.has("E") ? "completed" : "in_progress"), "Open");
   });
 

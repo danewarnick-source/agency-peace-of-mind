@@ -27,12 +27,7 @@ export function InHiveCertificate({
             ? "Certificate issued — already on the staff file"
             : "Topic checklist (complete remaining topics to issue)"}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => window.print()}
-        >
+        <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" />
           Print a copy
         </Button>

@@ -131,7 +131,9 @@ function guessIsImage(filename: string | null): boolean {
 }
 
 async function signedEvidenceUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from("obligation-evidence").createSignedUrl(path, 300);
+  const { data, error } = await supabase.storage
+    .from("obligation-evidence")
+    .createSignedUrl(path, 300);
   if (error || !data?.signedUrl) throw new Error(error?.message ?? "Could not open file");
   return data.signedUrl;
 }
@@ -175,7 +177,8 @@ export function StaffObligationsFilesTab({
   const uploadableRows = rows.filter((r) => r.canUpload);
   const selectedRows = rows.filter((r) => selected.has(r.instance.id));
   const viewQueue = useMemo(
-    () => viewIds.map((id) => rows.find((r) => r.instance.id === id)).filter((r): r is FileRow => !!r),
+    () =>
+      viewIds.map((id) => rows.find((r) => r.instance.id === id)).filter((r): r is FileRow => !!r),
     [viewIds, rows],
   );
   const viewing = viewQueue[viewIndex] ?? null;
@@ -200,7 +203,8 @@ export function StaffObligationsFilesTab({
           if (!cancelled) setNativeCert(cert);
         })
         .catch((e) => {
-          if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not open certificate");
+          if (!cancelled)
+            toast.error(e instanceof Error ? e.message : "Could not open certificate");
         });
     } else {
       setNativeCert(null);
@@ -303,7 +307,9 @@ export function StaffObligationsFilesTab({
       if (!uploadFile) throw new Error("Choose a file to upload.");
       const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${organizationId}/manual/${targetInstance.instance.id}/${crypto.randomUUID()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, uploadFile);
+      const { error: upErr } = await supabase.storage
+        .from("obligation-evidence")
+        .upload(path, uploadFile);
       if (upErr) throw new Error(upErr.message);
       await recordFn({
         data: {
@@ -343,11 +349,21 @@ export function StaffObligationsFilesTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={viewSelected} disabled={!selectedRows.some((r) => r.evidencePath)}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={viewSelected}
+          disabled={!selectedRows.some((r) => r.evidencePath)}
+        >
           <Eye className="mr-1.5 h-3.5 w-3.5" />
           View selected
         </Button>
-        <Button size="sm" variant="outline" onClick={() => void printPack()} disabled={!rows.some((r) => r.evidencePath)}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void printPack()}
+          disabled={!rows.some((r) => r.evidencePath)}
+        >
           <Printer className="mr-1.5 h-3.5 w-3.5" />
           Print / PDF pack
         </Button>
@@ -437,13 +453,17 @@ export function StaffObligationsFilesTab({
           <DialogHeader>
             <DialogTitle>Upload evidence</DialogTitle>
             <DialogDescription>
-              File attaches to the open cycle of this staff file item. Accepted certificates stay on file when a renewal is uploaded.
+              File attaches to the open cycle of this staff file item. Accepted certificates stay on
+              file when a renewal is uploaded.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Staff file item</Label>
-              <Select value={uploadInstanceId ?? ""} onValueChange={(v) => setUploadInstanceId(v || null)}>
+              <Select
+                value={uploadInstanceId ?? ""}
+                onValueChange={(v) => setUploadInstanceId(v || null)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose an item…" />
                 </SelectTrigger>
@@ -462,7 +482,8 @@ export function StaffObligationsFilesTab({
               </p>
             ) : attestationBlocked ? (
               <p className="text-sm text-amber-900">
-                This item requires the staff member to attest themselves. Evidence cannot be filed here.
+                This item requires the staff member to attest themselves. Evidence cannot be filed
+                here.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -480,7 +501,9 @@ export function StaffObligationsFilesTab({
               Cancel
             </Button>
             <Button
-              disabled={attestationBlocked || !uploadInstanceId || !uploadFile || uploadMut.isPending}
+              disabled={
+                attestationBlocked || !uploadInstanceId || !uploadFile || uploadMut.isPending
+              }
               onClick={() => uploadMut.mutate()}
             >
               {uploadMut.isPending ? "Saving…" : "Save evidence"}
@@ -489,7 +512,12 @@ export function StaffObligationsFilesTab({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={viewerOpen} onOpenChange={(open) => { if (!open) setViewIds([]); }}>
+      <Dialog
+        open={viewerOpen}
+        onOpenChange={(open) => {
+          if (!open) setViewIds([]);
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{viewing?.title ?? "Evidence"}</DialogTitle>
@@ -513,7 +541,11 @@ export function StaffObligationsFilesTab({
             ) : guessIsImage(viewing?.evidenceFilename ?? null) ? (
               <img src={viewUrl} alt="" className="max-h-[70vh] w-full object-contain" />
             ) : (
-              <iframe title="Staff file evidence" src={viewUrl} className="h-[70vh] w-full border-0" />
+              <iframe
+                title="Staff file evidence"
+                src={viewUrl}
+                className="h-[70vh] w-full border-0"
+              />
             )}
           </div>
           <DialogFooter className="gap-2 sm:justify-between">
@@ -555,4 +587,3 @@ export function StaffObligationsFilesTab({
     </div>
   );
 }
-

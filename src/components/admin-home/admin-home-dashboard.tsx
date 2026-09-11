@@ -268,7 +268,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
           </div>
           <nav aria-label="Desk shortcuts" className="flex shrink-0 items-center gap-3 pt-1">
             <PowerLink to="/dashboard/compliance">Compliance</PowerLink>
-            <PowerLink to="/dashboard/compliance-desk">Compliance desk</PowerLink>
+            <PowerLink to="/dashboard/compliance-desk">Records review</PowerLink>
           </nav>
         </div>
 

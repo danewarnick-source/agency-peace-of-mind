@@ -8,7 +8,7 @@ import { ComplianceDeskPage } from "./dashboard.compliance-desk";
  * shows a 404 shell and never loads timesheets.
  */
 export const Route = createFileRoute("/e2e/compliance-desk")({
-  head: () => ({ meta: [{ title: "E2E — EVV & Timesheet Control" }] }),
+  head: () => ({ meta: [{ title: "E2E — Records review" }] }),
   component: E2eComplianceDeskHarness,
 });
 

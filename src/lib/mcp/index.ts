@@ -13,6 +13,7 @@ import listCertificationsTool from "./tools/list-certifications";
 import listBillingSubmissionsTool from "./tools/list-billing-submissions";
 import coverageStatusTool from "./tools/coverage-status";
 import nectarFlagsTool from "./tools/nectar-flags";
+import sowIndexTool from "./tools/sow-index";
 
 // Build the OAuth issuer from the direct Supabase project ref. VITE_SUPABASE_URL
 // is rewritten to the `.lovable.cloud` proxy on publish, which mcp-js rejects
@@ -32,7 +33,7 @@ export default defineMcp({
     "Curated domain tools:\n" +
     "- `whoami`, `list_clients`, `get_client`\n" +
     "- `list_shifts`, `list_timesheets`, `list_incidents`, `list_certifications`\n" +
-    "- `list_billing_submissions`, `coverage_status`, `nectar_flags`\n\n" +
+    "- `list_billing_submissions`, `coverage_status`, `nectar_flags`, `sow_index`\n\n" +
     "Prefer curated tools when they fit; fall back to `sql_query` or `table_read` for anything else.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
@@ -49,6 +50,7 @@ export default defineMcp({
     listBillingSubmissionsTool,
     coverageStatusTool,
     nectarFlagsTool,
+    sowIndexTool,
     listTablesTool,
     tableReadTool,
     tableWriteTool,

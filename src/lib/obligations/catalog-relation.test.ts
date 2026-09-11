@@ -5,6 +5,7 @@ import {
   catalogRelationWritePatch,
   citationSection,
   missingCatalogRelationColumn,
+  promoteOverlayStatus,
   proposeCatalogRelation,
 } from "./catalog-relation.ts";
 
@@ -99,6 +100,10 @@ describe("proposeCatalogRelation", () => {
     assert.equal(patch.catalog_key, "pct_hire_practices");
     assert.equal(patch.catalog_relation_status, "proposed");
     assert.equal(patch.catalog_overlay, null);
+  });
+
+  it("promotes overlay via the confirmed status (Step 7c path)", () => {
+    assert.equal(promoteOverlayStatus(), "confirmed");
   });
 });
 

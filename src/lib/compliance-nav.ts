@@ -5,7 +5,7 @@
 
 export const COMPLIANCE_FILE_TABS = ["staff", "client", "agency"] as const;
 export type ComplianceFileTab = (typeof COMPLIANCE_FILE_TABS)[number];
-export type AgencyFileSubTab = "documents" | "company-policies";
+export type AgencyFileSubTab = "documents" | "company-policies" | "contract-index";
 
 export type ComplianceSearch = {
   tab?: string;
@@ -15,6 +15,7 @@ const STAFF_ALIASES = new Set(["staff", "personnel", "personnel-file", "staff-fi
 const CLIENT_ALIASES = new Set(["client", "client-file"]);
 const AGENCY_ALIASES = new Set(["agency", "agency-file", "agency-documents", "documents"]);
 const POLICY_ALIASES = new Set(["company-policies", "policies", "policy-library"]);
+const CONTRACT_ALIASES = new Set(["contract-index", "sow-index", "agency-contract", "contract"]);
 
 export function parseComplianceSearch(s: Record<string, unknown>): ComplianceSearch {
   const tabRaw = typeof s.tab === "string" ? s.tab.trim() : "";
@@ -25,13 +26,14 @@ export function parseComplianceSearch(s: Record<string, unknown>): ComplianceSea
 export function resolveComplianceFileTab(tab?: string): ComplianceFileTab {
   const key = (tab ?? "").trim().toLowerCase();
   if (CLIENT_ALIASES.has(key)) return "client";
-  if (AGENCY_ALIASES.has(key) || POLICY_ALIASES.has(key)) return "agency";
+  if (AGENCY_ALIASES.has(key) || POLICY_ALIASES.has(key) || CONTRACT_ALIASES.has(key)) return "agency";
   return "staff";
 }
 
 export function resolveAgencyFileSubTab(tab?: string): AgencyFileSubTab {
   const key = (tab ?? "").trim().toLowerCase();
   if (POLICY_ALIASES.has(key)) return "company-policies";
+  if (CONTRACT_ALIASES.has(key)) return "contract-index";
   return "documents";
 }
 
@@ -40,13 +42,16 @@ export function complianceSearchForFileTab(tab: ComplianceFileTab): ComplianceSe
 }
 
 export function complianceSearchForAgencySubTab(sub: AgencyFileSubTab): ComplianceSearch {
-  return { tab: sub === "company-policies" ? "company-policies" : "agency" };
+  if (sub === "company-policies") return { tab: "company-policies" };
+  if (sub === "contract-index") return { tab: "contract-index" };
+  return { tab: "agency" };
 }
 
 export function complianceRedirectSearchFromAgencyDocuments(
   tab?: string,
 ): ComplianceSearch {
-  return resolveAgencyFileSubTab(tab) === "company-policies"
-    ? { tab: "company-policies" }
-    : { tab: "agency" };
+  const sub = resolveAgencyFileSubTab(tab);
+  if (sub === "company-policies") return { tab: "company-policies" };
+  if (sub === "contract-index") return { tab: "contract-index" };
+  return { tab: "agency" };
 }

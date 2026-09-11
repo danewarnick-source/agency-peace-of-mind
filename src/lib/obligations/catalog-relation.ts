@@ -299,6 +299,15 @@ export function catalogRelationWritePatch(proposal: CatalogRelationProposal): {
   };
 }
 
+/**
+ * Step 7c / Step 9c promote overlay — same persist path as Agency Sources
+ * Confirm (`setCatalogRelationStatus` → `confirmed`). Do not invent a
+ * second promote writer.
+ */
+export function promoteOverlayStatus(): CatalogRelationStatus {
+  return "confirmed";
+}
+
 export function missingCatalogRelationColumn(message: string): boolean {
   return (
     /catalog_key|catalog_relation|catalog_overlay/i.test(message) &&

@@ -50,6 +50,8 @@ import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 import { PacketNextActionCard } from "@/components/compliance/packet-next-action";
 import { useCompliancePacket } from "@/hooks/use-compliance-packet";
+import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
+import { ThreadsPanel } from "@/components/threads/threads-panel";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "Staff file — Provider Interface" }] }),
@@ -912,6 +914,9 @@ function MyObligationsPage() {
           subtitle="Discrete dues on your file — On file, Missing, or Due soon."
         />
       </div>
+
+      <AttentionStrip />
+      <ThreadsPanel variant="staff" />
 
       <PacketNextActionCard
         nextAction={packetQ.data?.packet.nextAction}

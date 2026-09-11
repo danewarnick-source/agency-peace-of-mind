@@ -36,6 +36,9 @@ import { Home as HomeIcon } from "lucide-react";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
+import { reviewExceptions } from "@/lib/records-review-rules";
+import { RecordsReviewActions } from "@/components/records/records-review-actions";
+import { ThreadsPanel } from "@/components/threads/threads-panel";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -149,7 +152,7 @@ function GpsBypassBadge({ row }: { row: Pick<Row, "gps_in_bypassed" | "gps_in_by
 }
 
 export const Route = createFileRoute("/dashboard/compliance-desk")({
-  head: () => ({ meta: [{ title: "EVV & Timesheet Control — Provider Interface" }] }),
+  head: () => ({ meta: [{ title: "Records review — Provider Interface" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     focus: typeof s.focus === "string" ? s.focus : undefined,
   }),
@@ -782,11 +785,12 @@ export function ComplianceDeskPage() {
   return (
     <div id="compliance-desk" className="space-y-4">
       <NectarFocusBanner />
+
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">EVV & Timesheet Control</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Records review</h1>
           <p className="text-sm text-muted-foreground">
-            Approve EVV shifts, audit GPS punches, and export Utah DHHS billing files.
+            Ask, Approve, Trim, Accept, or Flag exceptions. Approve EVV shifts and export Utah DHHS CSV.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -801,6 +805,8 @@ export function ComplianceDeskPage() {
           </Button>
         </div>
       </header>
+
+      <ThreadsPanel variant="admin" />
 
       {/* 🤖 AI Vector Search — submits ONLY on click or Enter. No keystroke parsing. */}
       <div className="space-y-1.5">
@@ -1636,6 +1642,29 @@ function NeedsReviewRow({
         </div>
       ) : (
         <div className="flex flex-wrap justify-end gap-2">
+          <RecordsReviewActions
+            row={{
+              id: row.id,
+              staff_id: row.staff_id,
+              clock_in_timestamp: row.clock_in_timestamp,
+              clock_out_timestamp: row.clock_out_timestamp,
+              corrected_clock_out: row.corrected_clock_out,
+              rounded_clock_out: row.rounded_clock_out,
+              edit_audit_history_log: row.edit_audit_history_log,
+              exceptions: reviewExceptions({
+                is_out_of_bounds: row.reconciliation_status === "pending",
+                outside_geofence_reason:
+                  row.reconciliation_status === "pending" ? "" : row.outside_geofence_reason,
+                shift_note_text: row.shift_note_text,
+                goals_completed: row.goals_completed,
+                clock_in_timestamp: row.clock_in_timestamp,
+                clock_out_timestamp: row.clock_out_timestamp,
+                service_type_code: row.service_type_code,
+                import_source: null,
+                staff_confirmed_at: null,
+              }),
+            }}
+          />
           <Button variant="outline" size="sm" onClick={() => setShowReject(true)}>
             <X className="mr-1 h-3.5 w-3.5" /> Reject
           </Button>

@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgencyDocumentsCards } from "@/components/agency-documents/agency-documents-cards";
 import { CompanyPoliciesTab } from "@/components/agency-documents/company-policies-tab";
 import { PacketNextActionCard } from "@/components/compliance/packet-next-action";
+import { SowIndexPanel } from "@/components/compliance/sow-index-panel";
 import { ROLE_RANK } from "@/lib/rbac";
 import type { AgencyFileSubTab } from "@/lib/compliance-nav";
 
@@ -56,12 +57,15 @@ export function AgencyFilePanel({
       <Tabs
         value={agencyTab}
         onValueChange={(v) => {
-          onAgencyTabChange(v === "company-policies" ? "company-policies" : "documents");
+          if (v === "company-policies") onAgencyTabChange("company-policies");
+          else if (v === "contract-index") onAgencyTabChange("contract-index");
+          else onAgencyTabChange("documents");
         }}
       >
         <TabsList className="h-auto">
           <TabsTrigger value="documents">Agency file</TabsTrigger>
           <TabsTrigger value="company-policies">Company policies</TabsTrigger>
+          <TabsTrigger value="contract-index">Agency Contract</TabsTrigger>
         </TabsList>
         <TabsContent value="documents" className="mt-4">
           <AgencyDocumentsCards
@@ -71,6 +75,9 @@ export function AgencyFilePanel({
         </TabsContent>
         <TabsContent value="company-policies" className="mt-4">
           <CompanyPoliciesTab orgId={org.organization_id} />
+        </TabsContent>
+        <TabsContent value="contract-index" className="mt-4">
+          <SowIndexPanel />
         </TabsContent>
       </Tabs>
     </div>

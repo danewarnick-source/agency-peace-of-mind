@@ -30,7 +30,7 @@ function validate(input: unknown): AskInput {
 const HIVE_NAV_GUIDE = `HIVE NAVIGATION MAP (use these paths verbatim — never invent screens):
 
 ADMIN AREA (admin/manager/super_admin):
-- /dashboard/records-desk — Records Desk: review submitted timesheets, daily logs, EVV punches, incidents.
+- /dashboard/compliance-desk — Records review: review submitted timesheets, daily logs, EVV punches, incidents.
 - /dashboard/pba-ledger — PBA Trust Ledger: client personal-budget accounts, deposits, withdrawals, audit samples.
 - /dashboard/scheduling — Scheduling: publish/edit staff shifts on a calendar.
 - /dashboard/employees — Employees: staff roster, profiles, pay rates, certifications, role assignments.

@@ -77,18 +77,13 @@ export function formatRosterDate(value: string | null | undefined): string {
  * Unknown / RPC missing / staff not in the result → em dash.
  * Auth last_sign_in_at is null (known never) → Never.
  */
-export function formatLastLogin(
-  lastSignInAt: string | null | undefined,
-  known: boolean,
-): string {
+export function formatLastLogin(lastSignInAt: string | null | undefined, known: boolean): string {
   if (!known) return "—";
   if (!lastSignInAt) return "Never";
   return formatRosterDate(lastSignInAt);
 }
 
-export function lastLoginByUserId(
-  rows: unknown,
-): Map<string, string | null> {
+export function lastLoginByUserId(rows: unknown): Map<string, string | null> {
   const out = new Map<string, string | null>();
   if (!Array.isArray(rows)) return out;
   for (const row of rows) {

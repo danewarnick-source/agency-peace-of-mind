@@ -14,7 +14,10 @@ import {
 const active = { active: true, profile: { account_status: "active", is_active: true } };
 const deactivated = { active: false, profile: { account_status: "active", is_active: true } };
 const archived = { active: false, profile: { account_status: "archived", is_active: false } };
-const archivedStillFlaggedActive = { active: true, profile: { account_status: "archived", is_active: true } };
+const archivedStillFlaggedActive = {
+  active: true,
+  profile: { account_status: "archived", is_active: true },
+};
 const profileInactive = { active: true, profile: { account_status: "active", is_active: false } };
 
 describe("isEmployeeOnActiveRoster", () => {
@@ -48,7 +51,10 @@ describe("uniqueHireEmails", () => {
 
 describe("Add employee wizard source lock", () => {
   it("drops hire-time behavior pickers, training tracks, and end date", () => {
-    const src = readFileSync(new URL("../components/employees/add-employee-wizard.tsx", import.meta.url), "utf8");
+    const src = readFileSync(
+      new URL("../components/employees/add-employee-wizard.tsx", import.meta.url),
+      "utf8",
+    );
     assert.doesNotMatch(src, /Behavior-related training/);
     assert.doesNotMatch(src, /TrainingRequirementField/);
     assert.doesNotMatch(src, /Assigned training tracks/);
@@ -70,7 +76,10 @@ describe("Add employee wizard source lock", () => {
 
 describe("Employees list source lock", () => {
   it("splits Active / Inactive and uses existing archive/restore/delete RPCs", () => {
-    const src = readFileSync(new URL("../routes/dashboard.employees.index.tsx", import.meta.url), "utf8");
+    const src = readFileSync(
+      new URL("../routes/dashboard.employees.index.tsx", import.meta.url),
+      "utf8",
+    );
     assert.match(src, /filterEmployeesByRosterTab/);
     assert.match(src, /archiveEntity/);
     assert.match(src, /restoreEntity/);

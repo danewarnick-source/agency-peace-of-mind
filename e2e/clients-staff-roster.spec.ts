@@ -151,8 +151,18 @@ test.describe("Clients + Staff roster — mocked admin", () => {
         .first(),
     ).toBeVisible();
     await expect(page.locator("table").getByText(/^Last Login$/i)).toBeVisible();
-    await expect(page.locator("table").getByRole("button", { name: /Caseload/i }).first()).toBeVisible();
-    await expect(page.locator("table").getByRole("button", { name: /More actions/i }).first()).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByRole("button", { name: /Caseload/i })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByRole("button", { name: /More actions/i })
+        .first(),
+    ).toBeVisible();
     await expect(page.locator("table").getByRole("link", { name: /Staff file/i })).toHaveCount(0);
     await expect(page.locator("table").getByRole("link", { name: /^View$/i })).toHaveCount(0);
     await expect(page.locator("table").getByText("Aug 27, 2026").first()).toBeVisible();

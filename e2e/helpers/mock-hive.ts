@@ -134,7 +134,12 @@ function profileRow(staff: (typeof STAFF_LIST)[number]): Row {
     emergency_contact_name: null,
     emergency_contact_relationship: null,
     emergency_contact_phone: null,
-    staff_type_keys: staff.jobTitle === "DSP" ? ["dsp"] : staff.jobTitle === "House Manager" ? ["house_manager"] : [],
+    staff_type_keys:
+      staff.jobTitle === "DSP"
+        ? ["dsp"]
+        : staff.jobTitle === "House Manager"
+          ? ["house_manager"]
+          : [],
     ce_suggested_topics: [],
     requires_deescalation: true,
     requires_abi: true,
@@ -327,9 +332,7 @@ function expandDailyLog(row: (typeof DAILY_LOGS)[number]): Row {
   const client = CLIENT_LIST.find((c) => c.id === row.client_id);
   return {
     ...row,
-    profiles: staff
-      ? { full_name: staff.name, email: staff.email, agency_name: ORG_NAME }
-      : null,
+    profiles: staff ? { full_name: staff.name, email: staff.email, agency_name: ORG_NAME } : null,
     clients: client
       ? {
           first_name: client.first_name,
@@ -343,7 +346,14 @@ function expandDailyLog(row: (typeof DAILY_LOGS)[number]): Row {
 function parseFilters(url: URL): Array<{ col: string; op: string; val: string }> {
   const out: Array<{ col: string; op: string; val: string }> = [];
   for (const [key, raw] of url.searchParams.entries()) {
-    if (key === "select" || key === "order" || key === "limit" || key === "offset" || key === "apikey") continue;
+    if (
+      key === "select" ||
+      key === "order" ||
+      key === "limit" ||
+      key === "offset" ||
+      key === "apikey"
+    )
+      continue;
     const eq = raw.indexOf(".");
     if (eq === -1) continue;
     out.push({ col: key, op: raw.slice(0, eq), val: raw.slice(eq + 1) });
@@ -440,10 +450,54 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
       return [{ organization_id: ORG_ID, locked_at: null, created_at: "2026-01-01T00:00:00.000Z" }];
     case "feature_registry":
       return [
-        { id: "fr1", feature_key: "client_intake", label: "Clients", description: null, parent_key: null, category: "tab", default_enabled: true, sort_order: 1, required_tier: null, upgrade_blurb: null },
-        { id: "fr2", feature_key: "staff_onboarding", label: "Employees", description: null, parent_key: null, category: "tab", default_enabled: true, sort_order: 2, required_tier: null, upgrade_blurb: null },
-        { id: "fr3", feature_key: "evv_timesheets", label: "Scheduler", description: null, parent_key: null, category: "tab", default_enabled: true, sort_order: 3, required_tier: null, upgrade_blurb: null },
-        { id: "fr4", feature_key: "nectar", label: "NECTAR", description: null, parent_key: null, category: "tab", default_enabled: true, sort_order: 4, required_tier: null, upgrade_blurb: null },
+        {
+          id: "fr1",
+          feature_key: "client_intake",
+          label: "Clients",
+          description: null,
+          parent_key: null,
+          category: "tab",
+          default_enabled: true,
+          sort_order: 1,
+          required_tier: null,
+          upgrade_blurb: null,
+        },
+        {
+          id: "fr2",
+          feature_key: "staff_onboarding",
+          label: "Employees",
+          description: null,
+          parent_key: null,
+          category: "tab",
+          default_enabled: true,
+          sort_order: 2,
+          required_tier: null,
+          upgrade_blurb: null,
+        },
+        {
+          id: "fr3",
+          feature_key: "evv_timesheets",
+          label: "Scheduler",
+          description: null,
+          parent_key: null,
+          category: "tab",
+          default_enabled: true,
+          sort_order: 3,
+          required_tier: null,
+          upgrade_blurb: null,
+        },
+        {
+          id: "fr4",
+          feature_key: "nectar",
+          label: "NECTAR",
+          description: null,
+          parent_key: null,
+          category: "tab",
+          default_enabled: true,
+          sort_order: 4,
+          required_tier: null,
+          upgrade_blurb: null,
+        },
       ];
     case "organization_features":
       return [];
@@ -458,7 +512,12 @@ function wantsSingle(headers: { [k: string]: string }): boolean {
   return accept.includes("vnd.pgrst.object") || prefer.includes("params=single-object");
 }
 
-async function fulfillJson(route: Route, status: number, body: unknown, extra: Record<string, string> = {}) {
+async function fulfillJson(
+  route: Route,
+  status: number,
+  body: unknown,
+  extra: Record<string, string> = {},
+) {
   await route.fulfill({
     status,
     contentType: "application/json",
@@ -472,7 +531,12 @@ async function fulfillJson(route: Route, status: number, body: unknown, extra: R
   });
 }
 
-async function handleSupabase(route: Route, opts: MockOptions, personaId: string, session: ReturnType<typeof sessionBlob>) {
+async function handleSupabase(
+  route: Route,
+  opts: MockOptions,
+  personaId: string,
+  session: ReturnType<typeof sessionBlob>,
+) {
   const req = route.request();
   const url = new URL(req.url());
   const method = req.method();
@@ -581,7 +645,12 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
       await fulfillJson(
         route,
         406,
-        { code: "PGRST116", details: "Results contain 0 rows", hint: null, message: "Cannot coerce the result to a single JSON object" },
+        {
+          code: "PGRST116",
+          details: "Results contain 0 rows",
+          hint: null,
+          message: "Cannot coerce the result to a single JSON object",
+        },
         count ? { "content-range": "*/0" } : {},
       );
       return;
@@ -590,7 +659,9 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
     return;
   }
 
-  const extra = count ? { "content-range": rows.length ? `0-${rows.length - 1}/${rows.length}` : `*/0` } : {};
+  const extra = count
+    ? { "content-range": rows.length ? `0-${rows.length - 1}/${rows.length}` : `*/0` }
+    : {};
   if (isHead) {
     await route.fulfill({
       status: 200,
@@ -710,7 +781,14 @@ function serverFnPayload(url: string, body: string): unknown {
       sent: 1,
       skipped: 0,
       errors: 0,
-      results: [{ email: "sep1.tester@example.test", user_id: "00000000-0000-4000-a000-000000000499", status: "sent", reason: null }],
+      results: [
+        {
+          email: "sep1.tester@example.test",
+          user_id: "00000000-0000-4000-a000-000000000499",
+          status: "sent",
+          reason: null,
+        },
+      ],
     };
   }
   if (/archiveEntity|restoreEntity|deleteEntity/i.test(fn)) {
@@ -830,7 +908,8 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/evaluateShiftNote/i.test(fn)) {
     return {
       status: "Verified",
-      feedback: "NECTAR completeness check passed: 30 words, client referenced, support documented, client response documented.",
+      feedback:
+        "NECTAR completeness check passed: 30 words, client referenced, support documented, client response documented.",
       checks: [
         { key: "word_count", passed: true, message: "Word count met." },
         { key: "client_referenced", passed: true, message: "Client is referenced." },
@@ -922,9 +1001,14 @@ export async function installHiveMocks(page: Page, opts: MockOptions = {}): Prom
   const personaId = personaStaff.id;
   const session = sessionBlob(personaId, personaStaff.email, personaStaff.name);
 
-  await page.route(/https?:\/\/[^/]*supabase\.co\/.*/, (route) => handleSupabase(route, opts, personaId, session));
+  await page.route(/https?:\/\/[^/]*supabase\.co\/.*/, (route) =>
+    handleSupabase(route, opts, personaId, session),
+  );
 
-  await page.route((url) => isServerFnUrl(url), (route) => handleServerFn(route));
+  await page.route(
+    (url) => isServerFnUrl(url),
+    (route) => handleServerFn(route),
+  );
 
   // Catch same-origin POSTs that look like Start server functions even if
   // the path scheme changes between TanStack Start versions.
@@ -999,4 +1083,12 @@ export async function waitForDashboard(page: Page): Promise<void> {
   }
 }
 
-export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, DAILY_LOGS, STAFF, presentWithoutNoteDate };
+export {
+  ADMIN_EMAIL,
+  ADMIN_NAME,
+  ADMIN_USER_ID,
+  CLIENTS,
+  DAILY_LOGS,
+  STAFF,
+  presentWithoutNoteDate,
+};

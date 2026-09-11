@@ -371,10 +371,7 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
-          <SectionGroup
-            label="Home location"
-            hint="Move the pin if this is the wrong house"
-          >
+          <SectionGroup label="Home location">
             <SectionPanel icon={HomeIcon} accent="teal">
               <HomePinCard clientId={clientId} />
             </SectionPanel>

@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { isGpsFixConfident, isLikelyBadCoord } from "@/lib/geo";
+import { isLikelyBadCoord } from "@/lib/geo";
 import { syncHomePinFromAddress } from "@/lib/home-pin";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,13 +37,6 @@ async function requireAdminForClient(
   return { organizationId: client.organization_id as string };
 }
 
-const GpsPinInput = z.object({
-  clientId: z.string().uuid(),
-  latitude: z.number().gte(-90).lte(90),
-  longitude: z.number().gte(-180).lte(180),
-  accuracyMeters: z.number().positive(),
-});
-
 /** Admin map drag / tap — writes the EVV geofence center. No GPS accuracy check. */
 export const saveClientHomePin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,6 +45,7 @@ export const saveClientHomePin = createServerFn({ method: "POST" })
       clientId: z.string().uuid(),
       latitude: z.number().gte(-90).lte(90),
       longitude: z.number().gte(-180).lte(180),
+      geofenceRadiusFeet: z.number().int().min(100).max(5000).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -63,12 +57,20 @@ export const saveClientHomePin = createServerFn({ method: "POST" })
     if (isLikelyBadCoord({ lat: data.latitude, lng: data.longitude })) {
       throw new Error("That pin is not a valid location.");
     }
+    const patch: {
+      home_latitude: number;
+      home_longitude: number;
+      geofence_radius_feet?: number;
+    } = {
+      home_latitude: data.latitude,
+      home_longitude: data.longitude,
+    };
+    if (data.geofenceRadiusFeet != null) {
+      patch.geofence_radius_feet = data.geofenceRadiusFeet;
+    }
     const { error } = await sb
       .from("clients")
-      .update({
-        home_latitude: data.latitude,
-        home_longitude: data.longitude,
-      })
+      .update(patch)
       .eq("id", data.clientId)
       .eq("organization_id", organizationId);
     if (error) throw new Error(error.message);
@@ -76,48 +78,17 @@ export const saveClientHomePin = createServerFn({ method: "POST" })
       ok: true as const,
       latitude: data.latitude,
       longitude: data.longitude,
+      geofenceRadiusFeet: data.geofenceRadiusFeet ?? null,
     };
   });
 
-/** Owner standing at the house sets the EVV home pin from high-accuracy GPS. */
-export const saveClientHomePinFromGps = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => GpsPinInput.parse(d))
-  .handler(async ({ data, context }) => {
-    if (!context.supabase || !context.userId) {
-      throw new Error("Not signed in");
-    }
-    const sb = context.supabase as Sb;
-    const { organizationId } = await requireAdminForClient(sb, context.userId, data.clientId);
-    if (!isGpsFixConfident({ acc: data.accuracyMeters })) {
-      throw new Error("GPS accuracy is too coarse to set the home pin. Wait for a better fix and retry.");
-    }
-    if (isLikelyBadCoord({ lat: data.latitude, lng: data.longitude })) {
-      throw new Error("That GPS reading is not a valid location.");
-    }
-    const { error } = await sb
-      .from("clients")
-      .update({
-        home_latitude: data.latitude,
-        home_longitude: data.longitude,
-      })
-      .eq("id", data.clientId)
-      .eq("organization_id", organizationId);
-    if (error) throw new Error(error.message);
-    return {
-      ok: true as const,
-      latitude: data.latitude,
-      longitude: data.longitude,
-    };
-  });
-
-/** Re-geocode the address on file. No-op if Nominatim cannot resolve house + road. */
-export const refreshClientHomePinFromAddress = createServerFn({ method: "POST" })
+/** Per-client clock-in zone. Same column punch pad already reads. */
+export const saveClientGeofenceRadius = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
       clientId: z.string().uuid(),
-      address: z.string().min(1).max(500).optional(),
+      geofenceRadiusFeet: z.number().int().min(100).max(5000),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -126,34 +97,37 @@ export const refreshClientHomePinFromAddress = createServerFn({ method: "POST" }
     }
     const sb = context.supabase as Sb;
     const { organizationId } = await requireAdminForClient(sb, context.userId, data.clientId);
-    const { data: client } = await sb
+    const { error } = await sb
       .from("clients")
-      .select("physical_address, home_latitude, home_longitude")
+      .update({ geofence_radius_feet: data.geofenceRadiusFeet })
       .eq("id", data.clientId)
-      .eq("organization_id", organizationId)
-      .maybeSingle();
-    if (!client) throw new Error("Client not found");
-    const address = (data.address ?? client.physical_address ?? "").trim();
-    if (!address) throw new Error("No physical address on file to geocode.");
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const, geofenceRadiusFeet: data.geofenceRadiusFeet };
+  });
 
-    if (data.address && data.address.trim() !== (client.physical_address ?? "").trim()) {
-      const { error: addrErr } = await sb
-        .from("clients")
-        .update({ physical_address: data.address.trim() })
-        .eq("id", data.clientId)
-        .eq("organization_id", organizationId);
-      if (addrErr) throw new Error(addrErr.message);
+/** Address only — does not drop or move the home pin. */
+export const saveClientPhysicalAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      address: z.string().min(1).max(500),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      throw new Error("Not signed in");
     }
-
-    const result = await syncHomePinFromAddress(sb, {
-      clientId: data.clientId,
-      organizationId,
-      address,
-      mode: data.address ? "on_address_save" : "backfill",
-      existingLat: client.home_latitude,
-      existingLng: client.home_longitude,
-    });
-    return { ok: true as const, ...result };
+    const sb = context.supabase as Sb;
+    const { organizationId } = await requireAdminForClient(sb, context.userId, data.clientId);
+    const { error } = await sb
+      .from("clients")
+      .update({ physical_address: data.address.trim() })
+      .eq("id", data.clientId)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const, address: data.address.trim() };
   });
 
 /**

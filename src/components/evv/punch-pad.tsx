@@ -112,6 +112,7 @@ import {
   haversineFeet,
   isGpsFixConfident,
   pickBetterGpsFix,
+  resolveGeofenceRadiusFeet,
   MAX_GPS_ACCURACY_METERS,
   type GpsFix,
 } from "@/lib/geo";
@@ -540,7 +541,7 @@ export function PunchPad({
   }, [lockedClient, billingAuthorizedCodes, clientBillingCodesQ.isLoading, clientForPunch]);
 
   // ── Geofence derivation ─────────────────────────────────────────────────────
-  const mapRadiusFeet = clientForPunch?.geofenceRadiusFeet ?? 1000;
+  const mapRadiusFeet = resolveGeofenceRadiusFeet(clientForPunch?.geofenceRadiusFeet);
 
   const homeCoords =
     typeof clientForPunch?.homeLat === "number" &&
@@ -1885,7 +1886,7 @@ export function PunchPad({
 
       const lat    = refClient?.homeLat;
       const lng    = refClient?.homeLng;
-      const radius = refClient?.geofenceRadiusFeet ?? 1000;
+      const radius = resolveGeofenceRadiusFeet(refClient?.geofenceRadiusFeet);
 
       // Sequence GPS acquisition: fail-closed until a high-accuracy fix.
       let pos = livePosRef.current ?? livePos;

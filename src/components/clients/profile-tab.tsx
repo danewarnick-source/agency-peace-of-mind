@@ -1053,7 +1053,7 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
                   href="#home-location"
                   className="mt-0.5 block text-xs font-normal text-primary underline-offset-2 hover:underline"
                 >
-                  Clock-in uses the pin on the Home location map above. Move that pin if this is the wrong house.
+                  Clock-in uses the pin on the Home location map above.
                 </a>
               </span>
             </Row>

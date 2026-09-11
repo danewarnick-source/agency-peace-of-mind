@@ -15,7 +15,27 @@ export const MAX_GPS_ACCURACY_METERS = 100;
  */
 export const HOME_PIN_MISMATCH_FEET = 250;
 
+/** Product default clock-in zone. Matches `clients.geofence_radius_feet` DEFAULT 1000. */
+export const DEFAULT_GEOFENCE_RADIUS_FEET = 1000;
+
 export type LatLng = { lat: number; lng: number };
+
+export function resolveGeofenceRadiusFeet(value: number | null | undefined): number {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return DEFAULT_GEOFENCE_RADIUS_FEET;
+}
+
+/** True only while an unsaved map draft exists and differs from the stored pin. */
+export function isHomePinDraftDirty(
+  draft: LatLng | null,
+  saved: LatLng | null,
+): boolean {
+  if (!draft) return false;
+  if (!saved) return true;
+  return Math.abs(draft.lat - saved.lat) > 1e-6 || Math.abs(draft.lng - saved.lng) > 1e-6;
+}
 
 export type GpsFix = { lat: number; lng: number; acc: number };
 
@@ -99,9 +119,7 @@ export function evaluateGeofence(args: {
   const home = args.home;
   if (!home || isLikelyBadCoord(home)) return { kind: "no_home_pin" };
 
-  const limitFeet = Number.isFinite(args.radiusFeet) && args.radiusFeet > 0
-    ? args.radiusFeet
-    : 1000;
+  const limitFeet = resolveGeofenceRadiusFeet(args.radiusFeet);
   const distanceFeet = haversineFeet(home, live);
   if (distanceFeet <= limitFeet) {
     return { kind: "inside", distanceFeet, limitFeet };

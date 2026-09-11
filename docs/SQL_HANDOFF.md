@@ -6,6 +6,29 @@ it worked before moving on.
 
 ---
 
+## REVIEW — Client home clock-in radius (2026-09-11) — Core flag, no migration
+
+Per-client clock-in geofence radius is the existing column
+`public.clients.geofence_radius_feet` (integer, feet, `NOT NULL DEFAULT 1000`).
+Home pin stays `home_latitude` / `home_longitude`. Punch pad already reads this
+column. No new column. Do **not** bulk-drop or replace `clients` RLS.
+
+Clear the editor, paste:
+
+```sql
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'clients'
+  AND column_name IN ('home_latitude', 'home_longitude', 'geofence_radius_feet')
+ORDER BY column_name;
+```
+
+**What you'll see:** `geofence_radius_feet` integer, not null, default 1000;
+`home_latitude` / `home_longitude` numeric/float, nullable.
+
+---
+
 ## ACTION — Employees roster Last Login (2026-09-11) — Core RPC, no RLS
 
 Apex shipped Last Login on Admin Employees roster

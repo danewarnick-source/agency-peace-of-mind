@@ -613,6 +613,24 @@ function decodeServerFnExport(url: string): string {
 
 function serverFnPayload(url: string, body: string): unknown {
   const fn = decodeServerFnExport(url);
+  if (/saveClientHomePin(?!From)/i.test(fn)) {
+    const lat = Number((`${url}\n${body}`.match(/"latitude"\s*:\s*(-?\d+(?:\.\d+)?)/) ?? [])[1] ?? 40.7608);
+    const lng = Number((`${url}\n${body}`.match(/"longitude"\s*:\s*(-?\d+(?:\.\d+)?)/) ?? [])[1] ?? -111.891);
+    const radiusMatch = `${url}\n${body}`.match(/"geofenceRadiusFeet"\s*:\s*(\d+)/);
+    return {
+      ok: true,
+      latitude: lat,
+      longitude: lng,
+      geofenceRadiusFeet: radiusMatch ? Number(radiusMatch[1]) : 1000,
+    };
+  }
+  if (/saveClientGeofenceRadius/i.test(fn)) {
+    const radiusMatch = `${url}\n${body}`.match(/"geofenceRadiusFeet"\s*:\s*(\d+)/);
+    return { ok: true, geofenceRadiusFeet: radiusMatch ? Number(radiusMatch[1]) : 1000 };
+  }
+  if (/saveClientPhysicalAddress/i.test(fn)) {
+    return { ok: true, address: "1 Hive Way, Salt Lake City, UT" };
+  }
   if (/addClientBillingCodes/i.test(fn)) {
     return { ok: true, added: 0 };
   }
@@ -846,6 +864,8 @@ export async function waitForDashboard(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
   const loading = page.getByText(/^Loading…$/);
   await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
+  const workspace = page.getByText(/^Loading workspace…$/);
+  await workspace.waitFor({ state: "hidden", timeout: 45_000 }).catch(() => undefined);
 }
 
 export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, STAFF, DAILY_CODES, WORKSHEET_CODES };

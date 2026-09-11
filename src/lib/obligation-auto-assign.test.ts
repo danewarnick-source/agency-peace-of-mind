@@ -14,7 +14,6 @@ import {
   assignmentNeedsSupportStrategies,
   clientFlagsFromExistingSchema,
   hireDueDaysForTitle,
-  titleGroupsForHire,
 } from "./obligation-auto-assign.ts";
 
 describe("hire auto-assign", () => {
@@ -28,9 +27,14 @@ describe("hire auto-assign", () => {
         PCT_HIRE_COURSE_TITLE,
       ],
     );
-    assert.equal(titleGroupsForHire().length, 4);
+    assert.equal(HIRE_ALWAYS_TITLES.length, 4);
     assert.equal([...HIRE_ALWAYS_TITLES].includes(CONFLICT_OF_INTEREST_TITLE), false);
-    assert.ok(titleGroupsForHire().some((group) => group.includes(PCT_HIRE_COURSE_TITLE)));
+    assert.ok([...HIRE_ALWAYS_TITLES].includes(PCT_HIRE_COURSE_TITLE));
+    const hireSet = readFileSync(
+      fileURLToPath(new URL("./obligation-auto-assign.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.doesNotMatch(hireSet, /titleGroupsForHire/);
     const hireHook = readFileSync(
       fileURLToPath(new URL("./staff-assignment-hooks.functions.ts", import.meta.url)),
       "utf8",

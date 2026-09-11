@@ -19,7 +19,7 @@ Six topics, one server-graded formative check each, then a 15-question exam (pas
 Hire-level PCT is already in the all-staff hire catalog — same path as Code of Conduct, conflict of interest, 30-day, and initial CPR:
 
 - Catalog row: `sow-obligation-catalog.ts` title `Person-Centered Thinking and Practices Training`
-- Locked hire set: `HIRE_ALWAYS_TITLES` / `titleGroupsForHire()` in `obligation-auto-assign.ts`
+- Locked hire set: `HIRE_ALWAYS_TITLES` in `obligation-auto-assign.ts`
 - Fan-out: `onStaffHiredInternal` in `staff-assignment-hooks.functions.ts` (new hire, import, hire-date set)
 
 Not per-client. Not gated by assignment flags.

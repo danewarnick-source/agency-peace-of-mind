@@ -725,41 +725,6 @@ function arraysOverlapCaseInsensitive(target: string[], have: string[]): boolean
   return target.some((c) => haveUpper.has(c.toUpperCase()));
 }
 
-/**
- * For scope='staff' obligations with a non-empty target_service_codes list
- * (e.g. ACRE Training, SEI-only), only staff actively assigned to at least
- * one client whose service_codes overlap the target list actually work in
- * that service line — narrows a group-wide assignee list (e.g. "All Staff")
- * down to the staff it should really apply to.
- */
-async function filterAssigneesByServiceCodesInternal(
-  supabase: AnySupabase,
-  organizationId: string,
-  ob: CompanyObligationRow,
-  assignees: ResolvedStaffMember[],
-): Promise<ResolvedStaffMember[]> {
-  const targetCodes = (ob.target_service_codes ?? []).map((c: string) => c.toUpperCase());
-  if (ob.scope !== "staff" || !targetCodes.length || !assignees.length) return assignees;
-
-  const staffIds = assignees.map((a) => a.staff_id);
-  const { data: assignments, error } = await supabase
-    .from("staff_assignments")
-    .select("staff_id, service_codes")
-    .eq("organization_id", organizationId)
-    .in("staff_id", staffIds);
-  if (error) throw new Error(error.message);
-
-  const staffWithMatchingCode = new Set(
-    ((assignments ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>)
-      .filter((a) =>
-        (a.service_codes ?? []).some((c: string) => targetCodes.includes(c.toUpperCase())),
-      )
-      .map((a) => a.staff_id),
-  );
-
-  return assignees.filter((a) => staffWithMatchingCode.has(a.staff_id));
-}
-
 type DutyFilterMode = "visible" | "clock";
 
 /**

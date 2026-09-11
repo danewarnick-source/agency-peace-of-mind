@@ -3,18 +3,6 @@
 
 import { dutyKeyForObligation } from "./obligations/duty-applicability.ts";
 
-export function dutyRequiresTransporter(key: string | null | undefined): boolean {
-  return key === "driving_record_transport";
-}
-
-export function dutyRequiresBehaviorCaseload(key: string | null | undefined): boolean {
-  return key === "behavior_intervention_cert";
-}
-
-export function dutyRequiresAbiCaseload(key: string | null | undefined): boolean {
-  return key === "abi_training";
-}
-
 /** Org-level duties that must generate one instance per home, not one for the agency. */
 export function perHomeServiceCode(key: string | null | undefined): string | null {
   if (key === "hhs_home_cert_annual" || key === "hhs_evac_drills_quarterly") return "HHS";

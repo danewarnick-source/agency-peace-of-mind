@@ -72,10 +72,17 @@ describe("duty keys, not titles", () => {
       fileURLToPath(new URL("../obligation-assignee-rules.ts", import.meta.url)),
       "utf8",
     );
-    assert.match(rules, /driving_record_transport/);
-    assert.match(rules, /behavior_intervention_cert/);
-    assert.match(rules, /abi_training/);
+    const engine = readFileSync(
+      fileURLToPath(new URL("./duty-applicability.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(engine, /driving_record_transport/);
+    assert.match(engine, /behavior_intervention_cert/);
+    assert.match(engine, /abi_training/);
     assert.doesNotMatch(rules, /title\.startsWith/);
+    assert.doesNotMatch(rules, /dutyRequiresTransporter/);
+    assert.doesNotMatch(rules, /dutyRequiresBehaviorCaseload/);
+    assert.doesNotMatch(rules, /dutyRequiresAbiCaseload/);
   });
 
   it("generation uses keys, not obligation titles", () => {
@@ -83,8 +90,7 @@ describe("duty keys, not titles", () => {
       fileURLToPath(new URL("../company-obligations.functions.ts", import.meta.url)),
       "utf8",
     );
-    assert.doesNotMatch(gen, /dutyRequiresTransporter\(ob\.title\)/);
-    assert.doesNotMatch(gen, /dutyRequiresAbiCaseload\(ob\.title\)/);
+    assert.doesNotMatch(gen, /filterAssigneesByServiceCodesInternal/);
     assert.doesNotMatch(gen, /perHomeServiceCode\(ob\.title\)/);
     assert.match(gen, /obligationDutyKey/);
     assert.match(gen, /staffReceivesDutyClock/);

@@ -34,7 +34,7 @@ export async function findObligationByTitles(
   titles: string[],
 ): Promise<FoundObligation | null> {
   if (!titles.length) return null;
-  let query = supabase
+  const query = supabase
     .from("company_obligations")
     .select("id, title, key, disposition, source")
     .eq("organization_id", organizationId)

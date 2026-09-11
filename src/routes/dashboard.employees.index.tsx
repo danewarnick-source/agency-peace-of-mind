@@ -15,7 +15,10 @@ import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions
 import {
   countEmployeesOnRosterTab,
   filterEmployeesByRosterTab,
+  formatLastLogin,
+  formatRosterDate,
   isEmployeeOnActiveRoster,
+  lastLoginByUserId,
   type EmployeeRosterTab,
 } from "@/lib/employee-roster";
 import { AddEmployeeButton, AddEmployeeWizard } from "@/components/employees/add-employee-wizard";
@@ -28,7 +31,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, MoreHorizontal, Ban, ExternalLink, Settings, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
+import { Mail, KeyRound, Copy, UserCheck, UserX, Users as UsersIcon, Search, Loader2, MoreHorizontal, Ban, Settings, RefreshCcw, Trash2, AlertTriangle } from "lucide-react";
 import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -88,14 +91,25 @@ export function EmployeesPage() {
         .select("id, role, job_title, active, user_id, created_at")
         .eq("organization_id", org.organization_id);
       const ids = (data ?? []).map((m) => m.user_id);
-      const { data: profs } = await supabase.from("profiles")
+      const profilesQuery = supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, employee_id, position, account_status, is_active, worker_type, photo_path, photo_updated_at" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+      const lastLoginQuery = supabase.rpc(
+        "org_member_last_sign_ins" as never,
+        { _org: org.organization_id } as never,
+      );
+      const [{ data: profs }, lastLoginRes] = await Promise.all([profilesQuery, lastLoginQuery]);
+      const lastLoginByUser = lastLoginByUserId(lastLoginRes.error ? null : lastLoginRes.data);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []).map((m) => ({ ...m, profile: profMap.get(m.user_id) as any }));
+      return (data ?? []).map((m) => ({
+        ...m,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        profile: profMap.get(m.user_id) as any,
+        lastSignInAt: lastLoginByUser.get(m.user_id) ?? null,
+        lastSignInKnown: lastLoginByUser.has(m.user_id),
+      }));
     },
   });
   const visibleMembers = useMemo(
@@ -383,7 +397,14 @@ export function EmployeesPage() {
                       name={name === "—" ? null : name}
                       className="h-9 w-9 text-xs"
                     />
-                    <p className="truncate font-bold">{name}</p>
+                    <Link
+                      to="/dashboard/employees/$staffId"
+                      params={{ staffId: m.user_id }}
+                      className="truncate font-bold hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {name}
+                    </Link>
                   </div>
                   <span
                     className={
@@ -406,6 +427,9 @@ export function EmployeesPage() {
                     <span className="text-xs text-muted-foreground">No service codes</span>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Last login {formatLastLogin(m.lastSignInAt, m.lastSignInKnown)}
+                </p>
                 <div className="flex items-center justify-end gap-2 pt-1" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                   {rosterTab === "inactive" && m.user_id !== user?.id && (
                     <>
@@ -431,13 +455,6 @@ export function EmployeesPage() {
                       </Button>
                     </>
                   )}
-                  <Link
-                    to="/dashboard/employees/$staffId"
-                    params={{ staffId: m.user_id }}
-                    className="flex items-center gap-1 text-sm font-medium text-primary"
-                  >
-                    View <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
                 </div>
               </div>
             );
@@ -453,7 +470,8 @@ export function EmployeesPage() {
                 <th className="px-4 py-3 text-left font-semibold">Role</th>
                 <th className="px-4 py-3 text-left font-semibold">Status</th>
                 <th className="px-4 py-3 text-left font-semibold">Start date</th>
-                <th className="px-4 py-3 text-right font-semibold w-[220px]">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold">Last Login</th>
+                <th className="px-4 py-3 text-right font-semibold w-[140px]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -485,7 +503,14 @@ export function EmployeesPage() {
                         />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 truncate">
-                            <span className="truncate">{name}</span>
+                            <Link
+                              to="/dashboard/employees/$staffId"
+                              params={{ staffId: m.user_id }}
+                              className="truncate hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {name}
+                            </Link>
                             {needsReset && (
                               <span className="hive-role-pill rounded-full px-2 py-0.5 text-[10px] uppercase whitespace-nowrap">
                                 Pending first login
@@ -499,7 +524,15 @@ export function EmployeesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground whitespace-nowrap max-w-[220px]">
-                      <div className="truncate" title={login}>{login}</div>
+                      <Link
+                        to="/dashboard/employees/$staffId"
+                        params={{ staffId: m.user_id }}
+                        className="block truncate hover:underline"
+                        title={login}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {login}
+                      </Link>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span className="hive-role-pill rounded-full px-2 py-0.5 text-xs uppercase">{m.role}</span>
@@ -517,41 +550,13 @@ export function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                      {startDate
-                        ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                        : "—"}
+                      {formatRosterDate(startDate)}
                     </td>
-                    <td className="px-4 py-2 text-right whitespace-nowrap w-[280px]" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                      {formatLastLogin(m.lastSignInAt, m.lastSignInKnown)}
+                    </td>
+                    <td className="px-4 py-2 text-right whitespace-nowrap w-[160px]" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link
-                            to="/dashboard/employees/$staffId"
-                            params={{ staffId: m.user_id }}
-                            search={{ tab: "personnel" }}
-                          >
-                            Staff file
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link
-                            to="/dashboard/employees/$staffId"
-                            params={{ staffId: m.user_id }}
-                          >
-                            View <ExternalLink className="ml-1 h-3 w-3" />
-                          </Link>
-                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

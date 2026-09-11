@@ -522,6 +522,18 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
       await fulfillJson(route, 200, clients);
       return;
     }
+    if (rpc === "org_member_last_sign_ins") {
+      const staff = opts.emptyStaff ? STAFF_LIST.filter((s) => s.id === personaId) : STAFF_LIST;
+      await fulfillJson(
+        route,
+        200,
+        staff.map((s) => ({
+          user_id: s.id,
+          last_sign_in_at: s.id === ADMIN_USER_ID ? null : "2026-08-27T12:00:00.000Z",
+        })),
+      );
+      return;
+    }
     await fulfillJson(route, 200, []);
     return;
   }

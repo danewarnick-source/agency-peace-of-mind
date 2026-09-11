@@ -6,6 +6,83 @@ it worked before moving on.
 
 ---
 
+## ACTION — Employees roster Last Login (2026-09-11) — Core RPC, no RLS
+
+Apex shipped Last Login on Admin Employees roster
+(`/dashboard/hub/employees?tab=roster`). There is no last-login column on
+`profiles` / `org_member_directory`. Auth `last_sign_in_at` lives on
+`auth.users` (not PostgREST-visible). **Do not** add a profiles column and
+**do not** bulk-change RLS.
+
+Until this RPC exists, the roster shows `—`. After it runs, a known null
+`last_sign_in_at` shows `Never`.
+
+### Probe (optional)
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ' | ' ORDER BY p.proname)
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname = 'org_member_last_sign_ins';
+```
+
+**What you'll see:** one row, `NULL` until created.
+
+### Create
+
+Clear the editor, paste:
+
+```sql
+CREATE OR REPLACE FUNCTION public.org_member_last_sign_ins(_org uuid)
+RETURNS TABLE (
+  user_id uuid,
+  last_sign_in_at timestamptz
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_org_admin_or_manager(_org, auth.uid()) THEN
+    RAISE EXCEPTION 'Admin or manager access required.';
+  END IF;
+
+  RETURN QUERY
+  SELECT m.user_id, u.last_sign_in_at
+  FROM public.organization_members m
+  JOIN auth.users u ON u.id = m.user_id
+  WHERE m.organization_id = _org;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.org_member_last_sign_ins(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.org_member_last_sign_ins(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.org_member_last_sign_ins(uuid) TO authenticated;
+```
+
+**What you'll see:** `CREATE FUNCTION` then two `REVOKE` and one `GRANT`.
+No tables, columns, or RLS policies.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ' | ' ORDER BY p.proname)
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname = 'org_member_last_sign_ins';
+```
+
+**What you'll see:** `org_member_last_sign_ins(_org uuid)`.
+
+---
+
 ## REVIEW — Admin scope mixed client+staff (2026-09-11) — Core flag, do not drop RLS
 
 Apex shipped Admin scope on the employee Profile. Persist path is **existing**

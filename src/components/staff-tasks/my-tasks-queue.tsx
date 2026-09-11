@@ -26,7 +26,7 @@ export function MyTasksQueue({
           className={
             variant === "home"
               ? "text-base font-semibold text-foreground"
-              : "text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+              : "text-xl font-semibold tracking-tight text-foreground sm:text-2xl md:hidden"
           }
         >
           My tasks

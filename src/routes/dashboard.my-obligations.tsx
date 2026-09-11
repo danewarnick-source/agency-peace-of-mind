@@ -924,7 +924,7 @@ function MyObligationsPage() {
       <ThreadsPanel variant="staff" />
 
       <PacketNextActionCard
-        nextAction={packetQ.data?.packet.nextAction}
+        nextAction={packetQ.data?.packet?.nextAction}
         emptyLabel="Nothing needs you first — your file is current or waiting on an admin."
       />
 

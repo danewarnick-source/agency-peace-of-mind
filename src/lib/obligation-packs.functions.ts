@@ -17,7 +17,6 @@ import {
   LOCKED_PACK_KEYS,
   LOCKED_PACK_LABEL,
   mergeDueDayPackFields,
-  newCustomPackKey,
   obligationIsRequired,
   packCellStatus,
   packColumnForObligation,
@@ -27,7 +26,7 @@ import {
   type PackCellStatus,
 } from "./obligation-packs";
 import { ensureAllStaffGroupInternal } from "./staff-groups.functions";
-import { generateNextInstanceInternal } from "./company-obligations.functions";
+import { ORPHAN_OBLIGATION_CREATE_GONE } from "./compliance-spine";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -583,25 +582,6 @@ export const listObligationPackMatrix = createServerFn({ method: "POST" })
     };
   });
 
-async function insertObligation(
-  supabase: AnySupabase,
-  row: Record<string, unknown>,
-): Promise<ObRow> {
-  const first = await supabase.from("company_obligations").insert(row).select("*").maybeSingle();
-  if (!first.error && first.data) return first.data as ObRow;
-  if (first.error && columnMissing(first.error.message)) {
-    const stripped = { ...row };
-    delete stripped.pack_key;
-    delete stripped.is_required;
-    const retry = await supabase.from("company_obligations").insert(stripped).select("*").maybeSingle();
-    if (retry.error) throw new Error(retry.error.message);
-    if (!retry.data) throw new Error("Failed to create obligation.");
-    return retry.data as ObRow;
-  }
-  if (first.error) throw new Error(first.error.message);
-  throw new Error("Failed to create obligation.");
-}
-
 export const createObligationPack = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -624,61 +604,7 @@ export const createObligationPack = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) throw new Error("Not signed in.");
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
-
-    const packKey = newCustomPackKey();
-    const assign: PackAssignSpec = {
-      roles: data.assign.roles,
-      jobCodes: data.assign.jobCodes,
-      groupIds: data.assign.groupIds,
-      userIds: data.assign.userIds,
-    };
-    await upsertPackTable(
-      supabase,
-      data.organizationId,
-      { packKey, name: data.name, locked: false, assign },
-      userId,
-    );
-
-    const assignedUsers = await resolveAssignUserIds(supabase, data.organizationId, assign);
-    const allStaff =
-      assign.roles.length === 0 &&
-      assign.jobCodes.length === 0 &&
-      assign.groupIds.length === 0 &&
-      assign.userIds.length === 0
-        ? await ensureAllStaffGroupInternal(supabase, data.organizationId)
-        : null;
-
-    await insertObligation(supabase, {
-      organization_id: data.organizationId,
-      title: data.name,
-      description: "Pack tab",
-      source_policy_section: "hive-pack",
-      cadence: "one_time",
-      due_day_config: mergeDueDayPackFields({}, {
-        packKey,
-        packName: data.name,
-        isRequired: false,
-        sentinel: true,
-        assign,
-      }),
-      reminder_days_before: [],
-      evidence_type: "attestation",
-      attestation_text: null,
-      requires_individual_completion: false,
-      assigned_to_groups: allStaff ? [allStaff] : assign.groupIds,
-      assigned_to_users: assignedUsers,
-      assignee_role: "any_assigned",
-      scope: "staff",
-      target_service_codes: [],
-      source: "provider",
-      is_locked: false,
-      active: true,
-      pack_key: packKey,
-      is_required: false,
-      created_by: userId,
-    });
-
-    return { packKey, name: data.name };
+    throw new Error(ORPHAN_OBLIGATION_CREATE_GONE);
   });
 
 export const assignObligationPack = createServerFn({ method: "POST" })
@@ -800,52 +726,7 @@ export const addPackItem = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) throw new Error("Not signed in.");
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
-
-    const allStaff = await ensureAllStaffGroupInternal(supabase, data.organizationId);
-    const inserted = await insertObligation(supabase, {
-      organization_id: data.organizationId,
-      title: data.title,
-      description:
-        data.kind === "upload"
-          ? "Staff upload a file or card for this item."
-          : "Staff read this item and attest.",
-      source_policy_section: isLockedPackKey(data.packKey) ? data.packKey : "provider-pack",
-      cadence: "one_time",
-      due_day_config: mergeDueDayPackFields(
-        { days_after_hire: 30 },
-        {
-          packKey: data.packKey,
-          packName: data.packName ?? (isLockedPackKey(data.packKey) ? LOCKED_PACK_LABEL[data.packKey] : undefined),
-          isRequired: data.required,
-        },
-      ),
-      reminder_days_before: [7, 3],
-      evidence_type: data.kind === "upload" ? "upload" : "attestation",
-      attestation_text:
-        data.kind === "attest"
-          ? "I have read this item and understand what is expected of me."
-          : null,
-      requires_individual_completion: true,
-      assigned_to_groups: [allStaff],
-      assigned_to_users: [],
-      assignee_role: "any_assigned",
-      scope: "staff",
-      target_service_codes: [],
-      source: "provider",
-      is_locked: false,
-      active: true,
-      pack_key: data.packKey,
-      is_required: data.required,
-      created_by: userId,
-    });
-
-    try {
-      await generateNextInstanceInternal(supabase, data.organizationId, inserted.id);
-    } catch (e) {
-      console.warn("[obligation-packs] could not generate instance:", e);
-    }
-
-    return { obligationId: inserted.id };
+    throw new Error(ORPHAN_OBLIGATION_CREATE_GONE);
   });
 
 export const attachExistingToPack = createServerFn({ method: "POST" })

@@ -150,7 +150,7 @@ function ViewAllLink({
   hash,
 }: {
   to:
-    | "/dashboard/command-center"
+    | "/dashboard/compliance"
     | "/dashboard/hub/employees"
     | "/dashboard/hub/clients"
     | "/dashboard/compliance-desk";
@@ -172,7 +172,7 @@ function PowerLink({
   to,
   children,
 }: {
-  to: "/dashboard/command-center" | "/dashboard/compliance-desk";
+  to: "/dashboard/compliance" | "/dashboard/compliance-desk";
   children: ReactNode;
 }) {
   return (
@@ -266,7 +266,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
             </div>
           </div>
           <nav aria-label="Desk shortcuts" className="flex shrink-0 items-center gap-3 pt-1">
-            <PowerLink to="/dashboard/command-center">Command center</PowerLink>
+            <PowerLink to="/dashboard/compliance">Compliance</PowerLink>
             <PowerLink to="/dashboard/compliance-desk">Compliance desk</PowerLink>
           </nav>
         </div>
@@ -277,7 +277,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
           ) : instancesFailed ? (
             <Lift className="p-5">
               <LoadError>Could not load overdue items.</LoadError>
-              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
+              <ViewAllLink to="/dashboard/compliance" />
             </Lift>
           ) : derived.overdue.length === 0 ? (
             <Lift
@@ -299,7 +299,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
               <p className="mt-1 text-sm" style={{ color: PI_THEME.c50 }}>
                 No overdue obligation instances.
               </p>
-              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
+              <ViewAllLink to="/dashboard/compliance" />
             </Lift>
           ) : (
             <Lift className="p-5" style={{ background: PI_THEME.heroTileBg }}>
@@ -319,20 +319,26 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                     className="pb-2.5 last:pb-0"
                     style={{ borderBottom: `1px solid ${PI_THEME.hairlines.faint}` }}
                   >
-                    <div className="truncate text-sm font-medium">{item.title}</div>
-                    <div
-                      className="mt-0.5 flex items-center justify-between gap-3 text-xs"
-                      style={{ color: PI_THEME.c50 }}
+                    <Link
+                      to="/dashboard/compliance"
+                      className="block cursor-pointer"
+                      style={{ color: PI_THEME.cream }}
                     >
-                      <span className="truncate">{item.assignee}</span>
-                      <span className="shrink-0 tabular-nums" style={{ color: PI_THEME.red }}>
-                        {item.days} day{item.days === 1 ? "" : "s"} overdue
-                      </span>
-                    </div>
+                      <div className="truncate text-sm font-medium">{item.title}</div>
+                      <div
+                        className="mt-0.5 flex items-center justify-between gap-3 text-xs"
+                        style={{ color: PI_THEME.c50 }}
+                      >
+                        <span className="truncate">{item.assignee}</span>
+                        <span className="shrink-0 tabular-nums" style={{ color: PI_THEME.red }}>
+                          {item.days} day{item.days === 1 ? "" : "s"} overdue
+                        </span>
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
-              <ViewAllLink to="/dashboard/command-center" hash="obligations" />
+              <ViewAllLink to="/dashboard/compliance" />
             </Lift>
           )}
 
@@ -507,7 +513,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                 )}
               </ul>
             )}
-            <ViewAllLink to="/dashboard/command-center" hash="due" />
+            <ViewAllLink to="/dashboard/compliance" />
           </Lift>
 
           <Lift className="p-5">
@@ -532,7 +538,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                 No recommendations right now.
               </p>
             )}
-            <ViewAllLink to="/dashboard/command-center" hash="recommendations" />
+            <ViewAllLink to="/dashboard/compliance" />
           </Lift>
         </div>
 

@@ -347,26 +347,12 @@ export const raiseComplianceFlag = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data: _data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return null;
-    const { data: flag, error } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_flags" as any)
-      .insert({
-        organization_id: data.organizationId,
-        rule_id: data.ruleId,
-        requirement_id: data.requirementId,
-        detection_type: data.detectionType,
-        subject_context: data.subjectContext,
-        source_snapshot: data.sourceSnapshot,
-        raised_to: userId,
-      })
-      .select("id, raised_at")
-      .single();
-    if (error) throw new Error(error.message);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return flag as any;
+    // Parallel nectar_compliance_flags writer disabled. Punch-pad still
+    // detects and blocks; it must not persist a second compliance register.
+    return null;
   });
 
 export const resolveComplianceFlag = createServerFn({ method: "POST" })

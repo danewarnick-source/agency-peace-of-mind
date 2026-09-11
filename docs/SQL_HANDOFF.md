@@ -6,6 +6,19 @@ it worked before moving on.
 
 ---
 
+## NOTE — Parallel obligation writers killed in app (2026-09-11)
+
+Bell / punch-pad / shift-commit / incident / orphan-create paths no longer
+mint clocks. Only the Compliance spine (`company_obligations*` catalog /
+instance engine) plus explicit Soft Core / hire seeds write clocks.
+
+**Do not DROP tables. Do not run Soft SQL for this change.**
+`nectar_compliance_instances` / `nectar_compliance_flags` stay. App writers
+are no-ops; `createCompanyObligation` / `createObligationPack` / `addPackItem`
+throw 410. A later cleanup can retire empty nectar rows if needed.
+
+---
+
 ## ACTION — Retire per-client Person-Centered Thinking (2026-09-11) — Core flag
 
 Hire-level **Person-Centered Thinking and Practices Training** stays. The

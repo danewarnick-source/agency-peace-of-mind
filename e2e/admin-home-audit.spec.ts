@@ -152,11 +152,11 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     const viewAll = page.getByRole("link", { name: /View all/i }).first();
     if (await viewAll.isVisible().catch(() => false)) {
       await viewAll.click();
-      await expect(page).toHaveURL(/\/dashboard\/command-center#obligations/, { timeout: 15_000 });
-      await expect(page.getByRole("heading", { name: /Agency Command Center/i })).toBeVisible({
+      await expect(page).toHaveURL(/\/dashboard\/compliance/, { timeout: 15_000 });
+      await expect(page.getByRole("tab", { name: /Staff file/i })).toBeVisible({
         timeout: 15_000,
       });
-      await assertNoCrash(page, "home → command center obligations");
+      await assertNoCrash(page, "home → compliance");
     }
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });

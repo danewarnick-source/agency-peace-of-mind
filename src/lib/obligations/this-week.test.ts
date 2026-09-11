@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   decorateDecision,
@@ -175,6 +176,17 @@ describe("rollupDecisions", () => {
     assert.equal(rolled[0]?.count, 3);
     const decorated = decorateDecision(rolled[0]!, { now: NOW });
     assert.match(decorated.headline ?? "", HEADLINE_VERB_RE);
+  });
+});
+
+describe("QuietLine I/O lock", () => {
+  it("counts notes from live ai_compliance_status with head-only selects", () => {
+    const src = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
+    assert.match(src, /ai_compliance_status/);
+    assert.match(src, /count: "exact"/);
+    assert.match(src, /head: true/);
+    assert.match(src, /log_date/);
+    assert.doesNotMatch(src, /nectar_validation_status/);
   });
 });
 

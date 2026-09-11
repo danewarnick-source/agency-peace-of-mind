@@ -17,6 +17,7 @@ import {
   planOwnerLabel,
   urgencyForPlan,
 } from "./remediation.ts";
+import { addDaysYmd, denverYmd } from "../admin-home-data.ts";
 import { sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
 import { evvStaffIdsForScope, resolveScopeFromSnapshot } from "./scope.ts";
 import {
@@ -163,23 +164,23 @@ async function loadEvvNeedsReviewCount(
   if (staffIdsInScope && staffIdsInScope.length === 0) return null;
   let q = supabase
     .from("evv_timesheets")
-    .select("id, staff_id")
+    .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("review_status", "needs_review");
   if (staffIdsInScope) q = q.in("staff_id", staffIdsInScope);
-  const { data, error } = await q;
+  const { count, error } = await q;
   if (error) {
     if (tableMissing(error.message)) return null;
     throw new Error(error.message);
   }
-  const count = (data ?? []).length;
-  if (count === 0) return null;
+  const n = count ?? 0;
+  if (n === 0) return null;
   return {
     kind: "quiet_summary",
     id: `evv_needs_review:${organizationId}`,
     title: "EVV timesheets need review",
-    body: `${count} timesheet${count === 1 ? "" : "s"} in scope marked needs_review.`,
-    count,
+    body: `${n} timesheet${n === 1 ? "" : "s"} in scope marked needs_review.`,
+    count: n,
     urgency: "normal",
     dueAt: null,
     source: "evv_needs_review",
@@ -204,11 +205,14 @@ function standingMissingForAdmin(
   return out;
 }
 
+const NOTES_WINDOW_DAYS = 7;
+
 async function loadQuietCounts(
   supabase: AnySupabase,
   orgId: string,
   input: EvaluateInput,
   evvNeedsReview: number,
+  now: Date,
 ): Promise<QuietLine> {
   const obligationsSatisfied = input.instances.filter(
     (i) => i.status === "completed" || !!i.completed_at,
@@ -220,31 +224,29 @@ async function loadQuietCounts(
     if (input.obligationHasEvidence[ob.id]) standingCurrent += 1;
   }
 
-  let notesPassed = 0;
-  let notesTotal = 0;
-  let recordsReviewCleared = 0;
-
-  const [logsRes, reviewRes] = await Promise.all([
+  const notesSince = addDaysYmd(denverYmd(now), -(NOTES_WINDOW_DAYS - 1));
+  const notesBase = () =>
     supabase
       .from("daily_logs")
-      .select("id, nectar_validation_status")
-      .eq("organization_id", orgId),
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .gte("log_date", notesSince);
+
+  const [totalRes, passedRes, reviewRes] = await Promise.all([
+    notesBase(),
+    notesBase().eq("ai_compliance_status", "Verified"),
     supabase
       .from("evv_timesheets")
-      .select("id, review_status, reconciliation_status")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .or("review_status.eq.approved,reconciliation_status.eq.accepted"),
   ]);
 
-  if (!logsRes.error) {
-    const rows = (logsRes.data ?? []) as Array<{ nectar_validation_status?: string | null }>;
-    notesTotal = rows.length;
-    notesPassed = rows.filter((r) => (r.nectar_validation_status ?? "").toLowerCase() === "passed")
-      .length;
-  }
-  if (!reviewRes.error) {
-    recordsReviewCleared = (reviewRes.data ?? []).length;
-  }
+  // daily_logs.ai_compliance_status is the live Nectar column. Fail open on
+  // a missing table / column so Home still renders.
+  const notesTotal = totalRes.error ? 0 : (totalRes.count ?? 0);
+  const notesPassed = passedRes.error ? 0 : (passedRes.count ?? 0);
+  const recordsReviewCleared = reviewRes.error ? 0 : (reviewRes.count ?? 0);
 
   return buildQuietLine({
     obligationsSatisfied,
@@ -332,7 +334,7 @@ export async function getThisWeek(
 
   // 6. evv_timesheets needs_review in scope — QuietLine, not a card.
   const evv = await loadEvvNeedsReviewCount(supabase, orgId, evvStaffIdsForScope(viewerScope));
-  const quiet = await loadQuietCounts(supabase, orgId, input, evv?.count ?? 0);
+  const quiet = await loadQuietCounts(supabase, orgId, input, evv?.count ?? 0, now);
 
   return {
     items: finalizeDecisions(raw, userId, now),

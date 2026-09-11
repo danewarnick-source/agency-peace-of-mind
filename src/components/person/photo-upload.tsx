@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Upload, Trash2 } from "lucide-react";
+import { staffPermissionMutationErrorMessage } from "@/lib/staff-permission-toggles";
 import { PersonAvatar } from "./person-avatar";
 
 /**
@@ -64,7 +65,7 @@ export function PhotoUpload({
       await onUploaded(path);
       toast.success("Photo saved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
+      toast.error(staffPermissionMutationErrorMessage(e, "Upload failed"));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -116,7 +117,7 @@ export function PhotoUpload({
                   await onCleared();
                   toast.success("Photo removed");
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Remove failed");
+                  toast.error(staffPermissionMutationErrorMessage(e, "Remove failed"));
                 } finally {
                   setBusy(false);
                 }

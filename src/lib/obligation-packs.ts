@@ -10,10 +10,10 @@
 import { AGENCY_POLICY_SOURCE_SECTION } from "./agency-policies.ts";
 import {
   CLIENT_SPECIFIC_OBLIGATION_TITLE,
-  PCT_CLIENT_OBLIGATION_TITLE,
   PCT_HIRE_COURSE_TITLE,
   SUPPORT_STRATEGIES_OBLIGATION_TITLE,
   clientFormKindForTitle,
+  isRetiredPerClientPctTitle,
 } from "./client-form-obligations.ts";
 import { ABI_OBLIGATION_TITLE, THIRTY_DAY_OBLIGATION_TITLE } from "./in-hive-training.ts";
 import { CODE_OF_CONDUCT_TITLE, CONFLICT_OF_INTEREST_TITLE } from "./obligation-auto-assign.ts";
@@ -309,15 +309,6 @@ function lockedClient(title: string): ObligationPackRef | null {
       lockedPack: true,
     };
   }
-  if (kind === "person_centered" || titleEq(title, PCT_CLIENT_OBLIGATION_TITLE)) {
-    return {
-      packKey: "client",
-      columnKey: "pct-client",
-      label: "Person-centered thinking",
-      required: true,
-      lockedPack: true,
-    };
-  }
   if (titleStarts(title, "Housemate Informed-Choice")) {
     return {
       packKey: "client",
@@ -351,6 +342,7 @@ export function packColumnForObligation(ob: PackableObligation): ObligationPackR
   if (isPackSentinel(ob)) return null;
   const title = (ob.title ?? "").trim();
   if (!title) return null;
+  if (isRetiredPerClientPctTitle(title)) return null;
 
   const storedKey = (typeof ob.pack_key === "string" && ob.pack_key.trim()
     ? ob.pack_key.trim()
@@ -485,5 +477,4 @@ export function newCustomPackKey(): string {
 export const CLIENT_PACK_SEED_TITLES = [
   CLIENT_SPECIFIC_OBLIGATION_TITLE,
   SUPPORT_STRATEGIES_OBLIGATION_TITLE,
-  PCT_CLIENT_OBLIGATION_TITLE,
 ] as const;

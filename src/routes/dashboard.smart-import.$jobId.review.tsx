@@ -829,7 +829,7 @@ function SubjectWizard({
       {step === "staff" && (
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
-            Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
+            Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training) unlocks after PCSP upload.
           </div>
           <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
         </div>
@@ -3161,7 +3161,7 @@ function ImportSummaryPanel({
             <div className="text-[11px]">{staffNames.join(" · ")}</div>
           )}
           <div className="mt-1 text-[10px] text-muted-foreground">
-            Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) is created automatically once PCSP + goals are finalized.
+            Per-client training (Support strategies, Client-specific training) is created automatically once PCSP + goals are finalized.
           </div>
         </div>
       </div>

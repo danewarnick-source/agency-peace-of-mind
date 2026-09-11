@@ -84,7 +84,7 @@ describe("obligation pack mapping", () => {
     );
   });
 
-  it("maps client-specific / PCT / support strategies to Client", () => {
+  it("maps client-specific and support strategies to Client", () => {
     assert.equal(
       packColumnForObligation({
         id: "1",
@@ -106,8 +106,8 @@ describe("obligation pack mapping", () => {
         id: "3",
         title: "Person-Centered Thinking — [Client Name]",
         scope: "staff_per_client",
-      })?.columnKey,
-      "pct-client",
+      }),
+      null,
     );
   });
 

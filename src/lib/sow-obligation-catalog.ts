@@ -596,20 +596,6 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     service_codes: [],
     evidence_standard: "Support Strategies submitted to the SC within 30 days of PCSP activation.",
   },
-  {
-    title: "Person-Centered Thinking — [Client Name]",
-    citation: "DHHS91172 SOW §1.8(5)(C)",
-    category: "client_docs",
-    fulfillment: "in_hive",
-    fulfillment_note:
-      "One instance per staff+client assignment. Staff open this from the staff file and complete the existing person-centered thinking form with the client. Separate from the hire-level Person-Centered Thinking and Practices course.",
-    due_rule: { kind: "days_after_assignment", days: 30 },
-    owner: "staff",
-    service_codes: [],
-    evidence_standard:
-      "Completed person-centered thinking profile for the assigned client, attested by the staff member.",
-  },
-
   // ── Standing duties (seeded on first register open + SQL handoff) ────────
   {
     title: "Emergency Management and Business Continuity Plan",

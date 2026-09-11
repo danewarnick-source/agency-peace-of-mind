@@ -1,6 +1,6 @@
 /**
  * PCSP gate — verifies the three PCSP-derived workflows on the client Care tab
- * (Support Strategies, Client-Specific Training, Person-Centered Thinking) are
+ * (Support Strategies, Client-Specific Training) are
  * disabled until a PCSP is on file, and become enabled once one exists.
  *
  * Read-only against staging. Requires two seeded clients:
@@ -22,7 +22,6 @@ const DIALOG_BODY = /This client has no PCSP on file/i;
 const CARDS = [
   { name: "Support Strategies", heading: /Support Strategies/i },
   { name: "Client-Specific Training", heading: /Client-specific training/i },
-  { name: "Person-Centered Thinking", heading: /Person-Centered Thinking/i },
 ];
 
 async function gotoCare(page: Page, clientId: string) {

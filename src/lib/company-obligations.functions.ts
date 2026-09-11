@@ -30,6 +30,7 @@ import {
 import { resolveDueRule, sowCatalogEntry } from "./sow-obligation-catalog";
 import { obligationAppliesToFootprint } from "./dspd-audit-tool";
 import { STANDING_SOW_DUTIES } from "./standing-sow-duties";
+import { isRetiredPerClientPctTitle } from "./client-form-obligations";
 import {
   dutyRequiresAbiCaseload,
   dutyRequiresBehaviorCaseload,
@@ -890,6 +891,7 @@ async function generatePerClientInstancesInternal(
   organizationId: string,
   ob: CompanyObligationRow,
 ): Promise<ObligationInstanceRow[]> {
+  if (isRetiredPerClientPctTitle(ob.title)) return [];
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
 
   const { data: assignments, error: aErr } = await supabase
@@ -1256,6 +1258,7 @@ export async function generateNextInstanceInternal(
   obligationId: string,
 ): Promise<ObligationInstanceRow | null> {
   const ob = await fetchObligation(supabase, organizationId, obligationId);
+  if (isRetiredPerClientPctTitle(ob.title)) return null;
   if (ob.cadence === "per_event") return null;
 
   if (ob.scope === "staff_per_client") {
@@ -1539,6 +1542,7 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
       .map((i: ObligationInstanceRow) => {
         const obligation = obligationById.get(i.obligation_id);
         if (!obligation || isPackSentinel(obligation)) return null;
+        if (isRetiredPerClientPctTitle(obligation.title)) return null;
         if (obligation.evidence_type === "form") {
           return {
             ...i,
@@ -1680,6 +1684,7 @@ export const listStaffObligationInstances = createServerFn({ method: "POST" })
       .map((i: ObligationInstanceRow) => {
         const obligation = obligationById.get(i.obligation_id);
         if (!obligation || isPackSentinel(obligation)) return null;
+        if (isRetiredPerClientPctTitle(obligation.title)) return null;
         const resolved =
           obligation.evidence_type === "form"
             ? {
@@ -1941,8 +1946,10 @@ async function bootstrapVisibleObligationInstancesInternalUnsafe(
 
   const footprint = await orgServiceFootprintInternal(supabase, organizationId);
 
-  const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) =>
-    obligationAppliesToFootprint(o.title, o.target_service_codes, footprint),
+  const visibleObligations = (obligations ?? []).filter(
+    (o: CompanyObligationRow) =>
+      !isRetiredPerClientPctTitle(o.title) &&
+      obligationAppliesToFootprint(o.title, o.target_service_codes, footprint),
   );
 
   const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);

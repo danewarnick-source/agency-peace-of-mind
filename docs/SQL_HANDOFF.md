@@ -6,6 +6,81 @@ it worked before moving on.
 
 ---
 
+## ACTION — Retire per-client Person-Centered Thinking (2026-09-11) — Core flag
+
+Hire-level **Person-Centered Thinking and Practices Training** stays. The
+per-client form `Person-Centered Thinking — [Client Name]` is retired: do not
+assign one card per client. App no longer seeds or generates that duty.
+
+**No new tables. Do not drop RLS. Do not delete historical completions or
+`client_specific_trainings` rows.** Soft-clean only: deactivate the catalog
+row and waive open clocks.
+
+Matches `supabase/migrations/20260911053000_retire_per_client_pct_obligation.sql`.
+
+### Step 1 — see what is live (counts + titles only)
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM public.company_obligations
+    WHERE title = 'Person-Centered Thinking — [Client Name]') AS pct_client_rows,
+  (SELECT count(*) FROM public.company_obligations
+    WHERE title = 'Person-Centered Thinking — [Client Name]' AND active) AS pct_client_active,
+  (SELECT count(*) FROM public.company_obligations
+    WHERE title = 'Person-Centered Thinking and Practices Training' AND active) AS pct_hire_active,
+  (SELECT count(*)
+     FROM public.company_obligation_instances i
+     JOIN public.company_obligations o ON o.id = i.obligation_id
+    WHERE o.title = 'Person-Centered Thinking — [Client Name]'
+      AND i.status IN ('pending', 'overdue')) AS pct_client_open_clocks,
+  (SELECT string_agg(o.organization_id::text, ' | ' ORDER BY o.organization_id)
+     FROM public.company_obligations o
+    WHERE o.title = 'Person-Centered Thinking — [Client Name]'
+      AND o.active) AS orgs_still_active;
+```
+
+**What you'll see:** `pct_hire_active` stays > 0. `pct_client_active` and
+`pct_client_open_clocks` are the rows Step 2 will retire. Empty
+`orgs_still_active` means the live catalog is already clean.
+
+### Step 2 — deactivate the per-client duty and waive open clocks
+
+Clear the editor, paste:
+
+```sql
+UPDATE public.company_obligations
+SET active = false
+WHERE title = 'Person-Centered Thinking — [Client Name]'
+  AND active IS DISTINCT FROM false;
+
+UPDATE public.company_obligation_instances i
+SET status = 'waived',
+    waive_reason = 'Retired: Person-Centered Thinking is hire-level staff training once, not a per-client form.'
+WHERE i.status IN ('pending', 'overdue')
+  AND i.obligation_id IN (
+    SELECT o.id FROM public.company_obligations o
+    WHERE o.title = 'Person-Centered Thinking — [Client Name]'
+  );
+
+SELECT
+  (SELECT count(*) FROM public.company_obligations
+    WHERE title = 'Person-Centered Thinking — [Client Name]' AND active) AS pct_client_still_active,
+  (SELECT count(*)
+     FROM public.company_obligation_instances i
+     JOIN public.company_obligations o ON o.id = i.obligation_id
+    WHERE o.title = 'Person-Centered Thinking — [Client Name]'
+      AND i.status IN ('pending', 'overdue')) AS pct_client_still_open,
+  (SELECT count(*) FROM public.company_obligations
+    WHERE title = 'Person-Centered Thinking and Practices Training' AND active) AS pct_hire_still_active;
+```
+
+**What you'll see:** `pct_client_still_active = 0`, `pct_client_still_open = 0`,
+`pct_hire_still_active` unchanged. Completed instances stay completed.
+
+---
+
 ## REVIEW — Client home clock-in radius (2026-09-11) — Core flag, no migration
 
 Per-client clock-in geofence radius is the existing column

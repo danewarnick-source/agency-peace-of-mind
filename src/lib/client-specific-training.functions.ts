@@ -1559,7 +1559,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
-    if (!supabase || !userId) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies" | "person_centered"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
+    if (!supabase || !userId) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
     const m = await getMembership(supabase, userId);
 
     let clientIds: string[] = [];
@@ -1588,7 +1588,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
       } catch { /* ignore */ }
     }
 
-    if (!clientIds.length) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies" | "person_centered"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
+    if (!clientIds.length) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
 
     const { data: clients } = await supabase
       .from("clients")
@@ -1631,7 +1631,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
       return {
         clientId: cid,
         clientName: clientMap[cid] ?? cid,
-        trainings: (["person_specific", "support_strategies", "person_centered"] as const).map((type) => {
+        trainings: (["person_specific", "support_strategies"] as const).map((type) => {
           const t = ct[type];
           const label = CLIENT_FORM_LABEL[type];
           if (!t) return { type, label, setupStatus: "not_setup" as const, completionStatus: "not_started" as const, completedAt: null as string | null };

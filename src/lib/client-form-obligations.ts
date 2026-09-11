@@ -1,8 +1,9 @@
 /**
  * Per-client trainings that stay as forms on My Obligations:
- * person-centered thinking, support strategies, and client-specific training.
- * Not the hire-level "Person-Centered Thinking and Practices" course,
- * and not SEI UPI support-strategy entry.
+ * support strategies and client-specific training.
+ * Hire-level "Person-Centered Thinking and Practices" is staff training once.
+ * Per-client Person-Centered Thinking — [Client] is retired (not assigned).
+ * Not SEI UPI support-strategy entry.
  */
 
 export type ClientFormKind = "person_specific" | "support_strategies" | "person_centered";
@@ -21,16 +22,26 @@ export const CLIENT_FORM_LABEL: Record<ClientFormKind, string> = {
   person_centered: "Person-centered thinking",
 };
 
+/** Per-client PCT form — retired. Hire-level PCT course is not this. */
+export function isRetiredPerClientPctTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t) return false;
+  if (t === PCT_HIRE_COURSE_TITLE || t.startsWith("Person-Centered Thinking and Practices")) {
+    return false;
+  }
+  return t === PCT_CLIENT_OBLIGATION_TITLE || t.startsWith("Person-Centered Thinking");
+}
+
 export function clientFormKindForTitle(title: string): ClientFormKind | null {
   const t = title.trim();
   if (!t) return null;
   if (t === PCT_HIRE_COURSE_TITLE) return null;
+  if (isRetiredPerClientPctTitle(t)) return null;
   if (t === SEI_SUPPORT_STRATEGIES_UPI_TITLE || t.startsWith("SEI Employment Support Strategies")) {
     return null;
   }
   if (t.startsWith("Client-Specific Training")) return "person_specific";
   if (t.startsWith("Support Strategies")) return "support_strategies";
-  if (t.startsWith("Person-Centered Thinking")) return "person_centered";
   return null;
 }
 

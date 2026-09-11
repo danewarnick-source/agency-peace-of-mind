@@ -27,7 +27,13 @@ import {
   periodsToEnsure,
   explainDueRule,
 } from "./obligation-due-dates";
-import { resolveDueRule, sowCatalogEntry } from "./sow-obligation-catalog";
+import {
+  obligationCreatesInstances,
+  resolveDueRule,
+  sowCatalogEntry,
+  sowCatalogEntryByKey,
+  STANDING_RECLASSIFY_REASON,
+} from "./sow-obligation-catalog";
 import { obligationAppliesToFootprint } from "./dspd-audit-tool";
 import { STANDING_SOW_DUTIES } from "./standing-sow-duties";
 import { isRetiredPerClientPctTitle } from "./client-form-obligations";
@@ -75,6 +81,9 @@ export type CompanyObligationRow = {
   pack_key?: string | null;
   is_required?: boolean | null;
   agency_policy_id?: string | null;
+  key?: string | null;
+  state_code?: string | null;
+  disposition?: string | null;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -1253,6 +1262,27 @@ async function generatePerHomeInstancesInternal(
   return created;
 }
 
+async function waiveStandingInstancesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<void> {
+  const catalog =
+    (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
+  const disposition = ob.disposition ?? catalog?.disposition ?? null;
+  if (disposition !== "standing") return;
+
+  const { error } = await supabase
+    .from("company_obligation_instances")
+    .update({ status: "waived", waive_reason: STANDING_RECLASSIFY_REASON })
+    .eq("organization_id", organizationId)
+    .eq("obligation_id", ob.id)
+    .in("status", ["pending", "overdue"]);
+  if (error) {
+    console.warn(`[obligations] could not waive standing instances for "${ob.title}":`, error.message);
+  }
+}
+
 export async function generateNextInstanceInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -1260,6 +1290,10 @@ export async function generateNextInstanceInternal(
 ): Promise<ObligationInstanceRow | null> {
   const ob = await fetchObligation(supabase, organizationId, obligationId);
   if (isRetiredPerClientPctTitle(ob.title)) return null;
+  if (!obligationCreatesInstances(ob)) {
+    await waiveStandingInstancesInternal(supabase, organizationId, ob);
+    return null;
+  }
   if (ob.cadence === "per_event") return null;
 
   if (ob.scope === "staff_per_client") {
@@ -1844,7 +1878,8 @@ async function ensureStandingDutiesInternal(
   }
 
   for (const d of missing) {
-    const { error: insErr } = await supabase.from("company_obligations").insert({
+    const catalog = sowCatalogEntry(d.title);
+    const payload: Record<string, unknown> = {
       organization_id: organizationId,
       title: d.title,
       description: d.description,
@@ -1865,7 +1900,20 @@ async function ensureStandingDutiesInternal(
       active: true,
       source: "sow",
       is_locked: true,
-    });
+      key: catalog?.key ?? null,
+      state_code: catalog?.state_code ?? "UT",
+      disposition: catalog?.disposition ?? "standing",
+    };
+    let { error: insErr } = await supabase.from("company_obligations").insert(payload);
+    // Columns land when Soft Core applies the Step 1 migration. Until then,
+    // retry without identity fields so new-org seed still works.
+    if (insErr && /column|schema cache|disposition|state_code/i.test(insErr.message)) {
+      delete payload.key;
+      delete payload.state_code;
+      delete payload.disposition;
+      const retry = await supabase.from("company_obligations").insert(payload);
+      insErr = retry.error;
+    }
     if (insErr) {
       console.warn(`[obligations] could not seed "${d.title}":`, insErr.message);
     }
@@ -1971,6 +2019,7 @@ async function bootstrapVisibleObligationInstancesInternalUnsafe(
   // a first instance). Explicit Soft Core / hire paths still generate.
   const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
     if (!o.active) return false;
+    if (!obligationCreatesInstances(o)) return false;
     const rows = instancesByObligation.get(o.id) ?? [];
     if (o.scope === "org") return true;
     // Per-person generators skip assignees who already have an open instance,

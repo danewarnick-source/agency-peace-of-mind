@@ -4762,6 +4762,7 @@ export type Database = {
           obligation_id: string
           organization_id: string
           period_key: string
+          state_code: string | null
           status: string
           updated_at: string | null
           upload_filename: string | null
@@ -4789,6 +4790,7 @@ export type Database = {
           obligation_id: string
           organization_id: string
           period_key: string
+          state_code?: string | null
           status?: string
           updated_at?: string | null
           upload_filename?: string | null
@@ -4816,6 +4818,7 @@ export type Database = {
           obligation_id?: string
           organization_id?: string
           period_key?: string
+          state_code?: string | null
           status?: string
           updated_at?: string | null
           upload_filename?: string | null
@@ -4906,10 +4909,12 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          disposition: string | null
           due_day_config: Json
           evidence_type: string
           id: string
           is_locked: boolean
+          key: string | null
           linked_form_id: string | null
           nectar_cert_type_label: string | null
           nectar_keyword_groups: Json
@@ -4921,6 +4926,7 @@ export type Database = {
           scope: string
           source: string
           source_policy_section: string | null
+          state_code: string | null
           target_service_codes: string[]
           title: string
           updated_at: string | null
@@ -4935,10 +4941,12 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          disposition?: string | null
           due_day_config?: Json
           evidence_type: string
           id?: string
           is_locked?: boolean
+          key?: string | null
           linked_form_id?: string | null
           nectar_cert_type_label?: string | null
           nectar_keyword_groups?: Json
@@ -4950,6 +4958,7 @@ export type Database = {
           scope?: string
           source?: string
           source_policy_section?: string | null
+          state_code?: string | null
           target_service_codes?: string[]
           title: string
           updated_at?: string | null
@@ -4964,10 +4973,12 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          disposition?: string | null
           due_day_config?: Json
           evidence_type?: string
           id?: string
           is_locked?: boolean
+          key?: string | null
           linked_form_id?: string | null
           nectar_cert_type_label?: string | null
           nectar_keyword_groups?: Json
@@ -4979,6 +4990,7 @@ export type Database = {
           scope?: string
           source?: string
           source_policy_section?: string | null
+          state_code?: string | null
           target_service_codes?: string[]
           title?: string
           updated_at?: string | null
@@ -13142,6 +13154,7 @@ export type Database = {
           account_contact_name: string | null
           additional_state_codes: string[]
           aliases: string[]
+          applied_pack_version: string | null
           approx_client_count: number | null
           billing_exempt: boolean
           billing_sms_phone: string | null
@@ -13175,6 +13188,7 @@ export type Database = {
           account_contact_name?: string | null
           additional_state_codes?: string[]
           aliases?: string[]
+          applied_pack_version?: string | null
           approx_client_count?: number | null
           billing_exempt?: boolean
           billing_sms_phone?: string | null
@@ -13208,6 +13222,7 @@ export type Database = {
           account_contact_name?: string | null
           additional_state_codes?: string[]
           aliases?: string[]
+          applied_pack_version?: string | null
           approx_client_count?: number | null
           billing_exempt?: boolean
           billing_sms_phone?: string | null
@@ -13245,6 +13260,36 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      pack_changelog: {
+        Row: {
+          change_kind: string
+          created_at: string
+          id: string
+          note: string | null
+          obligation_key: string
+          pack_version: string
+          state_code: string
+        }
+        Insert: {
+          change_kind: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          obligation_key: string
+          pack_version: string
+          state_code: string
+        }
+        Update: {
+          change_kind?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          obligation_key?: string
+          pack_version?: string
+          state_code?: string
+        }
+        Relationships: []
       }
       payment_events: {
         Row: {

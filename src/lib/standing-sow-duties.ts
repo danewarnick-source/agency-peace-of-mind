@@ -1,6 +1,8 @@
 // Standing / previously-unseeded DHHS91172 duties. Inserted idempotently
 // the first time an org opens the compliance register (and via SQL handoff
-// for TNS). Titles must match sow-obligation-catalog.ts and DSPD_AUDIT_ITEMS.
+// for TNS). Titles must match sow-obligation-catalog.ts. Seeder writes
+// catalog key + disposition (standing rows get disposition=standing).
+// Instance creation skips non-obligation dispositions.
 
 export type StandingDutySeed = {
   title: string;

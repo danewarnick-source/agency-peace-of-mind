@@ -6930,6 +6930,36 @@ export type Database = {
           },
         ]
       }
+      escalation_rules: {
+        Row: {
+          archived_at: string | null
+          climbs_to: string
+          id: string
+          message_template: string
+          state_code: string
+          trigger: string
+          urgency: string
+        }
+        Insert: {
+          archived_at?: string | null
+          climbs_to: string
+          id?: string
+          message_template: string
+          state_code?: string
+          trigger: string
+          urgency: string
+        }
+        Update: {
+          archived_at?: string | null
+          climbs_to?: string
+          id?: string
+          message_template?: string
+          state_code?: string
+          trigger?: string
+          urgency?: string
+        }
+        Relationships: []
+      }
       exec_message_attachments: {
         Row: {
           created_at: string

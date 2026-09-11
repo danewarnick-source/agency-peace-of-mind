@@ -47,8 +47,24 @@ describe("Compliance spine — parallel writers killed", () => {
     const punch = read("./nectar-compliance.functions.ts");
     const raiseStart = punch.indexOf("export const raiseComplianceFlag");
     const raise = punch.slice(raiseStart, punch.indexOf("export const resolveComplianceFlag"));
-    assert.match(raise, /return null;/);
+    assert.match(raise, /skipNectarComplianceWrite/);
     assert.doesNotMatch(raise, /\.from\(["']nectar_compliance_flags/);
+
+    const updateStart = punch.indexOf("export const updateComplianceRule");
+    const update = punch.slice(updateStart, punch.indexOf("export const listRuleHistory"));
+    assert.match(update, /skipNectarComplianceMutation/);
+    assert.doesNotMatch(update, /\.from\(["']nectar_compliance_rules/);
+
+    const resolveStart = punch.indexOf("export const resolveComplianceFlag");
+    const resolve = punch.slice(resolveStart, punch.indexOf("export const listComplianceFlags"));
+    assert.match(resolve, /skipNectarComplianceMutation/);
+    assert.doesNotMatch(resolve, /\.from\(["']nectar_compliance_flags/);
+
+    const usage = read("./nectar-requirement-usage.functions.ts");
+    const saveStart = usage.indexOf("export const saveRequirementUsageNote");
+    const save = usage.slice(saveStart, usage.indexOf("export const recategorizeRequirement"));
+    assert.match(save, /skipRequirementUsageWrite/);
+    assert.doesNotMatch(save, /\.insert\(/);
 
     const shift = read("./scheduling/shift-commit.ts");
     const raiseFn = shift.slice(
@@ -63,6 +79,12 @@ describe("Compliance spine — parallel writers killed", () => {
     assert.match(incident, /export async function createIncidentInstances/);
     assert.doesNotMatch(incident, /\.from\(["']nectar_compliance_instances/);
     assert.doesNotMatch(incident, /\.insert\(/);
+
+    const attest = read("./authoritative-sources.functions.ts");
+    assert.match(attest, /nectar_compliance_instances stay/);
+    const held = read("./nectar-held-timesheets.functions.ts");
+    assert.match(held, /nectar_compliance_flags writes are retired/);
+    assert.doesNotMatch(held, /\.update\(\{[\s\S]*resolution:/);
   });
 
   it("orphan create APIs throw 410 and do not insert", () => {
@@ -94,7 +116,10 @@ describe("Compliance spine — parallel writers killed", () => {
   it("does not drop nectar or obligation tables", () => {
     const note = read("../../docs/SQL_HANDOFF.md");
     assert.match(note, /Do not DROP tables\. Do not run Soft SQL for this change/);
-    assert.doesNotMatch(note.slice(0, 1800), /DROP TABLE/);
+    const step10Note = note.slice(0, note.indexOf("## ACTION — Compliance revamp Step 9"));
+    assert.match(step10Note, /Step 10: stop-writes only/);
+    assert.doesNotMatch(step10Note, /DROP TABLE/);
+    assert.doesNotMatch(step10Note, /20260911160000/);
     const step7 = read(
       "../../supabase/migrations/20260911130000_nectar_requirement_catalog_relation.sql",
     );

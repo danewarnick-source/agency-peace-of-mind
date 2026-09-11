@@ -91,14 +91,14 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(block, /\/dashboard\/scheduler/);
   });
 
-  it("keeps both desk routes mounted with matching hash anchors", () => {
+  it("retires Command Center to Home and keeps Compliance Desk mounted for EVV CSV", () => {
     const cc = read("../routes/dashboard.command-center.tsx");
     const desk = read("../routes/dashboard.compliance-desk.tsx");
     assert.match(cc, /createFileRoute\("\/dashboard\/command-center"\)/);
+    assert.match(cc, /throw redirect/);
+    assert.match(cc, /to: "\/dashboard"/);
+    assert.doesNotMatch(cc, /id="obligations"/);
     assert.match(desk, /createFileRoute\("\/dashboard\/compliance-desk"\)/);
-    assert.match(cc, /id="obligations"/);
-    assert.match(cc, /id="due"/);
-    assert.match(cc, /id="recommendations"/);
     assert.match(desk, /id="compliance-desk"/);
   });
 
@@ -114,6 +114,7 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(dash, /to="\/dashboard\/compliance-desk"/);
     assert.match(dash, /Records review/);
     assert.doesNotMatch(dash, /Compliance desk/);
+    assert.match(dash, /ThisWeekPlanCards/);
     assert.match(dash, /fontSize: 12/);
     assert.match(dash, /PI_THEME\.c50/);
     assert.match(dash, /PI_THEME\.gold/);

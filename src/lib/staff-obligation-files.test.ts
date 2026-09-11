@@ -256,8 +256,7 @@ describe("Org-wide Staff file lock", () => {
   it("folds Staff file under Admin Compliance and keeps the legacy URL", () => {
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
     assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
-    assert.match(nav, /to: "\/dashboard\/state-audit"/);
-    assert.match(nav, /label: "State Audit"/);
+    assert.doesNotMatch(nav, /label: "State Audit"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/personnel-file", label: "/);
     assert.doesNotMatch(nav, /label: "Personnel file"/);
     const route = readFileSync(

@@ -76,11 +76,18 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("heading", { name: /Due soon/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Recommendations/i }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Command center$/i })).toBeVisible();
+    await expect(page.getByTestId("this-week")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^This week$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Generate my review/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /What changed/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Records review$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Records review$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^State Audit$/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^Reports$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /Agency Command Center/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
     await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
@@ -227,19 +234,16 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("heading", { name: /^Staff file$/i })).toHaveCount(0);
   });
 
-  test("Command center and NECTAR focus banners do not error", async ({ page }) => {
+  test("Command center redirects to Admin Home This week", async ({ page }) => {
     await page.goto("/dashboard/command-center", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Agency Command Center/i })).toBeVisible({
+    await expect(page).toHaveURL(/\/dashboard\/?(\?|$)/, { timeout: 15_000 });
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
       timeout: 20_000,
     });
-    await assertNoCrash(page, "command-center");
-    const nectarTab = page.getByRole("button", { name: /NECTAR Infusion/i });
-    if (await nectarTab.isVisible().catch(() => false)) {
-      await nectarTab.click();
-      await page.waitForTimeout(500);
-      await assertNoCrash(page, "command-center nectar tab");
-    }
-    await shot(page, "command-center");
+    await expect(page.getByTestId("this-week")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Agency Command Center/i })).toHaveCount(0);
+    await assertNoCrash(page, "command-center redirect");
+    await shot(page, "command-center-redirect");
 
     await page.goto("/dashboard/compliance-desk?focus=audit-readiness", {
       waitUntil: "domcontentloaded",
@@ -333,9 +337,10 @@ test.describe("Permission wall — DSP vs admin", () => {
     await shot(page, "dsp-company-obligations-wall");
 
     await page.goto("/dashboard/command-center", { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/unauthorized/, { timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: /Access denied/i }).first()).toBeVisible();
-    await shot(page, "dsp-command-center-wall");
+    await expect(page).toHaveURL(/\/dashboard\/?(\?|$)/, { timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: /Agency Command Center/i })).toHaveCount(0);
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toHaveCount(0);
+    await shot(page, "dsp-command-center-redirect");
 
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1500);

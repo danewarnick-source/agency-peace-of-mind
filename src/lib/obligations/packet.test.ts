@@ -228,6 +228,47 @@ describe("buildPacket", () => {
     assert.equal(packet.nextAction?.urgency, "critical");
   });
 
+  it("Harvey house-manager packet exposes one next action", () => {
+    const harvey = "harvey-alisa-house-manager";
+    const scope = resolveScope({
+      organizationId: TNS_ORG_ID,
+      userId: harvey,
+      scopeGroupId: HOUSE_A,
+      members: [
+        { group_id: HOUSE_A, staff_id: harvey, is_lead: true },
+        { group_id: HOUSE_A, staff_id: STAFF, is_lead: false },
+      ],
+    });
+    const packet = buildPacket({
+      organizationId: TNS_ORG_ID,
+      subject: "staff",
+      subjectId: harvey,
+      viewerUserId: harvey,
+      scope,
+      facts: TNS_FACTS,
+      clocks: [
+        clock({
+          obligationKey: "cpr_first_aid_initial",
+          title: "CPR/First Aid Certification — Initial",
+          instanceStatus: "overdue",
+          dueAt: "2026-08-01T00:00:00.000Z",
+          staffUserId: harvey,
+        }),
+        clock({
+          obligationKey: "ce_12h_annual",
+          title: "Annual 12-Hour Continuing Education",
+          dueAt: "2026-09-20T00:00:00.000Z",
+          staffUserId: harvey,
+        }),
+      ],
+      now: NOW,
+    });
+    assert.equal(packet.scoped, true);
+    assert.ok(packet.nextAction);
+    assert.equal(Array.isArray(packet.nextAction), false);
+    assert.equal(packet.nextAction.obligationKey, "cpr_first_aid_initial");
+  });
+
   it("clocksFromMyInstances resolve catalog keys from titles", () => {
     const clocks = clocksFromMyInstances([
       {
@@ -284,6 +325,7 @@ describe("Step 6 locks", () => {
     assert.match(client, /PacketNextActionCard/);
     assert.match(agency, /PacketNextActionCard/);
     assert.match(mine, /PacketNextActionCard/);
+    assert.equal((staff.match(/<PacketNextActionCard/g) ?? []).length, 1);
     assert.doesNotMatch(staff, /[\u{1F300}-\u{1FAFF}]/u);
     assert.doesNotMatch(client, /[\u{1F300}-\u{1FAFF}]/u);
     assert.doesNotMatch(agency, /[\u{1F300}-\u{1FAFF}]/u);

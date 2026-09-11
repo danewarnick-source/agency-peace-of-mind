@@ -55,3 +55,36 @@ export function complianceRedirectSearchFromAgencyDocuments(
   if (sub === "contract-index") return { tab: "contract-index" };
   return { tab: "agency" };
 }
+
+/** Admin primary sidebar — twelve items. State Audit and Reports stay as routes. */
+export const ADMIN_PRIMARY_NAV_LABELS = [
+  "Home",
+  "Employees",
+  "Clients",
+  "Scheduler",
+  "Documentation",
+  "Daily Logs",
+  "Compliance",
+  "Summaries",
+  "Finances",
+  "Training",
+  "Inbox",
+  "Settings",
+] as const;
+
+export type RetiredComplianceRedirect = {
+  from: string;
+  to: string;
+  search?: Record<string, string>;
+};
+
+/** Bookmarks for retired parallel surfaces. Command Center → Home. */
+export const RETIRED_COMPLIANCE_REDIRECTS: RetiredComplianceRedirect[] = [
+  { from: "/dashboard/personnel-file", to: "/dashboard/compliance", search: { tab: "staff" } },
+  { from: "/dashboard/client-file", to: "/dashboard/compliance", search: { tab: "client" } },
+  { from: "/dashboard/agency-documents", to: "/dashboard/compliance", search: { tab: "agency" } },
+  { from: "/dashboard/company-obligations", to: "/dashboard/compliance" },
+  { from: "/dashboard/deadlines", to: "/dashboard/compliance", search: { tab: "staff" } },
+  { from: "/dashboard/command-center", to: "/dashboard" },
+  { from: "/dashboard/external-compliance", to: "/dashboard/hub/knowledge", search: { tab: "external" } },
+];

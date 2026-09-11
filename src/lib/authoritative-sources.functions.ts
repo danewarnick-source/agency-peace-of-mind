@@ -2633,21 +2633,8 @@ export const recordComplianceEvidence = createServerFn({ method: "POST" })
       .single();
     if (attestErr || !attest) throw new Error(attestErr?.message ?? "Insert failed");
 
-    if (data.coversInstanceId) {
-      await supabase
-        .from("nectar_compliance_instances")
-        .update({
-          status: "resolved",
-          resolved_at: new Date().toISOString(),
-          resolved_by: userId,
-          resolved_via: data.evidenceType,
-          attestation_id: attest.id,
-          document_url: documentPath,
-          resolution_note: data.statement ?? null,
-          external_reference: data.externalReference ?? null,
-        })
-        .eq("id", data.coversInstanceId);
-    }
+    // nectar_compliance_instances stay; this writer no longer patches them.
+    void data.coversInstanceId;
 
     return { ok: true, attestationId: attest.id as string };
   });

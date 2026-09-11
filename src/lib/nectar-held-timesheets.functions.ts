@@ -308,37 +308,15 @@ export const resolveHeldTimesheet = createServerFn({ method: "POST" })
       const s = (f.subject_context ?? {}) as Record<string, unknown>;
       return s.source === "evv_close" && s.timesheet_id === data.timesheetId;
     });
-    if (mine.length === 0) {
-      throw new Error("No open compliance flag found for this timesheet — it may have been resolved already.");
-    }
-
-    const resolution = data.decision === "acknowledge_and_finalize" ? "acknowledged_continued" : "stopped";
-    const nowIso = new Date().toISOString();
-
-    // Resolve every open flag tied to this timesheet. The BEFORE UPDATE
-    // freeze trigger locks each row after this write.
-    const { error: re } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_flags" as any)
-      .update({
-        resolution,
-        resolved_by: userId,
-        resolved_at: nowIso,
-        resolution_note: data.note,
-      })
-      .in(
-        "id",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mine as any[]).map((f) => f.id),
-      )
-      .is("resolution", null);
-    if (re) throw new Error(re.message);
+    // nectar_compliance_flags writes are retired. Finalize EVV without
+    // mutating the parallel register.
+    void mine;
 
     if (data.decision === "stop") {
       return {
         ok: true as const,
         finalized: false as const,
-        flagsResolved: mine.length,
+        flagsResolved: 0,
       };
     }
 
@@ -355,7 +333,7 @@ export const resolveHeldTimesheet = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       finalized: true as const,
-      flagsResolved: mine.length,
+      flagsResolved: 0,
       billedUnits: units,
     };
   });
@@ -407,35 +385,13 @@ export const resolveClockInHold = createServerFn({ method: "POST" })
         s.date === data.serviceDate
       );
     });
-    if (mine.length === 0) {
-      throw new Error("No open compliance flag found for this clock-in — it may have been resolved already.");
-    }
-
-    const resolution =
-      data.decision === "acknowledge_and_proceed" ? "acknowledged_continued" : "stopped";
-    const nowIso = new Date().toISOString();
-
-    const { error: re } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_flags" as any)
-      .update({
-        resolution,
-        resolved_by: userId,
-        resolved_at: nowIso,
-        resolution_note: data.note,
-      })
-      .in(
-        "id",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mine as any[]).map((f) => f.id),
-      )
-      .is("resolution", null);
-    if (re) throw new Error(re.message);
-
+    // nectar_compliance_flags writes are retired. Clock-in holds close
+    // without mutating the parallel register.
+    void mine;
     return {
       ok: true as const,
       finalized: false as const,
-      flagsResolved: mine.length,
+      flagsResolved: 0,
     };
   });
 

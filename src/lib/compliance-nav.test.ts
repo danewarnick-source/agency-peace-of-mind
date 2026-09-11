@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  ADMIN_PRIMARY_NAV_LABELS,
+  RETIRED_COMPLIANCE_REDIRECTS,
   complianceRedirectSearchFromAgencyDocuments,
   complianceSearchForAgencySubTab,
   complianceSearchForFileTab,
@@ -44,12 +46,21 @@ describe("Compliance search aliases", () => {
 });
 
 describe("Compliance nav lock", () => {
-  it("replaces the three Admin file items with Compliance and leaves State Audit", () => {
+  it("keeps twelve primary admin nav items and drops retired parallel labels", () => {
+    assert.equal(ADMIN_PRIMARY_NAV_LABELS.length, 12);
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
+    const start = nav.indexOf("const ADMIN_NAV: NavItem[] = [");
+    const end = nav.indexOf("];", start);
+    assert.ok(start >= 0 && end > start, "ADMIN_NAV block");
+    const block = nav.slice(start, end);
+    const labels = [...block.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(labels, [...ADMIN_PRIMARY_NAV_LABELS]);
     assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
     assert.match(nav, /item\.to === "\/dashboard\/compliance"/);
-    assert.match(nav, /to: "\/dashboard\/state-audit"/);
-    assert.match(nav, /label: "State Audit"/);
+    assert.doesNotMatch(block, /state-audit/);
+    assert.doesNotMatch(block, /label: "Reports"/);
+    assert.doesNotMatch(block, /command-center/);
+    assert.doesNotMatch(block, /compliance-desk/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/personnel-file"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/client-file"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/agency-documents"/);
@@ -65,7 +76,21 @@ describe("Compliance nav lock", () => {
     assert.match(shell, /StaffFilePanel/);
     assert.match(shell, /ClientFilePanel/);
     assert.match(shell, /AgencyFilePanel/);
-    assert.doesNotMatch(shell, /State Audit/);
+    assert.match(shell, /to="\/dashboard\/state-audit"/);
+    assert.match(shell, /to="\/dashboard\/reports"/);
+    assert.doesNotMatch(shell, /RequirePermission/);
+  });
+
+  it("lists retired route redirects including Command Center → Home", () => {
+    const froms = RETIRED_COMPLIANCE_REDIRECTS.map((r) => r.from);
+    assert.ok(froms.includes("/dashboard/command-center"));
+    assert.ok(froms.includes("/dashboard/external-compliance"));
+    const cc = readFileSync(new URL("../routes/dashboard.command-center.tsx", import.meta.url), "utf8");
+    assert.match(cc, /throw redirect/);
+    assert.match(cc, /to: "\/dashboard"/);
+    assert.doesNotMatch(cc, /id="obligations"/);
+    const ext = readFileSync(new URL("../routes/dashboard.external-compliance.tsx", import.meta.url), "utf8");
+    assert.match(ext, /to: "\/dashboard\/hub\/knowledge"/);
   });
 
   it("keeps Company policies under Agency file", () => {

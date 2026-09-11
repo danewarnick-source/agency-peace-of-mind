@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -8,7 +9,8 @@ import {
   getThisWeekForUser,
   reviewRemediationPlan,
 } from "@/lib/obligations/remediation.functions";
-import type { Decision, ThisWeekItem } from "@/lib/obligations/this-week.functions";
+import { generateMyReview, listPackWhatChanged } from "@/lib/obligations/review-pack.functions";
+import type { Decision, QuietSummary, ThisWeekItem } from "@/lib/obligations/this-week.functions";
 import { PI_THEME } from "@/lib/pi-theme";
 
 function urgencyBar(urgency: Decision["urgency"]): string {
@@ -96,19 +98,57 @@ function PlanCard({
   );
 }
 
+function QuietCard({ item }: { item: QuietSummary }) {
+  return (
+    <li
+      className="rounded-lg p-3"
+      style={{
+        background: PI_THEME.heroTileBg,
+        border: `1px solid ${PI_THEME.hairlines.faint}`,
+      }}
+    >
+      <div
+        className="text-[10px] font-semibold uppercase tracking-wider"
+        style={{ color: PI_THEME.c50 }}
+      >
+        Quiet
+      </div>
+      <div className="mt-0.5 text-sm font-medium" style={{ color: PI_THEME.cream }}>
+        {item.title}
+      </div>
+      <p className="mt-1 text-xs" style={{ color: PI_THEME.c50 }}>
+        {item.body}
+      </p>
+    </li>
+  );
+}
+
 export function ThisWeekPlanCards() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const loadWeek = useServerFn(getThisWeekForUser);
   const review = useServerFn(reviewRemediationPlan);
+  const loadChanges = useServerFn(listPackWhatChanged);
+  const generateReview = useServerFn(generateMyReview);
+  const [reviewText, setReviewText] = useState<string | null>(null);
 
   const orgId = org?.organization_id ?? null;
-  const canManage = org ? isAdminLevelRole(org.role) || org.role === "manager" || org.role === "program_manager" : false;
+  const canManage = org
+    ? isAdminLevelRole(org.role) || org.role === "manager" || org.role === "program_manager"
+    : false;
+  const scoped = !!org && !isAdminLevelRole(org.role);
 
   const q = useQuery({
     enabled: !!orgId && canManage,
     queryKey: ["this-week-plans", orgId],
     queryFn: () => loadWeek({ data: { organizationId: orgId! } }),
+    staleTime: 60_000,
+  });
+
+  const changesQ = useQuery({
+    enabled: !!orgId && canManage,
+    queryKey: ["pack-what-changed", orgId],
+    queryFn: () => loadChanges({ data: { organizationId: orgId! } }),
     staleTime: 60_000,
   });
 
@@ -130,62 +170,137 @@ export function ThisWeekPlanCards() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (!orgId || !canManage) return null;
+  const generateMut = useMutation({
+    mutationFn: () => {
+      if (!orgId) throw new Error("No active organization");
+      return generateReview({ data: { organizationId: orgId } });
+    },
+    onSuccess: (pack) => {
+      if (!pack) {
+        toast.error("Could not generate review.");
+        return;
+      }
+      setReviewText(pack.text);
+      toast.success("Draft review ready. Not published.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  const items = (q.data ?? []).filter((i): i is Decision => i.kind === "decision");
-  if (q.isLoading) {
-    return (
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
+  if (!orgId) return null;
+  if (!canManage) return null;
+
+  const decisions = (q.data ?? []).filter((i): i is Decision => i.kind === "decision");
+  const quiet = (q.data ?? []).filter((i): i is QuietSummary => i.kind === "quiet_summary");
+  const changes = changesQ.data?.changes ?? [];
+
+  return (
+    <section className="space-y-3" data-testid="this-week">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
+            This week
+          </h2>
+          {scoped ? (
+            <p className="mt-0.5 text-xs" style={{ color: PI_THEME.c50 }}>
+              Manager scope — your team only.
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs" style={{ color: PI_THEME.c50 }}>
+              Organization queue.
+            </p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={generateMut.isPending}
+          onClick={() => generateMut.mutate()}
+        >
+          Generate my review
+        </Button>
+      </div>
+
+      {q.isLoading ? (
         <p className="text-sm" style={{ color: PI_THEME.c50 }}>
           Loading decisions.
         </p>
-      </section>
-    );
-  }
-  if (q.isError) {
-    return (
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
+      ) : q.isError ? (
         <p className="text-sm" style={{ color: PI_THEME.c50 }}>
           Could not load this week.
         </p>
-      </section>
-    );
-  }
-  if (items.length === 0) {
-    return (
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-          This week
-        </h2>
+      ) : decisions.length === 0 && quiet.length === 0 ? (
         <p className="text-sm" style={{ color: PI_THEME.c50 }}>
           No manager decisions waiting.
         </p>
-      </section>
-    );
-  }
+      ) : (
+        <ul className="space-y-2">
+          {decisions.map((item) => (
+            <PlanCard
+              key={item.id}
+              item={item}
+              canReview={!!item.planId}
+              reviewing={reviewMut.isPending}
+              onReview={(planId, decision) => reviewMut.mutate({ planId, decision })}
+            />
+          ))}
+          {quiet.map((item) => (
+            <QuietCard key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
 
-  return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
-        This week
-      </h2>
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <PlanCard
-            key={item.id}
-            item={item}
-            canReview={!!item.planId}
-            reviewing={reviewMut.isPending}
-            onReview={(planId, decision) => reviewMut.mutate({ planId, decision })}
-          />
-        ))}
-      </ul>
+      {reviewText ? (
+        <div
+          className="rounded-lg p-3"
+          style={{
+            background: PI_THEME.heroTileBg,
+            border: `1px solid ${PI_THEME.hairlines.faint}`,
+          }}
+          data-testid="this-week-review-draft"
+        >
+          <p
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: PI_THEME.c50 }}
+          >
+            Draft — not published
+          </p>
+          <pre
+            className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs"
+            style={{ color: PI_THEME.c70 }}
+          >
+            {reviewText}
+          </pre>
+        </div>
+      ) : null}
+
+      <div data-testid="pack-what-changed">
+        <h3 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
+          What changed
+        </h3>
+        {changesQ.isLoading ? (
+          <p className="mt-1 text-xs" style={{ color: PI_THEME.c50 }}>
+            Loading pack changelog.
+          </p>
+        ) : changes.length === 0 ? (
+          <p className="mt-1 text-xs" style={{ color: PI_THEME.c50 }}>
+            No pack changelog rows for this version.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1">
+            {changes.slice(0, 8).map((row) => (
+              <li key={`${row.pack_version}:${row.obligation_key}:${row.change_kind}`} className="text-xs" style={{ color: PI_THEME.c70 }}>
+                {row.change_kind}: {row.obligation_key}
+                {row.note ? ` — ${row.note}` : ""}
+              </li>
+            ))}
+            {changes.length > 8 ? (
+              <li className="text-xs" style={{ color: PI_THEME.c50 }}>
+                {changes.length - 8} more catalog keys in this pack.
+              </li>
+            ) : null}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

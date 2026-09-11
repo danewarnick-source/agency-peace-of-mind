@@ -364,7 +364,7 @@ export async function getThisWeek(
     }
   }
 
-  // 5. Org-profile facts + assignment gaps become Owner cards. Never discard.
+  // 5. Org-profile facts (source org_profile_facts) + assignment gaps become Owner cards. Never discard.
   if (adminLevel) {
     const facts = input.orgFacts ?? (await loadOrgFacts(supabase, orgId));
     const factCard = unansweredFactsQuietSummary(orgId, facts ?? EMPTY_ORG_FACTS);

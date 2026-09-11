@@ -7,6 +7,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { getThisWeek, type ThisWeekItem } from "./this-week.functions.ts";
 import {
   hasActiveSoloOverride,
+  initialRemediationPlanStatus,
   loadAwaitingApprovalPlans,
   resolveEscalationsForPlan,
   tableMissing,
@@ -221,6 +222,16 @@ export const proposeRemediationPlan = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) throw new Error("Not authenticated");
     await requireManager(supabase, userId, data.organizationId);
+    if (
+      (data.kind === "license_risk" ||
+        data.kind === "standing_missing" ||
+        data.kind === "overdue") &&
+      !data.dueAt
+    ) {
+      throw new Error("Due date is required.");
+    }
+    const status = initialRemediationPlanStatus(data.kind);
+    const now = new Date().toISOString();
     const { data: row, error } = await supabase
       .from("remediation_plans")
       .insert({
@@ -233,10 +244,18 @@ export const proposeRemediationPlan = createServerFn({ method: "POST" })
         instance_id: data.instanceId ?? null,
         staff_id: data.staffId ?? null,
         due_at: data.dueAt ?? null,
-        status: "awaiting_approval",
+        status,
         proposed_by: userId,
+        ...(status === "approved"
+          ? {
+              reviewed_by: userId,
+              reviewed_at: now,
+              outcome: "approved",
+              outcome_at: now,
+            }
+          : {}),
       })
-      .select("id")
+      .select("id, instance_id, obligation_id")
       .single();
     if (error) {
       if (tableMissing(error.message)) {
@@ -253,7 +272,11 @@ export const proposeRemediationPlan = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
-    return { id: (row as { id: string }).id };
+    const created = row as Pick<RemediationPlanRow, "id" | "instance_id" | "obligation_id">;
+    if (status === "approved") {
+      await resolveEscalationsForPlan(supabase, data.organizationId, created);
+    }
+    return { id: created.id };
   });
 
 export const reviewRemediationPlan = createServerFn({ method: "POST" })

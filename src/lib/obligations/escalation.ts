@@ -255,15 +255,15 @@ export function consequenceForTrigger(
 ): string {
   switch (trigger) {
     case "half_window_not_started":
-      return `Not started with ${vars.n_days ?? "?"} days left. Manager owns the start.`;
+      return `If this isn't started soon, it becomes overdue on ${vars.due ?? "the due date"} and escalates to the next manager up.`;
     case "overdue":
-      return `Overdue ${vars.days_overdue ?? "?"} days. Manager of manager owns closure.`;
+      return `${vars.days_overdue ?? "?"} days overdue. If unresolved, this is a finding on the next DSPD review.`;
     case "would_create_finding_if_scheduled":
-      return `Each scheduled shift while lapsed is a ${vars.audit_ref ?? "review-tool"} finding.`;
+      return `Each shift scheduled while this is lapsed is a ${vars.audit_ref ?? "review-tool"} finding if the reviewer samples it.`;
     case "license_or_repayment_risk":
-      return `License/repayment item (${vars.citation ?? "citation"}). Admin-level.`;
+      return `This is a licensing or repayment item (${vars.citation ?? "citation"}). Missing it risks a corrective action plan or repayment demand, not just a note on file.`;
     case "standing_record_missing_30d":
-      return "Standing record has been missing for 30 days. Admin-level.";
+      return "This policy has been missing 30+ days. A reviewer will ask for it by name — there is currently nothing to show them.";
   }
 }
 

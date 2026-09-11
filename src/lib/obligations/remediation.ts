@@ -121,6 +121,14 @@ export function planOwnerLabel(kind: RemediationPlanKind): "admin_level" | "mana
   return kind === "license_risk" || kind === "standing_missing" ? "admin_level" : "manager";
 }
 
+/** Status on first insert. Overdue follows planOwnerLabel — do not guess. */
+export function initialRemediationPlanStatus(
+  kind: RemediationPlanKind,
+): Extract<RemediationPlanStatus, "awaiting_approval" | "approved"> {
+  if (kind !== "overdue") return "awaiting_approval";
+  return planOwnerLabel(kind) === "admin_level" ? "awaiting_approval" : "approved";
+}
+
 export function pickPlanOwner(
   kind: RemediationPlanKind,
   staffId: string | null,

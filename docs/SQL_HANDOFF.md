@@ -6,6 +6,64 @@ it worked before moving on.
 
 ---
 
+## ACTION — Harden notifications.type CHECK for escalation (2026-09-11) — Core flag
+
+Follow-up to Step 2. The `20260911090000_escalation_rules.sql` DO/regexp
+did not match live `CHECK ((type = ANY (ARRAY[…])))` (trailing `]))`), so
+`escalation` was not added. Table + 5 seeds + RLS + indexes from that
+paste were fine — do not re-run it.
+
+**Hive-Platform already Soft-fixed** with explicit 22 + `escalation`.
+This paste is **idempotent** and may no-op there.
+
+Matches `supabase/migrations/20260911100000_notifications_type_escalation_check.sql`.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first).
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  pg_get_constraintdef(oid) AS def,
+  (pg_get_constraintdef(oid) ILIKE '%''escalation''%') AS has_escalation
+FROM pg_constraint
+WHERE conname = 'notifications_type_check'
+  AND conrelid = 'public.notifications'::regclass;
+```
+
+**What you'll see:** `has_escalation = t` if already widened (Hive-Platform
+Soft-fix). `f` or no row means this ACTION still needs to run.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911100000_notifications_type_escalation_check.sql`.
+
+**What you'll see:** `Success. No rows returned`. On Hive-Platform this is
+typically a no-op (escalation already in the CHECK). Elsewhere: DROP + ADD
+of `notifications_type_check` with the known 22 types + `escalation`.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (pg_get_constraintdef(oid) ILIKE '%''escalation''%') AS has_escalation,
+  pg_get_constraintdef(oid) AS def
+FROM pg_constraint
+WHERE conname = 'notifications_type_check'
+  AND conrelid = 'public.notifications'::regclass;
+```
+
+**What you'll see:** `has_escalation = t`. `def` includes `'escalation'::text`
+inside `CHECK ((type = ANY (ARRAY[…])))`.
+
+---
+
 ## ACTION — Compliance revamp Step 2: escalation_rules (2026-09-11) — Core flag
 
 Hive-authored catalog. **Read-only to orgs.** Additive. No DROP.

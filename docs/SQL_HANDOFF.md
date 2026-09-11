@@ -6,6 +6,87 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 7: nectar_requirements catalog relation (2026-09-11) — Core flag
+
+Additive columns on existing `nectar_requirements`. No DROP. No new RLS
+(org-scoped policies already cover the table). Matches
+`supabase/migrations/20260911130000_nectar_requirement_catalog_relation.sql`.
+
+**Soft queue:** apply **after Step 5** Soft (`fact_*` / `obligation_applicability`).
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App computes live match / overlay / conflict until
+these columns exist.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(column_name, ' | ' ORDER BY column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'nectar_requirements'
+  AND column_name IN (
+    'catalog_key',
+    'catalog_overlay',
+    'catalog_relation',
+    'catalog_relation_rationale',
+    'catalog_relation_status'
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911130000_nectar_requirement_catalog_relation.sql`.
+
+**What you'll see:** `ALTER TABLE` × 5, two CHECKs, one partial index.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'nectar_requirements'
+       AND column_name IN (
+         'catalog_key','catalog_overlay','catalog_relation',
+         'catalog_relation_rationale','catalog_relation_status'
+       )) AS cols,
+  (SELECT count(*) FROM pg_constraint
+     WHERE conrelid = 'public.nectar_requirements'::regclass
+       AND conname IN (
+         'nectar_requirements_catalog_relation_chk',
+         'nectar_requirements_catalog_relation_status_chk'
+       )) AS checks,
+  (SELECT count(*) FROM pg_indexes
+     WHERE schemaname = 'public'
+       AND indexname = 'nectar_requirements_org_catalog_relation_idx') AS rel_idx;
+```
+
+**What you'll see:** `5 | 2 | 1`.
+
+### RLS intent
+
+No RLS change. Columns inherit existing org-scoped `nectar_requirements`
+policies (`is_org_member` / admin-or-manager writers). Not PHI: titles and
+catalog keys only.
+
+### Column list
+
+| column | values |
+| --- | --- |
+| `catalog_key` | keyed SOW catalog key or null |
+| `catalog_relation` | `match` \| `overlay` \| `conflict` |
+| `catalog_relation_status` | `proposed` \| `confirmed` \| `dismissed` |
+| `catalog_relation_rationale` | human-readable proposal |
+| `catalog_overlay` | jsonb `{agency_title, catalog_title, citation_delta}` |
+
+---
+
 ## ACTION — Compliance revamp Step 4: remediation_plans + compliance_overrides (2026-09-11) — Core flag
 
 Org-scoped ops tables. Additive. Never drop tables.

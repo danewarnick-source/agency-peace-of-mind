@@ -74,38 +74,12 @@ export const proposeComplianceRule = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data: _data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return { id: "" };
-    const { data: rule, error } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_rules" as any)
-      .insert({
-        organization_id: data.organizationId,
-        requirement_id: data.requirementId,
-        rule_type: data.ruleType,
-        rule_definition: data.ruleDefinition,
-        proposed_by: "nectar",
-        proposed_rationale: data.rationale ?? null,
-        status: "proposed",
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_rule_history" as any)
-      .insert({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        rule_id: (rule as any).id,
-        organization_id: data.organizationId,
-        action: "proposed",
-        actor_id: userId,
-        actor_label: "nectar",
-        snapshot: { rule_type: data.ruleType, rule_definition: data.ruleDefinition, rationale: data.rationale ?? null },
-      });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { id: (rule as any).id };
+    // Intake / agency sources relate to the catalog (Step 7).
+    // nectar_compliance_rules stays; this writer no longer inserts.
+    return { id: "" };
   });
 
 export const updateComplianceRule = createServerFn({ method: "POST" })
@@ -645,47 +619,8 @@ export const draftStaffPrerequisiteRules = createServerFn({ method: "POST" })
       });
     }
 
-    if (data.dryRun) return { drafts, declined, inserted: 0 };
-
-    let inserted = 0;
-    for (const d of drafts) {
-      const { data: rule, error: iErr } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("nectar_compliance_rules" as any)
-        .insert({
-          organization_id: data.organizationId,
-          requirement_id: d.requirementId,
-          rule_type: "staff_prerequisite",
-          rule_definition: {
-            applicable_codes: d.applicable_codes,
-            required_qualifications: d.required_qualifications.map((q) => ({
-              kind: q.kind,
-              key: q.key,
-              must_be_unexpired: q.must_be_unexpired,
-            })),
-            scope: "per_shift",
-          },
-          proposed_by: "nectar",
-          proposed_rationale: d.rationale,
-          status: "proposed",
-        })
-        .select("id")
-        .single();
-      if (iErr) continue;
-      inserted++;
-      await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("nectar_compliance_rule_history" as any)
-        .insert({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          rule_id: (rule as any).id,
-          organization_id: data.organizationId,
-          action: "proposed",
-          actor_id: userId,
-          actor_label: "nectar",
-          snapshot: { source: "draftStaffPrerequisiteRules", requirement_id: d.requirementId, draft: d },
-        });
-    }
-
-    return { drafts, declined, inserted };
+    // Leave tables. Intake must not mint nectar_compliance_rules —
+    // proposeCatalogRelation is the catalog path (Step 7).
+    void data.dryRun;
+    return { drafts, declined, inserted: 0 };
   });

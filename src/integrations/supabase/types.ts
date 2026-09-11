@@ -12331,6 +12331,11 @@ export type Database = {
           activation_state: string
           applies_to: string | null
           approval_state: string | null
+          catalog_key: string | null
+          catalog_overlay: Json | null
+          catalog_relation: string | null
+          catalog_relation_rationale: string | null
+          catalog_relation_status: string | null
           category: string | null
           compliance_pattern: string | null
           confirmed_optional: boolean
@@ -12372,6 +12377,11 @@ export type Database = {
           activation_state?: string
           applies_to?: string | null
           approval_state?: string | null
+          catalog_key?: string | null
+          catalog_overlay?: Json | null
+          catalog_relation?: string | null
+          catalog_relation_rationale?: string | null
+          catalog_relation_status?: string | null
           category?: string | null
           compliance_pattern?: string | null
           confirmed_optional?: boolean
@@ -12413,6 +12423,11 @@ export type Database = {
           activation_state?: string
           applies_to?: string | null
           approval_state?: string | null
+          catalog_key?: string | null
+          catalog_overlay?: Json | null
+          catalog_relation?: string | null
+          catalog_relation_rationale?: string | null
+          catalog_relation_status?: string | null
           category?: string | null
           compliance_pattern?: string | null
           confirmed_optional?: boolean

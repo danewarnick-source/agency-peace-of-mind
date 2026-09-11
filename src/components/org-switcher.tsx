@@ -33,7 +33,10 @@ export function OrgSwitcher({ className }: { className?: string }) {
         )}
       >
         <Building2 className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/70" />
-        <span className="truncate font-medium text-sidebar-foreground">
+        <span
+          className="truncate font-medium text-sidebar-foreground"
+          title={org.legal_name || org.organization_name}
+        >
           {org.organization_name}
         </span>
         {org.is_demo && <DemoBadge />}
@@ -54,7 +57,9 @@ export function OrgSwitcher({ className }: { className?: string }) {
         >
           <span className="flex min-w-0 items-center gap-2">
             <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
-            <span className="truncate">{org.organization_name}</span>
+            <span className="truncate" title={org.legal_name || org.organization_name}>
+              {org.organization_name}
+            </span>
             {org.is_demo && <DemoBadge />}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -75,7 +80,9 @@ export function OrgSwitcher({ className }: { className?: string }) {
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Building2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                <span className="truncate">{m.organization_name}</span>
+                <span className="truncate" title={m.legal_name || m.organization_name}>
+                  {m.organization_name}
+                </span>
                 {m.is_demo && <DemoBadge subtle />}
               </span>
               {isActive && <Check className="h-3.5 w-3.5 text-primary" />}

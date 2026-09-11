@@ -872,14 +872,27 @@ function DashboardLayout() {
                     <h1 className="truncate text-lg font-semibold tracking-tight" style={{ color: PI_THEME.cream }}>
                       {pageTitle}
                     </h1>
-                    <p className="truncate text-xs" style={{ color: PI_THEME.c50 }}>
+                    <p
+                      data-testid="shell-org-subtitle"
+                      className="text-xs leading-snug whitespace-normal break-words"
+                      style={{ color: PI_THEME.c50 }}
+                      title={
+                        isHiveExecView
+                          ? "Provider Interface · Exec"
+                          : isStatePreview
+                            ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
+                            : [org?.legal_name, org?.organization_name, org?.dba_name]
+                                .map((s) => (s ?? "").trim())
+                                .find(Boolean) || "Workspace"
+                      }
+                    >
                       {isHiveExecView ? (
                         "Provider Interface · Exec"
                       ) : isStatePreview ? (
                         `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
                       ) : (
-                        <span className="inline-flex items-center gap-1.5">
-                          {org?.organization_name ?? "Workspace"}
+                        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          <span>{org?.organization_name ?? "Workspace"}</span>
                           {org?.is_demo && <DemoBadge />}
                           <span>· {ROLE_LABEL[role]}</span>
                         </span>

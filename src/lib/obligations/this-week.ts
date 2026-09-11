@@ -236,7 +236,53 @@ function mergeDecisionGroup(group: Decision[]): Decision {
   };
 }
 
-/** One Decision per instance. Plan wins over raw escalation. Same-key summaries roll up with count. */
+function isUnplannedLicense(d: Decision): boolean {
+  if (d.planId) return false;
+  return isLicenseDecision(d);
+}
+
+/** Same-type license renewals share a key even across distinct instanceIds. */
+export function licenseTypeKey(d: Decision): string | null {
+  if (!isUnplannedLicense(d)) return null;
+  const key = (d.obligationKey ?? "").trim();
+  if (key.startsWith("ol_")) return "lic:ol_family";
+  if (key) return `lic:${key}`;
+  const title = shortTitle(d.title).toLowerCase();
+  if (/\bol\b/.test(title)) return "lic:ol_family";
+  return title ? `lic-title:${title}` : "lic:other";
+}
+
+function mergeLicenseGroup(group: Decision[]): Decision {
+  const merged = mergeDecisionGroup(group);
+  const keys = new Set(group.map((d) => (d.obligationKey ?? "").trim()).filter(Boolean));
+  const titles = new Set(group.map((d) => shortTitle(d.title)));
+  if (keys.size > 1 || titles.size > 1) {
+    return { ...merged, obligationKey: null, title: "overdue licenses" };
+  }
+  return merged;
+}
+
+function rollupLicenseTypes(items: Decision[]): Decision[] {
+  const byType = new Map<string, Decision[]>();
+  const rest: Decision[] = [];
+  for (const item of items) {
+    const key = licenseTypeKey(item);
+    if (!key) {
+      rest.push(item);
+      continue;
+    }
+    const list = byType.get(key) ?? [];
+    list.push(item);
+    byType.set(key, list);
+  }
+  const rolled = [...byType.values()].map(mergeLicenseGroup);
+  // Mass distinct license clocks are not separate Owner decisions.
+  if (rolled.length > 3) return [...rest, mergeLicenseGroup(rolled)];
+  return [...rest, ...rolled];
+}
+
+/** One Decision per instance. Plan wins over raw escalation. Same-key summaries roll up with count.
+ *  Unplanned license renewals of the same type (incl. OL family) collapse to one card. */
 export function rollupDecisions(items: Decision[]): Decision[] {
   const byInstance = new Map<string, Decision[]>();
   const bySummary = new Map<string, Decision[]>();
@@ -264,7 +310,7 @@ export function rollupDecisions(items: Decision[]): Decision[] {
   for (const group of byInstance.values()) out.push(mergeDecisionGroup(group));
   for (const group of bySummary.values()) out.push(mergeDecisionGroup(group));
   out.push(...passthrough);
-  return out;
+  return rollupLicenseTypes(out);
 }
 
 export function humanDue(dueAt: string | null | undefined, now: Date = new Date()): string {
@@ -381,6 +427,15 @@ function headlineFor(d: Decision): string {
     return `Sign off solo shifts until ${cert} renews`;
   }
   if (isLicenseDecision(d)) {
+    if (n > 1) {
+      if ((d.obligationKey ?? "").startsWith("ol_") || /^ol\b/i.test(title)) {
+        return `Renew ${n} OL licenses`;
+      }
+      if (/^overdue licenses$/i.test(title) || !title) {
+        return `Renew ${n} overdue licenses`;
+      }
+      return `Renew ${n} ${title}`;
+    }
     return `Renew ${title || "the license"}`;
   }
   if (isStandingDecision(d)) {
@@ -400,6 +455,7 @@ function headlineFor(d: Decision): string {
 function whyFor(d: Decision): string {
   const name = firstName(d.subjectName);
   const title = shortTitle(d.title);
+  const n = d.count && d.count > 1 ? d.count : 0;
   if (d.planId && d.body.trim() && !hasForbiddenDecisionCopy(d.body)) {
     return scrubDecisionCopy(d.body.trim());
   }
@@ -414,6 +470,9 @@ function whyFor(d: Decision): string {
       : "This staff cannot work alone until this clock is current. Confirm coverage before the next solo shift.";
   }
   if (isLicenseDecision(d)) {
+    if (n > 1) {
+      return `${n} license clocks need a logged renewal so the file stays current.`;
+    }
     return `${title || "This license clock"} needs a logged renewal so the file stays current.`;
   }
   if (isStandingDecision(d)) {

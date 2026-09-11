@@ -46,6 +46,23 @@ describe("SOW catalog pack identity", () => {
     assert.equal(sowCatalogEntry("Person-Centered Thinking and Practices")?.key, "pct_hire_practices");
   });
 
+  it("maps leftover live titles to hive keys instead of source=provider", () => {
+    const cpr = sowCatalogEntry("CPR & First Aid Certification");
+    assert.equal(cpr?.key, "cpr_first_aid_initial");
+    assert.equal(cpr?.title, "CPR/First Aid Certification — Initial");
+    assert.equal(sowCatalogEntry("CPR/First Aid Certification — Renewal")?.key, "cpr_first_aid_renewal");
+
+    const clientSpecific = sowCatalogEntry("Client-Specific Training");
+    assert.equal(clientSpecific?.key, "client_specific_training");
+    assert.equal(clientSpecific?.title, "Client-Specific Training — [Client Name]");
+    assert.equal(
+      sowCatalogEntry("Client-Specific Training — Jane Doe")?.key,
+      "client_specific_training",
+    );
+    assert.equal(catalogTitleIsReserved("CPR & First Aid Certification"), true);
+    assert.equal(catalogTitleIsReserved("Client-Specific Training"), true);
+  });
+
   it("does not create instances for non-obligation dispositions", () => {
     const standing = sowCatalogEntry("Emergency Management and Business Continuity Plan");
     const intake = sowCatalogEntry("Grievance Policy Acknowledgment — Signed");
@@ -143,6 +160,10 @@ describe("obligation key backfill", () => {
     assert.equal(result.updated.find((r) => r.id === "fix-3")?.disposition, "retired");
     assert.equal(result.updated.find((r) => r.id === "fix-4")?.key, "pct_client");
     assert.equal(result.updated.find((r) => r.id === "fix-5")?.disposition, "standing");
+    assert.equal(result.updated.find((r) => r.id === "fix-7")?.key, "cpr_first_aid_initial");
+    assert.equal(result.updated.find((r) => r.id === "fix-7")?.source, "sow");
+    assert.equal(result.updated.find((r) => r.id === "fix-8")?.key, "client_specific_training");
+    assert.equal(result.updated.find((r) => r.id === "fix-8")?.source, "sow");
     assert.deepEqual(
       result.unmatched.map((r) => r.title),
       ["Custom Agency Handbook Review"],

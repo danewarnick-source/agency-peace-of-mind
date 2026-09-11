@@ -44,6 +44,8 @@ export const BACKFILL_FIXTURE_ROWS: ObligationBackfillRow[] = [
   { id: "fix-4", title: "Person-Centered Thinking — Jane Doe", source: "sow" },
   { id: "fix-5", title: "Emergency Management and Business Continuity Plan", source: "sow" },
   { id: "fix-6", title: "Custom Agency Handbook Review", source: "sow" },
+  { id: "fix-7", title: "CPR & First Aid Certification", source: "sow" },
+  { id: "fix-8", title: "Client-Specific Training", source: "sow" },
 ];
 
 function resolveCatalog(title: string): SowCatalogEntry | null {

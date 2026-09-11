@@ -211,7 +211,15 @@ const ROOM_BOARD_FORM: CatalogFormTemplate = {
 export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
   "30-Day New Hire Orientation Training": { key: "orientation_30_day", disposition: "obligation" },
   "Annual 12-Hour Continuing Education": { key: "ce_12h_annual", disposition: "obligation" },
-  "CPR/First Aid Certification — Initial": { key: "cpr_first_aid_initial", disposition: "obligation" },
+  "CPR/First Aid Certification — Initial": {
+    key: "cpr_first_aid_initial",
+    disposition: "obligation",
+    // Live TNS combined Initial+Renewal into one card (20260819200000).
+    // One leftover card → Initial. If an org also still has a Renewal row,
+    // that exact title keeps cpr_first_aid_renewal; this leftover still maps
+    // to Initial (Soft UNIQUE later may collapse two Initial-keyed rows).
+    aliases: ["CPR & First Aid Certification"],
+  },
   "CPR/First Aid Certification — Renewal": { key: "cpr_first_aid_renewal", disposition: "obligation" },
   "Person-Centered Thinking and Practices Training": {
     key: "pct_hire_practices",
@@ -348,6 +356,9 @@ export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
   "Client-Specific Training — [Client Name]": {
     key: "client_specific_training",
     disposition: "obligation",
+    // Bare live title (no client name) is the same catalog duty as the
+    // "[Client Name]" pattern — not a provider row.
+    aliases: ["Client-Specific Training"],
     form_template: CLIENT_SPECIFIC_FORM,
   },
   "Support Strategies — [Client Name]": {

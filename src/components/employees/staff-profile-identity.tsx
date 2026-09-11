@@ -61,7 +61,11 @@ export function StaffProfileIdentity({
   const patch = (partial: Partial<StaffIdentityDraft>) => onDraftChange({ ...draft, ...partial });
 
   return (
-    <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+    <div
+      className="flex flex-col gap-6 sm:flex-row sm:items-start"
+      data-testid="staff-profile-identity"
+      data-staff-id={staffId}
+    >
       <div className="shrink-0">
         <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} editing={editing} />
       </div>

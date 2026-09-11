@@ -26,6 +26,10 @@ import {
 import { StaffProfileIdentity } from "@/components/employees/staff-profile-identity";
 import {
   identityDraftFrom,
+  loadStaffProfileIdentity,
+  memberBelongsToRouteStaff,
+  profileBelongsToRouteStaff,
+  staffProfileIdentityQueryKey,
   type StaffIdentityDraft,
   type StaffIdentityMember,
   type StaffIdentityProfile,
@@ -69,11 +73,32 @@ export function StaffProfilePanel({
   const savePermsFn = useServerFn(saveStaffPermissionToggles);
   const setScopeFn = useServerFn(setScopeAssignments);
 
+  const identityQ = useQuery({
+    enabled: !!orgId && !!staffId,
+    queryKey: staffProfileIdentityQueryKey(orgId, staffId),
+    queryFn: () => loadStaffProfileIdentity(supabase, { organizationId: orgId, staffId }),
+  });
+  const loaded = identityQ.data;
+  const routeProfile =
+    loaded !== undefined
+      ? profileBelongsToRouteStaff(loaded?.profile ?? null, staffId)
+        ? (loaded?.profile ?? null)
+        : null
+      : profileBelongsToRouteStaff(profile, staffId)
+        ? profile
+        : null;
+  const routeMember =
+    loaded?.member && memberBelongsToRouteStaff(loaded.member, staffId)
+      ? loaded.member
+      : memberBelongsToRouteStaff(member, staffId)
+        ? member
+        : member;
+
   const { data: effective, isLoading: permsLoading } = useEffectivePermissions(staffId);
   const { data: matrix } = useOrgPermissions();
 
   const scopeQ = useQuery({
-    enabled: !!orgId && isAdminScopeRole(member.role),
+    enabled: !!orgId && isAdminScopeRole(routeMember.role),
     queryKey: ["staff-admin-scope", orgId, staffId],
     queryFn: async (): Promise<ParsedAdminScope> => {
       const { data } = await supabase
@@ -87,12 +112,12 @@ export function StaffProfilePanel({
 
   const [editing, setEditing] = useState(false);
   const [identity, setIdentity] = useState<StaffIdentityDraft>(() =>
-    identityDraftFrom(profile, member),
+    identityDraftFrom(routeProfile, routeMember),
   );
   const [permDraft, setPermDraft] = useState<Record<string, boolean>>({});
   const [scopeDraft, setScopeDraft] = useState<ParsedAdminScope>(EMPTY_SCOPE);
 
-  const roleForDefaults = (editing ? identity.role : member.role) as Role;
+  const roleForDefaults = (editing ? identity.role : routeMember.role) as Role;
   const roleGranted = useMemo(
     () => fillRoleGrantedMap(roleForDefaults, matrixRows(matrix, roleForDefaults)),
     [matrix, roleForDefaults],
@@ -100,8 +125,8 @@ export function StaffProfilePanel({
 
   useEffect(() => {
     if (editing) return;
-    setIdentity(identityDraftFrom(profile, member));
-  }, [editing, profile, member]);
+    setIdentity(identityDraftFrom(routeProfile, routeMember));
+  }, [editing, routeProfile, routeMember, staffId]);
 
   useEffect(() => {
     if (!effective || editing) return;
@@ -115,11 +140,11 @@ export function StaffProfilePanel({
   useEffect(() => {
     if (editing) return;
     if (scopeQ.data) setScopeDraft(scopeQ.data);
-    else if (adminScopeIsLockedWholeOrg(member.role)) setScopeDraft(EMPTY_SCOPE);
-  }, [editing, scopeQ.data, member.role]);
+    else if (adminScopeIsLockedWholeOrg(routeMember.role)) setScopeDraft(EMPTY_SCOPE);
+  }, [editing, scopeQ.data, routeMember.role]);
 
   const startEdit = () => {
-    setIdentity(identityDraftFrom(profile, member));
+    setIdentity(identityDraftFrom(routeProfile, routeMember));
     if (effective) {
       const next: Record<string, boolean> = {};
       for (const perm of ALL_PERMISSIONS) {
@@ -132,7 +157,7 @@ export function StaffProfilePanel({
   };
 
   const cancel = () => {
-    setIdentity(identityDraftFrom(profile, member));
+    setIdentity(identityDraftFrom(routeProfile, routeMember));
     if (effective) {
       const next: Record<string, boolean> = {};
       for (const perm of ALL_PERMISSIONS) {
@@ -182,7 +207,8 @@ export function StaffProfilePanel({
         const { error: jobErr } = await supabase
           .from("organization_members")
           .update({ job_title: identity.job_title.trim() || null })
-          .eq("id", member.id);
+          .eq("id", routeMember.id)
+          .eq("user_id", staffId);
         if (jobErr) throw new Error(jobErr.message);
 
         if (identity.hire_date) {
@@ -192,11 +218,11 @@ export function StaffProfilePanel({
             console.warn("[obligations] hire auto-assign failed:", e);
           }
         }
-        if (identity.role !== member.role) {
+        if (identity.role !== routeMember.role) {
           await setGrantsFn({
             data: {
               organization_id: orgId,
-              membership_id: member.id,
+              membership_id: routeMember.id,
               target_user_id: staffId,
               explicit_role: identity.role as ProviderRole,
             },
@@ -252,6 +278,7 @@ export function StaffProfilePanel({
     onSuccess: () => {
       toast.success("Saved");
       setEditing(false);
+      qc.invalidateQueries({ queryKey: staffProfileIdentityQueryKey(orgId, staffId) });
       qc.invalidateQueries({ queryKey: ["effective-permissions", orgId, staffId] });
       qc.invalidateQueries({ queryKey: ["staff-admin-scope", orgId, staffId] });
       qc.invalidateQueries({ queryKey: ["scope-assignments", orgId] });
@@ -265,7 +292,7 @@ export function StaffProfilePanel({
       ),
   });
 
-  const showScope = isAdminScopeRole(editing ? identity.role : member.role);
+  const showScope = isAdminScopeRole(editing ? identity.role : routeMember.role);
 
   return (
     <div className="space-y-6">
@@ -294,8 +321,8 @@ export function StaffProfilePanel({
           orgId={orgId}
           staffId={staffId}
           name={name}
-          profile={profile}
-          member={member}
+          profile={routeProfile}
+          member={routeMember}
           editing={editing && canEditIdentity}
           draft={identity}
           onDraftChange={onIdentityChange}
@@ -320,10 +347,10 @@ export function StaffProfilePanel({
               <h3 className="text-sm font-semibold">Admin scope</h3>
               <AdminScopeFields
                 orgId={orgId}
-                role={editing ? identity.role : member.role}
+                role={editing ? identity.role : routeMember.role}
                 editing={editing}
                 draft={
-                  adminScopeIsLockedWholeOrg(editing ? identity.role : member.role)
+                  adminScopeIsLockedWholeOrg(editing ? identity.role : routeMember.role)
                     ? EMPTY_SCOPE
                     : scopeDraft
                 }

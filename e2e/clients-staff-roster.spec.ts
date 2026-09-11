@@ -151,8 +151,22 @@ test.describe("Clients + Staff roster — mocked admin", () => {
         .first(),
     ).toBeVisible();
 
-    await page.locator("table a[href*='/dashboard/employees/']").first().click();
-    await page.waitForURL(/\/dashboard\/employees\/00000000-0000-4000-a000-/);
+    await gotoAdmin(page, `/dashboard/employees/${STAFF.jake.id}`);
+    await expect(page).toHaveURL(new RegExp(`/dashboard/employees/${STAFF.jake.id}`));
+    await expect(page.getByTestId("staff-profile-page")).toHaveAttribute(
+      "data-staff-id",
+      STAFF.jake.id,
+    );
+    await expect(page.getByTestId("staff-profile-heading")).toHaveText(/Jake Probert/);
+    await expect(page.getByTestId("staff-profile-identity")).toHaveAttribute(
+      "data-staff-id",
+      STAFF.jake.id,
+    );
+    await expect(page.getByTestId("staff-profile-identity")).toContainText("Jake");
+    await expect(page.getByTestId("staff-profile-identity")).toContainText("Probert");
+    await expect(page.getByTestId("staff-profile-identity")).not.toContainText("Dane");
+    await expect(page.getByTestId("staff-profile-identity")).not.toContainText("Owner");
+    await expect(page.getByTestId("staff-profile-heading")).not.toHaveText(/Dane|Roster Admin/);
     await expect(page.getByRole("tab", { name: /^Profile$/i })).toBeVisible({
       timeout: 15_000,
     });

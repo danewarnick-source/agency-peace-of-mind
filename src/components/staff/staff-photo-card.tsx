@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PhotoUpload } from "@/components/person/photo-upload";
+import { staffProfileIdentityQueryKey } from "@/lib/staff-profile-identity";
 
 export function StaffPhotoCard({
   orgId,
@@ -39,7 +40,7 @@ export function StaffPhotoCard({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["staff-photo-card", staffId] });
-      qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+      qc.invalidateQueries({ queryKey: staffProfileIdentityQueryKey(orgId, staffId) });
     },
   });
 

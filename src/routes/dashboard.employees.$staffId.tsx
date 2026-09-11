@@ -23,6 +23,11 @@ import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sh
 import { StaffProfilePanel } from "@/components/employees/staff-profile-panel";
 import { StaffObligationsFilesTab } from "@/components/employees/staff-obligations-files-tab";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
+import {
+  loadStaffProfileIdentity,
+  staffProfileDisplayName,
+  staffProfileIdentityQueryKey,
+} from "@/lib/staff-profile-identity";
 
 const PROFILE_TABS = ["profile", "personnel", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
@@ -75,27 +80,11 @@ function StaffProfilePage() {
   const orgId = org?.organization_id;
 
   const memberQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["staff-profile", orgId, staffId],
-    queryFn: async () => {
-      const { data: m, error: mErr } = await supabase
-        .from("organization_members")
-        .select("id, role, job_title, active, user_id, created_at")
-        .eq("organization_id", orgId!)
-        .eq("user_id", staffId)
-        .maybeSingle();
-      if (mErr) throw mErr;
-      if (!m) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: p, error: pErr } = await (supabase as any)
-        .from("profiles")
-        .select(
-          "id, full_name, first_name, last_name, email, username, hire_date, start_date, photo_path, photo_updated_at, phone, employee_id",
-        )
-        .eq("id", staffId)
-        .maybeSingle();
-      if (pErr) throw pErr;
-      return { member: m, profile: p ?? null };
+    enabled: !!orgId && !!staffId,
+    queryKey: staffProfileIdentityQueryKey(orgId, staffId),
+    queryFn: () => {
+      if (!orgId) throw new Error("No organization selected.");
+      return loadStaffProfileIdentity(supabase, { organizationId: orgId, staffId });
     },
   });
 
@@ -115,18 +104,18 @@ function StaffProfilePage() {
 
   const m = memberQ.data!.member;
   const p = memberQ.data!.profile;
-  const name =
-    (p?.full_name && String(p.full_name).trim()) ||
-    (p?.username && String(p.username).trim()) ||
-    (p?.email && String(p.email).trim()) ||
-    "Name not set";
+  const name = staffProfileDisplayName(p);
 
   const invalidateProfile = () => {
-    qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+    qc.invalidateQueries({ queryKey: staffProfileIdentityQueryKey(orgId, staffId) });
   };
 
   return (
-    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
+    <div
+      className="min-w-0 max-w-full space-y-6 overflow-x-hidden"
+      data-testid="staff-profile-page"
+      data-staff-id={staffId}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button
@@ -147,7 +136,9 @@ function StaffProfilePage() {
             className="h-11 w-11"
           />
           <div>
-            <h1 className="text-xl font-semibold leading-tight">{name}</h1>
+            <h1 className="text-xl font-semibold leading-tight" data-testid="staff-profile-heading">
+              {name}
+            </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
               <Badge
                 variant="outline"
@@ -205,6 +196,7 @@ function StaffProfilePage() {
 
         <TabsContent value="profile" className="mt-4 space-y-6">
           <StaffProfilePanel
+            key={staffId}
             orgId={orgId}
             staffId={staffId}
             profile={p}

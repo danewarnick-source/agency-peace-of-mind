@@ -3,14 +3,17 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   TNS_ORG_ID,
+  consequenceForTrigger,
   evaluateEscalations,
   persistEscalationHits,
   resolveRecipient,
   recurrenceKey,
+  renderTemplate,
   isLicenseOrRepaymentCatalog,
   citationIsLicenseOrRepayment,
   pickAdminLevelRecipient,
   pickLowestAdminLevel,
+  SEED_ESCALATION_RULES,
   type EscalationHit,
   type EvaluateInput,
   type OrgMemberRow,
@@ -197,7 +200,9 @@ describe("evaluator fixtures (TNS)", () => {
       (h) => h.trigger === "overdue" && h.obligationKey === "cpr_first_aid_initial",
     );
     assert.equal(cprOverdue?.recipientUserId, MOM);
-    assert.match(cprOverdue?.consequence ?? "", /Manager of manager/);
+    assert.match(cprOverdue?.consequence ?? "", /days overdue/);
+    assert.match(cprOverdue?.consequence ?? "", /DSPD review/);
+    assert.notEqual(cprOverdue?.consequence, cprOverdue?.message);
 
     const hhs = hits.find(
       (h) => h.trigger === "overdue" && h.obligationKey === "hhs_home_cert_annual",
@@ -208,7 +213,49 @@ describe("evaluator fixtures (TNS)", () => {
 
     const standing = hits.find((h) => h.trigger === "standing_record_missing_30d");
     assert.equal(standing?.recipientUserId, SUPER);
-    assert.match(standing?.consequence ?? "", /Standing record/);
+    assert.match(standing?.consequence ?? "", /missing 30\+ days/);
+    assert.match(standing?.consequence ?? "", /nothing to show them/);
+    assert.notEqual(standing?.consequence, standing?.message);
+  });
+
+  it("writes a distinct consequence per trigger and never restates the message", () => {
+    const vars = {
+      due: "2026-10-01",
+      days_overdue: "12",
+      audit_ref: "IV-7",
+      citation: "§1.13",
+      n_days: "5",
+      title: "HHS Inspection",
+      subject: "Ada Staff",
+      status: "overdue",
+      n_shifts: "2",
+    };
+    assert.equal(
+      consequenceForTrigger("half_window_not_started", vars),
+      "If this isn't started soon, it becomes overdue on 2026-10-01 and escalates to the next manager up.",
+    );
+    assert.equal(
+      consequenceForTrigger("overdue", vars),
+      "12 days overdue. If unresolved, this is a finding on the next DSPD review.",
+    );
+    assert.equal(
+      consequenceForTrigger("would_create_finding_if_scheduled", vars),
+      "Each shift scheduled while this is lapsed is a IV-7 finding if the reviewer samples it.",
+    );
+    assert.equal(
+      consequenceForTrigger("license_or_repayment_risk", vars),
+      "This is a licensing or repayment item (§1.13). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
+    );
+    assert.equal(
+      consequenceForTrigger("standing_record_missing_30d", vars),
+      "This policy has been missing 30+ days. A reviewer will ask for it by name — there is currently nothing to show them.",
+    );
+    for (const rule of SEED_ESCALATION_RULES) {
+      const message = renderTemplate(rule.message_template, vars);
+      const consequence = consequenceForTrigger(rule.trigger, vars);
+      assert.notEqual(consequence, message);
+      assert.notEqual(consequence, vars.title);
+    }
   });
 
   it("getThisWeek for TNS super_admin surfaces CPR, HHS, and missing standing with owner/consequence", () => {
@@ -230,7 +277,7 @@ describe("evaluator fixtures (TNS)", () => {
     const cpr = decisions.find((i) => i.title.includes("CPR") && i.trigger === "overdue");
     assert.ok(cpr && cpr.kind === "decision");
     assert.equal(cpr.ownerUserId, SUPER);
-    assert.match(cpr.consequence, /Overdue/);
+    assert.match(cpr.consequence, /days overdue/);
 
     const hhs = decisions.find((i) => i.title.includes("HHS") && i.trigger === "overdue");
     assert.ok(hhs && hhs.kind === "decision");
@@ -240,7 +287,7 @@ describe("evaluator fixtures (TNS)", () => {
     const standing = decisions.find((i) => i.source === "standing_missing");
     assert.ok(standing && standing.kind === "decision");
     assert.equal(standing.ownerUserId, SUPER);
-    assert.match(standing.consequence, /Standing record/);
+    assert.match(standing.consequence, /missing 30\+ days/);
   });
 
   it("sorts critical → high → normal, then soonest due", () => {

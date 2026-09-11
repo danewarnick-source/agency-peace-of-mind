@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   applyRemediationPlanOutcomes,
   consequenceForPlanKind,
+  initialRemediationPlanStatus,
   kindFromEscalationTrigger,
   pickPlanOwner,
   planOwnerLabel,
@@ -145,8 +146,33 @@ describe("plan kinds and owners", () => {
     assert.equal(pickPlanOwner("license_risk", STAFF, members), SUPER);
     assert.equal(planOwnerLabel("solo_lapse"), "manager");
     assert.equal(planOwnerLabel("standing_missing"), "admin_level");
+    assert.equal(planOwnerLabel("overdue"), "manager");
     assert.equal(urgencyForPlan("license_risk", false), "critical");
     assert.match(consequenceForPlanKind("solo_lapse"), /work alone/);
+    assert.equal(initialRemediationPlanStatus("overdue"), "approved");
+    assert.equal(initialRemediationPlanStatus("license_risk"), "awaiting_approval");
+    assert.equal(initialRemediationPlanStatus("standing_missing"), "awaiting_approval");
+    assert.equal(initialRemediationPlanStatus("solo_lapse"), "awaiting_approval");
+  });
+
+  it("labels This Week cards by trigger and never returns Escalation", () => {
+    const src = readFileSync(
+      new URL("../../components/compliance/this-week-plan-cards.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(src, /return "Escalation"/);
+    assert.match(src, /half_window_not_started/);
+    assert.match(src, /return "Due soon"/);
+    assert.match(src, /return "Overdue"/);
+    assert.match(src, /return "Scheduling risk"/);
+    assert.match(src, /return "License \/ repayment"/);
+    assert.match(src, /return "Standing record"/);
+    assert.match(src, /Unknown this-week trigger/);
+    assert.match(src, /Log a plan/);
+    assert.match(src, /Edit the starter \/ log a plan/);
+    assert.match(src, /LicenseRiskPlanDialog/);
+    assert.match(src, /StandingRecordPlanDialog/);
+    assert.match(src, /OverdueObligationPlanDialog/);
   });
 });
 

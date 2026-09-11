@@ -100,8 +100,8 @@ describe("cert review surface lock", () => {
       "utf8",
     );
     const engine = readFileSync(new URL("./cert-review.ts", import.meta.url), "utf8");
-    const card = readFileSync(
-      new URL("../components/company-obligations/obligation-card.tsx", import.meta.url),
+    const staffFile = readFileSync(
+      new URL("../components/compliance/staff-file-panel.tsx", import.meta.url),
       "utf8",
     );
     assert.match(page, /CertReviewPanel/);
@@ -111,7 +111,7 @@ describe("cert review surface lock", () => {
     assert.match(panel, /Request correction/);
     assert.match(panel, /certReviewAcceptBlockReason/);
     assert.match(engine, /Confirm expiration before acceptance/);
-    assert.match(card, /cert-review/);
+    assert.match(staffFile, /cert-review/);
     assert.doesNotMatch(panel, /from\("certificate_reviews"\)/);
   });
 });

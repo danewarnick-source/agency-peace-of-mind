@@ -1,6 +1,11 @@
 // This Week queue (Compliance revamp Step 2 + Step 3 scope + Step 5 source 5).
 
-import { loadOrgFacts, unansweredFactsQuietSummary } from "./applicability.ts";
+import {
+  EMPTY_ORG_FACTS,
+  listUnansweredFacts,
+  loadOrgFacts,
+  unansweredFactsQuietSummary,
+} from "./applicability.ts";
 import { unansweredDutyQuietSummary } from "./duty-applicability.ts";
 import {
   evaluateEscalations,
@@ -23,6 +28,7 @@ import { sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
 import { evvStaffIdsForScope, resolveScopeFromSnapshot } from "./scope.ts";
 import {
   buildQuietLine,
+  decisionFromQuietSummary,
   decorateDecision,
   lastSundayLabel,
   rollupDecisions,
@@ -56,6 +62,7 @@ export type {
 } from "./this-week.ts";
 export {
   buildQuietLine,
+  decisionFromQuietSummary,
   decorateDecision,
   emptyQuietLine,
   formatQuietLine,
@@ -63,8 +70,10 @@ export {
   HEADLINE_VERB_RE,
   humanDue,
   licenseTypeKey,
+  quietLineIsClean,
   rollupDecisions,
   sortThisWeekItems,
+  thisWeekStatusLine,
 } from "./this-week.ts";
 export {
   emptyAlreadyAssigned,
@@ -262,14 +271,17 @@ async function loadQuietCounts(
 
   // daily_logs.ai_compliance_status is the live Nectar column. Fail open on
   // a missing table / column so Home still renders.
-  const notesTotal = totalRes.error ? 0 : (totalRes.count ?? 0);
-  const notesPassed = passedRes.error ? 0 : (passedRes.count ?? 0);
+  const notesFailed = !!(totalRes.error || passedRes.error);
+  const notesTotal = notesFailed ? 0 : (totalRes.count ?? 0);
+  const notesPassed = notesFailed ? 0 : (passedRes.count ?? 0);
   const recordsReviewCleared = reviewRes.error ? 0 : (reviewRes.count ?? 0);
+  const checkFailed = notesFailed || !!reviewRes.error;
 
   const dutyGaps = input.dutyGaps ?? [];
   const evaluationIncomplete =
     input.dutyFactsKnown === false || dutyGaps.some((g) => g.kind === "evaluation_incomplete");
   const assignmentGaps = dutyGaps.filter((g) => g.kind !== "evaluation_incomplete").length;
+  const unansweredFacts = input.orgFacts ? listUnansweredFacts(input.orgFacts).length : 0;
 
   return buildQuietLine({
     obligationsSatisfied,
@@ -277,9 +289,11 @@ async function loadQuietCounts(
     notesTotal,
     standingCurrent,
     recordsReviewCleared,
-    evvReconciledThrough: evvNeedsReview === 0 ? lastSundayLabel() : null,
+    evvReconciledThrough: evvNeedsReview === 0 && !checkFailed ? lastSundayLabel() : null,
     assignmentGaps,
+    unansweredFacts: input.orgFacts ? unansweredFacts : Math.max(unansweredFacts, 1),
     evaluationIncomplete,
+    checkFailed: checkFailed || input.orgFacts == null,
   });
 }
 
@@ -350,11 +364,13 @@ export async function getThisWeek(
     }
   }
 
-  // 5. Org-profile facts (source org_profile_facts) + assignment gaps stay loadable.
+  // 5. Org-profile facts (source org_profile_facts) + assignment gaps become Owner cards. Never discard.
   if (adminLevel) {
-    const facts = await loadOrgFacts(supabase, orgId);
-    if (facts) unansweredFactsQuietSummary(orgId, facts);
-    unansweredDutyQuietSummary(orgId, input.dutyGaps ?? []);
+    const facts = input.orgFacts ?? (await loadOrgFacts(supabase, orgId));
+    const factCard = unansweredFactsQuietSummary(orgId, facts ?? EMPTY_ORG_FACTS);
+    if (factCard) raw.push(decisionFromQuietSummary(factCard, userId));
+    const dutyCard = unansweredDutyQuietSummary(orgId, input.dutyGaps ?? []);
+    if (dutyCard) raw.push(decisionFromQuietSummary(dutyCard, userId));
   }
 
   // 6. evv_timesheets needs_review in scope — QuietLine, not a card.

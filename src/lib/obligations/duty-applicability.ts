@@ -216,7 +216,8 @@ export function evaluateStaffDuty(input: {
     return row(dutyKey, "unanswered", "missing_assignment");
   }
 
-  return row(dutyKey, "applies");
+  // Unknown key or unmatched catalog row: never invent applies, never hide as N/A.
+  return row(dutyKey, "unanswered");
 }
 
 export function evaluateStaffDuties(input: {

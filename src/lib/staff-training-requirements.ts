@@ -2,9 +2,8 @@
  * Fixed baseline list of required staff trainings.
  *
  * Every employee is checked against this list automatically — there is no
- * admin setup required. `getStaffChecklist` synthesizes a checklist row for
- * each applicable baseline training so a brand-new hire with nothing on file
- * shows Overdue / To-Do, never "0 overdue".
+ * admin setup required. Import and in-Hive roster use `isBaselineApplicable`
+ * so a brand-new hire with nothing on file stays visible, never "0 overdue".
  *
  * Pure module — no DB, no server imports — safe to use from client or server.
  */
@@ -560,7 +559,7 @@ export function isBaselineApplicable(t: BaselineTraining, ctx: ApplicabilityCont
     return codes.some((c) => assigned.includes(c.toUpperCase()));
   }
   if (t.conditional === "after_year_one") {
-    if (!ctx.hireDate) return false;
+    if (!ctx.hireDate) return true;
     const now = ctx.now ?? new Date();
     const oneYearMs = 365 * 86400_000;
     return now.getTime() - ctx.hireDate.getTime() >= oneYearMs;

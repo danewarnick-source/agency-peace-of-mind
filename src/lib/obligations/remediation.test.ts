@@ -189,8 +189,8 @@ describe("plan kinds and owners", () => {
     assert.match(src, /StandingRecordPlanDialog/);
     assert.match(src, /OverdueObligationPlanDialog/);
     assert.match(src, /HOME_CARD_CAP = 3/);
-    assert.match(src, /decisionCountLine/);
-    assert.match(src, /"Three"/);
+    assert.match(src, /thisWeekStatusLine/);
+    assert.match(decorate, /"Three"/);
   });
 });
 

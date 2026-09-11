@@ -108,12 +108,7 @@ export function useActionRequiredQueue(
     enabled,
     queryKey: ["company-obligations", orgId],
     queryFn: async () => {
-      try {
-        return await listFn({ data: { organizationId: orgId! } });
-      } catch (e) {
-        console.error("[action-required] obligations list failed", e);
-        return [];
-      }
+      return await listFn({ data: { organizationId: orgId! } });
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -147,10 +142,7 @@ export function useActionRequiredQueue(
         .neq("status", "State_Confirmed")
         .order("discovered_at", { ascending: false })
         .limit(100);
-      if (error) {
-        console.error("[action-required] incidents query failed", error);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as Array<{
         id: string;
         report_number: string;
@@ -178,10 +170,7 @@ export function useActionRequiredQueue(
         .gt("created_at", since)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) {
-        console.error("[action-required] flagged query failed", error);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as Array<{
         id: string;
         staff_id: string;
@@ -232,10 +221,7 @@ export function useActionRequiredQueue(
         .eq("active", true)
         .not("next_review_date", "is", null)
         .lte("next_review_date", cutoff);
-      if (error) {
-        console.error("[action-required] hrc query failed", error);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as Array<{
         id: string;
         client_id: string;
@@ -304,6 +290,26 @@ export function useActionRequiredQueue(
     const clients = clientsQ.data ?? [];
     const staffNames = staffNamesQ.data ?? new Map<string, string>();
     const out: ActionRequiredItem[] = [];
+    const sourceFailed =
+      obligationsQ.isError ||
+      clientsQ.isError ||
+      incidentsQ.isError ||
+      flaggedQ.isError ||
+      missingAttestQ.isError ||
+      hrcQ.isError ||
+      hireDatesQ.isError;
+    if (sourceFailed) {
+      out.push({
+        key: "queue-check-failed",
+        category: "staff_hr",
+        tone: "red",
+        title: "Compliance queue check did not finish",
+        subject: "One or more live sources failed",
+        dueLabel: "not a clean result",
+        sortAt: now.getTime(),
+        action: { kind: "hire_dates" },
+      });
+    }
 
     for (const o of obligationsQ.data ?? []) {
       if (!o.active) continue;
@@ -506,12 +512,19 @@ export function useActionRequiredQueue(
     };
   }, [
     obligationsQ.data,
+    obligationsQ.isError,
     clientsQ.data,
+    clientsQ.isError,
     incidentsQ.data,
+    incidentsQ.isError,
     flaggedQ.data,
+    flaggedQ.isError,
     missingAttestQ.data,
+    missingAttestQ.isError,
     hrcQ.data,
+    hrcQ.isError,
     hireDatesQ.data,
+    hireDatesQ.isError,
     staffNamesQ.data,
   ]);
 

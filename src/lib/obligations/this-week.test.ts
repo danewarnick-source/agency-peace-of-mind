@@ -3,15 +3,22 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   buildQuietLine,
+  decisionFromQuietSummary,
   decorateDecision,
+  emptyQuietLine,
   FORBIDDEN_DECISION_STRINGS,
+  formatQuietLine,
   hasForbiddenDecisionCopy,
   HEADLINE_VERB_RE,
   humanDue,
+  quietLineIsClean,
   rollupDecisions,
+  thisWeekStatusLine,
   wordCount,
   type Decision,
 } from "./this-week.ts";
+import { unansweredDutyQuietSummary } from "./duty-applicability.ts";
+import { unansweredFactsQuietSummary } from "./applicability.ts";
 
 const NOW = new Date("2026-09-11T18:00:00.000Z");
 
@@ -235,6 +242,60 @@ describe("assignment gaps are not a clean QuietLine", () => {
   it("adds a high-signal segment when evaluation is incomplete", () => {
     const quiet = buildQuietLine({ evaluationIncomplete: true });
     assert.ok(quiet.segments.some((s) => /not a clean compliance result/.test(s)));
+    assert.equal(quietLineIsClean(quiet), false);
+    assert.match(formatQuietLine(quiet), /not a clean compliance result/);
+    assert.doesNotMatch(formatQuietLine(quiet), /operations are current/);
+  });
+
+  it("does not treat a failed live check as current operations", () => {
+    const quiet = buildQuietLine({ checkFailed: true });
+    assert.equal(quietLineIsClean(quiet), false);
+    assert.equal(quiet.checkFailed, true);
+    assert.match(formatQuietLine(quiet), /not a clean compliance result/);
+    assert.equal(
+      thisWeekStatusLine({ itemCount: 0, quiet }),
+      "Duty evaluation or a live check did not finish. This is not a clean compliance result.",
+    );
+  });
+
+  it("does not say nothing needs you when setup facts are unanswered", () => {
+    const quiet = buildQuietLine({ unansweredFacts: 3 });
+    assert.equal(quietLineIsClean(quiet), false);
+    assert.equal(thisWeekStatusLine({ itemCount: 0, quiet }), "Compliance setup facts still need an answer.");
+    assert.doesNotMatch(thisWeekStatusLine({ itemCount: 0, quiet: emptyQuietLine() }), /not a clean/);
+  });
+
+  it("turns unanswered fact and duty-gap summaries into Owner cards", () => {
+    const facts = unansweredFactsQuietSummary("org", {
+      operates_ol_site: null,
+      uses_volunteers: null,
+      has_governing_board: null,
+      servicesOffered: [],
+    });
+    const gaps = unansweredDutyQuietSummary("org", [
+      { staffId: "s1", dutyKey: "orientation_30_day", kind: "missing_assignment" },
+    ]);
+    assert.ok(facts && gaps);
+    const factCard = decorateDecision(decisionFromQuietSummary(facts, "admin-1"), {
+      now: NOW,
+      viewerUserId: "admin-1",
+    });
+    const gapCard = decorateDecision(decisionFromQuietSummary(gaps, "admin-1"), {
+      now: NOW,
+      viewerUserId: "admin-1",
+    });
+    assert.match(factCard.headline ?? "", /Answer compliance setup facts/);
+    assert.match(gapCard.headline ?? "", /Answer assignment gaps/);
+    assert.match(factCard.headline ?? "", HEADLINE_VERB_RE);
+    assert.match(gapCard.headline ?? "", HEADLINE_VERB_RE);
+  });
+
+  it("pushes unanswered summaries in getThisWeek instead of discarding them", () => {
+    const io = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
+    assert.match(io, /decisionFromQuietSummary/);
+    assert.match(io, /if \(factCard\) raw\.push/);
+    assert.match(io, /if \(dutyCard\) raw\.push/);
+    assert.doesNotMatch(io, /if \(facts\) unansweredFactsQuietSummary\(orgId, facts\);\s*\n\s*unansweredDutyQuietSummary/);
   });
 
   it("names assignment_gaps as a QuietSummary source in the type module", () => {

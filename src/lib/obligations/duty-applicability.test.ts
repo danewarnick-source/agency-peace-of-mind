@@ -206,6 +206,15 @@ describe("unknown facts stay unanswered, never N/A", () => {
     assert.equal(row.applies, true);
   });
 
+  it("unknown duty keys stay unanswered, never N/A and never invented applies", () => {
+    const row = evaluateStaffDuty({ dutyKey: "not_a_real_duty_key", staff: DSP });
+    assert.equal(row.status, "unanswered");
+    assert.equal(row.applies, true);
+    assert.equal(row.unanswered, true);
+    assert.equal(staffReceivesDutyClock(row), false);
+    assert.equal(staffSeesDuty(row), true);
+  });
+
   it("failed evaluation is not compliant", () => {
     assert.equal(
       evaluationIsCompliant({ evaluationComplete: false, gaps: [], failed: false }),

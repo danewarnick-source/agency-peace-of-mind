@@ -168,7 +168,8 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     citation: "SOW §1.8(5)(C)",
     title: "Person-Centered Thinking is hire-level only (not per client)",
     status: "intentional_omit",
-    note: "Per-client Person-Centered Thinking form is retired. The SOW duty is staff training once — Person-Centered Thinking and Practices Training (90 days).",
+    catalog_titles: ["Person-Centered Thinking — [Client Name]"],
+    note: "Per-client Person-Centered Thinking form is retired (catalog key pct_client, retired_in UT-2026.07). The SOW duty is staff training once — Person-Centered Thinking and Practices Training (90 days).",
   },
   {
     id: "sow-1.8-behavior",
@@ -1017,6 +1018,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Human Rights Committee established and meeting",
     status: "live_artifact",
     audit_item_ids: ["I-3"],
+    catalog_titles: ["Human Rights Committee — Established and Meeting"],
     note: "HRC module. Written Human Rights Plan is the separate §1.21 duty.",
   },
   {
@@ -1043,6 +1045,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "EPR 20% community time",
     status: "live_artifact",
     audit_item_ids: ["I-6"],
+    catalog_titles: ["EPR Community Time — 20 Percent Process"],
   },
   {
     id: "rt-I-7",
@@ -1104,6 +1107,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Medical and dental examinations",
     status: "live_artifact",
     audit_item_ids: ["II-1"],
+    catalog_titles: ["Medical and Dental Examinations — Person File"],
   },
   {
     id: "rt-II-2",
@@ -1112,6 +1116,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Medication record when contractor supports meds",
     status: "live_artifact",
     audit_item_ids: ["II-2"],
+    catalog_titles: ["Medication Record — When Contractor Supports Meds"],
   },
   {
     id: "rt-II-3",
@@ -1129,6 +1134,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "FBA and BSP for BC1/BC2/BC3",
     status: "live_artifact",
     audit_item_ids: ["II-4"],
+    catalog_titles: ["Functional Behavior Assessment and Behavior Support Plan"],
   },
   {
     id: "rt-II-5",
@@ -1163,6 +1169,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Signed grievance-policy acknowledgment",
     status: "live_artifact",
     audit_item_ids: ["II-7"],
+    catalog_titles: ["Grievance Policy Acknowledgment — Signed"],
   },
   {
     id: "rt-II-8",
@@ -1171,6 +1178,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Human-rights restriction documentation (a–h)",
     status: "live_artifact",
     audit_item_ids: ["II-8"],
+    catalog_titles: ["Human-Rights Restriction Record"],
   },
   {
     id: "rt-II-9",
@@ -1179,6 +1187,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Belongings inventory (annual, $50+)",
     status: "live_artifact",
     audit_item_ids: ["II-9"],
+    catalog_titles: ["Belongings Inventory — Annual"],
   },
   {
     id: "rt-II-10-HHS",
@@ -1187,6 +1196,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "HHS room-and-board agreement",
     status: "live_artifact",
     audit_item_ids: ["II-10-HHS"],
+    catalog_titles: ["HHS Room-and-Board Agreement"],
   },
   {
     id: "rt-II-10-RHS",
@@ -1195,6 +1205,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "RHS lease agreement",
     status: "live_artifact",
     audit_item_ids: ["II-10-RHS"],
+    catalog_titles: ["RHS Lease Agreement"],
   },
   {
     id: "rt-II-10-PPS",
@@ -1203,6 +1214,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "PPS room-and-board agreement",
     status: "live_artifact",
     audit_item_ids: ["II-10-PPS"],
+    catalog_titles: ["PPS Room-and-Board Agreement"],
   },
   {
     id: "rt-II-PBA",
@@ -1211,6 +1223,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "PBA / representative-payee financial review",
     status: "live_artifact",
     audit_item_ids: ["II-PBA"],
+    catalog_titles: ["PBA / Representative-Payee Financial Review"],
   },
   {
     id: "rt-II-LOAN",
@@ -1219,6 +1232,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Emergency loan documentation",
     status: "live_artifact",
     audit_item_ids: ["II-LOAN"],
+    catalog_titles: ["Emergency Loan Documentation"],
   },
   {
     id: "rt-III-1",
@@ -1227,6 +1241,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Accurate attendance / timesheets",
     status: "live_artifact",
     audit_item_ids: ["III-1"],
+    catalog_titles: ["Attendance / Timesheets — Accurate Record"],
   },
   {
     id: "rt-III-2",
@@ -1235,6 +1250,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Electronic Visit Verification",
     status: "live_artifact",
     audit_item_ids: ["III-2"],
+    catalog_titles: ["Electronic Visit Verification"],
   },
   {
     id: "rt-III-3",
@@ -1243,6 +1259,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Billed services match the service-code description",
     status: "live_artifact",
     audit_item_ids: ["III-3"],
+    catalog_titles: ["Billed Services Match Service-Code Description"],
   },
   {
     id: "rt-III-HHS",
@@ -1251,6 +1268,7 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     title: "Billable HHS day = Present + daily note",
     status: "live_artifact",
     audit_item_ids: ["III-HHS"],
+    catalog_titles: ["HHS Billable Day — Present plus Daily Note"],
   },
   {
     id: "rt-IV-BG",

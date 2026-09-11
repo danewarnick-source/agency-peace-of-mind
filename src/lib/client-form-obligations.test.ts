@@ -50,11 +50,14 @@ describe("clientFormKindForTitle", () => {
     assert.equal(clientFormKindForTitle(clientFormTitleForKind("person_centered")), null);
   });
 
-  it("does not seed or catalog the retired per-client PCT duty", () => {
+  it("does not seed the retired per-client PCT duty; catalog keeps a retired path", () => {
     const standing = readFileSync(new URL("./standing-sow-duties.ts", import.meta.url), "utf8");
     const catalog = readFileSync(new URL("./sow-obligation-catalog.ts", import.meta.url), "utf8");
+    const pack = readFileSync(new URL("./sow-obligation-catalog-pack.ts", import.meta.url), "utf8");
     assert.doesNotMatch(standing, /title: "Person-Centered Thinking — \[Client Name\]"/);
-    assert.doesNotMatch(catalog, /title: "Person-Centered Thinking — \[Client Name\]"/);
+    assert.match(catalog, /title: "Person-Centered Thinking — \[Client Name\]"/);
+    assert.match(pack, /key: "pct_client"/);
+    assert.match(pack, /retired_in: PACK_VERSION/);
     assert.match(catalog, /title: "Person-Centered Thinking and Practices Training"/);
   });
 

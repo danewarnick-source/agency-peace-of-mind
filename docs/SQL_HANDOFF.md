@@ -6,6 +6,70 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 1: catalog keys / disposition / pack version (2026-09-11) — Core flag
+
+Additive only. No deletes. No RLS in this paste. Matches
+`supabase/migrations/20260911080000_obligation_catalog_keys.sql`.
+`company_obligations.source` already exists (`sow` | `provider`) — not added again.
+
+Soft Core apply order (do not skip):
+1. This ACTION (columns + `pack_changelog` seed).
+2. Title→key backfill (`scripts/backfill-obligation-keys.ts`) after columns exist. Unmatched titles become `source=provider` and are logged — zero silent skips.
+3. Enable RLS on `pack_changelog` (one change; table is global pack history, not org PHI). Suggested: SELECT for authenticated, writes for hive executive / service_role.
+4. Step 2 nightly pack-apply cron (deferred — not in this PR).
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'company_obligations' AND column_name IN ('key', 'state_code', 'disposition'))
+    OR (table_name = 'company_obligation_instances' AND column_name = 'state_code')
+    OR (table_name = 'organizations' AND column_name = 'applied_pack_version')
+    OR (table_name = 'pack_changelog' AND column_name = 'obligation_key')
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911080000_obligation_catalog_keys.sql`.
+
+**What you'll see:** `ALTER TABLE` × 4, `CREATE INDEX`, `CREATE TABLE`, grants, then 89 `pack_changelog` added rows for `UT-2026.07` (ON CONFLICT DO NOTHING).
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'company_obligations'
+       AND column_name IN ('key', 'state_code', 'disposition')) AS obligation_cols,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'company_obligation_instances'
+       AND column_name = 'state_code') AS instance_state_col,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'organizations'
+       AND column_name = 'applied_pack_version') AS org_pack_col,
+  (SELECT count(*) FROM public.pack_changelog
+     WHERE state_code = 'UT' AND pack_version = 'UT-2026.07' AND change_kind = 'added') AS changelog_added;
+```
+
+**What you'll see:** `3 | 1 | 1 | 89`.
+
+`pack_changelog` has **no RLS** in this PR. Soft Core must add RLS before treating the table as live.
+
+---
+
 ## NOTE — Parallel obligation writers killed in app (2026-09-11)
 
 Bell / punch-pad / shift-commit / incident / orphan-create paths no longer

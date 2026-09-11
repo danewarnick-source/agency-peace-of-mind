@@ -96,6 +96,7 @@ export function packIntegrityErrors(): string[] {
   }
 
   for (const entry of allSowCatalogEntries()) {
+    if (entry.disposition === "retired") continue;
     if (!coveredCatalog.has(entry.title)) {
       errors.push(`catalog title has no coverage row: ${entry.title}`);
     }

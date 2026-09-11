@@ -10,9 +10,27 @@
 //   - what evidence would satisfy a DSPD reviewer
 //
 // Titles must match the seeded rows exactly. Provider-created obligations
-// (source = 'provider') have no catalog entry.
+// (source = 'provider') have no catalog entry. Lookups also resolve title
+// aliases and [Client Name] prefixes so renames still hit the stable key.
 
-import { dueRuleFromConfig, explainDueRule, type DueRule } from "./obligation-due-dates";
+import { dueRuleFromConfig, explainDueRule, type DueRule } from "./obligation-due-dates.ts";
+import {
+  CATALOG_IDENTITY_BY_TITLE,
+  PACK_STATE_CODE,
+  PACK_VERSION,
+  STANDING_RECLASSIFY_REASON,
+  type CatalogFormTemplate,
+  type ObligationDisposition,
+} from "./sow-obligation-catalog-pack.ts";
+
+export {
+  PACK_STATE_CODE,
+  PACK_VERSION,
+  STANDING_RECLASSIFY_REASON,
+  type CatalogFormField,
+  type CatalogFormTemplate,
+  type ObligationDisposition,
+} from "./sow-obligation-catalog-pack.ts";
 
 export type ObligationCategory =
   | "training"
@@ -30,6 +48,11 @@ export type ObligationOwner = "admin" | "manager" | "staff" | "host";
 
 export type SowCatalogEntry = {
   title: string;
+  key: string;
+  state_code: "UT";
+  disposition: ObligationDisposition;
+  added_in: string;
+  retired_in?: string;
   citation: string;
   category: ObligationCategory;
   fulfillment: FulfillmentChannel;
@@ -40,6 +63,9 @@ export type SowCatalogEntry = {
   /** Empty = applies regardless of which service codes the org runs. */
   service_codes: string[];
   evidence_standard: string;
+  /** Data-only evidence / form template. No form UI in Step 1. */
+  evidence_template?: string;
+  form_template?: CatalogFormTemplate;
   /**
    * When true, a reviewer should not treat a missed calendar instance as a
    * finding by itself — the duty is "keep current" and the instance is a
@@ -81,7 +107,12 @@ export const OWNER_LABEL: Record<ObligationOwner, string> = {
   host: "Host home",
 };
 
-const SOW_ENTRIES: SowCatalogEntry[] = [
+type SowCatalogDraft = Omit<
+  SowCatalogEntry,
+  "key" | "state_code" | "disposition" | "added_in" | "retired_in" | "evidence_template" | "form_template"
+>;
+
+const RAW_SOW_ENTRIES: SowCatalogDraft[] = [
   // ── Staff training ──────────────────────────────────────────────────────
   {
     title: "30-Day New Hire Orientation Training",
@@ -1005,16 +1036,303 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     evidence_standard: "Current HIPAA Notice of Privacy Practices.",
     calendar_is_reminder_only: true,
   },
+
+  // Soft-retired per-client PCT (#299). Keep the catalog path + key so
+  // backfill and title aliases still resolve. Hire-level PCT stays live.
+  {
+    title: "Person-Centered Thinking — [Client Name]",
+    citation: "DHHS91172 SOW §1.8(5)(C)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "Retired. Person-centered thinking is hire-level staff training once (Person-Centered Thinking and Practices Training). Do not assign a per-client form.",
+    due_rule: { kind: "days_after_assignment", days: 30 },
+    owner: "staff",
+    service_codes: [],
+    evidence_standard: "Retired — use the hire-level Person-Centered Thinking and Practices course.",
+  },
+
+  // ── Review-tool / intake / by_design (data only; no new form UIs) ────────
+  {
+    title: "Human Rights Committee — Established and Meeting",
+    citation: "DHHS91172 SOW §1.21(5)",
+    category: "standing_records",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live HRC roster, meetings, and attendance. Not a second calendar to-do.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "HRC roster, meeting records, and attendance in HIVE.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "EPR Community Time — 20 Percent Process",
+    citation: "DHHS91172 SOW §9.3",
+    category: "reporting",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live EPR community-time tracking. Not a cloned register duty.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["EPR"],
+    evidence_standard: "Process and records showing Persons are in the community 20% of the time.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Medical and Dental Examinations — Person File",
+    citation: "DHHS91172 SOW §1.23(h)(1)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Collected into the Person file at intake and kept current.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["RHS", "PPS", "HHS", "SLH", "RP4", "RP5"],
+    evidence_standard: "Record of medical and/or dental examinations in the Person file.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Medication Record — When Contractor Supports Meds",
+    citation: "DHHS91172 SOW §1.23(b–c)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "eMAR is the electronic record. N/A when this contractor does not support meds.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: [],
+    evidence_standard: "Paper or electronic record of all medications taken.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Functional Behavior Assessment and Behavior Support Plan",
+    citation: "DHHS91172 SOW Articles 3–5",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live behavior-support module. Not a second to-do.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["BC1", "BC2", "BC3"],
+    evidence_standard: "FBA and BSP on file for Persons receiving BC1, BC2, or BC3.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Grievance Policy Acknowledgment — Signed",
+    citation: "DHHS91172 SOW §1.10(11)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Per-Person signed acknowledgment at intake. Not an org poster.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: [],
+    evidence_standard: "Signed statement that the Person (and representative) received and had the grievance policy explained.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Human-Rights Restriction Record",
+    citation: "DHHS91172 SOW §1.20",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live HRC restriction records (elements a–h). N/A when there is no modification.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: [],
+    evidence_standard: "Informed consent, assessed need, positive supports tried, less-intrusive methods, proportionate description, data review, time limits, and no-harm assurance.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Belongings Inventory — Annual",
+    citation: "DHHS91172 SOW §11.3(5) / §31.3",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live belongings register. Applies to HHS, SLH, PPS, and RHS — not SLN.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["HHS", "SLH", "PPS", "RHS"],
+    evidence_standard: "Inventory of belongings $50+ and items of significant value, reviewed at least annually.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "HHS Room-and-Board Agreement",
+    citation: "DHHS91172 SOW §11.3(9)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Signed agreement in the Person file at placement.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["HHS"],
+    evidence_standard: "Current room-and-board agreement meeting contract and HCBS Settings Rule standards.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "RHS Lease Agreement",
+    citation: "DHHS91172 SOW §21.3(1)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Signed lease in the Person file at placement.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["RHS"],
+    evidence_standard: "Lease agreement meeting contract and HCBS Settings Rule standards.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "PPS Room-and-Board Agreement",
+    citation: "DHHS91172 SOW §20.3",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note: "Signed agreement in the Person file at placement.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["PPS"],
+    evidence_standard: "Room-and-board agreement meeting contract and HCBS Settings Rule standards.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "PBA / Representative-Payee Financial Review",
+    citation: "DHHS91172 SOW §1.28 / §15.3",
+    category: "reporting",
+    fulfillment: "hybrid",
+    fulfillment_note: "Live PBA / representative-payee records. Not a cloned calendar class.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: ["PBA"],
+    evidence_standard: "Monthly records with the Person, bank statements, independent review, quarterly admin sample, monthly report to the SC.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Emergency Loan Documentation",
+    citation: "DHHS91172 SOW §1.28(7)",
+    category: "client_docs",
+    fulfillment: "hybrid",
+    fulfillment_note: "Live client-loans module. N/A when there are no loans.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "SC notice within 24 hours, PCPT approval, running accounting, monthly copy to Person/guardian/SC.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Attendance / Timesheets — Accurate Record",
+    citation: "DHHS91172 SOW §1.10(7); CST 55 & 56",
+    category: "reporting",
+    fulfillment: "in_hive",
+    fulfillment_note: "HIVE time entries are the attendance record. Not a second to-do.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Person, date, service code, staff, summary note; start/end time for quarter-hour codes.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Electronic Visit Verification",
+    citation: "DHHS91172 SOW §1.12",
+    category: "reporting",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live EVV / geofence validation. Not a cloned register duty.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "EVV for Companion, Homemaker, Respite (except RP4/RP5/RPS), Supported Living, and Personal Assistance.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Billed Services Match Service-Code Description",
+    citation: "DHHS91172 SOW Articles 3–33",
+    category: "reporting",
+    fulfillment: "in_hive",
+    fulfillment_note: "Nectar flags mismatches; a human attests before a claim goes out.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Billed units match the service-code description in Articles 3–33.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "HHS Billable Day — Present plus Daily Note",
+    citation: "DHHS91172 SOW Article 11",
+    category: "reporting",
+    fulfillment: "in_hive",
+    fulfillment_note: "Live hhs_daily_records_v. Present + daily note. No overnight stay = unbillable.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: ["HHS"],
+    evidence_standard: "Each billed Host Home day is attendance Present with a daily note.",
+    calendar_is_reminder_only: true,
+  },
 ];
 
+function finalizeCatalogEntry(raw: SowCatalogDraft): SowCatalogEntry {
+  const meta = CATALOG_IDENTITY_BY_TITLE[raw.title];
+  if (!meta) {
+    throw new Error(`Missing catalog key/disposition for "${raw.title}"`);
+  }
+  return {
+    ...raw,
+    key: meta.key,
+    state_code: PACK_STATE_CODE,
+    disposition: meta.disposition,
+    added_in: PACK_VERSION,
+    ...(meta.retired_in ? { retired_in: meta.retired_in } : {}),
+    ...(meta.evidence_template ? { evidence_template: meta.evidence_template } : {}),
+    ...(meta.form_template ? { form_template: meta.form_template } : {}),
+  };
+}
+
+const SOW_ENTRIES: SowCatalogEntry[] = RAW_SOW_ENTRIES.map(finalizeCatalogEntry);
+
 const BY_TITLE = new Map(SOW_ENTRIES.map((e) => [e.title, e]));
+export const BY_KEY = new Map(SOW_ENTRIES.map((e) => [e.key, e]));
+
+const TITLE_ALIASES = new Map<string, string>();
+for (const entry of SOW_ENTRIES) {
+  TITLE_ALIASES.set(entry.title, entry.key);
+  const meta = CATALOG_IDENTITY_BY_TITLE[entry.title];
+  for (const alias of meta?.aliases ?? []) {
+    TITLE_ALIASES.set(alias, entry.key);
+  }
+}
+
+function entryForClientPrefixedTitle(title: string): SowCatalogEntry | null {
+  for (const entry of SOW_ENTRIES) {
+    if (!entry.title.includes("[Client Name]")) continue;
+    const prefix = entry.title.split("[Client Name]")[0] ?? "";
+    if (prefix.length > 0 && title.startsWith(prefix)) return entry;
+  }
+  return null;
+}
+
+export function sowCatalogEntryByKey(key: string): SowCatalogEntry | null {
+  return BY_KEY.get(key) ?? null;
+}
 
 export function sowCatalogEntry(title: string): SowCatalogEntry | null {
-  return BY_TITLE.get(title) ?? null;
+  const direct = BY_TITLE.get(title);
+  if (direct) return direct;
+  const aliasedKey = TITLE_ALIASES.get(title);
+  if (aliasedKey) return BY_KEY.get(aliasedKey) ?? null;
+  const prefixed = entryForClientPrefixedTitle(title);
+  if (prefixed) return prefixed;
+  return BY_KEY.get(title) ?? null;
 }
 
 export function allSowCatalogEntries(): SowCatalogEntry[] {
   return SOW_ENTRIES;
+}
+
+export function catalogCreatesInstances(
+  entry: Pick<SowCatalogEntry, "disposition"> | null | undefined,
+): boolean {
+  if (!entry) return true;
+  return entry.disposition === "obligation";
+}
+
+export function obligationCreatesInstances(ob: {
+  title: string;
+  key?: string | null;
+  disposition?: string | null;
+}): boolean {
+  if (ob.disposition && ob.disposition !== "obligation") return false;
+  const catalog =
+    (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
+  return catalogCreatesInstances(catalog);
 }
 
 export function resolveDueRule(
@@ -1022,7 +1340,7 @@ export function resolveDueRule(
   cadence: string,
   dueDayConfig: Record<string, unknown> | null | undefined,
 ): DueRule | null {
-  const catalog = BY_TITLE.get(title);
+  const catalog = sowCatalogEntry(title);
   if (catalog) return catalog.due_rule;
   return dueRuleFromConfig(cadence, dueDayConfig ?? {});
 }

@@ -1,7 +1,7 @@
 // Compliance revamp Step 6 — Packets.
 // Pure assembler. File panels and my-obligations next action consume this.
-// Imports Step 3 `resolveScope` and Step 5 applicability. After those PRs
-// merge, rebase and drop the stub copies of those modules if they differ.
+// Uses landed Step 3 `resolveScope` and the real Step 5 `applicability.ts`
+// from main. No stub copy of that module.
 
 import {
   allSowCatalogEntries,

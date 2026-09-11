@@ -37,7 +37,10 @@ import {
   type StaffIdentityProfile,
 } from "@/lib/staff-profile-identity";
 import { AdminScopeFields } from "@/components/employees/admin-scope-fields";
+import { EmployeeScopeFields } from "@/components/employees/employee-scope-fields";
 import { StaffProfilePermissions } from "@/components/employees/staff-profile-permissions";
+import { loadEmployeeScope, setEmployeeScope } from "@/lib/obligations/scope.functions";
+import { employeeScopeFromSnapshot, type EmployeeScopeDraft } from "@/lib/obligations/scope";
 
 const EMPTY_SCOPE: ParsedAdminScope = {
   mode: "all",
@@ -74,6 +77,8 @@ export function StaffProfilePanel({
   const hireHookFn = useServerFn(onStaffHired);
   const savePermsFn = useServerFn(saveStaffPermissionToggles);
   const setScopeFn = useServerFn(setScopeAssignments);
+  const loadEmployeeScopeFn = useServerFn(loadEmployeeScope);
+  const setEmployeeScopeFn = useServerFn(setEmployeeScope);
 
   const identityQ = useQuery({
     enabled: !!orgId && !!staffId,
@@ -112,12 +117,35 @@ export function StaffProfilePanel({
     },
   });
 
+  const employeeScopeQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["employee-compliance-scope", orgId],
+    queryFn: () => loadEmployeeScopeFn({ data: { organizationId: orgId } }),
+  });
+  const EMPTY_EMPLOYEE_SCOPE: EmployeeScopeDraft = { scopeGroupId: null, leadGroupId: null };
+  const employeeScopeSaved = useMemo(
+    () =>
+      employeeScopeFromSnapshot(
+        staffId,
+        employeeScopeQ.data ?? {
+          available: false,
+          groups: [],
+          members: [],
+          scopeByStaffId: {},
+          leadsByGroupId: {},
+        },
+      ),
+    [staffId, employeeScopeQ.data],
+  );
+
   const [editing, setEditing] = useState(false);
   const [identity, setIdentity] = useState<StaffIdentityDraft>(() =>
     identityDraftFrom(routeProfile, routeMember),
   );
   const [permDraft, setPermDraft] = useState<Record<string, boolean>>({});
   const [scopeDraft, setScopeDraft] = useState<ParsedAdminScope>(EMPTY_SCOPE);
+  const [employeeScopeDraft, setEmployeeScopeDraft] =
+    useState<EmployeeScopeDraft>(EMPTY_EMPLOYEE_SCOPE);
 
   const roleForDefaults = (editing ? identity.role : routeMember.role) as Role;
   const roleGranted = useMemo(
@@ -145,6 +173,11 @@ export function StaffProfilePanel({
     else if (adminScopeIsLockedWholeOrg(routeMember.role)) setScopeDraft(EMPTY_SCOPE);
   }, [editing, scopeQ.data, routeMember.role]);
 
+  useEffect(() => {
+    if (editing) return;
+    setEmployeeScopeDraft(employeeScopeSaved);
+  }, [editing, employeeScopeSaved]);
+
   const startEdit = () => {
     setIdentity(identityDraftFrom(routeProfile, routeMember));
     if (effective) {
@@ -155,6 +188,7 @@ export function StaffProfilePanel({
       setPermDraft(next);
     }
     setScopeDraft(scopeQ.data ?? EMPTY_SCOPE);
+    setEmployeeScopeDraft(employeeScopeSaved);
     setEditing(true);
   };
 
@@ -168,6 +202,7 @@ export function StaffProfilePanel({
       setPermDraft(next);
     }
     setScopeDraft(scopeQ.data ?? EMPTY_SCOPE);
+    setEmployeeScopeDraft(employeeScopeSaved);
     setEditing(false);
   };
 
@@ -284,6 +319,25 @@ export function StaffProfilePanel({
           });
         }
       }
+
+      if (
+        employeeScopeQ.data?.available &&
+        (employeeScopeDraft.scopeGroupId !== employeeScopeSaved.scopeGroupId ||
+          employeeScopeDraft.leadGroupId !== employeeScopeSaved.leadGroupId)
+      ) {
+        const result = await setEmployeeScopeFn({
+          data: {
+            organizationId: orgId,
+            staffId,
+            scopeGroupId: employeeScopeDraft.scopeGroupId,
+            leadGroupId: employeeScopeDraft.leadGroupId,
+          },
+        });
+        if (!result.ok && result.reason === "not_live") {
+          throw new Error("Scope columns are not live yet. Core Soft applies them after merge.");
+        }
+        if (!result.ok) throw new Error("Could not save scope.");
+      }
     },
     onSuccess: () => {
       toast.success("Saved");
@@ -292,6 +346,7 @@ export function StaffProfilePanel({
       qc.invalidateQueries({ queryKey: ["effective-permissions", orgId, staffId] });
       qc.invalidateQueries({ queryKey: ["staff-admin-scope", orgId, staffId] });
       qc.invalidateQueries({ queryKey: ["scope-assignments", orgId] });
+      qc.invalidateQueries({ queryKey: ["employee-compliance-scope", orgId] });
       onSaved();
     },
     onError: (e) => toast.error(profileSaveErrorMessage(e)),
@@ -339,6 +394,21 @@ export function StaffProfilePanel({
           draft={identity}
           onDraftChange={onIdentityChange}
         />
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <h2 className="mb-3 text-sm font-semibold">Leads group / Scope</h2>
+        {employeeScopeQ.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading scope…</p>
+        ) : (
+          <EmployeeScopeFields
+            groups={employeeScopeQ.data?.groups ?? []}
+            available={!!employeeScopeQ.data?.available}
+            editing={editing && canEdit}
+            draft={editing ? employeeScopeDraft : employeeScopeSaved}
+            onChange={setEmployeeScopeDraft}
+          />
+        )}
       </section>
 
       {canManagePerms ? (

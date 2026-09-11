@@ -13703,6 +13703,7 @@ export type Database = {
           requires_abi: boolean
           requires_deescalation: boolean
           ssn_last4: string | null
+          scope_group_id: string | null
           staff_type_keys: string[]
           start_date: string | null
           system_role: string
@@ -13747,6 +13748,7 @@ export type Database = {
           requires_abi?: boolean
           requires_deescalation?: boolean
           ssn_last4?: string | null
+          scope_group_id?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
           system_role?: string
@@ -13791,6 +13793,7 @@ export type Database = {
           requires_abi?: boolean
           requires_deescalation?: boolean
           ssn_last4?: string | null
+          scope_group_id?: string | null
           staff_type_keys?: string[]
           start_date?: string | null
           system_role?: string
@@ -13800,6 +13803,13 @@ export type Database = {
           worker_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_scope_group_id_fkey"
+            columns: ["scope_group_id"]
+            isOneToOne: false
+            referencedRelation: "staff_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_team_id_fkey"
             columns: ["team_id"]
@@ -15910,18 +15920,21 @@ export type Database = {
           added_at: string | null
           group_id: string
           id: string
+          is_lead: boolean
           staff_id: string
         }
         Insert: {
           added_at?: string | null
           group_id: string
           id?: string
+          is_lead?: boolean
           staff_id: string
         }
         Update: {
           added_at?: string | null
           group_id?: string
           id?: string
+          is_lead?: boolean
           staff_id?: string
         }
         Relationships: [

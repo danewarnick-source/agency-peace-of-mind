@@ -5,6 +5,12 @@
 
 import { ROLE_RANK, type Role } from "../rbac.ts";
 import {
+  loadOrgScopeSnapshot,
+  pickScopeAdminRecipient,
+  type ScopeIndex,
+  type ScopeMemberRow,
+} from "./scope.ts";
+import {
   sowCatalogEntry,
   sowCatalogEntryByKey,
   type ObligationCategory,
@@ -90,7 +96,7 @@ export type EscalationSubject = {
   staffUserId: string | null;
   /** Primary assigned staff when the clock is shared. */
   primaryAssignedStaffId: string | null;
-  /** Step 3 — unused until scope groups exist. */
+  /** profiles.scope_group_id of the person-bound staff, when present. */
   scopeGroupId?: string | null;
   displayName: string;
 };
@@ -148,6 +154,10 @@ export type EvaluateInput = {
   /** obligation_id → has any completion / upload / attestation */
   obligationHasEvidence: Record<string, boolean>;
   subjectNames?: Record<string, string>;
+  /** Step 3 — staff user id → profiles.scope_group_id. Missing → org-wide. */
+  scopeByStaffId?: Record<string, string | null>;
+  leadsByGroupId?: Record<string, string[]>;
+  scopeMembers?: ScopeMemberRow[];
 };
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -313,12 +323,14 @@ export function pickLowestAdminLevel(members: OrgMemberRow[]): string | null {
   })[0]!.user_id;
 }
 
-function resolveAdminLevel(subject: EscalationSubject, members: OrgMemberRow[]): string | null {
-  // Step 3 scope_group match is not built. Missing scope_group_id → one
-  // admin-level user gets all (prefer super_admin, else any rank ≥ 4).
-  if (subject.scopeGroupId) {
-    // No scope_group table yet — fall through.
-  }
+function resolveAdminLevel(
+  subject: EscalationSubject,
+  members: OrgMemberRow[],
+  scopeIndex?: ScopeIndex | null,
+): string | null {
+  const scoped = pickScopeAdminRecipient(subject.scopeGroupId, scopeIndex?.leadsByGroupId ?? {});
+  if (scoped) return scoped;
+  // Missing scope_group_id or no lead → Step 2: one admin-level user.
   return pickAdminLevelRecipient(members);
 }
 
@@ -335,18 +347,19 @@ export function resolveRecipient(
   rule: Pick<EscalationRule, "climbs_to">,
   subject: EscalationSubject,
   members: OrgMemberRow[],
+  scopeIndex?: ScopeIndex | null,
 ): string | null {
   if (rule.climbs_to === "admin_level") {
-    return resolveAdminLevel(subject, members);
+    return resolveAdminLevel(subject, members, scopeIndex);
   }
   if (rule.climbs_to === "manager") {
     return resolveManager(subject, members);
   }
   // manager_of_manager: walk once; null → admin_level
   const first = resolveManager(subject, members);
-  if (!first) return resolveAdminLevel(subject, members);
+  if (!first) return resolveAdminLevel(subject, members, scopeIndex);
   const second = managerUserId(members, first);
-  return second ?? resolveAdminLevel(subject, members);
+  return second ?? resolveAdminLevel(subject, members, scopeIndex);
 }
 
 function subjectFor(
@@ -354,6 +367,7 @@ function subjectFor(
   ob: ObligationSnapshot,
   instance: InstanceSnapshot | null,
   names: Record<string, string>,
+  scopeByStaffId?: Record<string, string | null>,
 ): EscalationSubject {
   const staffId = instance?.assignee_staff_id ?? null;
   const personBound = ob.scope === "staff" || ob.scope === "staff_per_client" || !!staffId;
@@ -367,7 +381,7 @@ function subjectFor(
     kind: personBound ? "person" : "org",
     staffUserId: staffId,
     primaryAssignedStaffId: staffId,
-    scopeGroupId: null,
+    scopeGroupId: staffId ? (scopeByStaffId?.[staffId] ?? null) : null,
     displayName,
   };
 }
@@ -384,6 +398,10 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
   const rules = input.rules ?? SEED_ESCALATION_RULES;
   const ruleByTrigger = new Map(rules.map((r) => [r.trigger, r]));
   const names = input.subjectNames ?? {};
+  const scopeIndex: ScopeIndex = {
+    leadsByGroupId: input.leadsByGroupId ?? {},
+    scopeByStaffId: input.scopeByStaffId ?? {},
+  };
   const hits: EscalationHit[] = [];
 
   const pushHit = (
@@ -395,7 +413,7 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
   ) => {
     const rule = ruleByTrigger.get(trigger);
     if (!rule) return;
-    const recipientUserId = resolveRecipient(rule, subject, input.members);
+    const recipientUserId = resolveRecipient(rule, subject, input.members, scopeIndex);
     hits.push({
       trigger,
       rule,
@@ -417,7 +435,7 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
     const ob = input.obligations.find((o) => o.id === instance.obligation_id);
     if (!ob) continue;
     const catalog = catalogForObligation(ob);
-    const subject = subjectFor(input.organizationId, ob, instance, names);
+    const subject = subjectFor(input.organizationId, ob, instance, names, input.scopeByStaffId);
     const started = instanceIsStarted(instance, input.startedInstanceIds);
     const overdue = isInstanceOverdue(instance, input.now);
     const dueDays = daysUntilDue(instance, input.now);
@@ -498,7 +516,7 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
     if (input.obligationHasEvidence[ob.id]) continue;
     const missingDays = standingMissingDays(ob, input.now);
     if (missingDays === null || missingDays < 30) continue;
-    const subject = subjectFor(input.organizationId, ob, null, names);
+    const subject = subjectFor(input.organizationId, ob, null, names, input.scopeByStaffId);
     pushHit("standing_record_missing_30d", ob, null, { title: ob.title }, subject);
 
     if (
@@ -750,6 +768,8 @@ export async function loadEvaluateInput(
     .eq("active", true);
   if (mErr) throw new Error(mErr.message);
 
+  const scopeSnapshot = await loadOrgScopeSnapshot(supabase, organizationId);
+
   const staffIds = [
     ...new Set(insts.map((i) => i.assignee_staff_id).filter((id): id is string => !!id)),
   ];
@@ -797,6 +817,9 @@ export async function loadEvaluateInput(
     futureShiftCounts,
     obligationHasEvidence,
     subjectNames,
+    scopeByStaffId: scopeSnapshot.scopeByStaffId,
+    leadsByGroupId: scopeSnapshot.leadsByGroupId,
+    scopeMembers: scopeSnapshot.members,
   };
 }
 

@@ -6,6 +6,76 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 3: obligation scope (2026-09-11) — Core flag
+
+Additive columns only. **No DROP.** No new table. No seed. No RLS rewrite
+(existing `profiles` / `staff_group_members` policies cover the new columns).
+
+Live verify (2026-09-11): neither `profiles` nor `organization_members` has
+`scope_group_id`. Brief column is **`profiles.scope_group_id`** (nullable FK
+to `staff_groups`). `staff_group_members.is_lead` is also missing.
+
+Matches `supabase/migrations/20260911101000_obligation_scope.sql`.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App `resolveScope` treats missing columns as
+org-wide (Step 2 fallback).
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'profiles' AND column_name = 'scope_group_id')
+    OR (table_name = 'staff_group_members' AND column_name = 'is_lead')
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911101000_obligation_scope.sql`.
+
+**What you'll see:** two `ALTER TABLE` (columns), two `CREATE INDEX`.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'profiles'
+       AND column_name = 'scope_group_id') AS profiles_scope,
+  (SELECT is_nullable FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'profiles'
+       AND column_name = 'scope_group_id') AS scope_nullable,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'staff_group_members'
+       AND column_name = 'is_lead') AS members_is_lead,
+  (SELECT column_default FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'staff_group_members'
+       AND column_name = 'is_lead') AS lead_default;
+```
+
+**What you'll see:** `1 | YES | 1 | false`.
+
+### RLS intent (no policy change this Soft)
+
+- `profiles.scope_group_id` is org staff metadata, not a new PHI table.
+- Existing policies stay: own profile read/update; org managers read/update
+  member profiles; no `USING (true)` on org/PHI rows.
+- `staff_group_members.is_lead` uses existing org-member SELECT and
+  admin/manager ALL policies.
+
+---
+
 ## ACTION — Harden notifications.type CHECK for escalation (2026-09-11) — Core flag
 
 Follow-up to Step 2. The `20260911090000_escalation_rules.sql` DO/regexp

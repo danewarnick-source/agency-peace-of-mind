@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { getThisWeek, type ThisWeekItem } from "./this-week.functions.ts";
+import { emptyQuietLine, getThisWeek, type ThisWeekResult } from "./this-week.functions.ts";
 import {
   hasActiveSoloOverride,
   initialRemediationPlanStatus,
@@ -46,9 +46,9 @@ export const getThisWeekForUser = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ organizationId: z.string().uuid() }).parse(i),
   )
-  .handler(async ({ data, context }): Promise<ThisWeekItem[]> => {
+  .handler(async ({ data, context }): Promise<ThisWeekResult> => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    if (!supabase || !userId) return [];
+    if (!supabase || !userId) return { items: [], quiet: emptyQuietLine() };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     return getThisWeek(supabase, data.organizationId, userId);
   });

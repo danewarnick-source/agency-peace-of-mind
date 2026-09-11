@@ -160,19 +160,23 @@ describe("plan kinds and owners", () => {
       new URL("../../components/compliance/this-week-plan-cards.tsx", import.meta.url),
       "utf8",
     );
+    const card = readFileSync(
+      new URL("../../components/compliance/decision-card.tsx", import.meta.url),
+      "utf8",
+    );
+    const decorate = readFileSync(new URL("./this-week.ts", import.meta.url), "utf8");
     assert.doesNotMatch(src, /return "Escalation"/);
+    assert.doesNotMatch(card, /kindLabel/);
+    assert.doesNotMatch(card, /line-clamp|truncate/);
     assert.match(src, /half_window_not_started/);
-    assert.match(src, /return "Due soon"/);
-    assert.match(src, /return "Overdue"/);
-    assert.match(src, /return "Scheduling risk"/);
-    assert.match(src, /return "License \/ repayment"/);
-    assert.match(src, /return "Standing record"/);
-    assert.match(src, /Unknown this-week trigger/);
-    assert.match(src, /Log a plan/);
-    assert.match(src, /Edit the starter \/ log a plan/);
+    assert.match(decorate, /Log a plan/);
+    assert.match(decorate, /Log the renewal/);
+    assert.match(decorate, /Read and sign/);
+    assert.match(src, /DecisionCard/);
     assert.match(src, /LicenseRiskPlanDialog/);
     assert.match(src, /StandingRecordPlanDialog/);
     assert.match(src, /OverdueObligationPlanDialog/);
+    assert.match(src, /HOME_CARD_CAP = 3/);
   });
 });
 

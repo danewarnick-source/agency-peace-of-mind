@@ -30,9 +30,9 @@ export const generateMyReview = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
-    const [items, pack] = await Promise.all([
+    const [week, pack] = await Promise.all([
       getThisWeek(supabase, data.organizationId, userId),
       loadPackChangelog(supabase, data.organizationId),
     ]);
-    return assembleReviewPack(items, pack.changes, pack.appliedPackVersion);
+    return assembleReviewPack(week.items, pack.changes, pack.appliedPackVersion);
   });

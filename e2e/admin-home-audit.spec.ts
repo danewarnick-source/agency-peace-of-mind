@@ -70,17 +70,15 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
       timeout: 25_000,
     });
     await expect(page.getByText(/True North Supports/i).first()).toBeVisible();
-    await expect(page.getByText(/Staff with overdue/i)).toBeVisible();
-    await expect(page.getByText(/Active clients/i).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Staff status/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Due soon/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Recommendations/i }).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
     await expect(page.getByTestId("this-week")).toBeVisible();
     await expect(page.getByRole("heading", { name: /^This week$/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Generate my review/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /What changed/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Records review$/i })).toBeVisible();
+    await expect(page.getByTestId("decision-card")).toHaveCount(3);
+    await expect(page.getByTestId("quiet-line")).toBeVisible();
+    await expect(page.getByText(/Handled without you:/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
+    await expect(page.getByText(/Staff with overdue/i)).toHaveCount(0);
+    await expect(page.getByText(/Active clients/i)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Records review$/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
@@ -103,25 +101,22 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     const week = page.getByTestId("this-week");
     await expect(week).toBeVisible({ timeout: 25_000 });
     await expect(week.getByText(/^Escalation$/i)).toHaveCount(0);
-    await expect(week.getByText("License / repayment", { exact: true })).toBeVisible();
-    await expect(week.getByText("HHS Inspection", { exact: true })).toBeVisible();
-    await expect(week.getByText(/corrective action plan or repayment demand/i)).toBeVisible();
-    await expect(week.getByText("Standing record", { exact: true })).toBeVisible();
-    await expect(week.getByText("Person Discharge Process", { exact: true })).toBeVisible();
-    await expect(week.getByText(/nothing to show them/i)).toBeVisible();
-    await expect(week.getByText("Overdue", { exact: true })).toBeVisible();
-    await expect(week.getByText("Annual Continuing Education", { exact: true })).toBeVisible();
-    await expect(week.getByText(/finding on the next DSPD review/i)).toBeVisible();
-    await expect(week.getByText("Due soon", { exact: true })).toBeVisible();
-    await expect(week.getByText(/escalates to the next manager up/i)).toBeVisible();
+    await expect(week.getByText("License / repayment", { exact: true })).toHaveCount(0);
+    await expect(week.getByText(/corrective action plan or repayment demand/i)).toHaveCount(0);
+    await expect(week.getByText(/licensing or repayment item/i)).toHaveCount(0);
+    await expect(week.getByText(/DHHS91172/i)).toHaveCount(0);
+    await expect(week.getByText(/\d{4}-\d{2}-\d{2}/)).toHaveCount(0);
+    await expect(week.getByRole("button", { name: "Log the renewal" })).toBeVisible();
+    await expect(week.getByRole("button", { name: "Read and sign" })).toBeVisible();
+    await expect(week.getByRole("button", { name: "Log a plan" })).toBeVisible();
 
-    await week.getByRole("button", { name: "Log a plan" }).first().click();
+    await week.getByRole("button", { name: "Log the renewal" }).click();
     await expect(page.getByRole("heading", { name: /License \/ repayment plan/i })).toBeVisible();
     await shot(page, "this-week-license-plan-dialog");
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByRole("heading", { name: /License \/ repayment plan/i })).toHaveCount(0);
 
-    await week.getByRole("button", { name: /Edit the starter \/ log a plan/i }).click();
+    await week.getByRole("button", { name: "Read and sign" }).click();
     const standingDlg = page.getByRole("dialog", { name: /Standing record plan/i });
     await expect(standingDlg).toBeVisible();
     await standingDlg.locator("#standing-record-plan").fill("Write the discharge procedure and file it this week.");
@@ -130,11 +125,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await standingDlg.getByRole("button", { name: "Submit plan" }).click();
     await expect(standingDlg).toBeHidden();
 
-    await week
-      .locator("li")
-      .filter({ hasText: "Annual Continuing Education" })
-      .getByRole("button", { name: "Log a plan" })
-      .click();
+    await week.getByRole("button", { name: "Log a plan" }).click();
     const overdueDlg = page.getByRole("dialog", { name: /Overdue obligation plan/i });
     await expect(overdueDlg).toBeVisible();
     await overdueDlg.locator("#overdue-obligation-plan").fill("Schedule the CE course and close the clock.");
@@ -164,65 +155,54 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
   });
 
 
-  test("Admin Home scrolls — cards are reachable in the shell", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 560 });
+  test("This week at 1280 is a single 820 column with Review day", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
-      timeout: 25_000,
-    });
-
-    const home = page.getByTestId("admin-home-dashboard");
-    await expect(home).toBeVisible();
-    const overflowY = await home.evaluate((el) => getComputedStyle(el).overflowY);
-    expect(overflowY, "Admin Home must not clip; shell main scrolls").not.toBe("hidden");
-
-    const main = page.locator("main");
-    const scroll = await main.evaluate((el) => ({
-      scrollHeight: el.scrollHeight,
-      clientHeight: el.clientHeight,
-      overflowY: getComputedStyle(el).overflowY,
-    }));
-    expect(scroll.overflowY, "shell main is the scrollport").toMatch(/auto|scroll/);
-    expect(scroll.scrollHeight, "Home content is taller than the shell").toBeGreaterThan(
-      scroll.clientHeight,
-    );
-
-    const area = page.getByRole("heading", { name: /Compliance by area/i });
-    await expect(area).not.toBeInViewport();
-    await main.evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
-    });
-    await expect(area).toBeInViewport();
-    await shot(page, "admin-home-scrolled-cards");
-    await assertNoCrash(page, "admin home scroll");
+    await expect(page.getByTestId("this-week")).toBeVisible({ timeout: 25_000 });
+    const col = page.getByTestId("home-column");
+    const width = await col.evaluate((el) => (el as HTMLElement).getBoundingClientRect().width);
+    expect(width, "Home column stays at or under 820").toBeLessThanOrEqual(820);
+    await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
+    await page.getByRole("tab", { name: /^Review day$/i }).click();
+    await expect(page.getByTestId("review-day")).toBeVisible();
+    await page.getByRole("button", { name: /Generate my DSPD review/i }).click();
+    await expect(page.getByTestId("review-pack-text")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("review-pack-text")).toContainText(/This week review \(draft\)/);
+    await shot(page, "home-this-week-web");
+    await assertNoCrash(page, "admin home 1280");
   });
 
-  test("Admin Home navigates to obligations and staff from live cards", async ({ page }) => {
+  test("This week at 390 keeps six card parts and unclipped tabs", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
-      timeout: 25_000,
-    });
+    await expect(page.getByTestId("this-week")).toBeVisible({ timeout: 25_000 });
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth, "phone Home does not clip horizontally").toBeLessThanOrEqual(390);
+    const tabs = page.getByTestId("home-tabs");
+    const tabBox = await tabs.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(tabBox.scrollWidth, "tabs wrap or scroll inside 390").toBeLessThanOrEqual(390);
+    const card = page.getByTestId("decision-card").first();
+    await expect(card.getByTestId("decision-headline")).toBeVisible();
+    await expect(card.getByTestId("decision-due")).toBeVisible();
+    await expect(card.getByTestId("decision-why")).toBeVisible();
+    await expect(card.getByTestId("decision-owner")).toBeVisible();
+    await expect(card.getByTestId("decision-if-missed")).toBeVisible();
+    await expect(card.getByTestId("decision-action")).toBeVisible();
+    await shot(page, "home-this-week-phone");
+    await assertNoCrash(page, "admin home 390");
+  });
 
-    const viewAll = page.getByRole("link", { name: /View all/i }).first();
-    if (await viewAll.isVisible().catch(() => false)) {
-      await viewAll.click();
-      await expect(page).toHaveURL(/\/dashboard\/compliance/, { timeout: 15_000 });
-      await expect(page.getByRole("tab", { name: /Staff file/i })).toBeVisible({
-        timeout: 15_000,
-      });
-      await assertNoCrash(page, "home → compliance");
-    }
-
+  test("Admin Home more-this-week link opens Compliance", async ({ page }) => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Staff status/i })).toBeVisible({
-      timeout: 20_000,
-    });
-    const jordan = page.getByRole("link", { name: /Jordan Lee/i }).first();
-    if (await jordan.isVisible().catch(() => false)) {
-      await jordan.click();
-      await expect(page).toHaveURL(/\/dashboard\/employees\//, { timeout: 15_000 });
-      await assertNoCrash(page, "home → staff");
-    }
+    await expect(page.getByTestId("this-week")).toBeVisible({ timeout: 25_000 });
+    const more = page.getByRole("link", { name: /more this week/i });
+    await expect(more).toBeVisible();
+    await more.click();
+    await expect(page).toHaveURL(/\/dashboard\/compliance/, { timeout: 15_000 });
+    await assertNoCrash(page, "home → compliance");
     await shot(page, "admin-home-cta-staff");
   });
 

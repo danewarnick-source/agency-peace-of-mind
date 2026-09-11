@@ -1,5 +1,5 @@
 import { PACK_STATE_CODE, PACK_VERSION } from "../sow-obligation-catalog-pack.ts";
-import type { ThisWeekItem } from "./this-week.functions.ts";
+import type { Decision, ThisWeekItem } from "./this-week.ts";
 
 export type PackChangeRow = {
   change_kind: string;
@@ -34,7 +34,7 @@ export function generateReviewText(
   packVersion: string,
   generatedAt: string,
 ): string {
-  const decisions = items.filter((i) => i.kind === "decision");
+  const decisions = items.filter((i): i is Decision => i.kind === "decision");
   const quiet = items.filter((i) => i.kind === "quiet_summary");
   const lines: string[] = [
     "This week review (draft)",
@@ -47,10 +47,10 @@ export function generateReviewText(
     lines.push("None.");
   } else {
     for (const d of decisions) {
-      if (d.kind !== "decision") continue;
-      const owner = d.ownerLabel || "unassigned";
-      const due = d.dueAt ? d.dueAt.slice(0, 10) : "no due date";
-      lines.push(`- ${d.title} (${d.urgency}; owner ${owner}; ${due}). ${d.consequence}`);
+      const owner = d.ownerText || d.ownerLabel || "unassigned";
+      const due = d.dueText || "no due date";
+      const title = d.headline || d.title;
+      lines.push(`- ${title} (${d.urgency}; owner ${owner}; ${due}).`);
     }
   }
   lines.push("", "Quiet");

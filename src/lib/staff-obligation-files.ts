@@ -10,15 +10,47 @@ export type ObligationFileStatus = keyof typeof OBLIGATION_FILE_STATUS_LABEL;
 
 const DUE_SOON_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Valid evidence = completed/waived, or a completion that Nectar did not reject. */
+/** Valid evidence = accepted (instance closed) and not sitting in review. Uploaded ≠ accepted. */
 export function hasValidObligationEvidence(args: {
   instanceStatus: "pending" | "completed" | "overdue" | "waived";
   hasCompletion: boolean;
   nectarValidationStatus?: string | null;
 }): boolean {
-  if (args.nectarValidationStatus === "failed") return false;
+  if (args.nectarValidationStatus === "failed" || args.nectarValidationStatus === "needs_review") {
+    return false;
+  }
   if (args.instanceStatus === "completed" || args.instanceStatus === "waived") return true;
-  return args.hasCompletion;
+  return false;
+}
+
+export function isAwaitingEvidenceReview(args: {
+  instanceStatus: "pending" | "completed" | "overdue" | "waived";
+  nectarValidationStatus?: string | null;
+  correctionRequested?: boolean;
+}): boolean {
+  if (args.correctionRequested) return true;
+  if (args.instanceStatus === "completed" || args.instanceStatus === "waived") return false;
+  return args.nectarValidationStatus === "failed" || args.nectarValidationStatus === "needs_review";
+}
+
+export function staffFileCycleKind(args: {
+  instanceId: string;
+  instanceStatus: "pending" | "completed" | "overdue" | "waived";
+  dueAt: string;
+  peers: Array<{
+    instanceId: string;
+    instanceStatus: "pending" | "completed" | "overdue" | "waived";
+    dueAt: string;
+  }>;
+}): "current" | "previous" {
+  const open = args.peers.filter(
+    (p) => p.instanceStatus === "pending" || p.instanceStatus === "overdue",
+  );
+  if (open.length) {
+    return open.some((p) => p.instanceId === args.instanceId) ? "current" : "previous";
+  }
+  const latest = [...args.peers].sort((a, b) => b.dueAt.localeCompare(a.dueAt))[0];
+  return latest?.instanceId === args.instanceId ? "current" : "previous";
 }
 
 /**

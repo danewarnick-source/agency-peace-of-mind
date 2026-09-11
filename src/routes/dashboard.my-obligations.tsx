@@ -245,7 +245,7 @@ function OpenCard({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [nectarResult, setNectarResult] = useState<{
-    status: "passed" | "failed";
+    status: "passed" | "failed" | "needs_review";
     certType: string | null;
     expiresAt: string | null;
     reasons: string[];
@@ -311,7 +311,7 @@ function OpenCard({
         result as {
           nectarValidation?: {
             ran: boolean;
-            status: "passed" | "failed" | null;
+            status: "passed" | "failed" | "needs_review" | null;
             reasons: string[];
             cert_type: string | null;
             expires_date: string | null;
@@ -326,8 +326,8 @@ function OpenCard({
           reasons: validation.reasons,
         });
       }
-      if (validation?.ran && validation.status === "failed") {
-        toast.warning("Uploaded, but NECTAR couldn't verify it — pending admin review");
+      if (validation?.ran && (validation.status === "failed" || validation.status === "needs_review")) {
+        toast.warning("Uploaded — awaiting review. This is not accepted yet.");
       } else {
         toast.success("Evidence submitted");
         onCompleted();
@@ -339,7 +339,7 @@ function OpenCard({
     }
   };
 
-  if (nectarResult?.status === "failed") {
+  if (nectarResult?.status === "failed" || nectarResult?.status === "needs_review") {
     return (
       <div
         id={`packet-${instance.id}`}
@@ -349,10 +349,14 @@ function OpenCard({
         <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <p className="font-medium">NECTAR couldn't verify this upload</p>
+            <p className="font-medium">
+              {nectarResult.status === "needs_review"
+                ? "Awaiting review"
+                : "NECTAR couldn't verify this upload"}
+            </p>
             <p>{nectarResult.reasons.join("; ")}</p>
             <p className="mt-1 font-medium">
-              Pending admin review — an admin will confirm your upload.
+              Uploaded is not accepted. An admin will review this before it is On file.
             </p>
           </div>
         </div>
@@ -796,10 +800,11 @@ function MyObligationsPage() {
 
   const [tab, setTab] = useState<"all" | "missing" | "due_soon" | "on_file">("all");
 
-  // A completion whose NECTAR validation failed stays out of "Completed" —
-  // the instance was never closed and an admin still needs to confirm it.
-  const isPendingReview = (instId: string) =>
-    completionByInstance.get(instId)?.nectar_validation_status === "failed";
+  // A completion in review stays out of "On file" — uploaded ≠ accepted.
+  const isPendingReview = (instId: string) => {
+    const status = completionByInstance.get(instId)?.nectar_validation_status;
+    return status === "failed" || status === "needs_review";
+  };
 
   const formDoneByClientKind = useMemo(() => {
     const done = new Set<string>();
@@ -821,16 +826,10 @@ function MyObligationsPage() {
     for (const inst of instances) {
       const kind = clientFormKindForTitle(inst.obligation.title);
       if (kind && inst.client_id) covered.add(`${inst.client_id}:${kind}`);
-      const hasCompletion = completionByInstance.has(inst.id);
-      const failedValidation =
-        completionByInstance.get(inst.id)?.nectar_validation_status === "failed";
       const formAlreadyDone =
         !!kind && !!inst.client_id && formDoneByClientKind.has(`${inst.client_id}:${kind}`);
       const iCompleted =
-        inst.status === "completed" ||
-        inst.status === "waived" ||
-        formAlreadyDone ||
-        (hasCompletion && !failedValidation);
+        inst.status === "completed" || inst.status === "waived" || formAlreadyDone;
       if (iCompleted) {
         completed.push(inst);
         continue;

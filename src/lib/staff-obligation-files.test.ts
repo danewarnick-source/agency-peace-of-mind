@@ -3,11 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   hasValidObligationEvidence,
+  isAwaitingEvidenceReview,
   dueLabel,
   liveObligationTitle,
   missingPersonnelCsv,
   obligationFileStatus,
   obligationFileStatusLabel,
+  staffFileCycleKind,
   statusForObligationInstance,
 } from "./staff-obligation-files.ts";
 
@@ -85,14 +87,22 @@ describe("hasValidObligationEvidence", () => {
     );
   });
 
-  it("accepts a completion that passed or was not scanned", () => {
+  it("does not treat a pending upload as accepted", () => {
     assert.equal(
       hasValidObligationEvidence({
         instanceStatus: "pending",
         hasCompletion: true,
         nectarValidationStatus: "passed",
       }),
-      true,
+      false,
+    );
+    assert.equal(
+      hasValidObligationEvidence({
+        instanceStatus: "pending",
+        hasCompletion: true,
+        nectarValidationStatus: "needs_review",
+      }),
+      false,
     );
     assert.equal(
       hasValidObligationEvidence({
@@ -101,6 +111,38 @@ describe("hasValidObligationEvidence", () => {
         nectarValidationStatus: null,
       }),
       true,
+    );
+    assert.equal(
+      isAwaitingEvidenceReview({
+        instanceStatus: "pending",
+        nectarValidationStatus: "needs_review",
+      }),
+      true,
+    );
+  });
+
+  it("keeps a completed cycle as previous when a renewal instance is open", () => {
+    const peers = [
+      { instanceId: "old", instanceStatus: "completed" as const, dueAt: "2026-01-01T00:00:00.000Z" },
+      { instanceId: "next", instanceStatus: "pending" as const, dueAt: "2027-01-01T00:00:00.000Z" },
+    ];
+    assert.equal(
+      staffFileCycleKind({
+        instanceId: "old",
+        instanceStatus: "completed",
+        dueAt: "2026-01-01T00:00:00.000Z",
+        peers,
+      }),
+      "previous",
+    );
+    assert.equal(
+      staffFileCycleKind({
+        instanceId: "next",
+        instanceStatus: "pending",
+        dueAt: "2027-01-01T00:00:00.000Z",
+        peers,
+      }),
+      "current",
     );
   });
 });
@@ -243,6 +285,8 @@ describe("Staff staff-file page lock", () => {
     assert.match(src, /Or upload a certificate/);
     assert.match(src, /A certificate upload clears this same 30-day card/);
     assert.match(src, /A certificate upload clears this same hire-level PCT card/);
+    assert.doesNotMatch(src, /hasCompletion && !failedValidation/);
+    assert.match(src, /Uploaded is not accepted/);
     assert.doesNotMatch(src, /title="My Obligations"/);
     assert.doesNotMatch(src, /My Compliance/);
   });

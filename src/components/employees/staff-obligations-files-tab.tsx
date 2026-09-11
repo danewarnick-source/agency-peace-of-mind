@@ -31,12 +31,19 @@ import {
 } from "@/lib/company-obligations.functions";
 import {
   hasValidObligationEvidence,
+  isAwaitingEvidenceReview,
   liveObligationTitle,
   obligationFileStatus,
   obligationFileStatusLabel,
   personnelPackHtml,
+  staffFileCycleKind,
   type ObligationFileStatus,
 } from "@/lib/staff-obligation-files";
+import { isNativePlatformEvidence } from "@/lib/cert-review";
+import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
+import { loadInHiveCourseCertificate } from "@/lib/in-hive-training.functions";
+import { InHiveCertificate } from "@/components/training/in-hive-certificate";
+import type { ThirtyDayCertificateRecord } from "@/lib/in-hive-training";
 
 type FileRow = {
   instance: StaffObligationFileRow;
@@ -44,6 +51,10 @@ type FileRow = {
   status: ObligationFileStatus;
   evidencePath: string | null;
   evidenceFilename: string | null;
+  cycle: "current" | "previous";
+  awaitingReview: boolean;
+  evidenceTypeUsed: string | null;
+  canUpload: boolean;
 };
 
 function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
@@ -60,6 +71,24 @@ function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
       hasCompletion,
       nectarValidationStatus: completion?.nectar_validation_status ?? null,
     });
+    const peers = raw
+      .filter((r) => r.obligation.id === instance.obligation.id)
+      .map((r) => ({
+        instanceId: r.id,
+        instanceStatus: r.status,
+        dueAt: r.due_at,
+      }));
+    const cycle = staffFileCycleKind({
+      instanceId: instance.id,
+      instanceStatus: instance.status,
+      dueAt: instance.due_at,
+      peers,
+    });
+    const awaitingReview = isAwaitingEvidenceReview({
+      instanceStatus: instance.status,
+      nectarValidationStatus: completion?.nectar_validation_status ?? null,
+    });
+    const evidenceTypeUsed = completion?.evidence_type_used ?? null;
     return {
       instance,
       title: liveObligationTitle(
@@ -74,6 +103,13 @@ function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
       }),
       evidencePath: completion?.upload_path ?? instance.upload_path,
       evidenceFilename: completion?.upload_filename ?? instance.upload_filename,
+      cycle,
+      awaitingReview,
+      evidenceTypeUsed,
+      canUpload:
+        cycle === "current" &&
+        (instance.status === "pending" || instance.status === "overdue") &&
+        instance.obligation.evidence_type !== "attestation",
     };
   });
 }
@@ -120,6 +156,7 @@ export function StaffObligationsFilesTab({
   const [viewIds, setViewIds] = useState<string[]>([]);
   const [viewIndex, setViewIndex] = useState(0);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [nativeCert, setNativeCert] = useState<ThirtyDayCertificateRecord | null>(null);
 
   const listQ = useQuery({
     queryKey: ["staff-obligation-files", organizationId, staffId],
@@ -127,7 +164,15 @@ export function StaffObligationsFilesTab({
     queryFn: () => listFn({ data: { organizationId, staffId } }),
   });
 
-  const rows = useMemo(() => buildRows(listQ.data ?? []), [listQ.data]);
+  const rows = useMemo(() => {
+    const built = buildRows(listQ.data ?? []);
+    return built.sort((a, b) => {
+      if (a.title !== b.title) return a.title.localeCompare(b.title);
+      if (a.cycle !== b.cycle) return a.cycle === "current" ? -1 : 1;
+      return b.instance.due_at.localeCompare(a.instance.due_at);
+    });
+  }, [listQ.data]);
+  const uploadableRows = rows.filter((r) => r.canUpload);
   const selectedRows = rows.filter((r) => selected.has(r.instance.id));
   const viewQueue = useMemo(
     () => viewIds.map((id) => rows.find((r) => r.instance.id === id)).filter((r): r is FileRow => !!r),
@@ -137,22 +182,44 @@ export function StaffObligationsFilesTab({
   const viewerOpen = viewIds.length > 0;
 
   useEffect(() => {
-    if (!viewing?.evidencePath) {
+    if (!viewing) {
       setViewUrl(null);
+      setNativeCert(null);
       return;
     }
+    const courseId =
+      inHiveCourseIdForTitle(viewing.instance.obligation.title) ??
+      (isNativePlatformEvidence(viewing.evidenceTypeUsed)
+        ? inHiveCourseIdForTitle(viewing.instance.obligation.title)
+        : null);
     let cancelled = false;
-    signedEvidenceUrl(viewing.evidencePath)
-      .then((url) => {
-        if (!cancelled) setViewUrl(url);
-      })
-      .catch((e) => {
-        if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not open file");
-      });
+    if (courseId) {
+      setViewUrl(null);
+      loadInHiveCourseCertificate(staffId, courseId)
+        .then((cert) => {
+          if (!cancelled) setNativeCert(cert);
+        })
+        .catch((e) => {
+          if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not open certificate");
+        });
+    } else {
+      setNativeCert(null);
+    }
+    if (viewing.evidencePath) {
+      signedEvidenceUrl(viewing.evidencePath)
+        .then((url) => {
+          if (!cancelled) setViewUrl(url);
+        })
+        .catch((e) => {
+          if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not open file");
+        });
+    } else {
+      setViewUrl(null);
+    }
     return () => {
       cancelled = true;
     };
-  }, [viewing?.evidencePath]);
+  }, [viewing, staffId]);
 
   const toggle = (id: string, on: boolean) => {
     setSelected((prev) => {
@@ -168,14 +235,19 @@ export function StaffObligationsFilesTab({
   };
 
   const openUpload = () => {
-    const only = selectedRows.length === 1 ? selectedRows[0]!.instance.id : null;
+    const selectedUploadable = selectedRows.filter((r) => r.canUpload);
+    const only = selectedUploadable.length === 1 ? selectedUploadable[0]!.instance.id : null;
     setUploadInstanceId(only);
     setUploadFile(null);
     setUploadOpen(true);
   };
 
   const openView = (row: FileRow) => {
-    if (!row.evidencePath) {
+    if (
+      !row.evidencePath &&
+      !isNativePlatformEvidence(row.evidenceTypeUsed) &&
+      !inHiveCourseIdForTitle(row.instance.obligation.title)
+    ) {
       toast.error("No file on this item yet.");
       return;
     }
@@ -240,19 +312,18 @@ export function StaffObligationsFilesTab({
           evidenceTypeUsed: "upload",
           uploadPath: path,
           uploadFilename: uploadFile.name,
-          isManualEntry: true,
           staffId,
           staffName,
-          completedAt: new Date().toISOString(),
         },
       });
     },
     onSuccess: () => {
-      toast.success("Evidence saved to this staff file item.");
+      toast.success("Upload saved. It stays awaiting review until accepted.");
       setUploadOpen(false);
       setUploadFile(null);
       qc.invalidateQueries({ queryKey: ["staff-obligation-files", organizationId, staffId] });
       qc.invalidateQueries({ queryKey: ["company-obligations", organizationId] });
+      qc.invalidateQueries({ queryKey: ["pending-cert-reviews", organizationId] });
       qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
@@ -318,14 +389,24 @@ export function StaffObligationsFilesTab({
                   </td>
                   <td className="px-3 py-2">
                     <p className="font-medium">{row.title}</p>
+                    {row.cycle === "previous" ? (
+                      <p className="text-xs text-muted-foreground">Previous cycle</p>
+                    ) : null}
                     {row.evidenceFilename && (
                       <p className="text-xs text-muted-foreground">{row.evidenceFilename}</p>
                     )}
+                    {isNativePlatformEvidence(row.evidenceTypeUsed) ||
+                    inHiveCourseIdForTitle(row.instance.obligation.title) ? (
+                      <p className="text-xs text-muted-foreground">In-platform certificate</p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2">
                     <Badge variant="outline" className={statusBadgeClass(row.status)}>
                       {obligationFileStatusLabel(row.status)}
                     </Badge>
+                    {row.awaitingReview ? (
+                      <p className="mt-1 text-xs text-amber-900">Awaiting review</p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                     {formatDue(row.instance.due_at)}
@@ -334,7 +415,11 @@ export function StaffObligationsFilesTab({
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={!row.evidencePath}
+                      disabled={
+                        !row.evidencePath &&
+                        !isNativePlatformEvidence(row.evidenceTypeUsed) &&
+                        !inHiveCourseIdForTitle(row.instance.obligation.title)
+                      }
                       onClick={() => openView(row)}
                     >
                       View
@@ -350,9 +435,9 @@ export function StaffObligationsFilesTab({
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{targetInstance?.status === "on_file" ? "Replace evidence" : "Upload evidence"}</DialogTitle>
+            <DialogTitle>Upload evidence</DialogTitle>
             <DialogDescription>
-              File attaches to this staff member’s existing staff file item — the same record as the org-wide Staff file.
+              File attaches to the open cycle of this staff file item. Accepted certificates stay on file when a renewal is uploaded.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -363,7 +448,7 @@ export function StaffObligationsFilesTab({
                   <SelectValue placeholder="Choose an item…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {rows.map((r) => (
+                  {uploadableRows.map((r) => (
                     <SelectItem key={r.instance.id} value={r.instance.id}>
                       {r.title}
                     </SelectItem>
@@ -371,7 +456,11 @@ export function StaffObligationsFilesTab({
                 </SelectContent>
               </Select>
             </div>
-            {attestationBlocked ? (
+            {uploadableRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No open cycle to attach a new file. Previous certificates stay on file.
+              </p>
+            ) : attestationBlocked ? (
               <p className="text-sm text-amber-900">
                 This item requires the staff member to attest themselves. Evidence cannot be filed here.
               </p>
@@ -409,8 +498,18 @@ export function StaffObligationsFilesTab({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-[50vh] rounded-md border border-border bg-muted/20">
-            {!viewUrl ? (
-              <p className="p-6 text-sm text-muted-foreground">Loading file…</p>
+            {nativeCert ? (
+              <div className="p-4">
+                <InHiveCertificate record={nativeCert} issued />
+              </div>
+            ) : !viewUrl ? (
+              <p className="p-6 text-sm text-muted-foreground">
+                {viewing &&
+                (isNativePlatformEvidence(viewing.evidenceTypeUsed) ||
+                  inHiveCourseIdForTitle(viewing.instance.obligation.title))
+                  ? "Loading certificate…"
+                  : "Loading file…"}
+              </p>
             ) : guessIsImage(viewing?.evidenceFilename ?? null) ? (
               <img src={viewUrl} alt="" className="max-h-[70vh] w-full object-contain" />
             ) : (

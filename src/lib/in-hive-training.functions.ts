@@ -10,6 +10,7 @@ import {
   type ExamAttemptSnapshot,
   type InHiveCourseId,
   type SegmentProof,
+  parseInHiveCertificateRecord,
   type ThirtyDayCertificateRecord,
 } from "@/lib/in-hive-training";
 
@@ -187,6 +188,24 @@ export async function insertInHiveCourseCertificate(args: {
     completed_at: args.certificate.completedAt,
   });
   if (error && !/duplicate|unique/i.test(error.message ?? "")) throw error;
+}
+
+export async function loadInHiveCourseCertificate(
+  userId: string,
+  courseId: InHiveCourseId,
+): Promise<ThirtyDayCertificateRecord | null> {
+  const refId = inHiveRefUuid(courseId, "__cert__");
+  const { data, error } = await (supabase as any)
+    .from("training_completions")
+    .select("question_answers")
+    .eq("user_id", userId)
+    .eq("topic_kind", IN_HIVE_PROGRESS_KIND)
+    .eq("ref_id", refId)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return parseInHiveCertificateRecord(data?.question_answers);
 }
 
 function parseSnapshot(raw: unknown): ExamAttemptSnapshot | null {

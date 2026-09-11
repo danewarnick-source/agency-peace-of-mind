@@ -90,8 +90,9 @@ export function staffTaskEvidence(input: StaffTaskInput): StaffTaskEvidence {
 }
 
 export function staffTaskAction(input: StaffTaskInput): StaffTaskActionKind {
-  const pending = isPendingCertReview(input.nectarValidationStatus);
-  if (pending || input.correctionRequested) return "fix_submission";
+  if (input.correctionRequested || input.nectarValidationStatus === "failed") {
+    return "fix_submission";
+  }
   const evidence = staffTaskEvidence(input);
   if (evidence === "course") {
     const started = (input.courseProgress?.completed ?? 0) > 0;

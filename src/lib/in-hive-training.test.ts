@@ -21,6 +21,7 @@ import {
   topicCodesForCourse,
   buildExamAnswerRecords,
   buildThirtyDayCertificate,
+  parseInHiveCertificateRecord,
   canIssueThirtyDayCertificate,
   examLocked,
   examUnlocked,
@@ -541,6 +542,8 @@ describe("obligation and certificate write path", () => {
     assert.equal(d?.passed, false);
     assert.match(d?.sowCite ?? "", /1\.8\(4\)\(D\)/);
     assert.ok(cert.topics.filter((t) => t.passed).length === THIRTY_DAY_TOPIC_CODES.length - 1);
+    assert.equal(parseInHiveCertificateRecord(cert)?.courseName, cert.courseName);
+    assert.equal(parseInHiveCertificateRecord({ foo: 1 }), null);
   });
 });
 
@@ -586,7 +589,14 @@ describe("staff vs admin auditor export (source)", () => {
     );
     assert.match(progressFns, /\.in\("ref_id"/);
     assert.match(progressFns, /\.neq\("status", "completed"\)/);
+    assert.match(progressFns, /loadInHiveCourseCertificate/);
     assert.doesNotMatch(progressFns, /topicCodes\.map\(async/);
+    const certUi = readFileSync(
+      fileURLToPath(new URL("../components/training/in-hive-certificate.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(certUi, /already on the staff file/);
+    assert.doesNotMatch(certUi, /Print \/ save/);
   });
 
   it("gates a failed segment behind Retake this segment and does not flash the answer key", () => {

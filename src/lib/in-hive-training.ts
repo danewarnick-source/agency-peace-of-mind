@@ -602,6 +602,14 @@ export type ThirtyDayCertificateRecord = {
   topics: CertificateTopicLine[];
 };
 
+export function parseInHiveCertificateRecord(raw: unknown): ThirtyDayCertificateRecord | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Partial<ThirtyDayCertificateRecord>;
+  if (typeof o.courseName !== "string" || typeof o.completedAt !== "string") return null;
+  if (!Array.isArray(o.topics)) return null;
+  return o as ThirtyDayCertificateRecord;
+}
+
 export function buildThirtyDayCertificate(args: {
   staffName: string;
   organizationName: string;

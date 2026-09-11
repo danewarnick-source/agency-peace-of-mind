@@ -6,6 +6,8 @@ import {
   certReviewAcceptBlockReason,
   certReviewStatus,
   certReviewStatusLabel,
+  nectarReviewDisposition,
+  nextRenewalDueFromRules,
   renewalDueFromExpiration,
   resolvedCertExpiration,
   usesCertExpirationCadence,
@@ -54,10 +56,95 @@ describe("cert review rules", () => {
 
   it("never treats upload date as an expiration", () => {
     const fn = readFileSync(new URL("./company-obligations.functions.ts", import.meta.url), "utf8");
+    const due = readFileSync(new URL("./obligation-due-dates.ts", import.meta.url), "utf8");
+    const baseline = readFileSync(
+      new URL("./staff-training-requirements.functions.ts", import.meta.url),
+      "utf8",
+    );
     assert.doesNotMatch(fn, /renewal defaulted to/);
     assert.doesNotMatch(fn, /months from upload date/);
-    assert.match(fn, /resolvedCertExpiration|renewalDueFromExpiration|canAcceptCertEvidence/);
+    assert.doesNotMatch(fn, /addMonthsUTC\(new Date\(completedAt\)/);
+    assert.match(fn, /nextRenewalDueFromRules|nectarReviewDisposition/);
     assert.match(fn, /manually_confirmed/);
+    assert.doesNotMatch(due, /months from the last verified upload/);
+    assert.match(due, /never taken from the upload date/);
+    assert.doesNotMatch(baseline, /default_validity_months &&/);
+  });
+
+  it("routes uncertain uploads to review and accepts native platform completions", () => {
+    const uncertain = nectarReviewDisposition({
+      evidenceTypeUsed: "upload",
+      isManualEntry: false,
+      usesCertExpiration: false,
+      validationRan: false,
+      validationStatus: null,
+      expiresOn: null,
+      confidence: null,
+    });
+    assert.equal(uncertain.status, "needs_review");
+    assert.equal(uncertain.holdOpen, true);
+
+    const lowConfidence = nectarReviewDisposition({
+      evidenceTypeUsed: "upload",
+      isManualEntry: false,
+      usesCertExpiration: true,
+      validationRan: true,
+      validationStatus: "passed",
+      expiresOn: "2027-01-15",
+      confidence: 0.4,
+    });
+    assert.equal(lowConfidence.status, "needs_review");
+
+    const native = nectarReviewDisposition({
+      evidenceTypeUsed: "in_hive_course",
+      isManualEntry: false,
+      usesCertExpiration: true,
+      validationRan: false,
+      validationStatus: null,
+      expiresOn: null,
+      confidence: null,
+    });
+    assert.equal(native.holdOpen, false);
+    assert.equal(native.status, null);
+  });
+
+  it("schedules renewals from printed expiration or verified completion, never upload time", () => {
+    assert.equal(
+      nextRenewalDueFromRules({
+        usesCertExpiration: true,
+        extractedExpiresOn: "2027-06-01",
+        authoritativeCompletedOn: "2025-09-11",
+        everyNMonths: 24,
+      }),
+      "2027-06-01",
+    );
+    assert.equal(
+      nextRenewalDueFromRules({
+        usesCertExpiration: true,
+        extractedExpiresOn: null,
+        authoritativeCompletedOn: "2025-09-11",
+        everyNMonths: 24,
+      }),
+      null,
+    );
+    assert.equal(
+      nextRenewalDueFromRules({
+        usesCertExpiration: false,
+        extractedExpiresOn: null,
+        authoritativeCompletedOn: "2025-09-11",
+        everyNMonths: 12,
+      }),
+      "2026-09-11",
+    );
+    assert.equal(
+      nextRenewalDueFromRules({
+        usesCertExpiration: false,
+        extractedExpiresOn: null,
+        authoritativeCompletedOn: null,
+        everyNMonths: 12,
+      }),
+      null,
+    );
   });
 
   it("labels awaiting review until accept or correction", () => {
@@ -113,5 +200,13 @@ describe("cert review surface lock", () => {
     assert.match(engine, /Confirm expiration before acceptance/);
     assert.match(staffFile, /cert-review/);
     assert.doesNotMatch(panel, /from\("certificate_reviews"\)/);
+    const personFile = readFileSync(
+      new URL("../components/employees/staff-obligations-files-tab.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(personFile, /Replace evidence/);
+    assert.match(personFile, /Previous cycle/);
+    assert.match(personFile, /InHiveCertificate|loadInHiveCourseCertificate/);
+    assert.doesNotMatch(personFile, /isManualEntry: true/);
   });
 });

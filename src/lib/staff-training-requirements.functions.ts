@@ -197,17 +197,8 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
         : null;
     let expires: string | null = null;
     if (validationStatus === "passed") {
+      // Printed/extracted expiration only. Never invent from upload or completion date.
       expires = t.tracks_expiration ? nectarExpires : null;
-      if (
-        !expires &&
-        t.tracks_expiration &&
-        t.default_validity_months &&
-        completedDate
-      ) {
-        const d = new Date(`${completedDate}T00:00:00Z`);
-        d.setUTCMonth(d.getUTCMonth() + t.default_validity_months);
-        expires = d.toISOString().slice(0, 10);
-      }
     }
 
     // Look up any existing row to preserve previous attached evidence when

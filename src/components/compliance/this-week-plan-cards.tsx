@@ -61,27 +61,31 @@ export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   return null;
 }
 
-function asWeek(
-  data: ThisWeekResult | ThisWeekItem[] | { result?: ThisWeekResult | ThisWeekItem[] } | undefined,
-): {
-  items: Decision[];
-  quiet: QuietLine;
-} {
+function asWeek(data: unknown): { items: Decision[]; quiet: QuietLine } {
   if (!data) return { items: [], quiet: emptyQuietLine() };
-  const inner =
-    !Array.isArray(data) && data.result && (Array.isArray(data.result) || Array.isArray((data.result as ThisWeekResult).items) || (data.result as ThisWeekResult).quiet)
-      ? data.result
-      : data;
+  if (Array.isArray(data)) {
+    return {
+      items: data.filter((i): i is Decision => i.kind === "decision"),
+      quiet: emptyQuietLine(),
+    };
+  }
+  if (typeof data !== "object") return { items: [], quiet: emptyQuietLine() };
+  const rec = data as { items?: Decision[]; quiet?: QuietLine; result?: unknown };
+  const inner = rec.result ?? rec;
   if (Array.isArray(inner)) {
     return {
       items: inner.filter((i): i is Decision => i.kind === "decision"),
       quiet: emptyQuietLine(),
     };
   }
-  return {
-    items: inner.items ?? [],
-    quiet: inner.quiet ?? emptyQuietLine(),
-  };
+  if (inner && typeof inner === "object") {
+    const week = inner as ThisWeekResult;
+    return {
+      items: week.items ?? [],
+      quiet: week.quiet ?? emptyQuietLine(),
+    };
+  }
+  return { items: [], quiet: emptyQuietLine() };
 }
 
 export function ThisWeekPlanCards() {

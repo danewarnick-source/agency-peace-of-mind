@@ -9,32 +9,28 @@ import {
   AlertTriangle,
   ClipboardList,
   Activity as ActivityIcon,
-  Camera,
-  Contact,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 import { RequirePermission } from "@/components/rbac-guard";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
-import { usePermissions } from "@/hooks/use-permissions";
-import { StaffPermissionsTab } from "@/components/employees/staff-permissions-tab";
-import { StaffProfileIdentity } from "@/components/employees/staff-profile-identity";
+import { StaffProfilePanel } from "@/components/employees/staff-profile-panel";
 import { StaffObligationsFilesTab } from "@/components/employees/staff-obligations-files-tab";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
 
-const PROFILE_TABS = ["profile", "personnel", "permissions", "activity"] as const;
+const PROFILE_TABS = ["profile", "personnel", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
-type SearchTab = ProfileTab | "record" | "obligations";
+type SearchTab = ProfileTab | "record" | "obligations" | "permissions";
 
 function resolveTab(tab: SearchTab | undefined): ProfileTab {
   if (tab === "record" || tab === "obligations") return "personnel";
+  if (tab === "permissions") return "profile";
   if (tab && (PROFILE_TABS as readonly string[]).includes(tab)) return tab;
   return "profile";
 }
@@ -44,11 +40,17 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
     const out: { tab?: SearchTab; override_perm?: Permission } = {};
     if (
       typeof s.tab === "string" &&
-      (s.tab === "record" || s.tab === "obligations" || (PROFILE_TABS as readonly string[]).includes(s.tab))
+      (s.tab === "record" ||
+        s.tab === "obligations" ||
+        s.tab === "permissions" ||
+        (PROFILE_TABS as readonly string[]).includes(s.tab))
     ) {
       out.tab = s.tab as SearchTab;
     }
-    if (typeof s.override_perm === "string" && (ALL_PERMISSIONS as readonly string[]).includes(s.override_perm)) {
+    if (
+      typeof s.override_perm === "string" &&
+      (ALL_PERMISSIONS as readonly string[]).includes(s.override_perm)
+    ) {
       out.override_perm = s.override_perm as Permission;
     }
     return out;
@@ -68,8 +70,6 @@ function StaffProfilePage() {
   const qc = useQueryClient();
   const navigate = Route.useNavigate();
   const activeTab = resolveTab(tab);
-  const { can: canManagePermissions } = usePermissions();
-  const showPermissionsTab = canManagePermissions("manage_permissions");
 
   const orgId = org?.organization_id;
 
@@ -85,15 +85,16 @@ function StaffProfilePage() {
         .maybeSingle();
       if (mErr) throw mErr;
       if (!m) return null;
-      const { data: p, error: pErr } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: p, error: pErr } = await (supabase as any)
         .from("profiles")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, hire_date, start_date, photo_path, photo_updated_at, phone" as any)
+        .select(
+          "id, full_name, first_name, last_name, email, username, hire_date, start_date, photo_path, photo_updated_at, phone, employee_id",
+        )
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { member: m, profile: (p ?? null) as any };
+      return { member: m, profile: p ?? null };
     },
   });
 
@@ -127,7 +128,15 @@ function StaffProfilePage() {
     <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              window.history.length > 1
+                ? router.history.back()
+                : router.navigate({ to: "/dashboard/hub/employees" })
+            }
+          >
             <ArrowLeft className="mr-1 h-4 w-4" /> Employees
           </Button>
           <PersonAvatar
@@ -159,12 +168,21 @@ function StaffProfilePage() {
               </Badge>
               <EmployeeFaceSheetButton staffId={staffId} organizationId={orgId} variant="pill" />
               {(p?.hire_date || p?.start_date) && (
-                <span className="text-muted-foreground">· Hired {p?.hire_date ?? p?.start_date}</span>
+                <span className="text-muted-foreground">
+                  · Hired {p?.hire_date ?? p?.start_date}
+                </span>
               )}
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
+        <Button
+          variant="outline"
+          onClick={() =>
+            window.history.length > 1
+              ? router.history.back()
+              : router.navigate({ to: "/dashboard/hub/employees" })
+          }
+        >
           Back to list
         </Button>
       </div>
@@ -172,7 +190,9 @@ function StaffProfilePage() {
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
-          navigate({ search: (prev) => ({ ...prev, tab: v === "profile" ? undefined : (v as ProfileTab) }) })
+          navigate({
+            search: (prev) => ({ ...prev, tab: v === "profile" ? undefined : (v as ProfileTab) }),
+          })
         }
         className="w-full"
       >
@@ -180,32 +200,22 @@ function StaffProfilePage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="personnel">Personnel file</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          {showPermissionsTab && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4 space-y-6">
-          <SectionGroup label="Identity & job" hint="Name, contact, role, hire date">
-            <SectionPanel icon={Camera} accent="indigo">
-              <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
-            </SectionPanel>
-            <SectionPanel icon={Contact} accent="violet">
-              <StaffProfileIdentity
-                orgId={orgId}
-                staffId={staffId}
-                profile={p}
-                member={m}
-                onSaved={invalidateProfile}
-              />
-            </SectionPanel>
-          </SectionGroup>
+          <StaffProfilePanel
+            orgId={orgId}
+            staffId={staffId}
+            profile={p}
+            member={m}
+            name={name}
+            highlightPermission={override_perm}
+            onSaved={invalidateProfile}
+          />
         </TabsContent>
 
         <TabsContent value="personnel" className="mt-4 space-y-6">
-          <StaffObligationsFilesTab
-            organizationId={orgId}
-            staffId={staffId}
-            staffName={name}
-          />
+          <StaffObligationsFilesTab organizationId={orgId} staffId={staffId} staffName={name} />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4 space-y-6">
@@ -215,16 +225,6 @@ function StaffProfilePage() {
             </SectionPanel>
           </SectionGroup>
         </TabsContent>
-
-        {showPermissionsTab && (
-          <TabsContent value="permissions" className="mt-4 space-y-6">
-            <StaffPermissionsTab
-              organizationId={orgId}
-              staffId={staffId}
-              initialOverridePermission={override_perm}
-            />
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );
@@ -251,7 +251,9 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
     queryFn: async () => {
       const { data } = await supabase
         .from("evv_timesheets")
-        .select("id, client_id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, billed_units")
+        .select(
+          "id, client_id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, billed_units",
+        )
         .eq("organization_id", organizationId)
         .eq("staff_id", staffId)
         .order("clock_in_timestamp", { ascending: false })
@@ -268,7 +270,10 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
           nameById.set(c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || "—");
         }
       }
-      return rows.map((r) => ({ ...r, client_name: r.client_id ? nameById.get(r.client_id) ?? "—" : null }));
+      return rows.map((r) => ({
+        ...r,
+        client_name: r.client_id ? (nameById.get(r.client_id) ?? "—") : null,
+      }));
     },
   });
 
@@ -315,7 +320,11 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
           id: `evv-shift-${r.id}`,
           kind: "Shift",
           title: titleSuffix,
-          status: r.status ? String(r.status) : (r.clock_out_timestamp ? "Clocked out" : "Clocked in"),
+          status: r.status
+            ? String(r.status)
+            : r.clock_out_timestamp
+              ? "Clocked out"
+              : "Clocked in",
           date: r.clock_in_timestamp as string,
           clientId: r.client_id ?? null,
           clientName: r.client_name ?? null,
@@ -369,11 +378,21 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2">
-          <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
-          <FilterChip active={filter === "Shift"} onClick={() => setFilter("Shift")}>Shifts</FilterChip>
-          <FilterChip active={filter === "Timesheet"} onClick={() => setFilter("Timesheet")}>Timesheets</FilterChip>
-          <FilterChip active={filter === "Form"} onClick={() => setFilter("Form")}>Forms</FilterChip>
-          <FilterChip active={filter === "Incident"} onClick={() => setFilter("Incident")}>Incidents</FilterChip>
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+            All
+          </FilterChip>
+          <FilterChip active={filter === "Shift"} onClick={() => setFilter("Shift")}>
+            Shifts
+          </FilterChip>
+          <FilterChip active={filter === "Timesheet"} onClick={() => setFilter("Timesheet")}>
+            Timesheets
+          </FilterChip>
+          <FilterChip active={filter === "Form"} onClick={() => setFilter("Form")}>
+            Forms
+          </FilterChip>
+          <FilterChip active={filter === "Incident"} onClick={() => setFilter("Incident")}>
+            Incidents
+          </FilterChip>
         </div>
 
         {isLoading ? (
@@ -407,10 +426,18 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
                         >
                           {it.clientName ?? "—"}
                         </Link>
-                      ) : "—"}
+                      ) : (
+                        "—"
+                      )}
                     </td>
-                    <td className="px-3 py-2"><code className="font-mono text-xs">{it.serviceCode ?? "—"}</code></td>
-                    <td className="px-3 py-2"><Badge variant="outline" className="capitalize">{it.status}</Badge></td>
+                    <td className="px-3 py-2">
+                      <code className="font-mono text-xs">{it.serviceCode ?? "—"}</code>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge variant="outline" className="capitalize">
+                        {it.status}
+                      </Badge>
+                    </td>
                     <td className="px-3 py-2 text-right">{it.units ?? "—"}</td>
                   </tr>
                 ))}
@@ -426,7 +453,9 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
                   <span className="truncate font-medium">{it.title}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                  <Badge variant="outline" className="text-[10px] capitalize">{it.status}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize">
+                    {it.status}
+                  </Badge>
                   <span>{new Date(it.date).toLocaleDateString()}</span>
                 </div>
               </li>
@@ -438,7 +467,15 @@ function ActivityFeed({ organizationId, staffId }: { organizationId: string; sta
   );
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -463,7 +500,9 @@ function KindBadge({ kind }: { kind: ActivityItem["kind"] }) {
   };
   const { Icon, cls } = map[kind];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
       <Icon className="h-3 w-3" /> {kind}
     </span>
   );

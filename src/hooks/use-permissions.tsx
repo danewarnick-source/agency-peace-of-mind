@@ -2,8 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAuth } from "./use-auth";
-import { ALL_PERMISSIONS, PROVIDER_ROLES, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
+import {
+  ALL_PERMISSIONS,
+  PROVIDER_ROLES,
+  type Permission,
+  type ProviderRole,
+  type Role,
+} from "@/lib/rbac";
 import { permissionsAreLoading, queryAwaitingFirstResult, resolveCan } from "@/lib/permissions-can";
+import { fillRoleGrantedMap } from "@/lib/staff-permission-toggles";
 
 export type PermissionMap = Record<ProviderRole, Record<Permission, boolean>>;
 
@@ -167,15 +174,17 @@ export function useEffectivePermissions(userId: string | null) {
         .eq("organization_id", org!.organization_id)
         .eq("user_id", userId!);
 
-      const activeOverrides = (overrides ?? []).filter(
-        (o) => !o.expires_at || o.expires_at > now,
+      const activeOverrides = (overrides ?? []).filter((o) => !o.expires_at || o.expires_at > now);
+
+      const roleGrantedMap = fillRoleGrantedMap(
+        member.role as Role,
+        (roleConfig ?? []) as Array<{ permission: string; enabled: boolean }>,
       );
 
       const resolved: Record<string, EffectivePermissionEntry> = {};
 
       ALL_PERMISSIONS.forEach((perm) => {
-        const roleRow = (roleConfig ?? []).find((r) => r.permission === perm);
-        const roleGranted = !!roleRow?.enabled;
+        const roleGranted = !!roleGrantedMap.get(perm);
         const override = activeOverrides.find((o) => o.permission === perm);
         if (override) {
           resolved[perm] = {

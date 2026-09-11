@@ -1,51 +1,25 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { setScopeAssignments } from "@/lib/permissions.functions";
-
-type ScopeType = "all" | "service_code" | "staff_group" | "client";
+import { ROLE_LABEL, type ProviderRole } from "@/lib/rbac";
+import { adminScopeSummary, parseAdminScope, type ParsedAdminScope } from "@/lib/admin-scope";
+import { AdminScopeFields } from "@/components/employees/admin-scope-fields";
 
 interface ScopedMember {
   user_id: string;
   full_name: string;
   role: string;
-  scopeType: ScopeType;
-  refIds: string[];
-  refLabels: string[];
-}
-
-interface ScopeRow {
-  user_id: string;
-  scope_type: ScopeType;
-  scope_ref_id: string | null;
-}
-
-function scopeSummary(m: ScopedMember): string {
-  if (m.scopeType === "all") return "All — no restriction";
-  const typeLabel = m.scopeType === "service_code" ? "Service code" : m.scopeType === "staff_group" ? "Staff group" : "Client";
-  if (!m.refLabels.length) return `${typeLabel}: none selected`;
-  return `${typeLabel}: ${m.refLabels.join(", ")}`;
+  scope: ParsedAdminScope;
 }
 
 export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<ScopedMember | null>(null);
-
-  const { data: staffGroups = [] } = useQuery({
-    queryKey: ["staff-groups-simple", orgId],
-    queryFn: async () => {
-      const { data } = await supabase.from("staff_groups").select("id, name").eq("organization_id", orgId).order("name");
-      return data ?? [];
-    },
-  });
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["scope-assignments", orgId],
@@ -55,7 +29,7 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
         .select("user_id, role")
         .eq("organization_id", orgId)
         .eq("active", true)
-        .in("role", ["manager"]);
+        .in("role", ["manager", "program_manager"]);
       if (!om?.length) return [];
 
       const userIds = om.map((m) => m.user_id);
@@ -70,35 +44,14 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
         .select("user_id, scope_type, scope_ref_id")
         .eq("organization_id", orgId)
         .in("user_id", userIds);
-      const scopes = (scopesRaw ?? []) as ScopeRow[];
-
-      const clientIds = scopes
-        .filter((s) => s.scope_type === "client" && s.scope_ref_id)
-        .map((s) => s.scope_ref_id as string);
-      let clientNameMap = new Map<string, string>();
-      if (clientIds.length) {
-        const { data: clients } = await supabase.from("clients").select("id, first_name, last_name").in("id", clientIds);
-        clientNameMap = new Map((clients ?? []).map((c) => [c.id, `${c.first_name} ${c.last_name}`]));
-      }
-      const groupNameMap = new Map((staffGroups as Array<{ id: string; name: string }>).map((g) => [g.id, g.name]));
 
       return om.map((m) => {
-        const myScopes = scopes.filter((s) => s.user_id === m.user_id);
-        const scopeType: ScopeType = myScopes[0]?.scope_type ?? "all";
-        const refIds = myScopes.map((s) => s.scope_ref_id).filter(Boolean) as string[];
-        const refLabels = refIds.map((id) => {
-          if (scopeType === "client") return clientNameMap.get(id) ?? id;
-          if (scopeType === "staff_group") return groupNameMap.get(id) ?? id;
-          const code = EVV_SERVICE_CODES.find((c) => c.code === id);
-          return code?.code ?? id;
-        });
+        const myScopes = (scopesRaw ?? []).filter((s) => s.user_id === m.user_id);
         return {
           user_id: m.user_id,
           full_name: nameMap.get(m.user_id) ?? "Unknown",
           role: m.role,
-          scopeType,
-          refIds,
-          refLabels,
+          scope: parseAdminScope(myScopes),
         };
       });
     },
@@ -108,23 +61,30 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        This person will only see clients, staff, and data that falls within their assigned
-        scope. If no scope is set, they see everything their permissions allow.
+        Admin scope is not caseload. Supervisors and program managers only see clients, staff, and
+        data inside this assignment. Owners stay whole-organization. Edit the same scope on the
+        employee Profile.
       </p>
       <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
         ) : !members.length ? (
-          <div className="p-6 text-sm text-muted-foreground">No supervisors to scope yet.</div>
+          <div className="p-6 text-sm text-muted-foreground">
+            No supervisors or program managers to scope yet.
+          </div>
         ) : (
           <div className="divide-y divide-border">
             {members.map((m) => (
               <div key={m.user_id} className="flex items-center justify-between gap-3 p-4">
                 <div>
                   <div className="text-sm font-medium">{m.full_name}</div>
-                  <div className="text-xs text-muted-foreground">Supervisor · {scopeSummary(m)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {ROLE_LABEL[m.role as ProviderRole] ?? m.role} · {adminScopeSummary(m.scope)}
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setEditing(m)}>Edit scope</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
+                  Edit scope
+                </Button>
               </div>
             ))}
           </div>
@@ -135,10 +95,10 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
         <EditScopeDrawer
           orgId={orgId}
           member={editing}
-          staffGroups={staffGroups as Array<{ id: string; name: string }>}
           onClose={() => setEditing(null)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["scope-assignments", orgId] });
+            qc.invalidateQueries({ queryKey: ["staff-admin-scope", orgId, editing.user_id] });
             setEditing(null);
           }}
         />
@@ -150,46 +110,37 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
 function EditScopeDrawer({
   orgId,
   member,
-  staffGroups,
   onClose,
   onSaved,
 }: {
   orgId: string;
   member: ScopedMember;
-  staffGroups: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [scopeType, setScopeType] = useState<ScopeType>(member.scopeType);
-  const [selected, setSelected] = useState<string[]>(member.refIds);
-  const [clientSearch, setClientSearch] = useState("");
+  const [draft, setDraft] = useState<ParsedAdminScope>(member.scope);
   const [saving, setSaving] = useState(false);
   const setScopeFn = useServerFn(setScopeAssignments);
 
-  const { data: clients = [] } = useQuery({
-    queryKey: ["scope-client-search", orgId, clientSearch],
-    queryFn: async () => {
-      let q = supabase.from("clients").select("id, first_name, last_name").eq("organization_id", orgId).limit(25);
-      if (clientSearch) q = q.ilike("first_name", `%${clientSearch}%`);
-      const { data } = await q;
-      return data ?? [];
-    },
-    enabled: scopeType === "client",
-  });
-
-  const toggle = (id: string) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-
   const save = async () => {
+    if (draft.mode === "selected" && !draft.clientIds.length && !draft.staffIds.length) {
+      toast.error("Select at least one client or staff member.");
+      return;
+    }
+    if (draft.mode === "service_code" && !draft.serviceCodes.length) {
+      toast.error("Select at least one service code.");
+      return;
+    }
     setSaving(true);
     try {
       await setScopeFn({
         data: {
           organizationId: orgId,
           targetUserId: member.user_id,
-          scopeType,
-          refIds: scopeType === "all" ? [] : selected,
+          mode: draft.mode,
+          clientIds: draft.clientIds,
+          staffIds: draft.staffIds,
+          serviceCodes: draft.serviceCodes,
         },
       });
       toast.success("Scope updated");
@@ -203,74 +154,23 @@ function EditScopeDrawer({
 
   return (
     <Sheet open onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Edit scope — {member.full_name}</SheetTitle>
+          <SheetTitle>Admin scope — {member.full_name}</SheetTitle>
         </SheetHeader>
         <div className="mt-6 space-y-5">
-          <p className="text-xs text-muted-foreground">
-            This person will only see clients, staff, and data that falls within their assigned
-            scope. If no scope is set, they see everything their permissions allow.
-          </p>
-
-          <RadioGroup value={scopeType} onValueChange={(v) => { setScopeType(v as ScopeType); setSelected([]); }} className="space-y-2">
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm">
-              <RadioGroupItem value="all" /> All data in org (no restriction)
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm">
-              <RadioGroupItem value="service_code" /> Specific service codes
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm">
-              <RadioGroupItem value="staff_group" /> Specific staff groups
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border/60 p-2.5 text-sm">
-              <RadioGroupItem value="client" /> Specific clients
-            </label>
-          </RadioGroup>
-
-          {scopeType === "service_code" && (
-            <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
-              {EVV_SERVICE_CODES.map((c) => (
-                <label key={c.code} className="flex items-center gap-2 rounded p-1.5 text-sm hover:bg-muted/40">
-                  <Checkbox checked={selected.includes(c.code)} onCheckedChange={() => toggle(c.code)} />
-                  {c.label}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {scopeType === "staff_group" && (
-            <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
-              {!staffGroups.length && <p className="p-2 text-xs text-muted-foreground">No staff groups yet.</p>}
-              {staffGroups.map((g) => (
-                <label key={g.id} className="flex items-center gap-2 rounded p-1.5 text-sm hover:bg-muted/40">
-                  <Checkbox checked={selected.includes(g.id)} onCheckedChange={() => toggle(g.id)} />
-                  {g.name}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {scopeType === "client" && (
-            <div className="space-y-2">
-              <Input placeholder="Search clients…" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
-              <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
-                {clients.map((c: { id: string; first_name: string; last_name: string }) => (
-                  <label key={c.id} className="flex items-center gap-2 rounded p-1.5 text-sm hover:bg-muted/40">
-                    <Checkbox checked={selected.includes(c.id)} onCheckedChange={() => toggle(c.id)} />
-                    {c.first_name} {c.last_name}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
+          <AdminScopeFields
+            orgId={orgId}
+            role={member.role}
+            editing
+            draft={draft}
+            onChange={setDraft}
+          />
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button
-              disabled={saving || (scopeType !== "all" && !selected.length)}
-              onClick={save}
-            >
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button disabled={saving} onClick={() => void save()}>
               {saving ? "Saving…" : "Save scope"}
             </Button>
           </div>

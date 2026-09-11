@@ -4,17 +4,18 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PhotoUpload } from "@/components/person/photo-upload";
 
 export function StaffPhotoCard({
   orgId,
   staffId,
   name,
+  editing = false,
 }: {
   orgId: string;
   staffId: string;
   name: string | null;
+  editing?: boolean;
 }) {
   const qc = useQueryClient();
 
@@ -43,32 +44,24 @@ export function StaffPhotoCard({
   });
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Photo</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <PhotoUpload
-          bucket="staff-photos"
-          organizationId={orgId}
-          subjectId={staffId}
-          currentPath={(q.data?.photo_path ?? null) as string | null}
-          personName={name}
-          avatarClassName="h-40 w-40 text-3xl"
-          onUploaded={async (path) => {
-            await persist.mutateAsync({
-              photo_path: path,
-              photo_updated_at: new Date().toISOString(),
-            });
-          }}
-          onCleared={async () => {
-            await persist.mutateAsync({ photo_path: null, photo_updated_at: null });
-          }}
-        />
-        <p className="mt-3 text-xs text-muted-foreground">
-          Used on the staff file, scheduler pill, and coverage lists.
-        </p>
-      </CardContent>
-    </Card>
+    <PhotoUpload
+      bucket="staff-photos"
+      organizationId={orgId}
+      subjectId={staffId}
+      currentPath={(q.data?.photo_path ?? null) as string | null}
+      personName={name}
+      avatarClassName="h-28 w-28 text-2xl sm:h-36 sm:w-36 sm:text-3xl"
+      className="flex flex-col items-start gap-3"
+      readOnly={!editing}
+      onUploaded={async (path) => {
+        await persist.mutateAsync({
+          photo_path: path,
+          photo_updated_at: new Date().toISOString(),
+        });
+      }}
+      onCleared={async () => {
+        await persist.mutateAsync({ photo_path: null, photo_updated_at: null });
+      }}
+    />
   );
 }

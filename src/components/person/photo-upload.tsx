@@ -26,6 +26,8 @@ export function PhotoUpload({
   onCleared,
   label = "Upload photo",
   avatarClassName = "h-16 w-16",
+  readOnly = false,
+  className = "flex items-center gap-3",
 }: {
   bucket: Bucket;
   organizationId: string;
@@ -36,6 +38,8 @@ export function PhotoUpload({
   onCleared?: () => Promise<void> | void;
   label?: string;
   avatarClassName?: string;
+  readOnly?: boolean;
+  className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +72,7 @@ export function PhotoUpload({
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className={className}>
       {bucket === "org-branding" ? null : (
         <PersonAvatar
           bucket={displayBucket}
@@ -77,50 +81,52 @@ export function PhotoUpload({
           className={avatarClassName}
         />
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void upload(f);
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="mr-1.5 h-3.5 w-3.5" />
-          {busy ? "Uploading…" : label}
-        </Button>
-        {currentPath && onCleared ? (
+      {readOnly ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+            }}
+          />
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await supabase.storage.from(bucket).remove([currentPath]);
-                await onCleared();
-                toast.success("Photo removed");
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Remove failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={() => inputRef.current?.click()}
           >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            {busy ? "Uploading…" : label}
           </Button>
-        ) : null}
-      </div>
+          {currentPath && onCleared ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await supabase.storage.from(bucket).remove([currentPath]);
+                  await onCleared();
+                  toast.success("Photo removed");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Remove failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+            </Button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

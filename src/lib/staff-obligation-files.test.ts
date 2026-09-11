@@ -238,7 +238,8 @@ describe("Staff staff-file page lock", () => {
       new URL("../routes/dashboard.my-obligations.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(src, /title="Staff file"/);
+    assert.match(src, /title: "Staff file/);
+    assert.match(src, /My tasks/);
     assert.match(src, /Or upload a certificate/);
     assert.match(src, /A certificate upload clears this same 30-day card/);
     assert.match(src, /A certificate upload clears this same hire-level PCT card/);

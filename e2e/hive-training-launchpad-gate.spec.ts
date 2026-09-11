@@ -85,7 +85,7 @@ test("2. Staff Hive Training shop is gone — staff land on Staff file", async (
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 20_000 });
   await expect(
-    page.getByRole("heading", { name: /Staff file/i }).filter({ visible: true }).first(),
+    page.getByRole("heading", { name: /My tasks/i }).filter({ visible: true }).first(),
   ).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/Training Catalog/i);
   await shot(page, "02-hive-training-staff-redirect");
@@ -191,7 +191,7 @@ test("6. Leftover catalog and LMS shop pages redirect; public /training has no s
   await page.goto("/dashboard/courses", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
   await expect(
-    page.getByRole("heading", { name: /Staff file/i }).filter({ visible: true }).first(),
+    page.getByRole("heading", { name: /My tasks/i }).filter({ visible: true }).first(),
   ).toBeVisible();
   await shot(page, "06d-courses");
 

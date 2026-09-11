@@ -225,6 +225,7 @@ import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashb
 import { Route as DashboardCoursesPolicyDocumentIdRouteImport } from './routes/dashboard.courses.policy.$documentId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
+import { Route as DashboardComplianceCertReviewCompletionIdRouteImport } from './routes/dashboard.compliance_.cert-review.$completionId'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
@@ -1401,6 +1402,12 @@ const DashboardCoursesCourseIdEditRoute =
     path: '/edit',
     getParentRoute: () => DashboardCoursesCourseIdRoute,
   } as any)
+const DashboardComplianceCertReviewCompletionIdRoute =
+  DashboardComplianceCertReviewCompletionIdRouteImport.update({
+    id: '/compliance_/cert-review/$completionId',
+    path: '/compliance/cert-review/$completionId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
   id: '/api/public/webhooks/stripe',
   path: '/api/public/webhooks/stripe',
@@ -1658,6 +1665,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
+  '/dashboard/compliance/cert-review/$completionId': typeof DashboardComplianceCertReviewCompletionIdRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
@@ -1877,6 +1885,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
+  '/dashboard/compliance/cert-review/$completionId': typeof DashboardComplianceCertReviewCompletionIdRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
@@ -2104,6 +2113,7 @@ export interface FileRoutesById {
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
+  '/dashboard/compliance_/cert-review/$completionId': typeof DashboardComplianceCertReviewCompletionIdRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
   '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
@@ -2332,6 +2342,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
+    | '/dashboard/compliance/cert-review/$completionId'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/policy/$documentId'
@@ -2551,6 +2562,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
+    | '/dashboard/compliance/cert-review/$completionId'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/policy/$documentId'
@@ -2777,6 +2789,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
+    | '/dashboard/compliance_/cert-review/$completionId'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
     | '/dashboard/courses/policy/$documentId'
@@ -4363,6 +4376,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesCourseIdEditRouteImport
       parentRoute: typeof DashboardCoursesCourseIdRoute
     }
+    '/dashboard/compliance_/cert-review/$completionId': {
+      id: '/dashboard/compliance_/cert-review/$completionId'
+      path: '/compliance/cert-review/$completionId'
+      fullPath: '/dashboard/compliance/cert-review/$completionId'
+      preLoaderRoute: typeof DashboardComplianceCertReviewCompletionIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/api/public/webhooks/stripe': {
       id: '/api/public/webhooks/stripe'
       path: '/api/public/webhooks/stripe'
@@ -4819,6 +4839,7 @@ interface DashboardRouteChildren {
   DashboardEmployeesIndexRoute: typeof DashboardEmployeesIndexRoute
   DashboardHiveTrainingIndexRoute: typeof DashboardHiveTrainingIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
+  DashboardComplianceCertReviewCompletionIdRoute: typeof DashboardComplianceCertReviewCompletionIdRoute
   DashboardCoursesPersonModuleAssignmentIdRoute: typeof DashboardCoursesPersonModuleAssignmentIdRoute
   DashboardCoursesPolicyDocumentIdRoute: typeof DashboardCoursesPolicyDocumentIdRoute
   DashboardCoursesTopicTopicIdRoute: typeof DashboardCoursesTopicTopicIdRoute
@@ -4921,6 +4942,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEmployeesIndexRoute: DashboardEmployeesIndexRoute,
   DashboardHiveTrainingIndexRoute: DashboardHiveTrainingIndexRoute,
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
+  DashboardComplianceCertReviewCompletionIdRoute:
+    DashboardComplianceCertReviewCompletionIdRoute,
   DashboardCoursesPersonModuleAssignmentIdRoute:
     DashboardCoursesPersonModuleAssignmentIdRoute,
   DashboardCoursesPolicyDocumentIdRoute: DashboardCoursesPolicyDocumentIdRoute,

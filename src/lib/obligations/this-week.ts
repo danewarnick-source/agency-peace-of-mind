@@ -10,6 +10,8 @@ import {
 } from "./escalation.ts";
 import type { RemediationPlanKind } from "./remediation.ts";
 import { isBlocksSoloWhenLapsedKey } from "./solo-lapse.ts";
+import type { AlreadyAssignedStrip, AutomationHeartbeat } from "./already-assigned.ts";
+export type { AlreadyAssignedStrip, AutomationHeartbeat } from "./already-assigned.ts";
 
 /** Review-tool Part + line. Kept here so this-week tests do not load dspd-audit-tool. */
 const IF_MISSED_BY_KEY: Record<string, string> = {
@@ -85,6 +87,8 @@ export type QuietLine = {
 export type ThisWeekResult = {
   items: Decision[];
   quiet: QuietLine;
+  alreadyAssigned: AlreadyAssignedStrip;
+  automation: AutomationHeartbeat;
 };
 
 export type DecorateDecisionCtx = {

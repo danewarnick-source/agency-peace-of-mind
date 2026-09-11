@@ -21,6 +21,7 @@ import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period
 import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
 import { staffClockOutSearch } from "@/lib/staff-clock-out";
 import { parseCheckoutReturnSearch } from "@/lib/billing-access";
+import { StaffHomeMyTasks } from "@/components/staff-tasks/staff-home-my-tasks";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
@@ -254,6 +255,7 @@ function StaffCaseloadHome() {
         <NectarPayPeriodCard open={false} onOpenChange={onNectarOpenChange} />
       ) : null}
       <PoliciesToAcknowledgeCard />
+      <StaffHomeMyTasks />
       <ComplianceInbox />
       <StaffClientGrid />
     </div>

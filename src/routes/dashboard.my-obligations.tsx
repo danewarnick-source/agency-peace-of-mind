@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -52,6 +52,8 @@ import { PacketNextActionCard } from "@/components/compliance/packet-next-action
 import { useCompliancePacket } from "@/hooks/use-compliance-packet";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { ThreadsPanel } from "@/components/threads/threads-panel";
+import { MyTasksQueue } from "@/components/staff-tasks/my-tasks-queue";
+import { buildStaffTask, STAFF_TASKS_FOOTER } from "@/lib/staff-my-tasks";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "Staff file — Provider Interface" }] }),
@@ -71,6 +73,7 @@ type MyCompletionRow = {
   nectar_validation_reasons: string[] | null;
   nectar_extracted_cert_type: string | null;
   nectar_extracted_expires_date: string | null;
+  admin_notes: string | null;
 };
 
 /** staff_per_client obligation titles carry a literal "[Client Name]"
@@ -663,7 +666,9 @@ function OverlayClientFormCard({
 function MyObligationsPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
+  const navigate = useNavigate();
   const orgId = org?.organization_id;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const packetQ = useCompliancePacket(orgId, "staff", user?.id ?? null);
   const qc = useQueryClient();
   const listFn = useServerFn(listMyObligationInstances);
@@ -774,7 +779,7 @@ function MyObligationsPage() {
       const { data, error } = await supabase
         .from("company_obligation_completions")
         .select(
-          "instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type, nectar_extracted_expires_date",
+          "instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type, nectar_extracted_expires_date, admin_notes",
         )
         .eq("staff_id", user!.id)
         .in("instance_id", instanceIds);
@@ -910,8 +915,8 @@ function MyObligationsPage() {
         <StaffPageHeader
           eyebrow="Staff file"
           eyebrowIcon={ClipboardList}
-          title="Staff file"
-          subtitle="Discrete dues on your file — On file, Missing, or Due soon."
+          title="My tasks"
+          subtitle="What is required, why, when it is due, and one action."
         />
       </div>
 
@@ -922,6 +927,57 @@ function MyObligationsPage() {
         nextAction={packetQ.data?.packet.nextAction}
         emptyLabel="Nothing needs you first — your file is current or waiting on an admin."
       />
+
+      {tab !== "on_file" ? (
+        <MyTasksQueue
+          tasks={open.map((inst) =>
+            buildStaffTask({
+              instanceId: inst.id,
+              title: resolveObligationTitle(inst.obligation, inst),
+              description: inst.obligation.description,
+              source: inst.obligation.source,
+              sourcePolicySection: inst.obligation.source_policy_section,
+              evidenceType: inst.obligation.evidence_type,
+              linkedFormId: inst.obligation.linked_form_id,
+              dueAt: inst.due_at,
+              instanceStatus: inst.status,
+              nectarValidationStatus: completionByInstance.get(inst.id)?.nectar_validation_status,
+              correctionRequested: String(
+                completionByInstance.get(inst.id)?.admin_notes ?? "",
+              ).startsWith("Correction requested:"),
+              courseProgress: courseProgressByInstance.get(inst.id) ?? null,
+            }),
+          )}
+          staffLabel={user.email ? `${user.email} · Staff` : "Staff"}
+          emptyLabel="Nothing needs you on this list."
+          onAction={(task) => {
+            const inst = open.find((row) => row.id === task.instanceId);
+            if (!inst) return;
+            const formKind = clientFormKindForTitle(inst.obligation.title);
+            if (task.action === "take_training" || task.action === "continue_training") {
+              void navigate({
+                to: "/dashboard/my-obligations/course/$instanceId",
+                params: { instanceId: inst.id },
+              });
+              return;
+            }
+            if (task.action === "complete_form" && formKind && inst.client_id) {
+              void navigate({
+                to: "/dashboard/client-training/$clientId",
+                params: { clientId: inst.client_id },
+                search: { trainingType: formKind, obligation_instance: inst.id },
+              });
+              return;
+            }
+            if (task.action === "complete_form" && isFormUuid(inst.obligation.linked_form_id)) {
+              window.location.href = `/dashboard/forms/${inst.obligation.linked_form_id}/fill?obligation_instance=${inst.id}`;
+              return;
+            }
+            setExpandedId(inst.id);
+            document.getElementById(`packet-${inst.id}`)?.scrollIntoView({ block: "start" });
+          }}
+        />
+      ) : null}
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {(
@@ -1015,6 +1071,7 @@ function MyObligationsPage() {
                   />
                 );
               }
+              if (expandedId !== inst.id) return null;
               return (
                 <OpenCard
                   key={inst.id}

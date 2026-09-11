@@ -51,6 +51,10 @@ import { ORPHAN_OBLIGATION_CREATE_GONE } from "./compliance-spine";
 import {
   canAcceptCertEvidence,
   certReviewAcceptBlockReason,
+  isNativePlatformEvidence,
+  isUploadEvidenceType,
+  nectarReviewDisposition,
+  nextRenewalDueFromRules,
   resolvedCertExpiration,
   usesCertExpirationCadence,
 } from "./cert-review";
@@ -2528,7 +2532,7 @@ export const logObligationEvent = createServerFn({ method: "POST" })
 // without it skip validation entirely (upload always "passes").
 type NectarValidationOutcome = {
   ran: boolean;
-  status: "passed" | "failed" | null;
+  status: "passed" | "failed" | "needs_review" | null;
   reasons: string[];
   cert_type: string | null;
   name: string | null;
@@ -2677,6 +2681,20 @@ export const recordCompletion = createServerFn({ method: "POST" })
     if (iErr) throw new Error(iErr.message);
     if (!inst) throw new Error("Instance not found.");
     const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+    const dueCfgForRenewal = (ob.due_day_config ?? {}) as Record<string, unknown>;
+    const certExpirationClock =
+      usesCertExpirationCadence(dueCfgForRenewal) ||
+      sowCatalogEntry(ob.title)?.due_rule.kind === "cert_expiration";
+    if (
+      (inst.status === "completed" || inst.status === "waived") &&
+      isUploadEvidenceType(data.evidenceTypeUsed) &&
+      certExpirationClock &&
+      !isNativePlatformEvidence(data.evidenceTypeUsed)
+    ) {
+      throw new Error(
+        "This certificate cycle is already accepted. Upload the renewal on the open renewal item so the previous certificate stays on file.",
+      );
+    }
 
     let staffName = data.staffName;
     if (!staffName) {
@@ -2713,19 +2731,21 @@ export const recordCompletion = createServerFn({ method: "POST" })
         ? new Date(`${validation.completed_date}T00:00:00Z`).toISOString()
         : (data.completedAt ?? new Date().toISOString());
 
-    const dueCfgForRenewal = (ob.due_day_config ?? {}) as Record<string, unknown>;
-    const certExpirationClock =
-      usesCertExpirationCadence(dueCfgForRenewal) ||
-      sowCatalogEntry(ob.title)?.due_rule.kind === "cert_expiration";
-    if (certExpirationClock && !validation.expires_date) {
+    const disposition = nectarReviewDisposition({
+      evidenceTypeUsed: data.evidenceTypeUsed,
+      isManualEntry: isManual,
+      usesCertExpiration: certExpirationClock,
+      validationRan: validation.ran,
+      validationStatus: validation.status,
+      expiresOn: validation.expires_date,
+      confidence: validation.confidence,
+    });
+    if (disposition.status) {
       validation = {
         ...validation,
         ran: true,
-        status: "failed",
-        reasons: [
-          ...validation.reasons,
-          "Expiration date could not be extracted. Confirm expiration before accepting — do not invent it from the upload date.",
-        ],
+        status: disposition.status,
+        reasons: [...validation.reasons, ...disposition.extraReasons],
       };
     }
 
@@ -2761,7 +2781,10 @@ export const recordCompletion = createServerFn({ method: "POST" })
     // instance — an admin must manually confirm before it counts. Notify
     // admins directly instead of going through the generic completion
     // notifier below.
-    if (validation.ran && validation.status === "failed") {
+    if (
+      validation.ran &&
+      (validation.status === "failed" || validation.status === "needs_review")
+    ) {
       const recipients = await resolveAdminRecipients(supabase, data.organizationId, ob);
       if (recipients.length) {
         const rows = recipients.map((recipientId) => ({
@@ -2770,10 +2793,15 @@ export const recordCompletion = createServerFn({ method: "POST" })
           recipient_role: "admin",
           type: "company_obligation_update",
           urgency: "high",
-          title: `NECTAR could not verify "${ob.title}" upload`,
+          title:
+            validation.status === "needs_review"
+              ? `"${ob.title}" upload is awaiting review`
+              : `NECTAR could not verify "${ob.title}" upload`,
           body:
-            `${staffName} uploaded evidence for "${ob.title}" but NECTAR could not verify it: ` +
-            `${validation.reasons.join("; ")}. An admin can manually confirm the upload.`,
+            validation.status === "needs_review"
+              ? `${staffName} uploaded evidence for "${ob.title}". It is awaiting review: ${validation.reasons.join("; ") || "Confirm expiration before accepting."}`
+              : `${staffName} uploaded evidence for "${ob.title}" but NECTAR could not verify it: ` +
+                `${validation.reasons.join("; ")}. An admin can manually confirm the upload.`,
           link_to: "/dashboard/compliance?tab=staff",
           related_id: data.instanceId,
           related_type: "company_obligation_instance",
@@ -2848,109 +2876,25 @@ export const recordCompletion = createServerFn({ method: "POST" })
       "completion",
     );
 
-    // Passed a NECTAR-verified renewal cert (background screening, fraud
-    // exclusion, etc.): schedule the next instance from the certificate's
-    // own expiration date rather than waiting for the normal
-    // hire-anniversary generator, so renewal dates track the real cert.
-    if (
-      obligationCreatesInstances(ob) &&
-      validation.ran &&
-      validation.status === "passed" &&
-      validation.expires_date &&
-      dueCfgForRenewal.anniversary_based === true &&
-      updatedInstance.status === "completed"
-    ) {
-      const { data: alreadyOpen } = await supabase
-        .from("company_obligation_instances")
-        .select("id")
-        .eq("obligation_id", ob.id)
-        .eq("assignee_staff_id", targetStaffId)
-        .in("status", ["pending", "overdue"])
-        .maybeSingle();
-      if (!alreadyOpen) {
-        const expiresDue = new Date(`${validation.expires_date}T00:00:00Z`);
-        const { data: nextInst, error: nextErr } = await supabase
-          .from("company_obligation_instances")
-          .insert({
-            obligation_id: ob.id,
-            organization_id: data.organizationId,
-            period_key: `Due ${formatShort(expiresDue)}`,
-            due_at: endOfDayUTC(expiresDue),
-            status: "pending",
-            assignee_staff_id: targetStaffId,
-          })
-          .select("*")
-          .maybeSingle();
-        if (!nextErr && nextInst) {
-          await supabase.from("company_obligation_instance_assignees").upsert(
-            [
-              {
-                instance_id: nextInst.id,
-                organization_id: data.organizationId,
-                staff_id: targetStaffId,
-                staff_name: staffName,
-                staff_role: "employee",
-              },
-            ],
-            { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
-          );
-          await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
-        }
-      }
-    }
-
-    // every_n_months renewal (e.g. CPR/First Aid): due on the cert's own
-    // printed expiration when NECTAR read one. Cert-expiration clocks never
-    // invent the next due from the upload date.
-    if (
-      obligationCreatesInstances(ob) &&
-      dueCfgForRenewal.every_n_months !== undefined &&
-      updatedInstance.status === "completed"
-    ) {
-      const months = Number(dueCfgForRenewal.every_n_months);
-      if (Number.isFinite(months)) {
-        const { data: alreadyOpen } = await supabase
-          .from("company_obligation_instances")
-          .select("id")
-          .eq("obligation_id", ob.id)
-          .eq("assignee_staff_id", targetStaffId)
-          .in("status", ["pending", "overdue"])
-          .maybeSingle();
-        const printedExpires = validation.expires_date;
-        const nextDue = printedExpires
-          ? new Date(`${printedExpires}T00:00:00Z`)
-          : certExpirationClock
-            ? null
-            : addMonthsUTC(new Date(completedAt), months);
-        if (!alreadyOpen && nextDue) {
-          const { data: nextInst, error: nextErr } = await supabase
-            .from("company_obligation_instances")
-            .insert({
-              obligation_id: ob.id,
-              organization_id: data.organizationId,
-              period_key: `Due ${formatShort(nextDue)}`,
-              due_at: endOfDayUTC(nextDue),
-              status: "pending",
-              assignee_staff_id: targetStaffId,
-            })
-            .select("*")
-            .maybeSingle();
-          if (!nextErr && nextInst) {
-            await supabase.from("company_obligation_instance_assignees").upsert(
-              [
-                {
-                  instance_id: nextInst.id,
-                  organization_id: data.organizationId,
-                  staff_id: targetStaffId,
-                  staff_name: staffName,
-                  staff_role: "employee",
-                },
-              ],
-              { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
-            );
-            await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
-          }
-        }
+    if (obligationCreatesInstances(ob) && updatedInstance.status === "completed") {
+      const nextDueDay = nextRenewalDueFromRules({
+        usesCertExpiration: certExpirationClock || dueCfgForRenewal.anniversary_based === true,
+        extractedExpiresOn: validation.expires_date,
+        authoritativeCompletedOn: validation.completed_date,
+        everyNMonths:
+          dueCfgForRenewal.every_n_months !== undefined
+            ? Number(dueCfgForRenewal.every_n_months)
+            : null,
+      });
+      if (nextDueDay) {
+        await openNextRenewalInstanceInternal(
+          supabase,
+          data.organizationId,
+          ob,
+          targetStaffId,
+          staffName ?? "Unknown",
+          nextDueDay,
+        );
       }
     }
 
@@ -2995,6 +2939,51 @@ async function resolveAdminRecipients(
     for (const a of (admins ?? []) as Array<{ user_id: string }>) recipientIds.add(a.user_id);
   }
   return Array.from(recipientIds);
+}
+
+async function openNextRenewalInstanceInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+  staffId: string,
+  staffName: string,
+  dueDay: string,
+): Promise<void> {
+  const { data: alreadyOpen } = await supabase
+    .from("company_obligation_instances")
+    .select("id")
+    .eq("obligation_id", ob.id)
+    .eq("assignee_staff_id", staffId)
+    .in("status", ["pending", "overdue"])
+    .maybeSingle();
+  if (alreadyOpen) return;
+  const nextDue = new Date(`${dueDay}T00:00:00Z`);
+  const { data: nextInst, error: nextErr } = await supabase
+    .from("company_obligation_instances")
+    .insert({
+      obligation_id: ob.id,
+      organization_id: organizationId,
+      period_key: `Due ${formatShort(nextDue)}`,
+      due_at: endOfDayUTC(nextDue),
+      status: "pending",
+      assignee_staff_id: staffId,
+    })
+    .select("*")
+    .maybeSingle();
+  if (nextErr || !nextInst) return;
+  await supabase.from("company_obligation_instance_assignees").upsert(
+    [
+      {
+        instance_id: nextInst.id,
+        organization_id: organizationId,
+        staff_id: staffId,
+        staff_name: staffName,
+        staff_role: "employee",
+      },
+    ],
+    { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+  );
+  await scheduleRemindersInternal(supabase, organizationId, nextInst.id, ob);
 }
 
 async function resolveInstanceNotifications(
@@ -3149,43 +3138,14 @@ export const confirmFailedObligationCompletion = createServerFn({ method: "POST"
     }
 
     if (expiresOn && obligationCreatesInstances(ob) && updatedInstance.status === "completed") {
-      const { data: alreadyOpen } = await supabase
-        .from("company_obligation_instances")
-        .select("id")
-        .eq("obligation_id", ob.id)
-        .eq("assignee_staff_id", completion.staff_id)
-        .in("status", ["pending", "overdue"])
-        .maybeSingle();
-      if (!alreadyOpen) {
-        const nextDue = new Date(`${expiresOn}T00:00:00Z`);
-        const { data: nextInst, error: nextErr } = await supabase
-          .from("company_obligation_instances")
-          .insert({
-            obligation_id: ob.id,
-            organization_id: data.organizationId,
-            period_key: `Due ${formatShort(nextDue)}`,
-            due_at: endOfDayUTC(nextDue),
-            status: "pending",
-            assignee_staff_id: completion.staff_id,
-          })
-          .select("*")
-          .maybeSingle();
-        if (!nextErr && nextInst) {
-          await supabase.from("company_obligation_instance_assignees").upsert(
-            [
-              {
-                instance_id: nextInst.id,
-                organization_id: data.organizationId,
-                staff_id: completion.staff_id,
-                staff_name: completion.staff_name,
-                staff_role: "employee",
-              },
-            ],
-            { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
-          );
-          await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
-        }
-      }
+      await openNextRenewalInstanceInternal(
+        supabase,
+        data.organizationId,
+        ob,
+        completion.staff_id as string,
+        completion.staff_name as string,
+        expiresOn,
+      );
     }
 
     return { instance: updatedInstance };

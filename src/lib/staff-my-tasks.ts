@@ -3,10 +3,7 @@
  * No second checklist table family.
  */
 import { dueLabel } from "./staff-obligation-files.ts";
-import {
-  inHiveCourseIdForTitle,
-  staffCourseProgressLabel,
-} from "./in-hive-training.ts";
+import { inHiveCourseIdForTitle, staffCourseProgressLabel } from "./in-hive-training.ts";
 import { clientFormKindForTitle } from "./client-form-obligations.ts";
 import { isFormUuid } from "./resolve-obligation-form.ts";
 
@@ -90,8 +87,9 @@ export function staffTaskEvidence(input: StaffTaskInput): StaffTaskEvidence {
 }
 
 export function staffTaskAction(input: StaffTaskInput): StaffTaskActionKind {
-  const pending = isPendingCertReview(input.nectarValidationStatus);
-  if (pending || input.correctionRequested) return "fix_submission";
+  if (input.correctionRequested || input.nectarValidationStatus === "failed") {
+    return "fix_submission";
+  }
   const evidence = staffTaskEvidence(input);
   if (evidence === "course") {
     const started = (input.courseProgress?.completed ?? 0) > 0;
@@ -130,5 +128,4 @@ export function staffTaskCanOpenForm(linkedFormId: string | null | undefined): b
   return isFormUuid(linkedFormId ?? null);
 }
 
-export const STAFF_TASKS_FOOTER =
-  "Your submissions and certificates stay in your staff file.";
+export const STAFF_TASKS_FOOTER = "Your submissions and certificates stay in your staff file.";

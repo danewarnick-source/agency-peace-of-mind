@@ -111,6 +111,18 @@ describe("staff My tasks engine", () => {
     });
     assert.equal(pending.pendingReview, true);
     assert.equal(pending.action, "fix_submission");
+
+    const awaiting = buildStaffTask({
+      instanceId: "i3",
+      title: "CPR/First Aid Certification — Renewal",
+      evidenceType: "upload",
+      dueAt: "2026-09-20T00:00:00.000Z",
+      instanceStatus: "pending",
+      nectarValidationStatus: "needs_review",
+      now: NOW,
+    });
+    assert.equal(awaiting.pendingReview, true);
+    assert.equal(awaiting.action, "upload_certificate");
   });
 
   it("prefers policy section then description for non-SOW why", () => {

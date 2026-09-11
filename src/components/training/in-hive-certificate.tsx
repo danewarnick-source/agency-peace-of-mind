@@ -23,16 +23,13 @@ export function InHiveCertificate({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <p className="text-sm font-medium">
-          {issued ? "Certificate issued" : "Topic checklist (complete remaining topics to issue)"}
+          {issued
+            ? "Certificate issued — already on the staff file"
+            : "Topic checklist (complete remaining topics to issue)"}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => window.print()}
-        >
+        <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" />
-          Print / save
+          Print a copy
         </Button>
       </div>
 

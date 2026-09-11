@@ -192,7 +192,7 @@ export function explainDueRule(rule: DueRule): string {
         ? "Due on each anniversary of the staff member's compliance start (later of hire date and HIVE add date)."
         : `Due on the compliance-start anniversary beginning year ${rule.start_year}.`;
     case "cert_expiration":
-      return `Due on the expiration date printed on the current certificate. If that date cannot be read, renewal defaults to ${rule.fallback_months} months from the last verified upload.`;
+      return "Due on the expiration date printed on the current certificate. If that date cannot be read, the upload stays in review until an admin confirms expiration — the due date is never taken from the upload date.";
     case "days_after_assignment":
       return `Due ${rule.days} days after the staff member is assigned to the client.`;
     case "days_after_event":

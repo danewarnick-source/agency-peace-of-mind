@@ -304,9 +304,7 @@ export function choiceFollowUp(fb: string): string {
 export type LengthCheckedChoice = { t: string; correct: boolean };
 
 /** True when the correct choice is the unique longest by more than 12 characters. */
-export function correctChoiceIsUniquelyLongest(
-  options: readonly LengthCheckedChoice[],
-): boolean {
+export function correctChoiceIsUniquelyLongest(options: readonly LengthCheckedChoice[]): boolean {
   if (options.length < 2) return false;
   const correct = options.find((o) => o.correct);
   if (!correct) return false;
@@ -580,7 +578,8 @@ export function courseCitation(courseId: InHiveCourseId): string {
     return "DHHS91172 SOW §1.8(4)(A)–(W) plus SAS 30-day essential topics";
   }
   if (courseId === "abi") return "DHHS91172 SOW §1.8(8)(A)–(F)";
-  if (courseId === ANNUAL_CE_COURSE_ID) return "DHHS91172 SOW §1.9 — placeholder; upload remains the evidence path";
+  if (courseId === ANNUAL_CE_COURSE_ID)
+    return "DHHS91172 SOW §1.9 — placeholder; upload remains the evidence path";
   return "NCAPPS-informed Provider Interface education — not official NCAPPS. Hire-level only.";
 }
 
@@ -601,6 +600,14 @@ export type ThirtyDayCertificateRecord = {
   examScorePct: number | null;
   topics: CertificateTopicLine[];
 };
+
+export function parseInHiveCertificateRecord(raw: unknown): ThirtyDayCertificateRecord | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Partial<ThirtyDayCertificateRecord>;
+  if (typeof o.courseName !== "string" || typeof o.completedAt !== "string") return null;
+  if (!Array.isArray(o.topics)) return null;
+  return o as ThirtyDayCertificateRecord;
+}
 
 export function buildThirtyDayCertificate(args: {
   staffName: string;

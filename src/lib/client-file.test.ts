@@ -166,6 +166,8 @@ describe("Client file surface lock", () => {
     );
     assert.match(profile, /Client file/);
     assert.match(profile, /ClientFileTab/);
+    assert.doesNotMatch(profile, /PersonCenteredProfilePanel/);
+    assert.doesNotMatch(profile, /<CardTitle className="text-base">Person-Centered Thinking<\/CardTitle>/);
     assert.doesNotMatch(profile, /<TabsTrigger value="files">Files<\/TabsTrigger>/);
     assert.ok(!CLIENT_FILE_CARD_KEYS.includes("rights" as (typeof CLIENT_FILE_CARD_KEYS)[number]));
     assert.ok(!Object.values(CLIENT_FILE_CARD_TITLE).some((t) => /rights/i.test(t)));

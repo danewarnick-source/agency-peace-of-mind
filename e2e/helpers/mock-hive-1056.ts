@@ -737,7 +737,7 @@ function serverFnPayload(url: string, body: string): unknown {
     const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-9]/);
     return emptyClientCareData(idMatch?.[0] ?? CLIENT_LIST[0].id);
   }
-  if (/getClientSpecificTraining|getSupportStrategies|createPersonCentered/i.test(fn)) {
+  if (/getClientSpecificTraining|getSupportStrategies/i.test(fn)) {
     return { training: null };
   }
   if (/getClientIntakeChecklist|getUiDismissals/i.test(fn)) return [];

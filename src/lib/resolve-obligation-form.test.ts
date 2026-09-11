@@ -75,7 +75,7 @@ describe("resolveObligationFormId", () => {
       isUnlinkedFormDuty({
         evidence_type: "form",
         linked_form_id: null,
-        title: "Person-Centered Thinking — [Client Name]",
+        title: "Support Strategies — [Client Name]",
       }),
       false,
     );

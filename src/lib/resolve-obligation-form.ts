@@ -4,11 +4,7 @@ function isPerClientTrainingFormTitle(title: string): boolean {
   const t = title.trim();
   if (t === "Person-Centered Thinking and Practices Training") return false;
   if (t.startsWith("SEI Employment Support Strategies")) return false;
-  return (
-    t.startsWith("Client-Specific Training") ||
-    t.startsWith("Support Strategies") ||
-    t.startsWith("Person-Centered Thinking")
-  );
+  return t.startsWith("Client-Specific Training") || t.startsWith("Support Strategies");
 }
 
 /** True only for a real form UUID — never the string "null". */
@@ -30,7 +26,7 @@ function isInHiveCourseTitle(title: string): boolean {
 }
 
 /** Form-typed duty with no published form UUID — unactionable for staff.
- *  Per-client PCT / support strategies / client-specific forms live on the
+ *  Per-client support strategies / client-specific forms live on the
  *  existing client-training viewer, not a company Forms UUID. */
 export function isUnlinkedFormDuty(ob: {
   evidence_type: string;

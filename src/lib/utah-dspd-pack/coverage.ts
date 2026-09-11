@@ -163,6 +163,14 @@ export const UTAH_DSPD_COVERAGE: PackCoverageRow[] = [
     note: "Initial 90 days; renewal follows the printed card.",
   },
   {
+    id: "sow-1.8-pct-per-client",
+    source: "sow",
+    citation: "SOW §1.8(5)(C)",
+    title: "Person-Centered Thinking is hire-level only (not per client)",
+    status: "intentional_omit",
+    note: "Per-client Person-Centered Thinking form is retired. The SOW duty is staff training once — Person-Centered Thinking and Practices Training (90 days).",
+  },
+  {
     id: "sow-1.8-behavior",
     source: "sow",
     citation: "SOW §1.8(6)",

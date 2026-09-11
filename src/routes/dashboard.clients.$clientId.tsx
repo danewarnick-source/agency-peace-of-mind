@@ -89,11 +89,9 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  UserCircle2,
   Target,
   ShieldCheck,
   GraduationCap,
-  HeartHandshake,
   Users,
   UtensilsCrossed,
   ListChecks,
@@ -120,7 +118,6 @@ import {
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
   draftClientSpecificTrainingBlank,
-  createPersonCenteredProfile,
   type CSTContent,
   type CSTSection,
   type CSTGoal,
@@ -501,9 +498,6 @@ function ClientProfileHub() {
           <CareGroup label="Supports & coordination" hint="Support strategies and team">
             <CareSection icon={ListChecks} accent="violet">
               <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-            </CareSection>
-            <CareSection icon={HeartHandshake} accent="rose">
-              <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
             </CareSection>
             <CareSection icon={Users} accent="sky">
               <CaseloadEditor clientId={clientId} />
@@ -1508,195 +1502,6 @@ function SupportStrategyCoveragePanel({
         </p>
       )}
     </div>
-  );
-}
-
-function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
-  const qc = useQueryClient();
-  const createFn = useServerFn(createPersonCenteredProfile);
-  const publishFn = useServerFn(publishClientSpecificTraining);
-  const [showPublish, setShowPublish] = useState(false);
-  const [bodyOpen, setBodyOpen] = useState(false);
-  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
-
-  const { data: hasPcsp } = useQuery({
-    queryKey: ["client-has-pcsp", clientId],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("client_documents")
-        .select("id", { count: "exact", head: true })
-        .eq("client_id", clientId)
-        .ilike("document_type", "pcsp");
-      if (error) throw error;
-      return (count ?? 0) > 0;
-    },
-    staleTime: 30_000,
-  });
-  const pcspReady = hasPcsp === true;
-
-  const q = useQuery({
-    queryKey: ["person-centered-profile", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_specific_trainings")
-        .select("id, status, version, updated_at, approved_at, review_questions")
-        .eq("client_id", clientId)
-        .eq("training_type", "person_centered")
-        .maybeSingle();
-      if (error) throw error;
-      return data as {
-        id: string;
-        status: string;
-        version: number;
-        updated_at: string | null;
-        approved_at: string | null;
-        review_questions: Array<{ id: string; tab?: string; prompt: string }> | null;
-      } | null;
-    },
-  });
-
-  const createMut = useMutation({
-    mutationFn: () => createFn({ data: { clientId } }),
-    onSuccess: () => {
-      toast.success("Person-centered profile created");
-      qc.invalidateQueries({ queryKey: ["person-centered-profile", clientId] });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create profile"),
-  });
-
-  const publishMut = useMutation({
-    mutationFn: (id: string) => publishFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Person-centered profile published");
-      qc.invalidateQueries({ queryKey: ["person-centered-profile", clientId] });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to publish profile"),
-  });
-
-  const training = q.data;
-
-  return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setBodyOpen((v) => !v)}
-              aria-label={bodyOpen ? "Collapse" : "Expand"}
-              className="rounded p-1 hover:bg-muted"
-            >
-              {bodyOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </button>
-            <UserCircle2 className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Person-Centered Thinking</CardTitle>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {training && (
-              <Badge variant={training.status === "published" ? "default" : "secondary"}>
-                {training.status === "published" ? `Published v${training.version}` : "Draft"}
-              </Badge>
-            )}
-            {!training && !q.isLoading && (
-              <Button
-                size="sm"
-                onClick={() => (pcspReady ? createMut.mutate() : setShowPcspPrompt(true))}
-                disabled={createMut.isPending}
-              >
-                {createMut.isPending ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Create profile
-              </Button>
-            )}
-            {training && training.status !== "published" && (
-              <Button
-                size="sm"
-                onClick={() => (pcspReady ? setShowPublish(true) : setShowPcspPrompt(true))}
-                disabled={publishMut.isPending}
-              >
-                {publishMut.isPending ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Review & Publish
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        {bodyOpen && (
-          <CardContent className="text-sm text-muted-foreground space-y-3">
-            {!pcspReady && (
-              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-                Upload a PCSP to get started — this profile is part of the PCSP-derived workflow.
-                Creating and publishing are disabled until a PCSP is on file (add it from the
-                client's Client file).
-              </div>
-            )}
-            {q.isLoading ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
-              </span>
-            ) : !training ? (
-              <p>
-                A person-centered profile is completed by staff together with the client, capturing
-                who they are and how they want to be supported. Create the profile to publish the 10
-                standard questions for staff to complete.
-              </p>
-            ) : training.status === "published" ? (
-              <p>
-                Published
-                {training.approved_at
-                  ? ` on ${new Date(training.approved_at).toLocaleDateString()}`
-                  : ""}
-                . Staff can complete the profile from their client training list.
-              </p>
-            ) : (
-              <p>
-                Review the questions and publish to assign this profile to staff for completion with
-                the person.
-              </p>
-            )}
-          </CardContent>
-        )}
-      </Card>
-      {training && (
-        <PublishConfirmDialog
-          open={showPublish}
-          onOpenChange={setShowPublish}
-          clientId={clientId}
-          orgId={orgId}
-          kindLabel="person-centered profile"
-          isPublishing={publishMut.isPending}
-          publishAsync={() => publishMut.mutateAsync(training.id)}
-          questions={(training.review_questions ?? []).map((q) => ({ id: q.id, prompt: q.prompt }))}
-        />
-      )}
-      <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Upload the PCSP first</DialogTitle>
-            <DialogDescription>
-              This client has no PCSP on file. The Person-Centered Profile is part of the
-              PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under
-              the client's Client file.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>
-              Got it
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 

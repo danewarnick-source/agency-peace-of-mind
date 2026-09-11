@@ -20,6 +20,7 @@ import {
   emptyQuietLine,
   formatQuietLine,
   rollupDecisions,
+  sortThisWeekItems,
   type Decision,
   type QuietLine,
   type ThisWeekItem,
@@ -28,6 +29,7 @@ import {
 import { PI_THEME } from "@/lib/pi-theme";
 import "./decision-card.css";
 
+/** PlanCard shim — keep 30 days while callers move to DecisionCard. */
 export { DecisionCard as PlanCard } from "@/components/compliance/decision-card";
 
 type PlanDialogKind = "license" | "standing" | "overdue";
@@ -59,20 +61,26 @@ export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   return null;
 }
 
-function asWeek(data: ThisWeekResult | ThisWeekItem[] | undefined): {
+function asWeek(
+  data: ThisWeekResult | ThisWeekItem[] | { result?: ThisWeekResult | ThisWeekItem[] } | undefined,
+): {
   items: Decision[];
   quiet: QuietLine;
 } {
   if (!data) return { items: [], quiet: emptyQuietLine() };
-  if (Array.isArray(data)) {
+  const inner =
+    !Array.isArray(data) && data.result && (Array.isArray(data.result) || Array.isArray((data.result as ThisWeekResult).items) || (data.result as ThisWeekResult).quiet)
+      ? data.result
+      : data;
+  if (Array.isArray(inner)) {
     return {
-      items: data.filter((i): i is Decision => i.kind === "decision"),
+      items: inner.filter((i): i is Decision => i.kind === "decision"),
       quiet: emptyQuietLine(),
     };
   }
   return {
-    items: data.items ?? [],
-    quiet: data.quiet ?? emptyQuietLine(),
+    items: inner.items ?? [],
+    quiet: inner.quiet ?? emptyQuietLine(),
   };
 }
 
@@ -121,8 +129,8 @@ export function ThisWeekPlanCards() {
   if (!orgId || !canManage) return null;
 
   const week = asWeek(q.data);
-  const items = rollupDecisions(week.items).map((d) =>
-    decorateDecision(d, { viewerUserId: viewerId }),
+  const items = sortThisWeekItems(
+    rollupDecisions(week.items).map((d) => decorateDecision(d, { viewerUserId: viewerId })),
   );
   const visible = items.slice(0, HOME_CARD_CAP);
   const extra = Math.max(0, items.length - HOME_CARD_CAP);
@@ -151,6 +159,7 @@ export function ThisWeekPlanCards() {
               item={item}
               done={doneIds.has(item.id)}
               reviewing={reviewMut.isPending}
+              viewerUserId={viewerId}
               onAction={(kind, decision) => {
                 if (kind === "approve_plan") {
                   if (!item.planId) return;

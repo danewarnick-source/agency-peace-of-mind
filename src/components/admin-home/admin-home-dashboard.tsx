@@ -59,6 +59,10 @@ function ReviewDayPanel({ orgId }: { orgId: string }) {
   const mut = useMutation({
     mutationFn: () => generate({ data: { organizationId: orgId } }),
   });
+  const reviewText =
+    mut.data?.text ??
+    (mut.data as { result?: { text?: string } } | undefined)?.result?.text ??
+    "";
 
   return (
     <section data-testid="review-day" className="space-y-4">
@@ -90,13 +94,13 @@ function ReviewDayPanel({ orgId }: { orgId: string }) {
           Could not generate the review.
         </p>
       ) : null}
-      {mut.data?.text ? (
+      {reviewText ? (
         <pre
           data-testid="review-pack-text"
           className="whitespace-pre-wrap text-sm"
           style={{ color: PI_THEME.c70 }}
         >
-          {mut.data.text}
+          {reviewText}
         </pre>
       ) : null}
     </section>
@@ -142,8 +146,12 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
     staleTime: 60_000,
   });
 
-  const changes = changedQ.data?.changes ?? [];
-  const applied = changedQ.data?.appliedPackVersion ?? null;
+  const changedPayload = changedQ.data as
+    | { changes?: Array<{ change_kind: string; obligation_key: string; note: string | null }>; appliedPackVersion?: string | null; result?: { changes?: Array<{ change_kind: string; obligation_key: string; note: string | null }>; appliedPackVersion?: string | null } }
+    | undefined;
+  const changed = changedPayload?.changes ? changedPayload : changedPayload?.result;
+  const changes = changed?.changes ?? [];
+  const applied = changed?.appliedPackVersion ?? null;
   const showWhatChanged = changes.length > 0 && applied !== PACK_VERSION;
 
   if (!orgId && !orgLoading) return null;

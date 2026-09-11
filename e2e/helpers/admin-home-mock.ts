@@ -829,7 +829,6 @@ function decodeDevServerFnExport(urlStr: string): string | null {
 
 function serverFnName(url: string, postText: string): string | null {
   const fromId = decodeDevServerFnExport(url);
-  const blob = `${fromId ?? ""}\n${url}\n${postText}`;
   const names = [
     "listObligationPackMatrix",
     "createObligationPack",
@@ -880,11 +879,17 @@ function serverFnName(url: string, postText: string): string | null {
     "reviewRemediationPlan",
     "generateMyReview",
     "listPackWhatChanged",
+    "getCompliancePacket",
   ];
+  // Prefer the decoded export. Searching the raw /_serverFn URL for
+  // name substrings false-matches other functions (base64 + shared chunks).
+  if (fromId && names.includes(fromId)) return fromId;
+  if (fromId) return fromId;
+  const blob = `${postText}`;
   const hit = [...names].sort((a, b) => b.length - a.length).find((n) => blob.includes(n));
   if (hit) return hit;
-  if (/ThisWeek|this-week|thisWeek/i.test(blob)) return "getThisWeekForUser";
-  return fromId;
+  if (/ThisWeek|this-week|thisWeek/i.test(`${url}\n${postText}`)) return "getThisWeekForUser";
+  return null;
 }
 
 function unwrapSeroval(parsed: unknown): Record<string, unknown> {
@@ -1131,8 +1136,8 @@ function serverFnResult(
       return { ok: true, obligationId: OB_CONDUCT_ID };
     case "listCompanyObligations":
       return fx.obligations;
-    case "listAgencyDocuments":
-      return {
+    case "listAgencyDocuments": {
+      const payload = {
         cards: [
           {
             key: "insurance",
@@ -1165,6 +1170,17 @@ function serverFnResult(
         ],
         counts: { missing: 2, due_soon: 0, on_file: 0 },
         codes: ["HHS", "SLN"],
+      };
+      return { ...payload, result: payload };
+    }
+    case "getCompliancePacket":
+      return {
+        result: {
+          packet: { nextAction: null, items: [] },
+          scopedStaffIds: null,
+          hiddenAgencyCards: [],
+          hiddenClientCards: [],
+        },
       };
     case "listAgencyPolicies":
       return [];

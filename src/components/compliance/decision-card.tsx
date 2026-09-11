@@ -22,14 +22,16 @@ export function DecisionCard({
   item,
   done = false,
   reviewing = false,
+  viewerUserId,
   onAction,
 }: {
   item: Decision;
   done?: boolean;
   reviewing?: boolean;
+  viewerUserId?: string | null;
   onAction: (kind: DecisionActionKind, decision: "approved" | "rejected" | "open") => void;
 }) {
-  const decorated = decorateDecision(item);
+  const decorated = decorateDecision(item, { viewerUserId });
   const headline = decorated.headline ?? decorated.title;
   const dueText = done ? "Done" : (decorated.dueText ?? "Before next review");
   const why = decorated.why ?? "";

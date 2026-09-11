@@ -875,9 +875,14 @@ function serverFnName(url: string, postText: string): string | null {
     "requestPermission",
     "requestFeatureUpgrade",
     "getPackageBuilderDetail",
+    "getThisWeekForUser",
+    "proposeRemediationPlan",
+    "reviewRemediationPlan",
   ];
   const hit = [...names].sort((a, b) => b.length - a.length).find((n) => blob.includes(n));
-  return hit ?? fromId;
+  if (hit) return hit;
+  if (/ThisWeek|this-week|thisWeek/i.test(blob)) return "getThisWeekForUser";
+  return fromId;
 }
 
 function unwrapSeroval(parsed: unknown): Record<string, unknown> {
@@ -1228,6 +1233,77 @@ function serverFnResult(
     case "requestPermission":
     case "requestFeatureUpgrade":
       return { ok: true };
+    case "getThisWeekForUser":
+      return { result: [
+        {
+          kind: "decision",
+          id: "license:ob-hhs-inspect",
+          title: "HHS Inspection",
+          body: "HHS Inspection — overdue. This is a license/repayment item (§1.34).",
+          urgency: "critical",
+          dueAt: "2026-09-20T00:00:00.000Z",
+          ownerUserId: ADMIN_USER_ID,
+          ownerLabel: "admin_level",
+          consequence:
+            "This is a licensing or repayment item (§1.34). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
+          source: "escalation",
+          trigger: "license_or_repayment_risk",
+          obligationId: "ob-hhs-inspect",
+          obligationKey: "hhs_inspection",
+        },
+        {
+          kind: "decision",
+          id: "standing:ob-discharge",
+          title: "Person Discharge Process",
+          body: "Person Discharge Process has been missing for 30 days.",
+          urgency: "high",
+          dueAt: null,
+          ownerUserId: ADMIN_USER_ID,
+          ownerLabel: "admin_level",
+          consequence:
+            "This policy has been missing 30+ days. A reviewer will ask for it by name — there is currently nothing to show them.",
+          source: "standing_missing",
+          trigger: "standing_record_missing_30d",
+          obligationId: "ob-discharge",
+          obligationKey: "person_discharge_process",
+        },
+        {
+          kind: "decision",
+          id: "overdue:ob-ce",
+          title: "Annual Continuing Education",
+          body: "Ada Staff: Annual Continuing Education is 12 days overdue.",
+          urgency: "high",
+          dueAt: "2026-08-30T00:00:00.000Z",
+          ownerUserId: ADMIN_USER_ID,
+          ownerLabel: "manager_of_manager",
+          consequence:
+            "12 days overdue. If unresolved, this is a finding on the next DSPD review.",
+          source: "escalation",
+          trigger: "overdue",
+          obligationId: "ob-ce",
+          obligationKey: "ce_12h_annual",
+        },
+        {
+          kind: "decision",
+          id: "half:ob-ce-half",
+          title: "Utah Medicaid Provider Manuals — Annual Memo",
+          body: "Ada Staff: Utah Medicaid Provider Manuals — Annual Memo not started, due 2026-10-01. 20 days left.",
+          urgency: "normal",
+          dueAt: "2026-10-01T00:00:00.000Z",
+          ownerUserId: ADMIN_USER_ID,
+          ownerLabel: "manager",
+          consequence:
+            "If this isn't started soon, it becomes overdue on 2026-10-01 and escalates to the next manager up.",
+          source: "escalation",
+          trigger: "half_window_not_started",
+          obligationId: "ob-ce-half",
+          obligationKey: "medicaid_manuals_memo",
+        },
+      ] };
+    case "proposeRemediationPlan":
+      return { result: { id: "e2e-plan-1" } };
+    case "reviewRemediationPlan":
+      return { result: { ok: true } };
     default:
       break;
   }

@@ -182,7 +182,7 @@ export function ThisWeekPlanCards() {
   const items = (q.data ?? []).filter((i): i is Decision => i.kind === "decision");
   if (q.isLoading) {
     return (
-      <section className="space-y-2">
+      <section data-testid="this-week" className="space-y-2">
         <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
           This week
         </h2>
@@ -194,7 +194,7 @@ export function ThisWeekPlanCards() {
   }
   if (q.isError) {
     return (
-      <section className="space-y-2">
+      <section data-testid="this-week" className="space-y-2">
         <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
           This week
         </h2>
@@ -206,7 +206,7 @@ export function ThisWeekPlanCards() {
   }
   if (items.length === 0) {
     return (
-      <section className="space-y-2">
+      <section data-testid="this-week" className="space-y-2">
         <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
           This week
         </h2>
@@ -218,7 +218,7 @@ export function ThisWeekPlanCards() {
   }
 
   return (
-    <section className="space-y-2">
+    <section data-testid="this-week" className="space-y-2">
       <h2 className="text-sm font-semibold" style={{ color: PI_THEME.cream }}>
         This week
       </h2>

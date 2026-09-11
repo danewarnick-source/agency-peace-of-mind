@@ -29,8 +29,10 @@ type Props = {
 };
 
 function dateValue(iso: string | null | undefined): string {
-  if (!iso) return "";
-  return iso.slice(0, 10);
+  if (iso) return iso.slice(0, 10);
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 7);
+  return d.toISOString().slice(0, 10);
 }
 
 export function OverdueObligationPlanDialog({

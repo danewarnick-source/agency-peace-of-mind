@@ -98,6 +98,52 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await shot(page, "admin-home");
   });
 
+  test("This Week plan dialogs cover license, standing, overdue, and due-soon", async ({ page }) => {
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    const week = page.getByTestId("this-week");
+    await expect(week).toBeVisible({ timeout: 25_000 });
+    await expect(week.getByText(/^Escalation$/i)).toHaveCount(0);
+    await expect(week.getByText("License / repayment", { exact: true })).toBeVisible();
+    await expect(week.getByText("HHS Inspection", { exact: true })).toBeVisible();
+    await expect(week.getByText(/corrective action plan or repayment demand/i)).toBeVisible();
+    await expect(week.getByText("Standing record", { exact: true })).toBeVisible();
+    await expect(week.getByText("Person Discharge Process", { exact: true })).toBeVisible();
+    await expect(week.getByText(/nothing to show them/i)).toBeVisible();
+    await expect(week.getByText("Overdue", { exact: true })).toBeVisible();
+    await expect(week.getByText("Annual Continuing Education", { exact: true })).toBeVisible();
+    await expect(week.getByText(/finding on the next DSPD review/i)).toBeVisible();
+    await expect(week.getByText("Due soon", { exact: true })).toBeVisible();
+    await expect(week.getByText(/escalates to the next manager up/i)).toBeVisible();
+
+    await week.getByRole("button", { name: "Log a plan" }).first().click();
+    await expect(page.getByRole("heading", { name: /License \/ repayment plan/i })).toBeVisible();
+    await shot(page, "this-week-license-plan-dialog");
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("heading", { name: /License \/ repayment plan/i })).toHaveCount(0);
+
+    await week.getByRole("button", { name: /Edit the starter \/ log a plan/i }).click();
+    const standingDlg = page.getByRole("dialog", { name: /Standing record plan/i });
+    await expect(standingDlg).toBeVisible();
+    await standingDlg.locator("#standing-record-plan").fill("Write the discharge procedure and file it this week.");
+    await standingDlg.locator("#standing-record-due").fill("2026-09-25");
+    await shot(page, "this-week-standing-plan-dialog");
+    await standingDlg.getByRole("button", { name: "Submit plan" }).click();
+    await expect(standingDlg).toBeHidden();
+
+    await week
+      .locator("li")
+      .filter({ hasText: "Annual Continuing Education" })
+      .getByRole("button", { name: "Log a plan" })
+      .click();
+    const overdueDlg = page.getByRole("dialog", { name: /Overdue obligation plan/i });
+    await expect(overdueDlg).toBeVisible();
+    await overdueDlg.locator("#overdue-obligation-plan").fill("Schedule the CE course and close the clock.");
+    await shot(page, "this-week-overdue-plan-dialog");
+    await overdueDlg.getByRole("button", { name: "Record plan" }).click();
+    await expect(overdueDlg).toBeHidden();
+    await shot(page, "this-week-plan-dialogs");
+  });
+
   test("welcome=1 shows the Home banner above the greeting; Skip hides it", async ({ page }) => {
     await page.goto("/dashboard?welcome=1", { waitUntil: "domcontentloaded" });
     const banner = page.getByTestId("admin-home-welcome");

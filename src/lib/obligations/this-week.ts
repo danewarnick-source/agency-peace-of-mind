@@ -82,6 +82,10 @@ export type QuietLine = {
   recordsReviewCleared: number;
   evvReconciledThrough: string | null;
   segments: string[];
+  assignmentGaps?: number;
+  unansweredFacts?: number;
+  evaluationIncomplete?: boolean;
+  checkFailed?: boolean;
 };
 
 export type ThisWeekResult = {
@@ -138,6 +142,10 @@ export function emptyQuietLine(): QuietLine {
     recordsReviewCleared: 0,
     evvReconciledThrough: null,
     segments: [],
+    assignmentGaps: 0,
+    unansweredFacts: 0,
+    evaluationIncomplete: false,
+    checkFailed: false,
   };
 }
 
@@ -149,7 +157,9 @@ export function buildQuietLine(counts: {
   recordsReviewCleared?: number;
   evvReconciledThrough?: string | null;
   assignmentGaps?: number;
+  unansweredFacts?: number;
   evaluationIncomplete?: boolean;
+  checkFailed?: boolean;
 }): QuietLine {
   const obligationsSatisfied = Math.max(0, counts.obligationsSatisfied ?? 0);
   const notesPassed = Math.max(0, counts.notesPassed ?? 0);
@@ -158,13 +168,24 @@ export function buildQuietLine(counts: {
   const recordsReviewCleared = Math.max(0, counts.recordsReviewCleared ?? 0);
   const evvReconciledThrough = counts.evvReconciledThrough ?? null;
   const assignmentGaps = Math.max(0, counts.assignmentGaps ?? 0);
+  const unansweredFacts = Math.max(0, counts.unansweredFacts ?? 0);
   const evaluationIncomplete = counts.evaluationIncomplete === true;
+  const checkFailed = counts.checkFailed === true;
   const segments: string[] = [];
-  if (evaluationIncomplete) {
-    segments.push("Duty evaluation incomplete — this is not a clean compliance result");
+  if (evaluationIncomplete || checkFailed) {
+    segments.push(
+      checkFailed && !evaluationIncomplete
+        ? "A live check did not finish — this is not a clean compliance result"
+        : "Duty evaluation incomplete — this is not a clean compliance result",
+    );
   } else if (assignmentGaps > 0) {
     segments.push(
       `${assignmentGaps} assignment gap${assignmentGaps === 1 ? "" : "s"} still open — not a clean compliance result`,
+    );
+  }
+  if (unansweredFacts > 0 && !evaluationIncomplete && !checkFailed) {
+    segments.push(
+      `${unansweredFacts} compliance setup fact${unansweredFacts === 1 ? "" : "s"} unanswered — not a clean compliance result`,
     );
   }
   if (obligationsSatisfied > 0) {
@@ -195,12 +216,72 @@ export function buildQuietLine(counts: {
     recordsReviewCleared,
     evvReconciledThrough,
     segments,
+    assignmentGaps,
+    unansweredFacts,
+    evaluationIncomplete,
+    checkFailed,
   };
 }
 
+export function quietLineIsClean(quiet: QuietLine): boolean {
+  if (quiet.evaluationIncomplete || quiet.checkFailed) return false;
+  if ((quiet.assignmentGaps ?? 0) > 0) return false;
+  if ((quiet.unansweredFacts ?? 0) > 0) return false;
+  return !quiet.segments.some((s) => /not a clean compliance result/.test(s));
+}
+
 export function formatQuietLine(quiet: QuietLine): string {
+  if (!quietLineIsClean(quiet)) {
+    const body = quiet.segments.length > 0 ? quiet.segments.join(" · ") : "this is not a clean compliance result";
+    return `Needs an answer: ${body}`;
+  }
   if (quiet.segments.length === 0) return "Handled without you: operations are current.";
   return `Handled without you: ${quiet.segments.join(" · ")}`;
+}
+
+export function thisWeekStatusLine(input: {
+  loading?: boolean;
+  failed?: boolean;
+  itemCount: number;
+  quiet: QuietLine;
+}): string {
+  if (input.loading) return "Loading decisions.";
+  if (input.failed) return "Could not load this week.";
+  if (!quietLineIsClean(input.quiet) && input.itemCount === 0) {
+    if (input.quiet.evaluationIncomplete || input.quiet.checkFailed) {
+      return "Duty evaluation or a live check did not finish. This is not a clean compliance result.";
+    }
+    if ((input.quiet.unansweredFacts ?? 0) > 0) {
+      return "Compliance setup facts still need an answer.";
+    }
+    return "Assignment gaps are still open. This is not a clean compliance result.";
+  }
+  if (input.itemCount === 0) return "Nothing needs you this week.";
+  const n = input.itemCount;
+  const word = n === 1 ? "One" : n === 2 ? "Two" : n === 3 ? "Three" : String(n);
+  return `${word} decision${n === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
+}
+
+export function decisionFromQuietSummary(
+  summary: QuietSummary,
+  ownerUserId: string,
+): Decision {
+  return {
+    kind: "decision",
+    id: summary.id,
+    title: summary.title,
+    body: summary.body,
+    urgency: summary.urgency,
+    dueAt: summary.dueAt,
+    ownerUserId,
+    ownerLabel: "admin_level",
+    consequence:
+      summary.source === "org_profile_facts"
+        ? "Unanswered setup facts keep conditional duties visible until they are recorded."
+        : "Missing assignments and unanswered duty facts are gaps, not a clean result.",
+    source: "standing_missing",
+    count: summary.count,
+  };
 }
 
 export function sortThisWeekItems<T extends { urgency: EscalationUrgency; dueAt: string | null }>(
@@ -448,6 +529,12 @@ function headlineFor(d: Decision): string {
 
   if (/unanswered|compliance setup facts/i.test(d.title)) {
     return "Answer compliance setup facts";
+  }
+  if (/duty evaluation incomplete/i.test(d.title)) {
+    return "Answer duty evaluation facts";
+  }
+  if (/assignment gaps/i.test(d.title)) {
+    return "Answer assignment gaps";
   }
   if (d.source === "nectar_proposed") {
     if (n > 1 && /summar/i.test(d.title)) return `Approve ${n} quarterly summaries`;

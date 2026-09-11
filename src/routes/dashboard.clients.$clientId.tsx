@@ -2171,13 +2171,9 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
         <CardTitle className="text-base">Action required</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
-        Urgent compliance items for this client are tracked on Compliance → Action Required.{" "}
-        <Link
-          className="underline"
-          to="/dashboard/company-obligations"
-          search={{ tab: "action-required" }}
-        >
-          Open Action Required →
+        Urgent compliance items for this client are tracked on the Client file.{" "}
+        <Link className="underline" to="/dashboard/compliance" search={{ tab: "client" }}>
+          Open Client file →
         </Link>
       </CardContent>
     </Card>

@@ -30,6 +30,7 @@ import {
   type Decision,
   type QuietLine,
   type ThisWeekItem,
+  thisWeekStatusLine,
   type ThisWeekResult,
 } from "@/lib/obligations/this-week.functions";
 import { PI_THEME } from "@/lib/pi-theme";
@@ -41,11 +42,6 @@ export { DecisionCard as PlanCard } from "@/components/compliance/decision-card"
 type PlanDialogKind = "license" | "standing" | "overdue";
 
 const HOME_CARD_CAP = 3;
-
-function decisionCountLine(n: number): string {
-  const word = n === 1 ? "One" : n === 2 ? "Two" : n === 3 ? "Three" : String(n);
-  return `${word} decision${n === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
-}
 
 export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   if (item.planId) return null;
@@ -166,8 +162,12 @@ export function ThisWeekPlanCards() {
   const assignedText = formatAlreadyAssigned(week.alreadyAssigned);
   const automationText = formatAutomationLine(week.automation);
 
-  const countLine =
-    items.length === 0 ? "Nothing needs you this week." : decisionCountLine(items.length);
+  const countLine = thisWeekStatusLine({
+    loading: q.isLoading,
+    failed: q.isError,
+    itemCount: items.length,
+    quiet: week.quiet,
+  });
 
   return (
     <section data-testid="this-week" className="space-y-4">
@@ -176,7 +176,7 @@ export function ThisWeekPlanCards() {
           This week
         </h2>
         <p className="mt-1 text-sm" style={{ color: PI_THEME.c50 }}>
-          {q.isLoading ? "Loading decisions." : q.isError ? "Could not load this week." : countLine}
+          {countLine}
         </p>
       </div>
       {!q.isLoading && !q.isError && items.length > 0 ? (

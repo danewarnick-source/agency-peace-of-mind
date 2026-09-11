@@ -30,4 +30,29 @@ describe("isBaselineApplicable — unknown is not N/A", () => {
     assert.equal(isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: null }), true);
     assert.equal(isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: [] }), false);
   });
+
+  it("keeps after_year_one visible when hire date is unanswered", () => {
+    const after = {
+      ...BASELINE_STAFF_TRAININGS[0]!,
+      key: "after_year_one_probe",
+      conditional: "after_year_one" as const,
+    };
+    assert.equal(
+      isBaselineApplicable(after, {
+        hireDate: null,
+        requiresDeescalation: false,
+        requiresAbi: false,
+      }),
+      true,
+    );
+    assert.equal(
+      isBaselineApplicable(after, {
+        hireDate: new Date("2026-08-01T00:00:00Z"),
+        requiresDeescalation: false,
+        requiresAbi: false,
+        now: new Date("2026-09-01T00:00:00Z"),
+      }),
+      false,
+    );
+  });
 });

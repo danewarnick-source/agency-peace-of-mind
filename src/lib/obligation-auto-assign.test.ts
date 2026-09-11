@@ -5,14 +5,9 @@ import { fileURLToPath } from "node:url";
 import { ABI_OBLIGATION_TITLE, THIRTY_DAY_OBLIGATION_TITLE } from "./in-hive-training.ts";
 import { PCT_HIRE_COURSE_TITLE } from "./client-form-obligations.ts";
 import {
-  ABI_OBLIGATION_TITLES,
   CODE_OF_CONDUCT_TITLE,
   CONFLICT_OF_INTEREST_TITLE,
   HIRE_ALWAYS_TITLES,
-  assignmentNeedsAbi,
-  assignmentNeedsMandt,
-  assignmentNeedsSupportStrategies,
-  clientFlagsFromExistingSchema,
   hireDueDaysForTitle,
 } from "./obligation-auto-assign.ts";
 
@@ -28,7 +23,10 @@ describe("hire auto-assign", () => {
       ],
     );
     assert.equal(HIRE_ALWAYS_TITLES.length, 4);
-    assert.equal([...HIRE_ALWAYS_TITLES].includes(CONFLICT_OF_INTEREST_TITLE), false);
+    assert.equal(
+      HIRE_ALWAYS_TITLES.some((title) => title === CONFLICT_OF_INTEREST_TITLE),
+      false,
+    );
     assert.ok([...HIRE_ALWAYS_TITLES].includes(PCT_HIRE_COURSE_TITLE));
     const hireSet = readFileSync(
       fileURLToPath(new URL("./obligation-auto-assign.ts", import.meta.url)),
@@ -103,105 +101,15 @@ describe("hire auto-assign", () => {
 });
 
 describe("assignment auto-assign", () => {
-  it("assigns ABI once per staff when the client or staff is ABI", () => {
-    assert.equal(
-      assignmentNeedsAbi({
-        hasAbi: true,
-        hasBehaviorPlan: false,
-        hasLikelyAggression: false,
-        hasPcsp: false,
-      }),
-      true,
+  it("does not keep a parallel title/flag matcher beside duty-applicability", () => {
+    const src = readFileSync(
+      fileURLToPath(new URL("./obligation-auto-assign.ts", import.meta.url)),
+      "utf8",
     );
-    assert.equal(
-      assignmentNeedsAbi(
-        { hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false },
-        { requiresAbi: true },
-      ),
-      true,
-    );
-    assert.equal(
-      assignmentNeedsAbi({
-        hasAbi: false,
-        hasBehaviorPlan: true,
-        hasLikelyAggression: false,
-        hasPcsp: false,
-      }),
-      false,
-    );
-    assert.deepEqual([...ABI_OBLIGATION_TITLES], [ABI_OBLIGATION_TITLE]);
-  });
-
-  it("assigns Mandt from a behavior plan, likely-aggression flag, or staff de-escalation flag", () => {
-    assert.equal(
-      assignmentNeedsMandt({
-        hasAbi: false,
-        hasBehaviorPlan: true,
-        hasLikelyAggression: false,
-        hasPcsp: false,
-      }),
-      true,
-    );
-    assert.equal(
-      assignmentNeedsMandt({
-        hasAbi: false,
-        hasBehaviorPlan: false,
-        hasLikelyAggression: true,
-        hasPcsp: false,
-      }),
-      true,
-    );
-    assert.equal(
-      assignmentNeedsMandt(
-        { hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false },
-        { requiresDeescalation: true },
-      ),
-      true,
-    );
-    assert.equal(
-      assignmentNeedsMandt({
-        hasAbi: true,
-        hasBehaviorPlan: false,
-        hasLikelyAggression: false,
-        hasPcsp: false,
-      }),
-      false,
-    );
-  });
-
-  it("unlocks support strategies only when the client has a PCSP", () => {
-    assert.equal(
-      assignmentNeedsSupportStrategies({
-        hasAbi: false,
-        hasBehaviorPlan: false,
-        hasLikelyAggression: false,
-        hasPcsp: true,
-      }),
-      true,
-    );
-    assert.equal(
-      assignmentNeedsSupportStrategies({
-        hasAbi: false,
-        hasBehaviorPlan: false,
-        hasLikelyAggression: false,
-        hasPcsp: false,
-      }),
-      false,
-    );
-  });
-
-  it("reads existing client columns instead of inventing new ones", () => {
-    const flags = clientFlagsFromExistingSchema({
-      has_abi: true,
-      pcsp_signed_date: "2026-07-01",
-      behaviorPlanEnabled: true,
-      hasTargetBehaviors: true,
-    });
-    assert.deepEqual(flags, {
-      hasAbi: true,
-      hasBehaviorPlan: true,
-      hasLikelyAggression: true,
-      hasPcsp: true,
-    });
+    assert.doesNotMatch(src, /assignmentNeedsMandt/);
+    assert.doesNotMatch(src, /assignmentNeedsAbi/);
+    assert.doesNotMatch(src, /assignmentNeedsSupportStrategies/);
+    assert.doesNotMatch(src, /clientFlagsFromExistingSchema/);
+    assert.doesNotMatch(src, /ABI_OBLIGATION_TITLES/);
   });
 });

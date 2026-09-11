@@ -289,5 +289,6 @@ describe("Org-wide Staff file lock", () => {
     const matrixFns = readFileSync(new URL("./hr-staff.functions.ts", import.meta.url), "utf8");
     assert.doesNotMatch(matrixFns, /getHrComplianceMatrix/);
     assert.doesNotMatch(matrixFns, /getHrAdminRollup/);
+    assert.doesNotMatch(matrixFns, /getStaffChecklist/);
   });
 });

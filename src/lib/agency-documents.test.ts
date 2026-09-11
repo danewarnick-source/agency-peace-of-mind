@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   AGENCY_DOC_CARD_KEYS,
@@ -243,6 +243,28 @@ describe("Agency file surface lock", () => {
     assert.match(src, /\/dashboard\/compliance/);
     assert.doesNotMatch(src, /ObligationPackGrid/);
     assert.doesNotMatch(src, /title: "Compliance/);
+  });
+
+  it("deletes the retired Obligations register screens", () => {
+    const gone = [
+      "../components/company-obligations/action-required-panel.tsx",
+      "../components/company-obligations/obligation-card.tsx",
+      "../components/company-obligations/obligation-drawer.tsx",
+      "../components/company-obligations/obligation-card-actions.tsx",
+      "../components/company-obligations/obligation-history-sheet.tsx",
+      "../components/company-obligations/obligation-catalog-note.tsx",
+      "../components/company-obligations/obligation-pack-grid.tsx",
+      "../components/company-obligations/pack-dialogs.tsx",
+      "../components/company-obligations/obligation-meta.tsx",
+    ];
+    for (const rel of gone) {
+      assert.equal(existsSync(new URL(rel, import.meta.url)), false, rel);
+    }
+    const kept = readFileSync(
+      new URL("../components/company-obligations/manual-completion-drawer.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(kept, /ManualCompletionDrawer/);
   });
 
   it("does not mix company policies into the encoded pack titles", () => {

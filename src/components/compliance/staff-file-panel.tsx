@@ -4,8 +4,10 @@ import { Link } from "@tanstack/react-router";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useCompliancePacket } from "@/hooks/use-compliance-packet";
 import { OrgPersonnelFileMatrix } from "@/components/personnel-file/org-personnel-file-matrix";
+import { AdminExamExportButton } from "@/components/compliance/admin-exam-export-button";
 import { PacketNextActionCard, PacketScopeNote } from "@/components/compliance/packet-next-action";
 import { listPendingCertReviews, type CertReviewRow } from "@/lib/company-obligations.functions";
+import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
 import { ROLE_RANK } from "@/lib/rbac";
 
 export function StaffFilePanel() {
@@ -69,13 +71,22 @@ export function StaffFilePanel() {
                 <span className="min-w-0 truncate text-amber-950">
                   {row.staffName} · {row.title}
                 </span>
-                <Link
-                  to="/dashboard/compliance/cert-review/$completionId"
-                  params={{ completionId: row.completionId }}
-                  className="shrink-0 font-medium underline-offset-2 hover:underline"
-                >
-                  Review
-                </Link>
+                <span className="flex shrink-0 items-center gap-2">
+                  {inHiveCourseIdForTitle(row.title) ? (
+                    <AdminExamExportButton
+                      staffId={row.staffId}
+                      staffName={row.staffName}
+                      obligationTitle={row.title}
+                    />
+                  ) : null}
+                  <Link
+                    to="/dashboard/compliance/cert-review/$completionId"
+                    params={{ completionId: row.completionId }}
+                    className="font-medium underline-offset-2 hover:underline"
+                  >
+                    Review
+                  </Link>
+                </span>
               </li>
             ))}
           </ul>

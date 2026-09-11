@@ -558,13 +558,20 @@ describe("staff vs admin auditor export (source)", () => {
     assert.doesNotMatch(player, /Hive Certify|Ask Hive|like Hive/);
   });
 
-  it("keeps auditor export on the admin obligation card only", () => {
-    const card = readFileSync(
-      fileURLToPath(new URL("../components/company-obligations/obligation-card.tsx", import.meta.url)),
+  it("keeps auditor export on the admin Staff file only", () => {
+    const exportBtn = readFileSync(
+      fileURLToPath(
+        new URL("../components/compliance/admin-exam-export-button.tsx", import.meta.url),
+      ),
       "utf8",
     );
-    assert.match(card, /Auditor export/);
-    assert.match(card, /AdminExamExportButton/);
+    const staffFile = readFileSync(
+      fileURLToPath(new URL("../components/compliance/staff-file-panel.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(exportBtn, /Auditor export/);
+    assert.match(exportBtn, /AdminExamExportButton/);
+    assert.match(staffFile, /AdminExamExportButton/);
     const obligations = readFileSync(
       fileURLToPath(new URL("../routes/dashboard.my-obligations.tsx", import.meta.url)),
       "utf8",

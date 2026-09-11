@@ -210,7 +210,7 @@ describe("scope lock files", () => {
 
   it("migration is additive and has no DROP", () => {
     const sql = readFileSync(
-      new URL("../../../supabase/migrations/20260911100000_obligation_scope.sql", import.meta.url),
+      new URL("../../../supabase/migrations/20260911110000_obligation_scope.sql", import.meta.url),
       "utf8",
     );
     assert.match(sql, /ADD COLUMN IF NOT EXISTS scope_group_id/);

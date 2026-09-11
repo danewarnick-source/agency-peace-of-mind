@@ -26,10 +26,10 @@ import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
 
 const PROFILE_TABS = ["profile", "personnel", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
-type SearchTab = ProfileTab | "record" | "obligations" | "permissions";
+type SearchTab = ProfileTab | "record" | "obligations" | "permissions" | "staff";
 
 function resolveTab(tab: SearchTab | undefined): ProfileTab {
-  if (tab === "record" || tab === "obligations") return "personnel";
+  if (tab === "record" || tab === "obligations" || tab === "staff") return "personnel";
   if (tab === "permissions") return "profile";
   if (tab && (PROFILE_TABS as readonly string[]).includes(tab)) return tab;
   return "profile";
@@ -43,6 +43,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
       (s.tab === "record" ||
         s.tab === "obligations" ||
         s.tab === "permissions" ||
+        s.tab === "staff" ||
         (PROFILE_TABS as readonly string[]).includes(s.tab))
     ) {
       out.tab = s.tab as SearchTab;
@@ -198,7 +199,7 @@ function StaffProfilePage() {
       >
         <TabsList className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start overflow-x-auto">
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="personnel">Personnel file</TabsTrigger>
+          <TabsTrigger value="personnel">Staff file</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 

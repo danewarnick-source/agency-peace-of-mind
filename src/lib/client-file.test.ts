@@ -171,13 +171,21 @@ describe("Client file surface lock", () => {
     assert.ok(!Object.values(CLIENT_FILE_CARD_TITLE).some((t) => /rights/i.test(t)));
 
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
-    assert.match(nav, /to: "\/dashboard\/client-file", label: "Client file"/);
+    assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
+    assert.doesNotMatch(nav, /to: "\/dashboard\/client-file", label: "Client file"/);
 
     const route = readFileSync(new URL("../routes/dashboard.client-file.tsx", import.meta.url), "utf8");
     assert.match(route, /createFileRoute\("\/dashboard\/client-file"\)/);
-    assert.match(route, /Client file — Provider Interface/);
-    assert.doesNotMatch(route, /EVV/);
-    assert.doesNotMatch(route, /HRC/);
+    assert.match(route, /redirect/);
+    assert.match(route, /\/dashboard\/compliance/);
+    const panel = readFileSync(
+      new URL("../components/compliance/client-file-panel.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(panel, /Client file/);
+    assert.match(panel, /OrgClientFileMatrix/);
+    assert.doesNotMatch(panel, /EVV/);
+    assert.doesNotMatch(panel, /HRC/);
   });
 
   it("does not add a fourth audit product", () => {

@@ -142,14 +142,14 @@ export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: str
   if (q.isLoading) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading personnel file…
+        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading staff file…
       </div>
     );
   }
   if (q.error) {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50/30 p-6 text-sm text-rose-700">
-        {q.error instanceof Error ? q.error.message : "Could not load the personnel file."}
+        {q.error instanceof Error ? q.error.message : "Could not load the staff file."}
       </div>
     );
   }

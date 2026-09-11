@@ -188,5 +188,5 @@ export function personnelPackHtml(files: PersonnelPackFile[]): string {
       return `<section style="page-break-after:always;margin-bottom:24px;"><h2 style="font:600 16px system-ui;">${escapeHtml(f.staffName)} — ${escapeHtml(f.title)}</h2>${media}</section>`;
     })
     .join("");
-  return `<!doctype html><html><head><title>Personnel file</title></head><body>${body}</body></html>`;
+  return `<!doctype html><html><head><title>Staff file</title></head><body>${body}</body></html>`;
 }

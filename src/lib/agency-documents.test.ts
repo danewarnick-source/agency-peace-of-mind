@@ -208,21 +208,31 @@ describe("Agency documents lock", () => {
   });
 });
 
-describe("Agency documents surface lock", () => {
-  it("adds an Admin sidebar item and dedicated route", () => {
+describe("Agency file surface lock", () => {
+  it("folds Agency file under Admin Compliance and keeps Company policies", () => {
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
-    assert.match(nav, /to: "\/dashboard\/agency-documents", label: "Agency documents"/);
+    assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
+    assert.match(nav, /to: "\/dashboard\/state-audit"/);
+    assert.match(nav, /label: "State Audit"/);
+    assert.doesNotMatch(nav, /to: "\/dashboard\/agency-documents", label: "/);
+    assert.doesNotMatch(nav, /label: "Agency documents"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/company-obligations", label: "Compliance"/);
     const route = readFileSync(
       new URL("../routes/dashboard.agency-documents.tsx", import.meta.url),
       "utf8",
     );
     assert.match(route, /createFileRoute\("\/dashboard\/agency-documents"\)/);
-    assert.match(route, /Agency documents — Provider Interface/);
-    assert.match(route, /Company policies/);
-    assert.doesNotMatch(route, /ObligationPackGrid/);
-    assert.doesNotMatch(route, /EVV/);
-    assert.doesNotMatch(route, /eMAR/);
+    assert.match(route, /redirect/);
+    assert.match(route, /\/dashboard\/compliance/);
+    const panel = readFileSync(
+      new URL("../components/compliance/agency-file-panel.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(panel, /Agency file/);
+    assert.match(panel, /Company policies/);
+    assert.doesNotMatch(panel, /ObligationPackGrid/);
+    assert.doesNotMatch(panel, /EVV/);
+    assert.doesNotMatch(panel, /eMAR/);
   });
 
   it("replaces the company-obligations product path with a redirect", () => {
@@ -231,7 +241,7 @@ describe("Agency documents surface lock", () => {
       "utf8",
     );
     assert.match(src, /redirect/);
-    assert.match(src, /\/dashboard\/agency-documents/);
+    assert.match(src, /\/dashboard\/compliance/);
     assert.doesNotMatch(src, /ObligationPackGrid/);
     assert.doesNotMatch(src, /title: "Compliance/);
   });

@@ -48,7 +48,7 @@ import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
-  head: () => ({ meta: [{ title: "Personnel file — Provider Interface" }] }),
+  head: () => ({ meta: [{ title: "Staff file — Provider Interface" }] }),
   component: MyObligationsPage,
 });
 
@@ -847,9 +847,9 @@ function MyObligationsPage() {
     <div className="w-full space-y-6">
       <div className="max-md:hidden">
         <StaffPageHeader
-          eyebrow="Personnel file"
+          eyebrow="Staff file"
           eyebrowIcon={ClipboardList}
-          title="Personnel file"
+          title="Staff file"
           subtitle="Discrete dues on your file — On file, Missing, or Due soon."
         />
       </div>
@@ -886,7 +886,7 @@ function MyObligationsPage() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : instances.length === 0 && overlayOpen.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nothing on your personnel file yet. Check with your administrator.
+          Nothing on your staff file yet. Check with your administrator.
         </div>
       ) : shown.length === 0 && shownOverlay.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">

@@ -89,7 +89,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Staff open this from the personnel file and complete the in-Hive 30-day course (SOW §1.8(4)(A)–(W) plus separately scored SAS essential topics, then a competency exam). Completing every topic and the exam greens the obligation and issues a checklist certificate. Paid agencies need a purchased 30-day or pack seat; True North Supports is always free. One-time hire requirement — annual hours are a separate obligation.",
+      "Staff open this from the staff file and complete the in-Hive 30-day course (SOW §1.8(4)(A)–(W) plus separately scored SAS essential topics, then a competency exam). Completing every topic and the exam greens the obligation and issues a checklist certificate. Paid agencies need a purchased 30-day or pack seat; True North Supports is always free. One-time hire requirement — annual hours are a separate obligation.",
     due_rule: { kind: "days_after_hire", days: 30 },
     owner: "staff",
     service_codes: [],
@@ -577,7 +577,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "client_docs",
     fulfillment: "in_hive",
     fulfillment_note:
-      "One instance per staff+client assignment, due 30 days after assignment. Staff open this from the personnel file and complete the existing client-specific form (attest). Not a scenario course.",
+      "One instance per staff+client assignment, due 30 days after assignment. Staff open this from the staff file and complete the existing client-specific form (attest). Not a scenario course.",
     due_rule: { kind: "days_after_assignment", days: 30 },
     owner: "staff",
     service_codes: [],
@@ -590,7 +590,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "client_docs",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Staff open this from the personnel file and complete the existing support strategies form (attest) after it is published for that client. Due 30 days after the plan is activated.",
+      "Staff open this from the staff file and complete the existing support strategies form (attest) after it is published for that client. Due 30 days after the plan is activated.",
     due_rule: { kind: "days_after_event", days: 30 },
     owner: "manager",
     service_codes: [],
@@ -602,7 +602,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "client_docs",
     fulfillment: "in_hive",
     fulfillment_note:
-      "One instance per staff+client assignment. Staff open this from the personnel file and complete the existing person-centered thinking form with the client. Separate from the hire-level Person-Centered Thinking and Practices course.",
+      "One instance per staff+client assignment. Staff open this from the staff file and complete the existing person-centered thinking form with the client. Separate from the hire-level Person-Centered Thinking and Practices course.",
     due_rule: { kind: "days_after_assignment", days: 30 },
     owner: "staff",
     service_codes: [],
@@ -706,7 +706,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Required before working alone with a person with acquired brain injury. Assigned only to staff on an ABI caseload (or flagged requires_abi). Staff open this from the personnel file and complete the in-Hive ABI course plus competency exam.",
+      "Required before working alone with a person with acquired brain injury. Assigned only to staff on an ABI caseload (or flagged requires_abi). Staff open this from the staff file and complete the in-Hive ABI course plus competency exam.",
     due_rule: { kind: "days_after_hire", days: 0 },
     owner: "staff",
     service_codes: [],
@@ -961,7 +961,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "standing_records",
     fulfillment: "standing",
     fulfillment_note:
-      "Site posting of the DHHS Code of Conduct. Separate from the signed staff copy on the personnel file.",
+      "Site posting of the DHHS Code of Conduct. Separate from the signed staff copy on the staff file.",
     due_rule: { kind: "standing" },
     owner: "admin",
     service_codes: [],

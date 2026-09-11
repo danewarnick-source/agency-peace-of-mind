@@ -309,7 +309,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           id: `personnel-file-${row.staff_id}`,
           area: "staff_certifications",
           severity: row.missing > 0 ? "critical" : "attention",
-          title: `${row.full_name} personnel file`,
+          title: `${row.full_name} staff file`,
           detail:
             `${detailParts.join("; ")}` +
             (missingTitles.length
@@ -319,7 +319,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           subjectId: row.staff_id,
           subjectName: row.full_name,
           fixHref: `/dashboard/employees/${row.staff_id}?tab=personnel`,
-          fixLabel: "Open personnel file",
+          fixLabel: "Open staff file",
           asOf: todayIso(),
         });
       }

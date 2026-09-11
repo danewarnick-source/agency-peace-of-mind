@@ -34,8 +34,12 @@ ADMIN AREA (admin/manager/super_admin):
 - /dashboard/pba-ledger — PBA Trust Ledger: client personal-budget accounts, deposits, withdrawals, audit samples.
 - /dashboard/scheduling — Scheduling: publish/edit staff shifts on a calendar.
 - /dashboard/employees — Employees: staff roster, profiles, pay rates, certifications, role assignments.
-- /dashboard/personnel-file — Personnel file: org-wide staff file status (missing / due soon / on file). Opens each employee Personnel file.
-- /dashboard/agency-documents — Agency documents: org-wide standing flags and encoded DSPD policies. Company policies sub-tab is internal and not a Practice Audit DSPD row.
+- /dashboard/compliance — Compliance: Staff file, Client file, and Agency file (Company policies is a sub-tab under Agency file).
+- /dashboard/compliance?tab=staff — Staff file: org-wide staff file status (missing / due soon / on file). Opens each employee Staff file.
+- /dashboard/compliance?tab=client — Client file: org-wide client file status. Opens each client's Client file.
+- /dashboard/compliance?tab=agency — Agency file: org-wide standing flags and encoded DSPD policies. Company policies sub-tab is internal and not a Practice Audit DSPD row.
+- /dashboard/personnel-file — legacy Staff file URL (redirects to Compliance → Staff file).
+- /dashboard/agency-documents — legacy Agency file URL (redirects to Compliance → Agency file).
 - /dashboard/clients — Clients: client profiles, demographics, medications, documents, custom fields.
 - /dashboard/teams — Teams & Homes: org structure, host-home sites, team membership.
 - /dashboard/assignments — Caseload Assignment Center: per staff × client × service-code toggles.
@@ -51,7 +55,7 @@ STAFF AREA (employee/host_family):
 - /dashboard                 — My Caseload.
 - /dashboard/timeclock       — General Time Clock.
 - /dashboard/daily-logs      — Daily logs and host-home daily workflow.
-- /dashboard/my-obligations  — Assigned trainings and forms (staff complete only what is listed here).
+- /dashboard/my-obligations  — Staff file: assigned trainings and forms (staff complete only what is listed here).
 
 ROLE RULES: Staff & host-family NEVER see billing rates, dollar amounts, the 520 view, or other clients' data.`;
 

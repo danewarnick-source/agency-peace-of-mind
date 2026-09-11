@@ -2496,7 +2496,7 @@ export const pauseObligationsForArchivedForm = createServerFn({ method: "POST" }
         title: "Obligation paused — linked form archived",
         body:
           `${list.length} obligation(s) were paused because their linked form '${formName}' was archived: ${titles}. ` +
-          `Edit each duty in Agency documents to restore it.`,
+          `Edit each duty in Agency file to restore it.`,
         link_to: "/dashboard/agency-documents",
       }));
       const { error: notifErr } = await supabase.from("notifications").insert(rows);
@@ -3246,7 +3246,7 @@ export const remindOutstandingAssignees = createServerFn({ method: "POST" })
       urgency,
       title: `${ob.title} requires your attention`,
       body:
-        `${inst.period_key}. Please complete this on your personnel file.` +
+        `${inst.period_key}. Please complete this on your staff file.` +
         `${ob.description ? " " + ob.description.slice(0, 120) : ""}`,
       link_to: "/dashboard/my-obligations",
       related_id: data.instanceId,

@@ -254,7 +254,7 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: ShieldCheck, label: "Audit readiness", value: metrics.audit,
       nextAction: "Open audit metrics",
-      to: "/dashboard/agency-documents",
+      to: "/dashboard/compliance", search: { tab: "agency" },
     },
     {
       icon: MapPin, label: "EVV documentation", value: metrics.evv,
@@ -267,11 +267,11 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
       to: "/dashboard/hub/documentation", search: { tab: "records", focus: "doc-gaps" },
     },
     {
-      icon: BadgeCheck, label: "Personnel file", value: metrics.creds,
+      icon: BadgeCheck, label: "Staff file", value: metrics.creds,
       nextAction: staffGaps
         ? `Complete ${staffGaps} item${staffGaps === 1 ? "" : "s"}`
-        : "Open Personnel file",
-      to: "/dashboard/personnel-file",
+        : "Open Staff file",
+      to: "/dashboard/compliance", search: { tab: "staff" },
     },
     {
       icon: Activity, label: "Overall compliance", value: metrics.overall,

@@ -26,16 +26,16 @@ export function HrAdminPage() {
         <div>
           <h1 className="text-xl font-semibold">HR Admin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Other trainings and HR settings. File status for every staffer lives on{" "}
-            <Link to="/dashboard/personnel-file" className="font-medium text-[var(--hive-ink)] underline">
-              Personnel file
+            Other trainings and HR settings.             File status for every staffer lives on{" "}
+            <Link to="/dashboard/compliance" search={{ tab: "staff" }} className="font-medium text-[var(--hive-ink)] underline">
+              Staff file
             </Link>
             .
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to="/dashboard/personnel-file">Open Personnel file</Link>
+            <Link to="/dashboard/compliance" search={{ tab: "staff" }}>Open Staff file</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to="/dashboard/hr-admin/settings">

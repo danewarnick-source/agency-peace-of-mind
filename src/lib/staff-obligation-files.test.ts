@@ -132,12 +132,14 @@ describe("dueLabel", () => {
 });
 
 describe("Admin employee profile lock", () => {
-  it("keeps Profile / Personnel file / Activity and drops junk surfaces", () => {
+  it("keeps Profile / Staff file / Activity and drops junk surfaces", () => {
     const src = readFileSync(
       new URL("../routes/dashboard.employees.$staffId.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(src, /Personnel file/);
+    assert.match(src, /Staff file/);
+    assert.match(src, /s\.tab === "staff"/);
+    assert.doesNotMatch(src, /Personnel file/);
     assert.match(src, /value="profile"/);
     assert.match(src, /value="personnel"/);
     assert.match(src, /value="activity"/);
@@ -230,13 +232,13 @@ describe("missingPersonnelCsv", () => {
   });
 });
 
-describe("Staff personnel file page lock", () => {
+describe("Staff staff-file page lock", () => {
   it("renames the staff surface and keeps 30-day course or upload on one card", () => {
     const src = readFileSync(
       new URL("../routes/dashboard.my-obligations.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(src, /title="Personnel file"/);
+    assert.match(src, /title="Staff file"/);
     assert.match(src, /Or upload a certificate/);
     assert.match(src, /A certificate upload clears this same 30-day card/);
     assert.doesNotMatch(src, /title="My Obligations"/);
@@ -249,19 +251,30 @@ describe("Staff personnel file page lock", () => {
   });
 });
 
-describe("Org-wide Personnel file lock", () => {
-  it("adds an Admin sidebar item and dedicated route", () => {
+describe("Org-wide Staff file lock", () => {
+  it("folds Staff file under Admin Compliance and keeps the legacy URL", () => {
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
-    assert.match(nav, /to: "\/dashboard\/personnel-file", label: "Personnel file"/);
+    assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
+    assert.match(nav, /to: "\/dashboard\/state-audit"/);
+    assert.match(nav, /label: "State Audit"/);
+    assert.doesNotMatch(nav, /to: "\/dashboard\/personnel-file", label: "/);
+    assert.doesNotMatch(nav, /label: "Personnel file"/);
     const route = readFileSync(
       new URL("../routes/dashboard.personnel-file.tsx", import.meta.url),
       "utf8",
     );
     assert.match(route, /createFileRoute\("\/dashboard\/personnel-file"\)/);
-    assert.match(route, /Personnel file — Provider Interface/);
-    assert.match(route, /OrgPersonnelFileMatrix/);
-    assert.doesNotMatch(route, /EVV/);
-    assert.doesNotMatch(route, /HRC/);
+    assert.match(route, /\/dashboard\/compliance/);
+    assert.match(route, /tab: "staff"/);
+    assert.match(route, /redirect/);
+    const panel = readFileSync(
+      new URL("../components/compliance/staff-file-panel.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(panel, /Staff file/);
+    assert.match(panel, /OrgPersonnelFileMatrix/);
+    assert.doesNotMatch(panel, /EVV/);
+    assert.doesNotMatch(panel, /HRC/);
   });
 
   it("deletes the leftover open-every-profile HR matrix", () => {
@@ -271,7 +284,7 @@ describe("Org-wide Personnel file lock", () => {
     );
     assert.doesNotMatch(hrAdmin, /HrComplianceMatrix/);
     assert.doesNotMatch(hrAdmin, /getHrAdminRollup/);
-    assert.match(hrAdmin, /to="\/dashboard\/personnel-file"/);
+    assert.match(hrAdmin, /to="\/dashboard\/compliance"/);
     const matrixFns = readFileSync(new URL("./hr-staff.functions.ts", import.meta.url), "utf8");
     assert.doesNotMatch(matrixFns, /getHrComplianceMatrix/);
     assert.doesNotMatch(matrixFns, /getHrAdminRollup/);

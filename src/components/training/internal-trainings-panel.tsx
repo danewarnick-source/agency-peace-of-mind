@@ -108,7 +108,7 @@ export function InternalTrainingsPanel({ orgId }: { orgId: string }) {
           fileSizeBytes: file?.size ?? null,
         },
       });
-      toast.success("Policy added. Staff will see it on their personnel file.");
+      toast.success("Policy added. Staff will see it on their staff file.");
       reset();
       qc.invalidateQueries({ queryKey: ["agency-policies", orgId] });
     } catch (e) {
@@ -125,7 +125,7 @@ export function InternalTrainingsPanel({ orgId }: { orgId: string }) {
           <h2 className="font-display text-xl font-semibold text-[#1A2B47]">Internal trainings</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             One binder for this agency. Add a policy, pick who it applies to, and Hive puts it on
-            those staff members&apos; personnel file. Staff read or watch it and attest. This
+            those staff members&apos; staff file. Staff read or watch it and attest. This
             is not a course builder and does not replace the 30-day orientation topics.
           </p>
         </div>
@@ -254,7 +254,7 @@ export function InternalTrainingsPanel({ orgId }: { orgId: string }) {
           <BookOpen className="mx-auto h-8 w-8 text-[var(--hive-gold)]" />
           <p className="mt-3 font-medium">No agency policies yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add the first one. Staff finish it on their personnel file — they do not hunt a separate Policies tab.
+            Add the first one. Staff finish it on their staff file — they do not hunt a separate Policies tab.
           </p>
         </div>
       ) : (
@@ -275,7 +275,7 @@ export function InternalTrainingsPanel({ orgId }: { orgId: string }) {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {p.open_count} open on personnel file
+                  {p.open_count} open on staff file
                 </p>
               </div>
             </li>

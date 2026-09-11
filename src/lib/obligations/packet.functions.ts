@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { sowCatalogEntry, sowCatalogEntryByKey } from "@/lib/sow-obligation-catalog";
 import { EMPTY_ORG_FACTS, loadOrgFacts, type OrgFacts } from "@/lib/obligations/applicability";
+import { loadStaffDutyFactsInternal } from "@/lib/obligations/load-staff-duty-facts.functions";
 import {
   loadOrgScopeSnapshot,
   orgWideResolvedScope,
@@ -129,6 +130,14 @@ export async function assembleCompliancePacket(args: {
     ? resolveScopeFromSnapshot(args.organizationId, args.viewerUserId, snapshot)
     : orgWideResolvedScope(args.organizationId, args.viewerUserId);
 
+  let staffDutyFacts = null;
+  if (args.subject === "staff" && args.subjectId) {
+    const map = await loadStaffDutyFactsInternal(args.supabase, args.organizationId, [
+      args.subjectId,
+    ]);
+    staffDutyFacts = map.get(args.subjectId) ?? null;
+  }
+
   return buildPacket({
     organizationId: args.organizationId,
     subject: args.subject,
@@ -137,6 +146,7 @@ export async function assembleCompliancePacket(args: {
     scope,
     facts,
     clocks,
+    staffDutyFacts,
   });
 }
 

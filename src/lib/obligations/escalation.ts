@@ -15,6 +15,16 @@ import {
   sowCatalogEntryByKey,
   type ObligationCategory,
 } from "../sow-obligation-catalog.ts";
+import { loadOrgFacts, type OrgFacts } from "./applicability.ts";
+import {
+  assignmentGapsForStaff,
+  dutyKeyForObligation,
+  evaluateStaffDuty,
+  evaluateStaffDuties,
+  type DutyGap,
+  type StaffDutyFacts,
+} from "./duty-applicability.ts";
+import { loadStaffDutyFactsInternal } from "./load-staff-duty-facts.functions.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -158,6 +168,11 @@ export type EvaluateInput = {
   scopeByStaffId?: Record<string, string | null>;
   leadsByGroupId?: Record<string, string[]>;
   scopeMembers?: ScopeMemberRow[];
+  /** Slice 2 — live assignment facts. Optional so existing tests keep working. */
+  staffDutyFactsById?: Record<string, StaffDutyFacts>;
+  orgFacts?: OrgFacts | null;
+  dutyFactsKnown?: boolean;
+  dutyGaps?: DutyGap[];
 };
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -404,6 +419,27 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
   };
   const hits: EscalationHit[] = [];
 
+  function instanceDutyDoesNotApply(
+    evalInput: EvaluateInput,
+    obligation: ObligationSnapshot,
+    instance: InstanceSnapshot,
+  ): boolean {
+    if (!evalInput.staffDutyFactsById) return false;
+    const staffId = instance.assignee_staff_id;
+    if (!staffId) return false;
+    const facts = evalInput.staffDutyFactsById[staffId];
+    if (!facts) return false;
+    const key = obligation.key ?? catalogForObligation(obligation)?.key ?? null;
+    if (!key) return false;
+    return (
+      evaluateStaffDuty({
+        dutyKey: key,
+        staff: facts,
+        orgFacts: evalInput.orgFacts,
+      }).status === "does_not_apply"
+    );
+  }
+
   const pushHit = (
     trigger: EscalationTrigger,
     ob: ObligationSnapshot,
@@ -434,6 +470,7 @@ export function evaluateEscalations(input: EvaluateInput): EscalationHit[] {
   for (const instance of input.instances) {
     const ob = input.obligations.find((o) => o.id === instance.obligation_id);
     if (!ob) continue;
+    if (instanceDutyDoesNotApply(input, ob, instance)) continue;
     const catalog = catalogForObligation(ob);
     const subject = subjectFor(input.organizationId, ob, instance, names, input.scopeByStaffId);
     const started = instanceIsStarted(instance, input.startedInstanceIds);
@@ -806,6 +843,63 @@ export async function loadEvaluateInput(
     }
   }
 
+  const memberRows = (members ?? []) as OrgMemberRow[];
+  let staffDutyFactsById: Record<string, StaffDutyFacts> | undefined;
+  let orgFacts: OrgFacts | null = null;
+  let dutyFactsKnown = false;
+  let dutyGaps: DutyGap[] = [];
+  try {
+    orgFacts = await loadOrgFacts(supabase, organizationId);
+    const memberIds = memberRows.map((m) => m.user_id);
+    const factsMap = await loadStaffDutyFactsInternal(supabase, organizationId, memberIds);
+    staffDutyFactsById = Object.fromEntries(factsMap);
+    dutyFactsKnown = [...factsMap.values()].every((f) => f.assignmentsKnown);
+    const dutyKeys = [
+      ...new Set(
+        obs
+          .filter((o) => {
+            const catalog = catalogForObligation(o);
+            return (
+              o.scope === "staff" || o.scope === "staff_per_client" || catalog?.owner === "staff"
+            );
+          })
+          .map((o) => dutyKeyForObligation(o))
+          .filter((k): k is string => !!k),
+      ),
+    ];
+    const assignedByStaff = new Map<string, Set<string>>();
+    for (const inst of insts) {
+      if (!inst.assignee_staff_id) continue;
+      const ob = obs.find((o) => o.id === inst.obligation_id);
+      const key = ob ? dutyKeyForObligation(ob) : null;
+      if (!key) continue;
+      const set = assignedByStaff.get(inst.assignee_staff_id) ?? new Set<string>();
+      set.add(key);
+      assignedByStaff.set(inst.assignee_staff_id, set);
+    }
+    for (const [staffId, facts] of factsMap) {
+      const duties = evaluateStaffDuties({ dutyKeys, staff: facts, orgFacts });
+      dutyGaps.push(
+        ...assignmentGapsForStaff({
+          staff: facts,
+          duties,
+          assignedDutyKeys: assignedByStaff.get(staffId) ?? new Set(),
+          evaluationComplete: facts.assignmentsKnown,
+        }),
+      );
+    }
+  } catch (e) {
+    console.warn("[obligations] duty facts for evaluate input failed:", e);
+    dutyFactsKnown = false;
+    dutyGaps = [
+      {
+        staffId: "*",
+        dutyKey: "*",
+        kind: "evaluation_incomplete",
+      },
+    ];
+  }
+
   return {
     organizationId,
     now,
@@ -813,13 +907,17 @@ export async function loadEvaluateInput(
     obligations: obs,
     instances: insts,
     startedInstanceIds,
-    members: (members ?? []) as OrgMemberRow[],
+    members: memberRows,
     futureShiftCounts,
     obligationHasEvidence,
     subjectNames,
     scopeByStaffId: scopeSnapshot.scopeByStaffId,
     leadsByGroupId: scopeSnapshot.leadsByGroupId,
     scopeMembers: scopeSnapshot.members,
+    staffDutyFactsById,
+    orgFacts,
+    dutyFactsKnown,
+    dutyGaps,
   };
 }
 

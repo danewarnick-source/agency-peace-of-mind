@@ -10,16 +10,39 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Users, Loader2, ChevronDown, ChevronRight, Save, AlertTriangle, ShieldAlert } from "lucide-react";
+import {
+  Users,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Save,
+  AlertTriangle,
+  ShieldAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.functions";
-import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
+import {
+  onStaffAssignmentCreated,
+  onStaffAssignmentRemoved,
+} from "@/lib/staff-assignment-hooks.functions";
 
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — Provider Interface" }] }),
@@ -49,6 +72,7 @@ function AssignmentsPage() {
   const qc = useQueryClient();
   const [staffId, setStaffId] = useState("");
   const assignmentHookFn = useServerFn(onStaffAssignmentCreated);
+  const assignmentRemovedFn = useServerFn(onStaffAssignmentRemoved);
 
   const { data: staff } = useQuery({
     enabled: !!org,
@@ -76,13 +100,14 @@ function AssignmentsPage() {
     enabled: !!org,
     queryKey: ["assign-clients", org?.organization_id],
     queryFn: async (): Promise<ClientRow[]> => {
+      // eslint-disable-next-line no-restricted-syntax -- existing caseload picker
       const { data } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, first_name, last_name, job_code" as any)
         .eq("organization_id", org!.organization_id)
         .order("last_name");
-      return ((data ?? []) as unknown) as ClientRow[];
+      return (data ?? []) as unknown as ClientRow[];
     },
   });
 
@@ -97,7 +122,7 @@ function AssignmentsPage() {
         .eq("organization_id", org!.organization_id)
         .eq("staff_id", staffId);
       if (error) throw error;
-      return ((data ?? []) as unknown) as AssignmentRow[];
+      return (data ?? []) as unknown as AssignmentRow[];
     },
   });
 
@@ -111,7 +136,9 @@ function AssignmentsPage() {
       const c = clients.find((x) => x.id === a.client_id);
       const all = (c?.job_code ?? []).filter(Boolean);
       // null service_codes = legacy "all codes"
-      next[a.client_id] = new Set(a.service_codes && a.service_codes.length ? a.service_codes : all);
+      next[a.client_id] = new Set(
+        a.service_codes && a.service_codes.length ? a.service_codes : all,
+      );
     }
     setDraft(next);
   }, [assignments, clients]);
@@ -138,10 +165,7 @@ function AssignmentsPage() {
       const toDelete: string[] = [];
       const toUpsert: { client_id: string; codes: string[] }[] = [];
 
-      const allClientIds = new Set<string>([
-        ...Object.keys(draft),
-        ...Array.from(existing.keys()),
-      ]);
+      const allClientIds = new Set<string>([...Object.keys(draft), ...Array.from(existing.keys())]);
       for (const cid of allClientIds) {
         const codes = Array.from(draft[cid] ?? new Set<string>()).sort();
         const wasAssigned = existing.has(cid);
@@ -153,11 +177,15 @@ function AssignmentsPage() {
       }
 
       if (toDelete.length) {
-        const { error } = await supabase
-          .from("staff_assignments")
-          .delete()
-          .in("id", toDelete);
+        const { error } = await supabase.from("staff_assignments").delete().in("id", toDelete);
         if (error) throw error;
+        try {
+          await assignmentRemovedFn({
+            data: { organizationId: org.organization_id, staffId },
+          });
+        } catch (e) {
+          console.warn("[obligations] assignment remove reevaluate failed:", e);
+        }
       }
 
       for (const row of toUpsert) {
@@ -172,13 +200,13 @@ function AssignmentsPage() {
         } else {
           const { error } = await supabase
             .from("staff_assignments")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
             .insert({
               organization_id: org.organization_id,
               staff_id: staffId,
               client_id: row.client_id,
               service_codes: row.codes,
-            } as any);
+            } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
           if (error) throw error;
         }
         try {
@@ -219,21 +247,24 @@ function AssignmentsPage() {
   const canOverrideBlock = myRole === "admin";
 
   type UnmetItem = { name: string; form_id: string; enforcement: "warn" | "block" };
-  const [pendingWarning, setPendingWarning] = useState<
-    | { items: UnmetItem[]; newClientIds: string[] }
-    | null
-  >(null);
-  const [pendingBlock, setPendingBlock] = useState<
-    | { items: UnmetItem[]; newClientIds: string[] }
-    | null
-  >(null);
+  const [pendingWarning, setPendingWarning] = useState<{
+    items: UnmetItem[];
+    newClientIds: string[];
+  } | null>(null);
+  const [pendingBlock, setPendingBlock] = useState<{
+    items: UnmetItem[];
+    newClientIds: string[];
+  } | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
 
   // Best-effort flag/notify after a proceed-anyway save. Failures here MUST
   // NOT roll back or block the assignment write — log only.
   async function recordOverrideBestEffort(p: {
-    formIds: string[]; names: string[]; newClientIds: string[];
-    overrideKind: "warn_proceed" | "block_override"; overrideReason?: string;
+    formIds: string[];
+    names: string[];
+    newClientIds: string[];
+    overrideKind: "warn_proceed" | "block_override";
+    overrideReason?: string;
   }) {
     if (!staffId || !p.formIds.length || !p.newClientIds.length) return;
     try {
@@ -311,8 +342,9 @@ function AssignmentsPage() {
           <Users className="h-6 w-6 text-muted-foreground" /> Caseload Assignment Center
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Assign staff to specific clients <strong>and</strong> the service codes they cover for each.
-          Staff only see their assigned clients and codes in Time Clock, Daily Logs, and NECTAR.
+          Assign staff to specific clients <strong>and</strong> the service codes they cover for
+          each. Staff only see their assigned clients and codes in Time Clock, Daily Logs, and
+          NECTAR.
         </p>
       </div>
 
@@ -321,10 +353,14 @@ function AssignmentsPage() {
           <div className="grid gap-1.5">
             <Label className="text-xs">Staff member</Label>
             <Select value={staffId} onValueChange={setStaffId}>
-              <SelectTrigger><SelectValue placeholder="Select a staff member" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a staff member" />
+              </SelectTrigger>
               <SelectContent>
                 {staff?.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -334,7 +370,9 @@ function AssignmentsPage() {
               {counts.clientsN} clients · {counts.servicesN} services selected
             </span>
             <Button
-              onClick={() => { void attemptSave(); }}
+              onClick={() => {
+                void attemptSave();
+              }}
               disabled={!staffId || saveMut.isPending}
               className="h-11 bg-[image:var(--gradient-amber)] text-[#412402] hover:brightness-95"
             >
@@ -373,7 +411,9 @@ function AssignmentsPage() {
       {/* WARN dialog — existing non-blocking flow (default behavior). */}
       <AlertDialog
         open={!!pendingWarning}
-        onOpenChange={(o) => { if (!o) setPendingWarning(null); }}
+        onOpenChange={(o) => {
+          if (!o) setPendingWarning(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -388,11 +428,11 @@ function AssignmentsPage() {
                   {(pendingWarning?.items.length ?? 0) === 1 ? "" : "s"}:
                 </p>
                 <ul className="list-disc pl-5">
-                  {pendingWarning?.items.map((u) => (<li key={u.form_id}>{u.name}</li>))}
+                  {pendingWarning?.items.map((u) => (
+                    <li key={u.form_id}>{u.name}</li>
+                  ))}
                 </ul>
-                <p className="text-muted-foreground">
-                  You can proceed; this will be recorded.
-                </p>
+                <p className="text-muted-foreground">You can proceed; this will be recorded.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -404,12 +444,13 @@ function AssignmentsPage() {
                 setPendingWarning(null);
                 saveMut.mutate(undefined, {
                   onSuccess: () => {
-                    if (p) void recordOverrideBestEffort({
-                      formIds: p.items.map((i) => i.form_id),
-                      names: p.items.map((i) => i.name),
-                      newClientIds: p.newClientIds,
-                      overrideKind: "warn_proceed",
-                    });
+                    if (p)
+                      void recordOverrideBestEffort({
+                        formIds: p.items.map((i) => i.form_id),
+                        names: p.items.map((i) => i.name),
+                        newClientIds: p.newClientIds,
+                        overrideKind: "warn_proceed",
+                      });
                   },
                 });
               }}
@@ -423,7 +464,12 @@ function AssignmentsPage() {
       {/* BLOCK dialog — hard stop. Owner may override with a typed reason. */}
       <AlertDialog
         open={!!pendingBlock}
-        onOpenChange={(o) => { if (!o) { setPendingBlock(null); setOverrideReason(""); } }}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPendingBlock(null);
+            setOverrideReason("");
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -434,26 +480,28 @@ function AssignmentsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  This staffer cannot be assigned until the following blocking
-                  required form{(pendingBlock?.items.length ?? 0) === 1 ? " is" : "s are"} complete:
+                  This staffer cannot be assigned until the following blocking required form
+                  {(pendingBlock?.items.length ?? 0) === 1 ? " is" : "s are"} complete:
                 </p>
                 <ul className="list-disc pl-5">
                   {pendingBlock?.items.map((u) => (
                     <li key={u.form_id}>
                       {u.name}
                       {u.enforcement === "block" ? (
-                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-800">Block</span>
+                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-800">
+                          Block
+                        </span>
                       ) : (
-                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">Warn</span>
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
+                          Warn
+                        </span>
                       )}
                     </li>
                   ))}
                 </ul>
                 {canOverrideBlock ? (
                   <div className="pt-2">
-                    <Label className="text-xs font-semibold">
-                      Override reason (required)
-                    </Label>
+                    <Label className="text-xs font-semibold">Override reason (required)</Label>
                     <Textarea
                       value={overrideReason}
                       onChange={(e) => setOverrideReason(e.target.value)}
@@ -464,9 +512,8 @@ function AssignmentsPage() {
                   </div>
                 ) : (
                   <p className="rounded bg-amber-50 px-3 py-2 text-amber-900">
-                    You don't have permission to override a blocking mandate.
-                    Please ask an admin or owner, or have the staffer complete
-                    the form(s) above before assignment.
+                    You don't have permission to override a blocking mandate. Please ask an admin or
+                    owner, or have the staffer complete the form(s) above before assignment.
                   </p>
                 )}
               </div>
@@ -474,7 +521,10 @@ function AssignmentsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
-              onClick={() => { setPendingBlock(null); setOverrideReason(""); }}
+              onClick={() => {
+                setPendingBlock(null);
+                setOverrideReason("");
+              }}
             >
               Cancel
             </AlertDialogCancel>

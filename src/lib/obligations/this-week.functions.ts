@@ -1,6 +1,7 @@
 // This Week queue (Compliance revamp Step 2 + Step 3 scope + Step 5 source 5).
 
 import { loadOrgFacts, unansweredFactsQuietSummary } from "./applicability.ts";
+import { unansweredDutyQuietSummary } from "./duty-applicability.ts";
 import {
   evaluateEscalations,
   isAdminLevelRole,
@@ -265,6 +266,11 @@ async function loadQuietCounts(
   const notesPassed = passedRes.error ? 0 : (passedRes.count ?? 0);
   const recordsReviewCleared = reviewRes.error ? 0 : (reviewRes.count ?? 0);
 
+  const dutyGaps = input.dutyGaps ?? [];
+  const evaluationIncomplete =
+    input.dutyFactsKnown === false || dutyGaps.some((g) => g.kind === "evaluation_incomplete");
+  const assignmentGaps = dutyGaps.filter((g) => g.kind !== "evaluation_incomplete").length;
+
   return buildQuietLine({
     obligationsSatisfied,
     notesPassed,
@@ -272,6 +278,8 @@ async function loadQuietCounts(
     standingCurrent,
     recordsReviewCleared,
     evvReconciledThrough: evvNeedsReview === 0 ? lastSundayLabel() : null,
+    assignmentGaps,
+    evaluationIncomplete,
   });
 }
 
@@ -342,11 +350,11 @@ export async function getThisWeek(
     }
   }
 
-  // 5. Org-profile facts stay loadable (source org_profile_facts). They are
-  // not Home cards — QuietSummary is rolled into QuietLine, not the queue.
+  // 5. Org-profile facts (source org_profile_facts) + assignment gaps stay loadable.
   if (adminLevel) {
     const facts = await loadOrgFacts(supabase, orgId);
     if (facts) unansweredFactsQuietSummary(orgId, facts);
+    unansweredDutyQuietSummary(orgId, input.dutyGaps ?? []);
   }
 
   // 6. evv_timesheets needs_review in scope — QuietLine, not a card.

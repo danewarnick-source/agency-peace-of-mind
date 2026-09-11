@@ -14,25 +14,33 @@ import {
   assignmentNeedsSupportStrategies,
   clientFlagsFromExistingSchema,
   hireDueDaysForTitle,
-  titleGroupsForHire,
 } from "./obligation-auto-assign.ts";
 
 describe("hire auto-assign", () => {
   it("always assigns the locked hire set", () => {
-    assert.deepEqual([...HIRE_ALWAYS_TITLES], [
-      CODE_OF_CONDUCT_TITLE,
-      THIRTY_DAY_OBLIGATION_TITLE,
-      "CPR/First Aid Certification — Initial",
-      PCT_HIRE_COURSE_TITLE,
-    ]);
-    assert.equal(titleGroupsForHire().length, 4);
+    assert.deepEqual(
+      [...HIRE_ALWAYS_TITLES],
+      [
+        CODE_OF_CONDUCT_TITLE,
+        THIRTY_DAY_OBLIGATION_TITLE,
+        "CPR/First Aid Certification — Initial",
+        PCT_HIRE_COURSE_TITLE,
+      ],
+    );
+    assert.equal(HIRE_ALWAYS_TITLES.length, 4);
     assert.equal([...HIRE_ALWAYS_TITLES].includes(CONFLICT_OF_INTEREST_TITLE), false);
-    assert.ok(titleGroupsForHire().some((group) => group.includes(PCT_HIRE_COURSE_TITLE)));
+    assert.ok([...HIRE_ALWAYS_TITLES].includes(PCT_HIRE_COURSE_TITLE));
+    const hireSet = readFileSync(
+      fileURLToPath(new URL("./obligation-auto-assign.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.doesNotMatch(hireSet, /titleGroupsForHire/);
     const hireHook = readFileSync(
       fileURLToPath(new URL("./staff-assignment-hooks.functions.ts", import.meta.url)),
       "utf8",
     );
-    assert.match(hireHook, /titleGroupsForHire\(\)/);
+    assert.match(hireHook, /reevaluateStaffDutiesInternal/);
+    assert.doesNotMatch(hireHook, /titleGroupsForHire\(\)/);
     assert.doesNotMatch(hireHook, /PCT_HIRE_COURSE_TITLE/);
   });
 
@@ -51,7 +59,15 @@ describe("hire auto-assign", () => {
 
 describe("assignment auto-assign", () => {
   it("assigns ABI once per staff when the client or staff is ABI", () => {
-    assert.equal(assignmentNeedsAbi({ hasAbi: true, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false }), true);
+    assert.equal(
+      assignmentNeedsAbi({
+        hasAbi: true,
+        hasBehaviorPlan: false,
+        hasLikelyAggression: false,
+        hasPcsp: false,
+      }),
+      true,
+    );
     assert.equal(
       assignmentNeedsAbi(
         { hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false },
@@ -60,7 +76,12 @@ describe("assignment auto-assign", () => {
       true,
     );
     assert.equal(
-      assignmentNeedsAbi({ hasAbi: false, hasBehaviorPlan: true, hasLikelyAggression: false, hasPcsp: false }),
+      assignmentNeedsAbi({
+        hasAbi: false,
+        hasBehaviorPlan: true,
+        hasLikelyAggression: false,
+        hasPcsp: false,
+      }),
       false,
     );
     assert.deepEqual([...ABI_OBLIGATION_TITLES], [ABI_OBLIGATION_TITLE]);
@@ -68,11 +89,21 @@ describe("assignment auto-assign", () => {
 
   it("assigns Mandt from a behavior plan, likely-aggression flag, or staff de-escalation flag", () => {
     assert.equal(
-      assignmentNeedsMandt({ hasAbi: false, hasBehaviorPlan: true, hasLikelyAggression: false, hasPcsp: false }),
+      assignmentNeedsMandt({
+        hasAbi: false,
+        hasBehaviorPlan: true,
+        hasLikelyAggression: false,
+        hasPcsp: false,
+      }),
       true,
     );
     assert.equal(
-      assignmentNeedsMandt({ hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: true, hasPcsp: false }),
+      assignmentNeedsMandt({
+        hasAbi: false,
+        hasBehaviorPlan: false,
+        hasLikelyAggression: true,
+        hasPcsp: false,
+      }),
       true,
     );
     assert.equal(
@@ -83,18 +114,33 @@ describe("assignment auto-assign", () => {
       true,
     );
     assert.equal(
-      assignmentNeedsMandt({ hasAbi: true, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false }),
+      assignmentNeedsMandt({
+        hasAbi: true,
+        hasBehaviorPlan: false,
+        hasLikelyAggression: false,
+        hasPcsp: false,
+      }),
       false,
     );
   });
 
   it("unlocks support strategies only when the client has a PCSP", () => {
     assert.equal(
-      assignmentNeedsSupportStrategies({ hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: true }),
+      assignmentNeedsSupportStrategies({
+        hasAbi: false,
+        hasBehaviorPlan: false,
+        hasLikelyAggression: false,
+        hasPcsp: true,
+      }),
       true,
     );
     assert.equal(
-      assignmentNeedsSupportStrategies({ hasAbi: false, hasBehaviorPlan: false, hasLikelyAggression: false, hasPcsp: false }),
+      assignmentNeedsSupportStrategies({
+        hasAbi: false,
+        hasBehaviorPlan: false,
+        hasLikelyAggression: false,
+        hasPcsp: false,
+      }),
       false,
     );
   });

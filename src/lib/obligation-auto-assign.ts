@@ -23,13 +23,6 @@ export const HIRE_ALWAYS_TITLES = [
   PCT_HIRE_COURSE_TITLE,
 ] as const;
 
-export const HIRE_ALWAYS_TITLE_ALIASES: Record<string, readonly string[]> = {
-  [CODE_OF_CONDUCT_TITLE]: [CODE_OF_CONDUCT_TITLE],
-  [THIRTY_DAY_OBLIGATION_TITLE]: [THIRTY_DAY_OBLIGATION_TITLE],
-  [CPR_OBLIGATION_TITLES[1]]: [...CPR_OBLIGATION_TITLES],
-  [PCT_HIRE_COURSE_TITLE]: [PCT_HIRE_COURSE_TITLE],
-};
-
 export const ABI_OBLIGATION_TITLES = [ABI_OBLIGATION_TITLE] as const;
 
 export type ClientAssignmentFlags = {
@@ -50,9 +43,7 @@ export function assignmentNeedsMandt(
   staff?: StaffAssignmentFlags,
 ): boolean {
   return (
-    client.hasBehaviorPlan ||
-    client.hasLikelyAggression ||
-    staff?.requiresDeescalation === true
+    client.hasBehaviorPlan || client.hasLikelyAggression || staff?.requiresDeescalation === true
   );
 }
 
@@ -81,12 +72,6 @@ export function hireDueDaysForTitle(title: string): number {
   return 30;
 }
 
-export function titleGroupsForHire(): string[][] {
-  return HIRE_ALWAYS_TITLES.map((title) => [
-    ...(HIRE_ALWAYS_TITLE_ALIASES[title] ?? [title]),
-  ]);
-}
-
 /**
  * Existing-schema flags used for Mandt. Do not invent new columns:
  * behavior_support_clients.features_enabled, client_target_behaviors,
@@ -102,8 +87,8 @@ export function clientFlagsFromExistingSchema(row: {
 }): ClientAssignmentFlags {
   const hasPcsp = Boolean(
     (typeof row.pcsp_signed_date === "string" && row.pcsp_signed_date.trim()) ||
-      (typeof row.pcsp_expiration_date === "string" && row.pcsp_expiration_date.trim()) ||
-      (Array.isArray(row.pcsp_goals) && row.pcsp_goals.length > 0),
+    (typeof row.pcsp_expiration_date === "string" && row.pcsp_expiration_date.trim()) ||
+    (Array.isArray(row.pcsp_goals) && row.pcsp_goals.length > 0),
   );
   const hasBehaviorPlan = row.behaviorPlanEnabled === true;
   const hasLikelyAggression = row.hasTargetBehaviors === true;

@@ -12,10 +12,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import {
-  isRequirementApplicable,
-  parseAppliesTo,
-} from "@/lib/staff-applicability";
+import { isRequirementApplicable, parseAppliesTo } from "@/lib/staff-applicability";
 import {
   BASELINE_STAFF_TRAININGS,
   baselineRequirementId,
@@ -103,9 +100,7 @@ export const getStaffPii = createServerFn({ method: "GET" })
  */
 export const listStaffPii = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z.object({ organization_id: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ organization_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<StaffPii[]> => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return [];
@@ -176,9 +171,6 @@ function baselinePhaseFor(key: string): string | null {
   }
 }
 
-
-
-
 export const getStaffChecklist = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => orgStaff.parse(d))
@@ -239,99 +231,85 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       ),
     );
 
-    const staffTypeKeys: string[] =
-      (prof?.staff_type_keys as string[] | null) ?? [];
+    const staffTypeKeys: string[] = (prof?.staff_type_keys as string[] | null) ?? [];
     const hireDateStr =
-      (prof?.start_date as string | null) ??
-      (prof?.hire_date as string | null) ??
-      null;
+      (prof?.start_date as string | null) ?? (prof?.hire_date as string | null) ?? null;
     const hireDate = hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null;
-    // Explicit, provider-decided setting only — no auto-detection from client
-    // caseload. Defaults to Required at the DB level.
     const requiresDeescalation =
-      (prof?.requires_deescalation as boolean | undefined) !== false;
-    const requiresAbi =
-      (prof?.requires_abi as boolean | undefined) !== false;
+      typeof prof?.requires_deescalation === "boolean" ? prof.requires_deescalation : null;
+    const requiresAbi = typeof prof?.requires_abi === "boolean" ? prof.requires_abi : null;
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);
 
-    const adminRows: ChecklistRow[] = (base ?? []).map(
-      (r: Record<string, unknown>) => {
-        const c = compMap.get(r.id as string);
-        const meta = (r.metadata ?? {}) as Record<string, unknown>;
-        const isRenewable = meta.is_renewable === true;
-        const intervalMonths =
-          typeof meta.renewal_interval_months === "number"
-            ? (meta.renewal_interval_months as number)
-            : null;
-        const completedDate = (c?.completed_date as string) ?? null;
-        let effExpiry = (c?.expires_at as string) ?? null;
-        if (!effExpiry && isRenewable && intervalMonths && completedDate) {
-          const d = new Date(completedDate);
-          if (!Number.isNaN(d.getTime())) {
-            d.setUTCMonth(d.getUTCMonth() + intervalMonths);
-            effExpiry = d.toISOString().slice(0, 10);
-          }
+    const adminRows: ChecklistRow[] = (base ?? []).map((r: Record<string, unknown>) => {
+      const c = compMap.get(r.id as string);
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const isRenewable = meta.is_renewable === true;
+      const intervalMonths =
+        typeof meta.renewal_interval_months === "number"
+          ? (meta.renewal_interval_months as number)
+          : null;
+      const completedDate = (c?.completed_date as string) ?? null;
+      let effExpiry = (c?.expires_at as string) ?? null;
+      if (!effExpiry && isRenewable && intervalMonths && completedDate) {
+        const d = new Date(completedDate);
+        if (!Number.isNaN(d.getTime())) {
+          d.setUTCMonth(d.getUTCMonth() + intervalMonths);
+          effExpiry = d.toISOString().slice(0, 10);
         }
-        const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
-        const applicable = isRequirementApplicable({
-          applies_to,
-          applies_to_confirmed_at,
-          staff_type_keys: staffTypeKeys,
-        });
-        return {
-          requirement_id: r.id as string,
-          title:
-            (r.title as string) ?? (r.short_label as string) ?? "Untitled",
-          category: (r.category as string) ?? null,
-          phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
-          source_citation: (r.source_citation as string) ?? null,
-          evidence_type: (r.evidence_type as string) ?? null,
-          renewal_frequency: (r.renewal_frequency as string) ?? null,
-          checklist_layer: (meta.checklist_layer as string) ?? null,
-          is_renewable: isRenewable,
-          renewal_interval_months: intervalMonths,
-          renewal_source: (meta.renewal_source as string) ?? null,
-          completion: {
-            id: (c?.id as string) ?? null,
-            status: (c?.status as string) ?? "not_started",
-            completed_date: completedDate,
-            expires_at: effExpiry,
-            evidence_document_id:
-              (c?.evidence_document_id as string) ?? null,
-            notes: (c?.notes as string) ?? null,
-            completed_by: (c?.completed_by as string) ?? null,
-            training_completion_id:
-              (c?.training_completion_id as string) ?? null,
-            auto_checked_at: (c?.auto_checked_at as string) ?? null,
-            admin_signed_off_at: null,
-            nectar_name_match: null,
-            nectar_extracted_name: null,
-            nectar_reviewed_at: null,
-            nectar_validation_status: null,
-            nectar_validation_reasons: null,
-            nectar_extracted_cert_type: null,
-            nectar_extracted_completed_date: null,
-            nectar_extracted_summary: null,
-          },
+      }
+      const { applies_to, applies_to_confirmed_at } = parseAppliesTo(meta);
+      const applicable = isRequirementApplicable({
+        applies_to,
+        applies_to_confirmed_at,
+        staff_type_keys: staffTypeKeys,
+      });
+      return {
+        requirement_id: r.id as string,
+        title: (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+        category: (r.category as string) ?? null,
+        phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
+        source_citation: (r.source_citation as string) ?? null,
+        evidence_type: (r.evidence_type as string) ?? null,
+        renewal_frequency: (r.renewal_frequency as string) ?? null,
+        checklist_layer: (meta.checklist_layer as string) ?? null,
+        is_renewable: isRenewable,
+        renewal_interval_months: intervalMonths,
+        renewal_source: (meta.renewal_source as string) ?? null,
+        completion: {
+          id: (c?.id as string) ?? null,
+          status: (c?.status as string) ?? "not_started",
+          completed_date: completedDate,
+          expires_at: effExpiry,
+          evidence_document_id: (c?.evidence_document_id as string) ?? null,
+          notes: (c?.notes as string) ?? null,
+          completed_by: (c?.completed_by as string) ?? null,
+          training_completion_id: (c?.training_completion_id as string) ?? null,
+          auto_checked_at: (c?.auto_checked_at as string) ?? null,
+          admin_signed_off_at: null,
+          nectar_name_match: null,
+          nectar_extracted_name: null,
+          nectar_reviewed_at: null,
+          nectar_validation_status: null,
+          nectar_validation_reasons: null,
+          nectar_extracted_cert_type: null,
+          nectar_extracted_completed_date: null,
+          nectar_extracted_summary: null,
+        },
 
-          applicable,
-          applies_to_staff_types:
-            applies_to === null || applies_to === undefined ? "all" : applies_to,
-          applies_to_confirmed_at,
-        };
-      },
-    );
+        applicable,
+        applies_to_staff_types:
+          applies_to === null || applies_to === undefined ? "all" : applies_to,
+        applies_to_confirmed_at,
+      };
+    });
 
     // Baseline rows — synthesized for EVERY employee so a new hire with
     // nothing on file shows Overdue / To-Do (never the silent "0 overdue").
-    const adminTitleSet = new Set(
-      adminRows.map((r) => r.title.trim().toLowerCase()),
-    );
+    const adminTitleSet = new Set(adminRows.map((r) => r.title.trim().toLowerCase()));
     const baselineMap = new Map<string, Record<string, unknown>>();
-    for (const bc of baselineComp ?? [])
-      baselineMap.set(bc.training_key as string, bc);
+    for (const bc of baselineComp ?? []) baselineMap.set(bc.training_key as string, bc);
 
     const baselineRows: ChecklistRow[] = BASELINE_STAFF_TRAININGS.map((t) => {
       const applicable = isBaselineApplicable(t, {
@@ -341,12 +319,9 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         assignedCodes,
       });
       const bc = baselineMap.get(t.key);
-      const nectarNameMatch =
-        (bc?.nectar_name_match as string | null) ?? null;
-      const nectarExtractedName =
-        (bc?.nectar_extracted_name as string | null) ?? null;
-      const nectarReviewedAt =
-        (bc?.nectar_reviewed_at as string | null) ?? null;
+      const nectarNameMatch = (bc?.nectar_name_match as string | null) ?? null;
+      const nectarExtractedName = (bc?.nectar_extracted_name as string | null) ?? null;
+      const nectarReviewedAt = (bc?.nectar_reviewed_at as string | null) ?? null;
       const { status, completedDate, expiresAt, evidenceDocId, adminSignedOffAt } =
         computeBaselineStatus(t, bc, hireDate);
       return {
@@ -375,23 +350,17 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           nectar_name_match: nectarNameMatch,
           nectar_extracted_name: nectarExtractedName,
           nectar_reviewed_at: nectarReviewedAt,
-          nectar_validation_status:
-            (bc?.nectar_validation_status as string | null) ?? null,
-          nectar_validation_reasons:
-            (bc?.nectar_validation_reasons as string[] | null) ?? null,
-          nectar_extracted_cert_type:
-            (bc?.nectar_extracted_cert_type as string | null) ?? null,
+          nectar_validation_status: (bc?.nectar_validation_status as string | null) ?? null,
+          nectar_validation_reasons: (bc?.nectar_validation_reasons as string[] | null) ?? null,
+          nectar_extracted_cert_type: (bc?.nectar_extracted_cert_type as string | null) ?? null,
           nectar_extracted_completed_date:
             (bc?.nectar_extracted_completed_date as string | null) ?? null,
-          nectar_extracted_summary:
-            (bc?.nectar_extracted_summary as string | null) ?? null,
+          nectar_extracted_summary: (bc?.nectar_extracted_summary as string | null) ?? null,
         },
         applicable,
         applies_to_staff_types: "all" as const,
         applies_to_confirmed_at: null,
-
       };
-
     }).filter(
       // Don't double-list a baseline if the admin already created an
       // equivalent custom requirement with the same title.
@@ -400,9 +369,6 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
 
     return [...baselineRows, ...adminRows];
   });
-
-
-
 
 // --- Mutations -------------------------------------------------------------
 
@@ -414,13 +380,7 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
         organization_id: z.string().uuid(),
         staff_id: z.string().uuid(),
         requirement_id: z.string().uuid(),
-        status: z.enum([
-          "not_started",
-          "in_progress",
-          "complete",
-          "expired",
-          "waived",
-        ]),
+        status: z.enum(["not_started", "in_progress", "complete", "expired", "waived"]),
         completed_date: z.string().date().nullable().optional(),
         expires_at: z.string().date().nullable().optional(),
         evidence_document_id: z.string().uuid().nullable().optional(),
@@ -464,14 +424,8 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
         .eq("id", data.requirement_id)
         .maybeSingle();
       const meta = (reqRow?.metadata ?? {}) as Record<string, unknown>;
-      if (
-        meta.is_renewable === true &&
-        typeof meta.renewal_interval_months === "number"
-      ) {
-        effExpires = addMonthsIso(
-          data.completed_date,
-          meta.renewal_interval_months as number,
-        );
+      if (meta.is_renewable === true && typeof meta.renewal_interval_months === "number") {
+        effExpires = addMonthsIso(data.completed_date, meta.renewal_interval_months as number);
       }
     }
 
@@ -489,15 +443,11 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
     };
 
     const { error } = existing?.id
-      ? await sb
-          .from("staff_checklist_completion")
-          .update(payload)
-          .eq("id", existing.id)
+      ? await sb.from("staff_checklist_completion").update(payload).eq("id", existing.id)
       : await sb.from("staff_checklist_completion").insert(payload);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
-
 
 const piiUpdateSchema = z.object({
   organization_id: z.string().uuid(),
@@ -545,7 +495,6 @@ export const updateStaffPii = createServerFn({ method: "POST" })
       }
     }
 
-
     const patch: Record<string, unknown> = {};
     if (data.ssn_last4 !== undefined) patch.ssn_last4 = data.ssn_last4;
     if (data.date_of_birth !== undefined) patch.date_of_birth = data.date_of_birth;
@@ -582,7 +531,9 @@ export const listHrDocuments = createServerFn({ method: "GET" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any)
       .from("hr_documents")
-      .select("id, document_kind, file_name, mime_type, size_bytes, requirement_id, uploaded_by, created_at")
+      .select(
+        "id, document_kind, file_name, mime_type, size_bytes, requirement_id, uploaded_by, created_at",
+      )
       .eq("organization_id", data.organization_id)
       .eq("staff_id", data.staff_id)
       .order("created_at", { ascending: false });
@@ -601,14 +552,18 @@ export const createHrDocumentUploadUrl = createServerFn({ method: "POST" })
         document_kind: z.string().min(1).max(64),
         file_name: z.string().min(1).max(255),
         mime_type: z.string().max(255).optional(),
-        size_bytes: z.number().int().min(0).max(50 * 1024 * 1024).optional(),
+        size_bytes: z
+          .number()
+          .int()
+          .min(0)
+          .max(50 * 1024 * 1024)
+          .optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId)
-      return { hr_document_id: null, object_path: null, upload: null };
+    if (!supabase || !userId) return { hr_document_id: null, object_path: null, upload: null };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -677,8 +632,7 @@ export const getHrDocumentUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId)
-      return { signed_url: null, file_name: null, expires_in_seconds: 0 };
+    if (!supabase || !userId) return { signed_url: null, file_name: null, expires_in_seconds: 0 };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -781,9 +735,7 @@ export interface HrChecklistRenewal {
 
 export const getHrChecklistRenewals = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z.object({ organization_id: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ organization_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return [] as HrChecklistRenewal[];
@@ -797,15 +749,9 @@ export const getHrChecklistRenewals = createServerFn({ method: "GET" })
     const renewable = new Map<string, { title: string; months: number }>();
     for (const r of (base ?? []) as Array<Record<string, unknown>>) {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
-      if (
-        meta.is_renewable === true &&
-        typeof meta.renewal_interval_months === "number"
-      ) {
+      if (meta.is_renewable === true && typeof meta.renewal_interval_months === "number") {
         renewable.set(r.id as string, {
-          title:
-            (meta.short_label as string) ??
-            (r.title as string) ??
-            "Requirement",
+          title: (meta.short_label as string) ?? (r.title as string) ?? "Requirement",
           months: meta.renewal_interval_months as number,
         });
       }
@@ -829,10 +775,7 @@ export const getHrChecklistRenewals = createServerFn({ method: "GET" })
     if (rows.length === 0) return [] as HrChecklistRenewal[];
 
     const staffIds = Array.from(new Set(rows.map((r) => r.staff_id)));
-    const { data: profs } = await sb
-      .from("profiles")
-      .select("id, full_name")
-      .in("id", staffIds);
+    const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", staffIds);
     const nameById = new Map<string, string>();
     for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
       nameById.set(p.id, p.full_name ?? "Staff member");
@@ -843,8 +786,7 @@ export const getHrChecklistRenewals = createServerFn({ method: "GET" })
       const req = renewable.get(c.requirement_id);
       if (!req) continue;
       const due =
-        c.expires_at ??
-        (c.completed_date ? addMonthsIso(c.completed_date, req.months) : null);
+        c.expires_at ?? (c.completed_date ? addMonthsIso(c.completed_date, req.months) : null);
       if (!due) continue;
       out.push({
         requirement_id: c.requirement_id,

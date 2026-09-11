@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  buildQuietLine,
   decorateDecision,
   FORBIDDEN_DECISION_STRINGS,
   hasForbiddenDecisionCopy,
@@ -22,7 +23,8 @@ function decision(partial: Partial<Decision> & Pick<Decision, "id" | "title">): 
     dueAt: null,
     ownerUserId: "admin-1",
     ownerLabel: "admin_level",
-    consequence: "This is a licensing or repayment item (§1.13). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
+    consequence:
+      "This is a licensing or repayment item (§1.13). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
     source: "escalation",
     ...partial,
   };
@@ -132,7 +134,10 @@ describe("rollupDecisions", () => {
     });
     const rolled = rollupDecisions([overdue, license]);
     assert.equal(rolled.length, 1);
-    assert.deepEqual(new Set(rolled[0]?.mergedTriggers), new Set(["overdue", "license_or_repayment_risk"]));
+    assert.deepEqual(
+      new Set(rolled[0]?.mergedTriggers),
+      new Set(["overdue", "license_or_repayment_risk"]),
+    );
   });
 
   it("lets a remediation plan win over the raw escalation", () => {
@@ -223,6 +228,20 @@ describe("rollupDecisions", () => {
     assert.equal(rolled[0]?.count, 4);
     const decorated = decorateDecision(rolled[0]!, { now: NOW });
     assert.match(decorated.headline ?? "", /Renew 4 overdue licenses|Renew 4 OL licenses/);
+  });
+});
+
+describe("assignment gaps are not a clean QuietLine", () => {
+  it("adds a high-signal segment when evaluation is incomplete", () => {
+    const quiet = buildQuietLine({ evaluationIncomplete: true });
+    assert.ok(quiet.segments.some((s) => /not a clean compliance result/.test(s)));
+  });
+
+  it("names assignment_gaps as a QuietSummary source in the type module", () => {
+    const src = readFileSync(new URL("./this-week.ts", import.meta.url), "utf8");
+    assert.match(src, /assignment_gaps/);
+    const io = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
+    assert.match(io, /unansweredDutyQuietSummary/);
   });
 });
 

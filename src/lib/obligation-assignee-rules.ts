@@ -1,32 +1,23 @@
-// Duty-specific assignee narrowing. Service-code overlap is handled
-// separately; these rules catch SOW duties that apply to a *subset* of
-// staff even when the obligation is assigned to All Staff.
+// Duty-specific assignee narrowing. Decisions use company_obligations.key
+// (catalog key). Title lookup is only for resolving a missing key.
 
-export function dutyRequiresTransporter(title: string): boolean {
-  return title.startsWith("Driving Record");
-}
-
-export function dutyRequiresBehaviorCaseload(title: string): boolean {
-  return title.startsWith("Behavior Intervention Certification");
-}
-
-export function dutyRequiresAbiCaseload(title: string): boolean {
-  return title.startsWith("ABI Training");
-}
+import { dutyKeyForObligation } from "./obligations/duty-applicability.ts";
 
 /** Org-level duties that must generate one instance per home, not one for the agency. */
-export function perHomeServiceCode(title: string): string | null {
-  if (
-    title === "HHS Home Certification — Annual (DSPD Form)" ||
-    title === "HHS Quarterly Evacuation Drills — All Sites"
-  ) {
-    return "HHS";
-  }
-  if (title === "RHS Quarterly Evacuation Drills — All Sites") return "RHS";
-  if (title === "PPS Quarterly Evacuation Drills — All Sites") return "PPS";
+export function perHomeServiceCode(key: string | null | undefined): string | null {
+  if (key === "hhs_home_cert_annual" || key === "hhs_evac_drills_quarterly") return "HHS";
+  if (key === "rhs_evac_drills_quarterly") return "RHS";
+  if (key === "pps_evac_drills_quarterly") return "PPS";
   return null;
 }
 
 export function homePeriodKey(teamName: string, teamId: string, catalogPeriodKey: string): string {
   return `${teamName} [${teamId.slice(0, 8)}] — ${catalogPeriodKey}`;
+}
+
+export function obligationDutyKey(ob: {
+  key?: string | null;
+  title?: string | null;
+}): string | null {
+  return dutyKeyForObligation(ob);
 }

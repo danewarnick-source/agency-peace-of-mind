@@ -68,7 +68,7 @@ export type QuietSummary = {
   count: number;
   urgency: EscalationUrgency;
   dueAt: string | null;
-  source: "evv_needs_review" | "org_profile_facts";
+  source: "evv_needs_review" | "org_profile_facts" | "assignment_gaps";
 };
 
 export type ThisWeekItem = Decision | QuietSummary;
@@ -113,7 +113,20 @@ const URGENCY_ORDER: Record<EscalationUrgency, number> = {
   normal: 2,
 };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
 
 export function emptyQuietLine(): QuietLine {
   return {
@@ -135,6 +148,8 @@ export function buildQuietLine(counts: {
   standingCurrent?: number;
   recordsReviewCleared?: number;
   evvReconciledThrough?: string | null;
+  assignmentGaps?: number;
+  evaluationIncomplete?: boolean;
 }): QuietLine {
   const obligationsSatisfied = Math.max(0, counts.obligationsSatisfied ?? 0);
   const notesPassed = Math.max(0, counts.notesPassed ?? 0);
@@ -142,7 +157,16 @@ export function buildQuietLine(counts: {
   const standingCurrent = Math.max(0, counts.standingCurrent ?? 0);
   const recordsReviewCleared = Math.max(0, counts.recordsReviewCleared ?? 0);
   const evvReconciledThrough = counts.evvReconciledThrough ?? null;
+  const assignmentGaps = Math.max(0, counts.assignmentGaps ?? 0);
+  const evaluationIncomplete = counts.evaluationIncomplete === true;
   const segments: string[] = [];
+  if (evaluationIncomplete) {
+    segments.push("Duty evaluation incomplete — this is not a clean compliance result");
+  } else if (assignmentGaps > 0) {
+    segments.push(
+      `${assignmentGaps} assignment gap${assignmentGaps === 1 ? "" : "s"} still open — not a clean compliance result`,
+    );
+  }
   if (obligationsSatisfied > 0) {
     segments.push(
       `${obligationsSatisfied} obligation${obligationsSatisfied === 1 ? "" : "s"} satisfied by normal operations`,
@@ -152,9 +176,7 @@ export function buildQuietLine(counts: {
     segments.push(`${notesPassed} of ${notesTotal} notes passed Nectar`);
   }
   if (standingCurrent > 0) {
-    segments.push(
-      `${standingCurrent} standing record${standingCurrent === 1 ? "" : "s"} current`,
-    );
+    segments.push(`${standingCurrent} standing record${standingCurrent === 1 ? "" : "s"} current`);
   }
   if (recordsReviewCleared > 0) {
     segments.push(
@@ -217,7 +239,8 @@ function summaryKey(d: Decision): string | null {
 
 function mergeDecisionGroup(group: Decision[]): Decision {
   const plan = group.find((d) => d.source === "remediation_plan" && d.planId);
-  const base = plan ?? group.slice().sort((a, b) => urgencyRank(a.urgency) - urgencyRank(b.urgency))[0]!;
+  const base =
+    plan ?? group.slice().sort((a, b) => urgencyRank(a.urgency) - urgencyRank(b.urgency))[0]!;
   const triggers = new Set<EscalationTrigger>();
   for (const d of group) {
     if (d.trigger) triggers.add(d.trigger);
@@ -348,7 +371,10 @@ export function scrubDecisionCopy(text: string): string {
   out = out.replace(/licensing or repayment item/gi, "license clock");
   out = out.replace(/corrective action plan or repayment demand/gi, "license risk");
   out = out.replace(/not just a note on file/gi, "");
-  out = out.replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
+  out = out
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
+    .trim();
   return out;
 }
 
@@ -399,7 +425,10 @@ function ifMissedFromAuditRef(ref: string): string | null {
 
 export function ifMissedForDecision(d: Decision): string {
   const key = d.obligationKey ?? "";
-  if (isSoloDecision(d) && (d.trigger === "would_create_finding_if_scheduled" || d.planKind === "solo_lapse")) {
+  if (
+    isSoloDecision(d) &&
+    (d.trigger === "would_create_finding_if_scheduled" || d.planKind === "solo_lapse")
+  ) {
     return "Part IV finding + safety risk";
   }
   if (key && IF_MISSED_BY_KEY[key]) return IF_MISSED_BY_KEY[key];
@@ -498,7 +527,11 @@ function whyFor(d: Decision): string {
 
 function ownerTextFor(d: Decision, viewerUserId?: string | null): string {
   const mine = !d.ownerUserId || !viewerUserId || d.ownerUserId === viewerUserId;
-  if (d.planId && mine && (d.planKind === "solo_lapse" || d.planKind === "scheduled_while_lapsed")) {
+  if (
+    d.planId &&
+    mine &&
+    (d.planKind === "solo_lapse" || d.planKind === "scheduled_while_lapsed")
+  ) {
     return "You · Supervisor did the work";
   }
   if (mine) return "You";

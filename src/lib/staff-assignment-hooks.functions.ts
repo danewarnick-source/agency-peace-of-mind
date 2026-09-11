@@ -15,13 +15,20 @@ import {
   assignmentNeedsMandt,
   assignmentNeedsSupportStrategies,
   clientFlagsFromExistingSchema,
-  titleGroupsForHire,
 } from "./obligation-auto-assign";
 import { MANDT_OBLIGATION_TITLES } from "./training-class";
 import {
+  ensureOpenStaffObligationByKeyInternal,
   ensureOpenStaffObligationInternal,
   loadStaffForEnsure,
 } from "./ensure-staff-obligation";
+import { loadOrgFacts } from "./obligations/applicability";
+import {
+  dutyKeyForObligation,
+  evaluateStaffDuties,
+  planDutyReevaluation,
+} from "./obligations/duty-applicability";
+import { loadStaffDutyFactsInternal } from "./obligations/load-staff-duty-facts.functions";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -64,7 +71,7 @@ async function loadClientAssignmentFlags(
   });
 }
 
-export async function onStaffHiredInternal(
+export async function reevaluateStaffDutiesInternal(
   supabase: AnySupabase,
   organizationId: string,
   staffId: string,
@@ -72,16 +79,126 @@ export async function onStaffHiredInternal(
   const staff = await loadStaffForEnsure(supabase, organizationId, staffId);
   if (!staff) return;
 
-  for (const titles of titleGroupsForHire()) {
-    await ensureOpenStaffObligationInternal(supabase, organizationId, titles, staff, {
-      periodPrefix: "Hire",
+  const [orgFacts, factsByStaff, { data: obligations, error: obErr }] = await Promise.all([
+    loadOrgFacts(supabase, organizationId),
+    loadStaffDutyFactsInternal(supabase, organizationId, [staffId]),
+    supabase
+      .from("company_obligations")
+      .select("id, title, key, scope, disposition")
+      .eq("organization_id", organizationId)
+      .eq("active", true),
+  ]);
+  if (obErr) throw new Error(obErr.message);
+
+  const facts = factsByStaff.get(staffId);
+  if (!facts) return;
+
+  const staffObs = (
+    (obligations ?? []) as Array<{
+      id: string;
+      title: string;
+      key?: string | null;
+      scope?: string | null;
+      disposition?: string | null;
+    }>
+  ).filter((ob) => ob.scope === "staff" || ob.scope === "staff_per_client" || !ob.scope);
+
+  const keyed = staffObs
+    .map((ob) => ({ ob, key: dutyKeyForObligation(ob) }))
+    .filter((row): row is { ob: (typeof staffObs)[number]; key: string } => !!row.key);
+  if (!keyed.length) return;
+
+  const duties = evaluateStaffDuties({
+    dutyKeys: [...new Set(keyed.map((r) => r.key))],
+    staff: facts,
+    orgFacts,
+  });
+
+  const { data: instances, error: iErr } = await supabase
+    .from("company_obligation_instances")
+    .select("id, obligation_id, status, completed_at, upload_path, attestation_signed_at")
+    .eq("organization_id", organizationId)
+    .eq("assignee_staff_id", staffId);
+  if (iErr) throw new Error(iErr.message);
+
+  const obIdToKey = new Map(keyed.map((r) => [r.ob.id, r.key]));
+  const openDutyKeys = new Set<string>();
+  const evidenceDutyKeys = new Set<string>();
+  for (const row of (instances ?? []) as Array<{
+    obligation_id: string;
+    status: string;
+    completed_at: string | null;
+    upload_path: string | null;
+    attestation_signed_at: string | null;
+  }>) {
+    const key = obIdToKey.get(row.obligation_id);
+    if (!key) continue;
+    if (row.status === "pending" || row.status === "overdue") openDutyKeys.add(key);
+    if (
+      row.status === "completed" ||
+      row.status === "waived" ||
+      row.completed_at ||
+      row.upload_path ||
+      row.attestation_signed_at
+    ) {
+      evidenceDutyKeys.add(key);
+    }
+  }
+
+  const plan = planDutyReevaluation({
+    staff: facts,
+    duties,
+    openDutyKeys,
+    evidenceDutyKeys,
+    evaluationComplete: facts.assignmentsKnown,
+  });
+
+  for (const key of plan.openKeys) {
+    await ensureOpenStaffObligationByKeyInternal(supabase, organizationId, key, staff, {
+      periodPrefix: "Assigned",
     });
   }
+}
+
+export async function onStaffHiredInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  staffId: string,
+): Promise<void> {
+  await reevaluateStaffDutiesInternal(supabase, organizationId, staffId);
   try {
     await assignMatchingPoliciesForStaffInternal(supabase, organizationId, staffId);
   } catch (e) {
     console.warn("[obligations] policy fan-out on hire failed:", e);
   }
+}
+
+export async function onStaffAssignmentRemovedInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  staffId: string,
+): Promise<void> {
+  await reevaluateStaffDutiesInternal(supabase, organizationId, staffId);
+  try {
+    await assignMatchingPoliciesForStaffInternal(supabase, organizationId, staffId);
+  } catch (e) {
+    console.warn("[obligations] policy fan-out on assignment remove failed:", e);
+  }
+}
+
+export async function onSupervisorChangedInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  staffId: string,
+  managerId: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("organization_members")
+    .update({ manager_id: managerId })
+    .eq("organization_id", organizationId)
+    .eq("user_id", staffId);
+  if (error) throw new Error(error.message);
+  await reevaluateStaffDutiesInternal(supabase, organizationId, staffId);
 }
 
 export async function onStaffAssignmentCreatedInternal(
@@ -154,6 +271,7 @@ export async function onStaffAssignmentCreatedInternal(
   } catch (e) {
     console.warn("[obligations] policy fan-out on assignment failed:", e);
   }
+  await reevaluateStaffDutiesInternal(supabase, organizationId, staffId);
 }
 
 export const onStaffHired = createServerFn({ method: "POST" })
@@ -197,5 +315,42 @@ export const onStaffAssignmentCreated = createServerFn({ method: "POST" })
       data.clientId,
       data.serviceCodes,
     );
+    return { ok: true };
+  });
+
+export const onStaffAssignmentRemoved = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    await onStaffAssignmentRemovedInternal(supabase, data.organizationId, data.staffId);
+    return { ok: true };
+  });
+
+export const setStaffSupervisor = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+        managerId: z.string().uuid().nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+    await onSupervisorChangedInternal(supabase, data.organizationId, data.staffId, data.managerId);
     return { ok: true };
   });

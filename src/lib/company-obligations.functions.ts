@@ -37,13 +37,14 @@ import {
 import { obligationAppliesToFootprint } from "./dspd-audit-tool";
 import { STANDING_SOW_DUTIES } from "./standing-sow-duties";
 import { isRetiredPerClientPctTitle } from "./client-form-obligations";
+import { homePeriodKey, obligationDutyKey, perHomeServiceCode } from "./obligation-assignee-rules";
+import { loadOrgFacts, type OrgFacts } from "./obligations/applicability";
 import {
-  dutyRequiresAbiCaseload,
-  dutyRequiresBehaviorCaseload,
-  dutyRequiresTransporter,
-  homePeriodKey,
-  perHomeServiceCode,
-} from "./obligation-assignee-rules";
+  evaluateStaffDuty,
+  staffReceivesDutyClock,
+  staffSeesDuty,
+} from "./obligations/duty-applicability";
+import { loadStaffDutyFactsInternal } from "./obligations/load-staff-duty-facts.functions";
 import { toIsoDateDay } from "./iso-date-day";
 import { isPackSentinel, obligationIsRequired } from "./obligation-packs";
 import { ORPHAN_OBLIGATION_CREATE_GONE } from "./compliance-spine";
@@ -386,7 +387,7 @@ export async function snapshotAssigneesInternal(
   const byId = new Map<string, ResolvedStaffMember>();
   for (const m of [...groupMembers, ...directMembers]) byId.set(m.staff_id, m);
   const all = Array.from(byId.values());
-  const filtered = await filterAssigneesByDutyInternal(supabase, organizationId, ob, all);
+  const filtered = await filterAssigneesByDutyInternal(supabase, organizationId, ob, all, "clock");
 
   if (filtered.length) {
     const rows = filtered.map((m) => ({
@@ -601,7 +602,7 @@ async function generatePerPersonInstancesInternal(
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
   let assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
   if (!assignees.length) return [];
-  assignees = await filterAssigneesByDutyInternal(supabase, organizationId, ob, assignees);
+  assignees = await filterAssigneesByDutyInternal(supabase, organizationId, ob, assignees, "clock");
   if (!assignees.length) return [];
 
   const hireDates = await fetchAssigneeHireDates(
@@ -724,153 +725,45 @@ function arraysOverlapCaseInsensitive(target: string[], have: string[]): boolean
   return target.some((c) => haveUpper.has(c.toUpperCase()));
 }
 
-/**
- * For scope='staff' obligations with a non-empty target_service_codes list
- * (e.g. ACRE Training, SEI-only), only staff actively assigned to at least
- * one client whose service_codes overlap the target list actually work in
- * that service line — narrows a group-wide assignee list (e.g. "All Staff")
- * down to the staff it should really apply to.
- */
-async function filterAssigneesByServiceCodesInternal(
-  supabase: AnySupabase,
-  organizationId: string,
-  ob: CompanyObligationRow,
-  assignees: ResolvedStaffMember[],
-): Promise<ResolvedStaffMember[]> {
-  const targetCodes = (ob.target_service_codes ?? []).map((c: string) => c.toUpperCase());
-  if (ob.scope !== "staff" || !targetCodes.length || !assignees.length) return assignees;
-
-  const staffIds = assignees.map((a) => a.staff_id);
-  const { data: assignments, error } = await supabase
-    .from("staff_assignments")
-    .select("staff_id, service_codes")
-    .eq("organization_id", organizationId)
-    .in("staff_id", staffIds);
-  if (error) throw new Error(error.message);
-
-  const staffWithMatchingCode = new Set(
-    ((assignments ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>)
-      .filter((a) =>
-        (a.service_codes ?? []).some((c: string) => targetCodes.includes(c.toUpperCase())),
-      )
-      .map((a) => a.staff_id),
-  );
-
-  return assignees.filter((a) => staffWithMatchingCode.has(a.staff_id));
-}
+type DutyFilterMode = "visible" | "clock";
 
 /**
- * Narrow All Staff (or a broad group) down to the people the SOW actually
- * names: transporters, behavior-caseload staff, ABI caseload. Empty result
- * means the duty is N/A for this program right now — do not generate
- * instances for everyone.
+ * Narrow All Staff by company_obligations.key + live assignment/org facts.
+ * visible: unanswered stays listed. clock: mint only when status === applies.
+ * Unknown facts never coerce to does_not_apply.
  */
 async function filterAssigneesByDutyInternal(
   supabase: AnySupabase,
   organizationId: string,
   ob: CompanyObligationRow,
   assignees: ResolvedStaffMember[],
+  mode: DutyFilterMode = "visible",
 ): Promise<ResolvedStaffMember[]> {
-  const next = await filterAssigneesByServiceCodesInternal(supabase, organizationId, ob, assignees);
+  const next = assignees;
   if (!next.length) return next;
+  const dutyKey = obligationDutyKey(ob);
+  if (!dutyKey) return next;
+  if (perHomeServiceCode(dutyKey)) return next;
 
-  if (dutyRequiresTransporter(ob.title)) {
-    const staffIds = next.map((a) => a.staff_id);
-    const [{ data: assignments, error: aErr }, { data: transport, error: tErr }] =
-      await Promise.all([
-        supabase
-          .from("staff_assignments")
-          .select("staff_id, service_codes")
-          .eq("organization_id", organizationId)
-          .in("staff_id", staffIds),
-        supabase
-          .from("day_program_transport")
-          .select("transport_staff_id")
-          .in("transport_staff_id", staffIds),
-      ]);
-    if (aErr) throw new Error(aErr.message);
-    if (tErr) throw new Error(tErr.message);
-    const keep = new Set<string>();
-    for (const row of (assignments ?? []) as Array<{
-      staff_id: string;
-      service_codes: string[] | null;
-    }>) {
-      if ((row.service_codes ?? []).some((c) => c.toUpperCase() === "MTP")) keep.add(row.staff_id);
-    }
-    for (const row of (transport ?? []) as Array<{ transport_staff_id: string | null }>) {
-      if (row.transport_staff_id) keep.add(row.transport_staff_id);
-    }
-    return next.filter((a) => keep.has(a.staff_id));
-  }
-
-  if (dutyRequiresBehaviorCaseload(ob.title)) {
-    const [{ data: bsc, error: bErr }, { data: targets, error: tErr }] = await Promise.all([
-      supabase
-        .from("behavior_support_clients")
-        .select("client_id")
-        .eq("organization_id", organizationId)
-        .eq("features_enabled", true),
-      supabase
-        .from("client_target_behaviors")
-        .select("client_id")
-        .eq("organization_id", organizationId),
-    ]);
-    if (bErr) throw new Error(bErr.message);
-    if (tErr) throw new Error(tErr.message);
-    const clientIds = [
-      ...new Set([
-        ...((bsc ?? []) as Array<{ client_id: string }>).map((r) => r.client_id),
-        ...((targets ?? []) as Array<{ client_id: string }>).map((r) => r.client_id),
-      ]),
-    ];
-    if (!clientIds.length) return [];
-    const staffIds = next.map((a) => a.staff_id);
-    const { data: assignments, error: aErr } = await supabase
-      .from("staff_assignments")
-      .select("staff_id, client_id")
-      .eq("organization_id", organizationId)
-      .in("staff_id", staffIds)
-      .in("client_id", clientIds);
-    if (aErr) throw new Error(aErr.message);
-    const keep = new Set(
-      ((assignments ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id),
-    );
-    return next.filter((a) => keep.has(a.staff_id));
-  }
-
-  if (dutyRequiresAbiCaseload(ob.title)) {
-    const staffIds = next.map((a) => a.staff_id);
-    const [{ data: abiClients, error: cErr }, { data: flagged, error: pErr }] = await Promise.all([
-      supabase
-        .from("clients")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("account_status", "active")
-        .eq("has_abi", true),
-      supabase
-        .from("profiles")
-        .select("id, requires_abi")
-        .in("id", staffIds)
-        .eq("requires_abi", true),
-    ]);
-    if (cErr) throw new Error(cErr.message);
-    if (pErr) throw new Error(pErr.message);
-    const keep = new Set(((flagged ?? []) as Array<{ id: string }>).map((r) => r.id));
-    const abiIds = ((abiClients ?? []) as Array<{ id: string }>).map((r) => r.id);
-    if (abiIds.length) {
-      const { data: assignments, error: aErr } = await supabase
-        .from("staff_assignments")
-        .select("staff_id")
-        .eq("organization_id", organizationId)
-        .in("staff_id", staffIds)
-        .in("client_id", abiIds);
-      if (aErr) throw new Error(aErr.message);
-      for (const r of (assignments ?? []) as Array<{ staff_id: string }>) keep.add(r.staff_id);
-    }
-    return next.filter((a) => keep.has(a.staff_id));
-  }
-
-  return next;
+  const [orgFacts, factsByStaff] = await Promise.all([
+    loadOrgFacts(supabase, organizationId),
+    loadStaffDutyFactsInternal(
+      supabase,
+      organizationId,
+      next.map((a) => a.staff_id),
+    ),
+  ]);
+  const facts: OrgFacts | null = orgFacts;
+  return next.filter((a) => {
+    const staffFacts = factsByStaff.get(a.staff_id);
+    if (!staffFacts) return mode === "visible";
+    const row = evaluateStaffDuty({
+      dutyKey,
+      staff: staffFacts,
+      orgFacts: facts,
+    });
+    return mode === "clock" ? staffReceivesDutyClock(row) : staffSeesDuty(row);
+  });
 }
 
 async function fetchClientNamesInternal(
@@ -1183,7 +1076,7 @@ async function generatePerHomeInstancesInternal(
   organizationId: string,
   ob: CompanyObligationRow,
 ): Promise<ObligationInstanceRow[]> {
-  const code = perHomeServiceCode(ob.title);
+  const code = perHomeServiceCode(obligationDutyKey(ob));
   if (!code) return [];
   const homes = await listHomesForServiceInternal(supabase, organizationId, code);
   if (!homes.length) return [];
@@ -1273,8 +1166,7 @@ async function waiveStandingInstancesInternal(
   organizationId: string,
   ob: CompanyObligationRow,
 ): Promise<void> {
-  const catalog =
-    (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
+  const catalog = (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
   const disposition = ob.disposition ?? catalog?.disposition ?? null;
   if (disposition !== "standing") return;
 
@@ -1285,7 +1177,10 @@ async function waiveStandingInstancesInternal(
     .eq("obligation_id", ob.id)
     .in("status", ["pending", "overdue"]);
   if (error) {
-    console.warn(`[obligations] could not waive standing instances for "${ob.title}":`, error.message);
+    console.warn(
+      `[obligations] could not waive standing instances for "${ob.title}":`,
+      error.message,
+    );
   }
 }
 
@@ -1307,7 +1202,7 @@ export async function generateNextInstanceInternal(
     return created[0] ?? null;
   }
 
-  if (perHomeServiceCode(ob.title)) {
+  if (perHomeServiceCode(obligationDutyKey(ob))) {
     const created = await generatePerHomeInstancesInternal(supabase, organizationId, ob);
     return created[0] ?? null;
   }
@@ -1566,8 +1461,7 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
     const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
 
     const formNeeded = (obligations ?? []).some(
-      (o: CompanyObligationRow) =>
-        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+      (o: CompanyObligationRow) => o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
     );
     let publishedForms: Array<{ id: string; name: string }> = [];
     if (formNeeded) {
@@ -1685,8 +1579,7 @@ export const listStaffObligationInstances = createServerFn({ method: "POST" })
     const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
 
     const formNeeded = (obligations ?? []).some(
-      (o: CompanyObligationRow) =>
-        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+      (o: CompanyObligationRow) => o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
     );
     let publishedForms: Array<{ id: string; name: string }> = [];
     if (formNeeded) {
@@ -1716,7 +1609,10 @@ export const listStaffObligationInstances = createServerFn({ method: "POST" })
         completionByInstance.set(row.instance_id, row);
         continue;
       }
-      if (existing.nectar_validation_status === "failed" && row.nectar_validation_status !== "failed") {
+      if (
+        existing.nectar_validation_status === "failed" &&
+        row.nectar_validation_status !== "failed"
+      ) {
         completionByInstance.set(row.instance_id, row);
       }
     }
@@ -1966,11 +1862,7 @@ async function bootstrapVisibleObligationInstancesInternal(
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
 }> {
   try {
-    return await bootstrapVisibleObligationInstancesInternalUnsafe(
-      supabase,
-      organizationId,
-      opts,
-    );
+    return await bootstrapVisibleObligationInstancesInternalUnsafe(supabase, organizationId, opts);
   } catch (e) {
     console.warn("[bootstrap] obligation bootstrap failed; continuing without clocks:", e);
     return { visibleObligations: [], instancesByObligation: new Map() };
@@ -2138,10 +2030,14 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
     let visibleObligations: CompanyObligationRow[] = [];
     let instancesByObligation: Map<string, ObligationInstanceRow[]> = new Map();
     try {
-      const boot = await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
-        generateMissing: false,
-        skipMutations: true,
-      });
+      const boot = await bootstrapVisibleObligationInstancesInternal(
+        supabase,
+        data.organizationId,
+        {
+          generateMissing: false,
+          skipMutations: true,
+        },
+      );
       visibleObligations = boot.visibleObligations;
       instancesByObligation = boot.instancesByObligation;
     } catch (e) {
@@ -3169,7 +3065,9 @@ export const confirmFailedObligationCompletion = createServerFn({ method: "POST"
       confirmedExpiresOn: data.confirmedExpiresDate ?? null,
     };
     if (!canAcceptCertEvidence(decision)) {
-      throw new Error(certReviewAcceptBlockReason(decision) ?? "Confirm expiration before accepting.");
+      throw new Error(
+        certReviewAcceptBlockReason(decision) ?? "Confirm expiration before accepting.",
+      );
     }
     const expiresOn = resolvedCertExpiration(decision);
 
@@ -3329,7 +3227,8 @@ export const requestObligationCorrection = createServerFn({ method: "POST" })
     if (!inst) throw new Error("Instance not found.");
     const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
 
-    const note = data.note?.trim() || "Please re-upload a clearer certificate that shows the expiration date.";
+    const note =
+      data.note?.trim() || "Please re-upload a clearer certificate that shows the expiration date.";
     const { error: upErr } = await supabase
       .from("company_obligation_completions")
       .update({
@@ -3454,14 +3353,19 @@ export const listPendingCertReviews = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!rows?.length) return [];
 
-    const instanceIds = Array.from(new Set(rows.map((r: { instance_id: string }) => r.instance_id)));
+    const instanceIds = Array.from(
+      new Set(rows.map((r: { instance_id: string }) => r.instance_id)),
+    );
     const { data: insts, error: iErr } = await supabase
       .from("company_obligation_instances")
       .select("id, obligation_id, status")
       .in("id", instanceIds);
     if (iErr) throw new Error(iErr.message);
     const instById = new Map(
-      ((insts ?? []) as Array<{ id: string; obligation_id: string; status: string }>).map((i) => [i.id, i]),
+      ((insts ?? []) as Array<{ id: string; obligation_id: string; status: string }>).map((i) => [
+        i.id,
+        i,
+      ]),
     );
     const obligationIds = Array.from(new Set([...instById.values()].map((i) => i.obligation_id)));
     const { data: obs, error: oErr } = await supabase

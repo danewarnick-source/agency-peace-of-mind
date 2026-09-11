@@ -84,7 +84,10 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
       .not("baseline_key" as any, "is", null);
     if (cErr) throw cErr;
     const courseByBaseline = new Map<string, string>();
-    for (const c of ((courses ?? []) as unknown) as Array<{ id: string; baseline_key: string | null }>) {
+    for (const c of (courses ?? []) as unknown as Array<{
+      id: string;
+      baseline_key: string | null;
+    }>) {
       if (c.baseline_key && !courseByBaseline.has(c.baseline_key)) {
         courseByBaseline.set(c.baseline_key, c.id);
       }
@@ -132,28 +135,27 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
       const hire = p.hire_date ? new Date(p.hire_date) : null;
       const ctx = {
         hireDate: hire,
-        requiresDeescalation: !!p.requires_deescalation,
-        requiresAbi: !!p.requires_abi,
-        assignedCodes: codesByStaff.get(p.id) ?? [],
+        requiresDeescalation:
+          typeof p.requires_deescalation === "boolean" ? p.requires_deescalation : null,
+        requiresAbi: typeof p.requires_abi === "boolean" ? p.requires_abi : null,
+        assignedCodes: codesByStaff.has(p.id) ? (codesByStaff.get(p.id) ?? []) : [],
       };
-      const trainings: StaffTrainingStatus[] = BASELINE_STAFF_TRAININGS
-        .filter((t: BaselineTraining) => isBaselineApplicable(t, ctx))
-        .map((t) => {
-          const courseId = courseByBaseline.get(t.key) ?? null;
-          const best = courseId ? bestByPair.get(`${p.id}:${courseId}`) : undefined;
-          const certified =
-            !!best &&
-            best.status === "completed" &&
-            (!best.expires_at || best.expires_at > nowIso);
-          return {
-            baselineKey: t.key,
-            title: t.title,
-            status: certified ? "certified" : "missing",
-            completedAt: certified ? best!.completed_at : null,
-            expiresAt: certified ? best!.expires_at : null,
-            courseId,
-          } satisfies StaffTrainingStatus;
-        });
+      const trainings: StaffTrainingStatus[] = BASELINE_STAFF_TRAININGS.filter(
+        (t: BaselineTraining) => isBaselineApplicable(t, ctx),
+      ).map((t) => {
+        const courseId = courseByBaseline.get(t.key) ?? null;
+        const best = courseId ? bestByPair.get(`${p.id}:${courseId}`) : undefined;
+        const certified =
+          !!best && best.status === "completed" && (!best.expires_at || best.expires_at > nowIso);
+        return {
+          baselineKey: t.key,
+          title: t.title,
+          status: certified ? "certified" : "missing",
+          completedAt: certified ? best!.completed_at : null,
+          expiresAt: certified ? best!.expires_at : null,
+          courseId,
+        } satisfies StaffTrainingStatus;
+      });
       return { userId: p.id, trainings } satisfies StaffTrainingRow;
     });
   });

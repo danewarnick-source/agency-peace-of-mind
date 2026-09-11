@@ -22,6 +22,7 @@ import {
   type OrgFacts,
 } from "./applicability.ts";
 import { evvStaffIdsForScope, resolveScope, staffInScope, type ResolvedScope } from "./scope.ts";
+import { evaluateStaffDuty, type StaffDutyFacts } from "./duty-applicability.ts";
 
 export { resolveScope, staffInScope, evvStaffIdsForScope };
 export { computeObligationApplicability, obligationFactApplicability };
@@ -50,6 +51,8 @@ export type BuildPacketInput = {
   clocks: PacketClock[];
   catalog?: SowCatalogEntry[];
   now?: Date;
+  /** Live staff assignment facts. Office / unmatched duties hide; unanswered stays. */
+  staffDutyFacts?: StaffDutyFacts | null;
 };
 
 export type PacketItemStatus = ObligationFileStatus | "does_not_apply" | "unanswered";
@@ -277,6 +280,17 @@ export function buildPacket(input: BuildPacketInput): Packet {
     }
     const fact = factByKey.get(entry.key) ?? obligationFactApplicability(entry.key, input.facts);
     if (fact?.status === "does_not_apply") hiddenKeys.push(entry.key);
+    if (
+      input.subject === "staff" &&
+      input.staffDutyFacts &&
+      evaluateStaffDuty({
+        dutyKey: entry.key,
+        staff: input.staffDutyFacts,
+        orgFacts: input.facts,
+      }).status === "does_not_apply"
+    ) {
+      if (!hiddenKeys.includes(entry.key)) hiddenKeys.push(entry.key);
+    }
   }
 
   const pushItem = (item: PacketItem) => {
@@ -297,14 +311,22 @@ export function buildPacket(input: BuildPacketInput): Packet {
     if (seen.has(stamp)) continue;
     seen.add(stamp);
     const fact = factByKey.get(key);
-    const status = itemStatus(clock, false, now);
+    const staffDuty =
+      input.subject === "staff" && input.staffDutyFacts
+        ? evaluateStaffDuty({
+            dutyKey: key,
+            staff: input.staffDutyFacts,
+            orgFacts: input.facts,
+          })
+        : null;
+    const status = itemStatus(clock, !!staffDuty?.unanswered || !!fact?.unanswered, now);
     pushItem({
       obligationKey: key,
       title: clock.title,
       subject: input.subject,
       status,
-      applies: fact ? fact.applies : true,
-      unanswered: !!fact?.unanswered,
+      applies: staffDuty ? staffDuty.applies : fact ? fact.applies : true,
+      unanswered: !!staffDuty?.unanswered || !!fact?.unanswered,
       dueAt: clock.dueAt,
       instanceId: clock.instanceId,
       instanceStatus: clock.instanceStatus,
@@ -314,12 +336,21 @@ export function buildPacket(input: BuildPacketInput): Packet {
     });
   }
 
-  // Fact-gated rows stay visible until answered, even with no clock.
+  // Fact-gated and unanswered staff-duty rows stay visible until answered.
   for (const entry of catalog) {
     if (packetSubjectForCatalog(entry) !== input.subject) continue;
     if (hiddenKeys.includes(entry.key)) continue;
     const fact = factByKey.get(entry.key);
-    if (!fact?.unanswered) continue;
+    const staffDuty =
+      input.subject === "staff" && input.staffDutyFacts
+        ? evaluateStaffDuty({
+            dutyKey: entry.key,
+            staff: input.staffDutyFacts,
+            orgFacts: input.facts,
+          })
+        : null;
+    const unanswered = !!fact?.unanswered || !!staffDuty?.unanswered;
+    if (!unanswered) continue;
     if (seen.has(`${entry.key}:`)) continue;
     seen.add(`${entry.key}:`);
     pushItem({

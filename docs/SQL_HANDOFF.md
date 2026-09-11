@@ -15,7 +15,7 @@ Live verify (2026-09-11): neither `profiles` nor `organization_members` has
 `scope_group_id`. Brief column is **`profiles.scope_group_id`** (nullable FK
 to `staff_groups`). `staff_group_members.is_lead` is also missing.
 
-Matches `supabase/migrations/20260911110000_obligation_scope.sql`.
+Matches `supabase/migrations/20260911101000_obligation_scope.sql`.
 
 Do **not** apply from CI. Propose-only until Core pastes in Lovable
 (clear the editor first). App `resolveScope` treats missing columns as
@@ -40,7 +40,7 @@ WHERE table_schema = 'public'
 ### Apply
 
 Clear the editor, paste the full file
-`supabase/migrations/20260911110000_obligation_scope.sql`.
+`supabase/migrations/20260911101000_obligation_scope.sql`.
 
 **What you'll see:** two `ALTER TABLE` (columns), two `CREATE INDEX`.
 

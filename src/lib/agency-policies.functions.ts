@@ -22,6 +22,7 @@ import {
 import { ensureOpenStaffObligationInternal } from "@/lib/ensure-staff-obligation";
 import { addToAllStaffGroupInternal, ensureAllStaffGroupInternal } from "@/lib/staff-groups.functions";
 import { mergeDueDayPackFields } from "@/lib/obligation-packs";
+import { catalogTitleIsReserved } from "@/lib/sow-obligation-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -143,6 +144,9 @@ async function fanOutPolicyObligation(
   policy: AgencyPolicyRow,
   createdBy: string,
 ): Promise<string> {
+  if (catalogTitleIsReserved(policy.title)) {
+    throw new Error("This title is already in the UT catalog. Do not create a second row.");
+  }
   const jobCode = policy.audience_job_code;
   const matching = await matchingStaffForPolicy(
     supabase,

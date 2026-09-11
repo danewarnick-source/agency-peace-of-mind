@@ -2562,6 +2562,9 @@ export const logObligationEvent = createServerFn({ method: "POST" })
     const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
     if (ob.cadence !== "per_event")
       throw new Error("logObligationEvent is only valid for per_event obligations.");
+    if (!obligationCreatesInstances(ob)) {
+      throw new Error("This duty does not create calendar instances.");
+    }
 
     const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
     const daysAfter = Number.isFinite(Number(cfg.days_after_trigger))
@@ -2947,6 +2950,7 @@ export const recordCompletion = createServerFn({ method: "POST" })
     // own expiration date rather than waiting for the normal
     // hire-anniversary generator, so renewal dates track the real cert.
     if (
+      obligationCreatesInstances(ob) &&
       validation.ran &&
       validation.status === "passed" &&
       validation.expires_date &&
@@ -2996,7 +3000,11 @@ export const recordCompletion = createServerFn({ method: "POST" })
     // printed expiration date when NECTAR read one off the upload;
     // otherwise fall back to completed_at + N months (the completion
     // record already carries an admin-facing warning for that case).
-    if (dueCfgForRenewal.every_n_months !== undefined && updatedInstance.status === "completed") {
+    if (
+      obligationCreatesInstances(ob) &&
+      dueCfgForRenewal.every_n_months !== undefined &&
+      updatedInstance.status === "completed"
+    ) {
       const months = Number(dueCfgForRenewal.every_n_months);
       if (Number.isFinite(months)) {
         const { data: alreadyOpen } = await supabase
@@ -3355,8 +3363,8 @@ export async function onPcspActivatedInternal(
     .eq("cadence", "per_event");
   if (error) throw new Error(error.message);
 
-  const matches = ((obligations ?? []) as CompanyObligationRow[]).filter((o) =>
-    o.title.startsWith("Support Strategies"),
+  const matches = ((obligations ?? []) as CompanyObligationRow[]).filter(
+    (o) => o.title.startsWith("Support Strategies") && obligationCreatesInstances(o),
   );
   for (const ob of matches) {
     await generateEventInstancesForClientInternal(supabase, organizationId, ob, clientId);
@@ -3369,6 +3377,7 @@ async function generateEventInstancesForClientInternal(
   ob: CompanyObligationRow,
   clientId: string,
 ): Promise<void> {
+  if (!obligationCreatesInstances(ob)) return;
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
   const days = Number(cfg.days_after_trigger ?? cfg.days_after_event ?? 30);
   const todayUTC = new Date(

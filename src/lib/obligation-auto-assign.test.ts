@@ -21,12 +21,12 @@ describe("hire auto-assign", () => {
   it("always assigns the locked hire set", () => {
     assert.deepEqual([...HIRE_ALWAYS_TITLES], [
       CODE_OF_CONDUCT_TITLE,
-      CONFLICT_OF_INTEREST_TITLE,
       THIRTY_DAY_OBLIGATION_TITLE,
       "CPR/First Aid Certification — Initial",
       PCT_HIRE_COURSE_TITLE,
     ]);
-    assert.equal(titleGroupsForHire().length, 5);
+    assert.equal(titleGroupsForHire().length, 4);
+    assert.equal([...HIRE_ALWAYS_TITLES].includes(CONFLICT_OF_INTEREST_TITLE), false);
     assert.ok(titleGroupsForHire().some((group) => group.includes(PCT_HIRE_COURSE_TITLE)));
     const hireHook = readFileSync(
       fileURLToPath(new URL("./staff-assignment-hooks.functions.ts", import.meta.url)),

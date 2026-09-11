@@ -1335,6 +1335,11 @@ export function obligationCreatesInstances(ob: {
   return catalogCreatesInstances(catalog);
 }
 
+/** Provider / pack / policy creates must not clone a catalog title. */
+export function catalogTitleIsReserved(title: string): boolean {
+  return sowCatalogEntry(title) != null;
+}
+
 export function resolveDueRule(
   title: string,
   cadence: string,

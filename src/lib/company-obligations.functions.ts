@@ -40,6 +40,7 @@ import {
 } from "./obligation-assignee-rules";
 import { toIsoDateDay } from "./iso-date-day";
 import { isPackSentinel, obligationIsRequired } from "./obligation-packs";
+import { ORPHAN_OBLIGATION_CREATE_GONE } from "./compliance-spine";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -1893,12 +1894,14 @@ async function loadInstancesByObligation(
 
 /**
  * Shared bootstrap for the compliance register and the Deadlines page:
- * mark overdue, seed standing SOW duties, hide N/A service codes, and
- * (optionally) generate the current/next calendar instances so clocks exist.
+ * hide N/A service codes, and (optionally) mark overdue / seed standing
+ * SOW duties / generate calendar instances.
  *
- * The register list must NOT generate. Per-staff / per-client generation
- * hangs the page on “Loading obligations…” while Admin Home already
- * reads the existing 18 overdue rows.
+ * Notification-bell and Deadlines fetches must pass skipMutations so
+ * opening the app never inserts catalog rows or instances. Standing
+ * seeds stay on explicit Soft Core / hire paths. The register list
+ * also must not generate — per-staff / per-client generation hangs
+ * the page on "Loading obligations…".
  */
 async function bootstrapVisibleObligationInstancesInternal(
   supabase: AnySupabase,
@@ -1928,7 +1931,8 @@ async function bootstrapVisibleObligationInstancesInternalUnsafe(
   visibleObligations: CompanyObligationRow[];
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
 }> {
-  if (!opts?.skipMutations) {
+  const skipMutations = opts?.skipMutations === true;
+  if (!skipMutations) {
     await checkAndMarkOverdueInternal(supabase, organizationId);
     try {
       await ensureStandingDutiesInternal(supabase, organizationId);
@@ -1955,14 +1959,16 @@ async function bootstrapVisibleObligationInstancesInternalUnsafe(
   const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
   let instancesByObligation = await loadInstancesByObligation(supabase, obligationIds);
 
-  if (opts?.generateMissing === false) {
+  // skipMutations also skips instance minting — bell / deadlines fetch
+  // must stay read-only even if a caller forgets generateMissing: false.
+  if (skipMutations || opts?.generateMissing === false) {
     return { visibleObligations, instancesByObligation };
   }
 
   // Ensure current + next calendar periods for org-level duties, and
   // bootstrap staff duties that have no OPEN instance (so a completed
   // anniversary year still generates the next one; new hires still get
-  // a first instance). Deadlines may generate; the register list does not.
+  // a first instance). Explicit Soft Core / hire paths still generate.
   const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
     if (!o.active) return false;
     const rows = instancesByObligation.get(o.id) ?? [];
@@ -2046,9 +2052,10 @@ export type DeadlineObligationItem = {
 };
 
 /**
- * Open obligation instances for the Deadlines page. Same register as
- * Compliance (SOW + provider/internal policy), footprint-filtered, with
- * current periods generated. Staff only see instances they are assigned to.
+ * Open obligation instances for the Deadlines page / notification bell.
+ * Same register as Compliance, footprint-filtered, read-only: never seeds
+ * catalog rows or mints instances on fetch. Staff only see instances
+ * they are assigned to.
  */
 export const listDeadlineObligationInstances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -2076,7 +2083,10 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
     let visibleObligations: CompanyObligationRow[] = [];
     let instancesByObligation: Map<string, ObligationInstanceRow[]> = new Map();
     try {
-      const boot = await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
+      const boot = await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
+        generateMissing: false,
+        skipMutations: true,
+      });
       visibleObligations = boot.visibleObligations;
       instancesByObligation = boot.instancesByObligation;
     } catch (e) {
@@ -2279,39 +2289,7 @@ export const createCompanyObligation = createServerFn({ method: "POST" })
         instance: null as ObligationInstanceRow | null,
       };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
-
-    const { data: inserted, error } = await supabase
-      .from("company_obligations")
-      .insert({
-        organization_id: data.organizationId,
-        title: data.title,
-        description: data.description ?? null,
-        source_policy_section: data.sourcePolicySection ?? null,
-        cadence: data.cadence,
-        due_day_config: data.dueDayConfig,
-        reminder_days_before: data.reminderDaysBefore,
-        evidence_type: data.evidenceType,
-        linked_form_id: data.linkedFormId ?? null,
-        attestation_text: data.attestationText ?? null,
-        requires_individual_completion: data.requiresIndividualCompletion,
-        assigned_to_groups: data.assignedToGroups,
-        assigned_to_users: data.assignedToUsers,
-        assignee_role: data.assigneeRole,
-        scope: data.scope,
-        target_service_codes: data.targetServiceCodes,
-        notify_manager_on_complete: data.notifyManagerOnComplete,
-        notify_manager_on_overdue: data.notifyManagerOnOverdue,
-        nectar_cert_type_label: data.nectarCertTypeLabel ?? null,
-        nectar_keyword_groups: data.nectarKeywordGroups,
-        created_by: userId,
-      })
-      .select("*")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!inserted) throw new Error("Failed to create obligation.");
-
-    const instance = await generateNextInstanceInternal(supabase, data.organizationId, inserted.id);
-    return { obligation: inserted as CompanyObligationRow, instance };
+    throw new Error(ORPHAN_OBLIGATION_CREATE_GONE);
   });
 
 export const updateCompanyObligation = createServerFn({ method: "POST" })

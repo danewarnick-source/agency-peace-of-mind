@@ -189,55 +189,14 @@ export async function detectShiftBundleConflicts(
 }
 
 async function raiseAndMaybeResolve(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  cand: CandidateFlagLike,
-  ack: Acknowledgement | null,
+  _supabase: SupabaseClient<Database>,
+  _userId: string,
+  _cand: CandidateFlagLike,
+  _ack: Acknowledgement | null,
 ) {
-  const orgLookup = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("nectar_compliance_rules" as any)
-    .select("organization_id")
-    .eq("id", cand.ruleId)
-    .single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orgId = (orgLookup.data as any)?.organization_id ?? null;
-  const { data: flag, error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("nectar_compliance_flags" as any)
-    .insert({
-      organization_id: orgId,
-      rule_id: cand.ruleId,
-      requirement_id: cand.requirementId,
-      detection_type: "billing_conflict",
-      subject_context: {
-        source: "scheduling",
-        client_id: cand.bundle.clientId,
-        date: cand.bundle.date,
-        incoming_codes: cand.bundle.incomingCodes,
-        sibling_codes: cand.bundle.siblingCodes,
-        matched_codes: cand.matchedCodes,
-      },
-      source_snapshot: cand.source,
-      raised_to: userId,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-  if (ack) {
-    const { error: uErr } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_flags" as any)
-      .update({
-        resolution: ack.resolution,
-        resolved_by: userId,
-        resolved_at: new Date().toISOString(),
-        resolution_note: ack.note ?? null,
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .eq("id", (flag as any).id);
-    if (uErr) throw uErr;
-  }
+  // Parallel nectar_compliance_flags writer disabled. Shift-commit still
+  // detects conflicts; it must not persist a second compliance register.
+  return;
 }
 
 export type GateOpts =

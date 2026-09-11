@@ -102,16 +102,16 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(desk, /id="compliance-desk"/);
   });
 
-  it("points Home View all and greeting power links at the demoted desks", () => {
+  it("points Home overdue, View all, and greeting power links at Compliance", () => {
     const dash = read("../components/admin-home/admin-home-dashboard.tsx");
-    assert.match(dash, /to="\/dashboard\/command-center"/);
-    assert.match(dash, /hash="obligations"/);
-    assert.match(dash, /hash="due"/);
-    assert.match(dash, /hash="recommendations"/);
+    assert.doesNotMatch(dash, /command-center/);
+    assert.doesNotMatch(dash, /hash="obligations"/);
+    assert.doesNotMatch(dash, /hash="due"/);
+    assert.doesNotMatch(dash, /hash="recommendations"/);
+    assert.match(dash, /to="\/dashboard\/compliance"/);
     assert.match(dash, /to="\/dashboard\/hub\/employees"/);
     assert.match(dash, /to="\/dashboard\/hub\/clients"/);
     assert.match(dash, /to="\/dashboard\/compliance-desk"/);
-    assert.match(dash, /Command center/);
     assert.match(dash, /Compliance desk/);
     assert.match(dash, /fontSize: 12/);
     assert.match(dash, /PI_THEME\.c50/);

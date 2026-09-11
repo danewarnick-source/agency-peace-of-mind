@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { onClientDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,7 @@ export function BehaviorSupportConfigCard({
   clientId, organizationId, clientName,
 }: { clientId: string; organizationId: string; clientName: string }) {
   const qc = useQueryClient();
+  const dutyFactsFn = useServerFn(onClientDutyFactsChanged);
 
   // Current per-client config (may not exist yet)
   const { data: bsc, isLoading: bscLoading } = useQuery<BscRow | null>({
@@ -112,6 +115,16 @@ export function BehaviorSupportConfigCard({
         .single();
       if (error) throw error;
 
+      if (enabled !== (bsc?.features_enabled === true)) {
+        try {
+          await dutyFactsFn({
+            data: { organizationId, clientId },
+          });
+        } catch (e) {
+          console.warn("[obligations] behavior-plan duty reevaluate failed:", e);
+        }
+      }
+
       // Warn-and-log: write a bc_flags row when credentials are below required tier
       if (assigneeId && !match.ok) {
         await supabase.from("bc_flags").insert({
@@ -127,7 +140,8 @@ export function BehaviorSupportConfigCard({
       qc.invalidateQueries({ queryKey: ["behavior_support_clients", clientId] });
       toast.success("Behavior Support configuration saved.");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to save configuration."),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Failed to save configuration."),
   });
 
   if (bscLoading) {

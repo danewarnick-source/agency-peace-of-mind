@@ -11,7 +11,10 @@ import { archiveEntity, deleteEntity, restoreEntity } from "@/lib/lifecycle.func
 import { inviteJoinUrl } from "@/lib/join-invite";
 import { resolveAuthOrigin } from "@/lib/auth-redirect";
 import { generateTempPassword } from "@/lib/temp-password";
-import { onStaffAssignmentCreated } from "@/lib/staff-assignment-hooks.functions";
+import {
+  onStaffAssignmentCreated,
+  onStaffAssignmentRemoved,
+} from "@/lib/staff-assignment-hooks.functions";
 import {
   countEmployeesOnRosterTab,
   filterEmployeesByRosterTab,
@@ -953,6 +956,7 @@ function CaseloadDrawer({
 }) {
   const qc = useQueryClient();
   const assignmentHookFn = useServerFn(onStaffAssignmentCreated);
+  const assignmentRemovedFn = useServerFn(onStaffAssignmentRemoved);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [original, setOriginal] = useState<Set<string>>(new Set());
@@ -1029,6 +1033,13 @@ function CaseloadDrawer({
           .delete()
           .in("id", toRemoveIds);
         if (error) throw error;
+        try {
+          await assignmentRemovedFn({
+            data: { organizationId, staffId: member.id },
+          });
+        } catch (e) {
+          console.warn("[obligations] assignment remove reevaluate failed:", e);
+        }
       }
       if (toAdd.length) {
         const rows = toAdd.map((client_id) => ({

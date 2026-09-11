@@ -25,6 +25,7 @@ import {
   type StaffDutyFacts,
 } from "./duty-applicability.ts";
 import { loadStaffDutyFactsInternal } from "./load-staff-duty-facts.functions.ts";
+import { AUTOMATION_HEARTBEAT_RECURRENCE_KEY } from "./already-assigned.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -701,7 +702,10 @@ export async function resolveStaleEscalations(
     throw new Error(error.message);
   }
   const stale = ((data ?? []) as Array<{ id: string; recurrence_key: string }>).filter(
-    (r) => r.recurrence_key && !liveKeys.has(r.recurrence_key),
+    (r) =>
+      r.recurrence_key &&
+      r.recurrence_key !== AUTOMATION_HEARTBEAT_RECURRENCE_KEY &&
+      !liveKeys.has(r.recurrence_key),
   );
   if (!stale.length) return 0;
   const { error: upErr } = await supabase
@@ -932,6 +936,60 @@ export async function evaluateOrgEscalations(
   const liveKeys = new Set(hits.map((h) => recurrenceKey(h.instanceId, h.obligationId, h.trigger)));
   persist.resolved += await resolveStaleEscalations(supabase, organizationId, liveKeys);
   return { hits, persist };
+}
+
+/**
+ * Persist last nightly check on the existing notifications job log.
+ * type=escalation is already allowed; dismissed so the bell never shows it.
+ * No PHI. One row per org (recurrence_key).
+ */
+export async function persistAutomationHeartbeat(
+  supabase: AnySupabase,
+  organizationId: string,
+  args: { ok: boolean; at?: Date },
+): Promise<void> {
+  const at = (args.at ?? new Date()).toISOString();
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id, resolved_at")
+    .eq("organization_id", organizationId)
+    .eq("type", "escalation")
+    .eq("recurrence_key", AUTOMATION_HEARTBEAT_RECURRENCE_KEY)
+    .maybeSingle();
+  if (error) {
+    if (tableMissing(error.message)) return;
+    throw new Error(error.message);
+  }
+  const existing = data as { id: string; resolved_at: string | null } | null;
+  const patch = {
+    body: args.ok ? "ok" : "failed",
+    urgency: "normal",
+    title: "Automation check",
+    dismissed_at: at,
+    next_remind_at: args.ok ? null : at,
+    resolved_at: args.ok ? at : (existing?.resolved_at ?? null),
+    related_type: "automation_heartbeat",
+  };
+  if (existing) {
+    const { error: upErr } = await supabase
+      .from("notifications")
+      .update(patch)
+      .eq("id", existing.id)
+      .eq("organization_id", organizationId);
+    if (upErr && !tableMissing(upErr.message)) throw new Error(upErr.message);
+    return;
+  }
+  const { error: insErr } = await supabase.from("notifications").insert({
+    organization_id: organizationId,
+    recipient_user_id: null,
+    recipient_role: "admin",
+    type: "escalation",
+    link_to: "/dashboard",
+    related_id: null,
+    recurrence_key: AUTOMATION_HEARTBEAT_RECURRENCE_KEY,
+    ...patch,
+  });
+  if (insErr && !tableMissing(insErr.message)) throw new Error(insErr.message);
 }
 
 export async function listActiveOrganizationIds(supabase: AnySupabase): Promise<string[]> {

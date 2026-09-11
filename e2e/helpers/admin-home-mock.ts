@@ -55,8 +55,7 @@ export type HiveMockOptions = {
   welcomeIncomplete?: boolean;
 };
 
-const isoDaysFromNow = (days: number) =>
-  new Date(Date.now() + days * 86_400_000).toISOString();
+const isoDaysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 
 const ORG = {
   name: "True North Supports",
@@ -128,8 +127,7 @@ function fakeJwt(userId: string, email: string): string {
 
 function userRecord(persona: MockPersona) {
   const id = persona === "admin" ? ADMIN_USER_ID : DSP_USER_ID;
-  const email =
-    persona === "admin" ? "e2e.admin@truenorth.example" : "e2e.dsp@truenorth.example";
+  const email = persona === "admin" ? "e2e.admin@truenorth.example" : "e2e.dsp@truenorth.example";
   const now = new Date().toISOString();
   return {
     id,
@@ -445,7 +443,13 @@ function featureRegistry() {
 function parsePostgrestFilters(url: URL): Array<{ col: string; op: string; value: string }> {
   const out: Array<{ col: string; op: string; value: string }> = [];
   for (const [key, raw] of url.searchParams.entries()) {
-    if (key === "select" || key === "order" || key === "limit" || key === "offset" || key === "or") {
+    if (
+      key === "select" ||
+      key === "order" ||
+      key === "limit" ||
+      key === "offset" ||
+      key === "or"
+    ) {
       continue;
     }
     const eq = raw.indexOf(".");
@@ -495,7 +499,10 @@ function attachEmbeds(
   });
 }
 
-function rowMatches(row: Record<string, unknown>, filters: ReturnType<typeof parsePostgrestFilters>) {
+function rowMatches(
+  row: Record<string, unknown>,
+  filters: ReturnType<typeof parsePostgrestFilters>,
+) {
   for (const f of filters) {
     const cell = row[f.col];
     if (f.op === "eq") {
@@ -515,7 +522,10 @@ function rowMatches(row: Record<string, unknown>, filters: ReturnType<typeof par
   return true;
 }
 
-function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Record<string, Record<string, unknown>[]> {
+function tableRows(
+  persona: MockPersona,
+  fx: ReturnType<typeof fixtures>,
+): Record<string, Record<string, unknown>[]> {
   const user = userRecord(persona);
   const role = persona === "admin" ? "admin" : "employee";
   const first = persona === "admin" ? "Dana" : "Alex";
@@ -797,7 +807,12 @@ function jsonHeaders(origin?: string | null, extra?: Record<string, string>) {
   };
 }
 
-function fulfillJson(route: Route, body: unknown, status = 200, extraHeaders?: Record<string, string>) {
+function fulfillJson(
+  route: Route,
+  body: unknown,
+  status = 200,
+  extraHeaders?: Record<string, string>,
+) {
   const origin = route.request().headers()["origin"];
   const payload = body === undefined ? null : body;
   return route.fulfill({
@@ -953,13 +968,12 @@ function orgFeaturesPayload() {
   };
 }
 
-function buildPackMatrix(
-  fx: ReturnType<typeof fixtures>,
-  persona: MockPersona,
-  packKey: string,
-) {
+function buildPackMatrix(fx: ReturnType<typeof fixtures>, persona: MockPersona, packKey: string) {
   const directory = [
-    { id: persona === "admin" ? ADMIN_USER_ID : DSP_USER_ID, full_name: persona === "admin" ? "Dana Admin" : "Alex DSP" },
+    {
+      id: persona === "admin" ? ADMIN_USER_ID : DSP_USER_ID,
+      full_name: persona === "admin" ? "Dana Admin" : "Alex DSP",
+    },
     { id: STAFF_USER_ID, full_name: "Jordan Lee" },
   ];
   const staff = directory.map((p) => ({
@@ -1001,8 +1015,7 @@ function buildPackMatrix(
     for (const person of staff) {
       const inst = fx.instances.filter(
         (i) =>
-          col.obligationIds.includes(String(i.obligation_id)) &&
-          i.assignee_staff_id === person.id,
+          col.obligationIds.includes(String(i.obligation_id)) && i.assignee_staff_id === person.id,
       );
       const assigned = inst.length > 0;
       const open = inst.filter((i) => i.status === "pending" || i.status === "overdue");
@@ -1050,11 +1063,12 @@ function buildPackMatrix(
       .map((o) => ({
         id: String(o.id),
         title: String(o.title),
-        packKey: packColumnForObligation({
-          id: String(o.id),
-          title: String(o.title),
-          scope: String(o.scope ?? "org"),
-        })?.packKey ?? null,
+        packKey:
+          packColumnForObligation({
+            id: String(o.id),
+            title: String(o.title),
+            scope: String(o.scope ?? "org"),
+          })?.packKey ?? null,
       })),
   };
 }
@@ -1257,103 +1271,105 @@ function serverFnResult(
     case "requestFeatureUpgrade":
       return { ok: true };
     case "getThisWeekForUser":
-      return { result: {
-        items: [
-          {
-            kind: "decision",
-            id: "license:ob-hhs-inspect",
-            title: "HHS Inspection",
-            body: "HHS Inspection — overdue. This is a license/repayment item (§1.34).",
-            urgency: "critical",
-            dueAt: "2026-09-20T00:00:00.000Z",
-            ownerUserId: ADMIN_USER_ID,
-            ownerLabel: "admin_level",
-            consequence:
-              "This is a licensing or repayment item (§1.34). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
-            source: "escalation",
-            trigger: "license_or_repayment_risk",
-            instanceId: "inst-hhs",
-            obligationId: "ob-hhs-inspect",
-            obligationKey: "hhs_home_cert_annual",
-          },
-          {
-            kind: "decision",
-            id: "standing:ob-discharge",
-            title: "Person Discharge Process",
-            body: "Person Discharge Process has been missing for 30 days.",
-            urgency: "high",
-            dueAt: null,
-            ownerUserId: ADMIN_USER_ID,
-            ownerLabel: "admin_level",
-            consequence:
-              "This policy has been missing 30+ days. A reviewer will ask for it by name — there is currently nothing to show them.",
-            source: "standing_missing",
-            trigger: "standing_record_missing_30d",
-            obligationId: "ob-discharge",
-            obligationKey: "person_discharge_process",
-          },
-          {
-            kind: "decision",
-            id: "overdue:ob-ce",
-            title: "Annual Continuing Education",
-            body: "Ada Staff: Annual Continuing Education is 12 days overdue.",
-            urgency: "high",
-            dueAt: "2026-08-30T00:00:00.000Z",
-            ownerUserId: ADMIN_USER_ID,
-            ownerLabel: "manager_of_manager",
-            consequence:
-              "12 days overdue. If unresolved, this is a finding on the next DSPD review.",
-            source: "escalation",
-            trigger: "overdue",
-            instanceId: "inst-ce",
-            obligationId: "ob-ce",
-            obligationKey: "ce_12h_annual",
-          },
-          {
-            kind: "decision",
-            id: "half:ob-ce-half",
-            title: "Utah Medicaid Provider Manuals — Annual Memo",
-            body: "Ada Staff: Utah Medicaid Provider Manuals — Annual Memo not started, due 2026-10-01. 20 days left.",
-            urgency: "normal",
-            dueAt: "2026-10-01T00:00:00.000Z",
-            ownerUserId: ADMIN_USER_ID,
-            ownerLabel: "manager",
-            consequence:
-              "If this isn't started soon, it becomes overdue on 2026-10-01 and escalates to the next manager up.",
-            source: "escalation",
-            trigger: "half_window_not_started",
-            instanceId: "inst-memo",
-            obligationId: "ob-ce-half",
-            obligationKey: "medicaid_manuals_memo",
-          },
-        ],
-        quiet: {
-          kind: "quiet_line",
-          obligationsSatisfied: 41,
-          notesPassed: 38,
-          notesTotal: 38,
-          standingCurrent: 8,
-          recordsReviewCleared: 2,
-          evvReconciledThrough: "Sunday",
-          segments: [
-            "41 obligations satisfied by normal operations",
-            "38 of 38 notes passed Nectar",
-            "8 standing records current",
-            "2 records-review items cleared",
-            "EVV reconciled through Sunday",
+      return {
+        result: {
+          items: [
+            {
+              kind: "decision",
+              id: "license:ob-hhs-inspect",
+              title: "HHS Inspection",
+              body: "HHS Inspection — overdue. This is a license/repayment item (§1.34).",
+              urgency: "critical",
+              dueAt: "2026-09-20T00:00:00.000Z",
+              ownerUserId: ADMIN_USER_ID,
+              ownerLabel: "admin_level",
+              consequence:
+                "This is a licensing or repayment item (§1.34). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
+              source: "escalation",
+              trigger: "license_or_repayment_risk",
+              instanceId: "inst-hhs",
+              obligationId: "ob-hhs-inspect",
+              obligationKey: "hhs_home_cert_annual",
+            },
+            {
+              kind: "decision",
+              id: "standing:ob-discharge",
+              title: "Person Discharge Process",
+              body: "Person Discharge Process has been missing for 30 days.",
+              urgency: "high",
+              dueAt: null,
+              ownerUserId: ADMIN_USER_ID,
+              ownerLabel: "admin_level",
+              consequence:
+                "This policy has been missing 30+ days. A reviewer will ask for it by name — there is currently nothing to show them.",
+              source: "standing_missing",
+              trigger: "standing_record_missing_30d",
+              obligationId: "ob-discharge",
+              obligationKey: "person_discharge_process",
+            },
+            {
+              kind: "decision",
+              id: "overdue:ob-ce",
+              title: "Annual Continuing Education",
+              body: "Ada Staff: Annual Continuing Education is 12 days overdue.",
+              urgency: "high",
+              dueAt: "2026-08-30T00:00:00.000Z",
+              ownerUserId: ADMIN_USER_ID,
+              ownerLabel: "manager_of_manager",
+              consequence:
+                "12 days overdue. If unresolved, this is a finding on the next DSPD review.",
+              source: "escalation",
+              trigger: "overdue",
+              instanceId: "inst-ce",
+              obligationId: "ob-ce",
+              obligationKey: "ce_12h_annual",
+            },
+            {
+              kind: "decision",
+              id: "half:ob-ce-half",
+              title: "Utah Medicaid Provider Manuals — Annual Memo",
+              body: "Ada Staff: Utah Medicaid Provider Manuals — Annual Memo not started, due 2026-10-01. 20 days left.",
+              urgency: "normal",
+              dueAt: "2026-10-01T00:00:00.000Z",
+              ownerUserId: ADMIN_USER_ID,
+              ownerLabel: "manager",
+              consequence:
+                "If this isn't started soon, it becomes overdue on 2026-10-01 and escalates to the next manager up.",
+              source: "escalation",
+              trigger: "half_window_not_started",
+              instanceId: "inst-memo",
+              obligationId: "ob-ce-half",
+              obligationKey: "medicaid_manuals_memo",
+            },
           ],
+          quiet: {
+            kind: "quiet_line",
+            obligationsSatisfied: 41,
+            notesPassed: 38,
+            notesTotal: 38,
+            standingCurrent: 8,
+            recordsReviewCleared: 2,
+            evvReconciledThrough: "Sunday",
+            segments: [
+              "41 obligations satisfied by normal operations",
+              "38 of 38 notes passed Nectar",
+              "8 standing records current",
+              "2 records-review items cleared",
+              "EVV reconciled through Sunday",
+            ],
+          },
+          alreadyAssigned: {
+            renewalCount: 4,
+            staffNotified: true,
+            dueInDays: 30,
+          },
+          automation: {
+            lastSuccessfulCheckAt: "2026-09-11T14:00:00.000Z",
+            lastFailedAt: null,
+            status: "ok",
+          },
         },
-        alreadyAssigned: {
-          renewalCount: 4,
-          staffNotified: true,
-          dueInDays: 30,
-        },
-        automation: {
-          lastSuccessfulCheckAt: null,
-          lastFailedAt: null,
-          status: "unknown",
-        },
-      } };
+      };
     case "generateMyReview":
       return {
         result: {
@@ -1514,8 +1530,9 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
   const body = { ...parseBody(queryText), ...parseBody(postText) };
   const result = serverFnResult(name, body, persona, fx) ?? null;
   if (!name) {
-    // eslint-disable-next-line no-console
-    console.log(`[hive-mock] unmatched server fn ${method} ${req.url()} body=${postText.slice(0, 180)}`);
+    console.log(
+      `[hive-mock] unmatched server fn ${method} ${req.url()} body=${postText.slice(0, 180)}`,
+    );
   }
   // TanStack Start's client returns application/json payloads as-is when
   // `x-tss-serialized` is absent (see serverFnFetcher getResponse).
@@ -1548,7 +1565,6 @@ export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
   );
 
   page.on("pageerror", (err) => {
-    // eslint-disable-next-line no-console
     console.log(`[hive-mock pageerror] ${err.message}`);
   });
 

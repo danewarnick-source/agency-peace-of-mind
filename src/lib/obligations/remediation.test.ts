@@ -20,7 +20,11 @@ import {
   soloLapseLabel,
   type SoloLapse,
 } from "./solo-lapse.ts";
-import { assembleThisWeekFromHits, sortThisWeekItems, type Decision } from "./this-week.functions.ts";
+import {
+  assembleThisWeekFromHits,
+  sortThisWeekItems,
+  type Decision,
+} from "./this-week.functions.ts";
 import { sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
 import {
   TNS_ORG_ID,
@@ -57,7 +61,9 @@ function soloRule(): EscalationRule {
   };
 }
 
-function hit(partial: Partial<EscalationHit> & Pick<EscalationHit, "trigger" | "obligationId">): EscalationHit {
+function hit(
+  partial: Partial<EscalationHit> & Pick<EscalationHit, "trigger" | "obligationId">,
+): EscalationHit {
   return {
     rule: soloRule(),
     instanceId: "inst-cpr",
@@ -95,7 +101,10 @@ describe("blocks_solo_when_lapsed keys", () => {
     assert.equal(soloLapseAppliesToClient("abi_training", { hasAbi: false }), false);
     assert.equal(soloLapseAppliesToClient("abi_training", { hasAbi: true }), true);
     assert.equal(soloLapseAppliesToClient("behavior_intervention_cert", {}), false);
-    assert.equal(soloLapseAppliesToClient("behavior_intervention_cert", { hasBehaviorPlan: true }), true);
+    assert.equal(
+      soloLapseAppliesToClient("behavior_intervention_cert", { hasBehaviorPlan: true }),
+      true,
+    );
   });
 
   it("filters client-inapplicable lapses", () => {
@@ -136,7 +145,10 @@ describe("plan kinds and owners", () => {
     );
     assert.equal(kindFromEscalationTrigger("overdue", "cpr_first_aid_renewal"), "solo_lapse");
     assert.equal(kindFromEscalationTrigger("overdue", "hhs_home_cert_annual"), "overdue");
-    assert.equal(kindFromEscalationTrigger("standing_record_missing_30d", null), "standing_missing");
+    assert.equal(
+      kindFromEscalationTrigger("standing_record_missing_30d", null),
+      "standing_missing",
+    );
     assert.equal(kindFromEscalationTrigger("license_or_repayment_risk", null), "license_risk");
     assert.equal(kindFromEscalationTrigger("half_window_not_started", "orientation_30_day"), null);
   });
@@ -200,7 +212,10 @@ describe("getThisWeek plan cards", () => {
     };
     const week = assembleThisWeekFromHits(MANAGER, [], [plan]);
     assert.equal(week[0]?.kind, "decision");
-    assert.equal(week[0] && week[0].kind === "decision" ? week[0].source : null, "remediation_plan");
+    assert.equal(
+      week[0] && week[0].kind === "decision" ? week[0].source : null,
+      "remediation_plan",
+    );
     assert.equal(week[0] && week[0].kind === "decision" ? week[0].planKind : null, "solo_lapse");
     assert.equal(week[0] && week[0].kind === "decision" ? week[0].ownerUserId : null, MANAGER);
   });
@@ -277,7 +292,7 @@ function fakeSupabase(store: {
     });
 
   const table = (name: string) => {
-    let rows: FakeRow[] =
+    const rows: FakeRow[] =
       name === "remediation_plans"
         ? store.plans
         : name === "company_obligation_instances"
@@ -442,6 +457,62 @@ describe("nightly plan outcomes", () => {
     assert.equal(store.inserts[0]?.kind, "scheduled_while_lapsed");
     assert.equal(store.inserts[0]?.status, "awaiting_approval");
     assert.ok(!String(store.inserts[0]?.plan_text ?? "").includes("Ada"));
+  });
+
+  it("does not complete the underlying instance when a plan is approved", async () => {
+    const plan: RemediationPlanRow = {
+      id: "p3",
+      organization_id: TNS_ORG_ID,
+      obligation_id: "ob-cpr",
+      instance_id: "inst-cpr",
+      staff_id: STAFF,
+      obligation_key: "cpr_first_aid_renewal",
+      title: "CPR/First Aid Certification — Renewal",
+      kind: "overdue",
+      status: "approved",
+      plan_text: "Restore CPR.",
+      due_at: "2026-10-01T00:00:00.000Z",
+      proposed_by: null,
+      reviewed_by: ADMIN,
+      reviewed_at: now.toISOString(),
+      outcome: "approved",
+      outcome_note: null,
+      outcome_at: now.toISOString(),
+    };
+    const store = {
+      plans: [plan as unknown as FakeRow],
+      instances: [{ id: "inst-cpr", status: "overdue", completed_at: null }],
+      notifications: [
+        {
+          id: "n2",
+          organization_id: TNS_ORG_ID,
+          type: "escalation",
+          related_id: "inst-cpr",
+          resolved_at: null,
+        },
+      ],
+      inserts: [] as FakeRow[],
+    };
+    await applyRemediationPlanOutcomes(fakeSupabase(store), TNS_ORG_ID, [], now);
+    assert.equal(store.instances[0]?.status, "overdue");
+    assert.equal(store.instances[0]?.completed_at, null);
+    assert.notEqual(store.plans[0]?.status, "completed");
+  });
+});
+
+describe("remediation plan does not close the requirement", () => {
+  it("review and propose writers never complete company_obligation_instances", () => {
+    const src = readFileSync(new URL("./remediation.functions.ts", import.meta.url), "utf8");
+    assert.match(src, /export const reviewRemediationPlan/);
+    assert.match(src, /export const proposeRemediationPlan/);
+    assert.doesNotMatch(
+      src,
+      /from\("company_obligation_instances"\)[\s\S]{0,800}status:\s*"completed"/,
+    );
+    assert.doesNotMatch(src, /\.update\(\{[\s\S]{0,200}status:\s*"completed"/);
+    const nightly = readFileSync(new URL("./remediation.ts", import.meta.url), "utf8");
+    assert.match(nightly, /markPlanOutcome/);
+    assert.doesNotMatch(nightly, /from\("company_obligation_instances"\)[\s\S]{0,400}\.update\(/);
   });
 });
 

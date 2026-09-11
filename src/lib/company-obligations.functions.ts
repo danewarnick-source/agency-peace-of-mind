@@ -3678,9 +3678,16 @@ export const onPcspActivated = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     try {
       await onPcspActivatedInternal(supabase, data.organizationId, data.clientId);
-      return { ok: true };
     } catch (e) {
       console.warn("[obligations] PCSP event clock failed:", e);
       return { ok: false };
     }
+    try {
+      const { reevaluateStaffAssignedToClientInternal } =
+        await import("@/lib/staff-assignment-hooks.functions");
+      await reevaluateStaffAssignedToClientInternal(supabase, data.organizationId, data.clientId);
+    } catch (e) {
+      console.warn("[obligations] PCSP duty reevaluate failed:", e);
+    }
+    return { ok: true };
   });

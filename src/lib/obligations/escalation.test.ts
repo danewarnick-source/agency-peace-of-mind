@@ -6,6 +6,8 @@ import {
   consequenceForTrigger,
   evaluateEscalations,
   persistEscalationHits,
+  persistAutomationHeartbeat,
+  resolveStaleEscalations,
   resolveRecipient,
   recurrenceKey,
   renderTemplate,
@@ -459,10 +461,12 @@ describe("escalation notification idempotency", () => {
 });
 
 describe("no dual escalation writers", () => {
-  it("type=escalation inserts only from persistEscalationHits", () => {
+  it("type=escalation inserts only from persistEscalationHits and persistAutomationHeartbeat", () => {
     const src = readFileSync(new URL("./escalation.ts", import.meta.url), "utf8");
     assert.match(src, /type: "escalation"/);
     assert.match(src, /export async function persistEscalationHits/);
+    assert.match(src, /export async function persistAutomationHeartbeat/);
+    assert.match(src, /AUTOMATION_HEARTBEAT_RECURRENCE_KEY/);
     const obligations = readFileSync(
       new URL("../company-obligations.functions.ts", import.meta.url),
       "utf8",
@@ -478,5 +482,48 @@ describe("no dual escalation writers", () => {
     assert.match(src, /verifyCronSecret/);
     assert.match(src, /runNightlyEscalationEvaluator/);
     assert.match(src, /count: 0, items: \[\]/);
+  });
+});
+
+describe("automation heartbeat job log", () => {
+  it("writes a dismissed escalation row and skips it as stale", async () => {
+    const store: Array<Record<string, unknown>> = [];
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+              }),
+              is: () =>
+                Promise.resolve({
+                  data: [
+                    { id: "hb", recurrence_key: "automation_heartbeat" },
+                    { id: "live", recurrence_key: "other" },
+                  ],
+                  error: null,
+                }),
+            }),
+          }),
+        }),
+        insert: async (row: Record<string, unknown>) => {
+          store.push(row);
+          return { error: null };
+        },
+        update: async () => ({ error: null }),
+      }),
+    };
+    await persistAutomationHeartbeat(supabase, TNS_ORG_ID, {
+      ok: true,
+      at: new Date("2026-09-11T14:00:00.000Z"),
+    });
+    assert.equal(store.length, 1);
+    assert.equal(store[0]?.type, "escalation");
+    assert.equal(store[0]?.recurrence_key, "automation_heartbeat");
+    assert.equal(store[0]?.body, "ok");
+    assert.ok(store[0]?.dismissed_at);
+    const resolved = await resolveStaleEscalations(supabase, TNS_ORG_ID, new Set(["other"]));
+    assert.equal(resolved, 0);
   });
 });

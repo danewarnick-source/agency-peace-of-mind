@@ -21,6 +21,7 @@ import { onPcspActivatedInternal } from "@/lib/company-obligations.functions";
 import {
   onStaffAssignmentCreatedInternal,
   onStaffHiredInternal,
+  reevaluateStaffAssignedToClientInternal,
 } from "@/lib/staff-assignment-hooks.functions";
 import { enrichNamesFromFull } from "@/lib/person-name";
 import { hireEmployeeInternal } from "@/lib/employees.functions";
@@ -966,6 +967,12 @@ async function commitClient(
     }
   } catch (err) {
     gaps.push(`PCSP carry-over warning: ${(err as Error).message}`);
+  }
+
+  try {
+    await reevaluateStaffAssignedToClientInternal(sb, orgId, recordId);
+  } catch (err) {
+    console.warn("[obligations] import client duty reevaluate failed:", err);
   }
 
   return recordId;

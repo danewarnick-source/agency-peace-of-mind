@@ -4,22 +4,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import {
-  generateNextInstanceInternal,
-  onPcspActivatedInternal,
-} from "./company-obligations.functions";
+import { generateNextInstanceInternal } from "./company-obligations.functions";
 import { assignMatchingPoliciesForStaffInternal } from "./agency-policies.functions";
 import {
-  ABI_OBLIGATION_TITLES,
-  assignmentNeedsAbi,
-  assignmentNeedsMandt,
-  assignmentNeedsSupportStrategies,
-  clientFlagsFromExistingSchema,
-} from "./obligation-auto-assign";
-import { MANDT_OBLIGATION_TITLES } from "./training-class";
-import {
   ensureOpenStaffObligationByKeyInternal,
-  ensureOpenStaffObligationInternal,
   loadStaffForEnsure,
 } from "./ensure-staff-obligation";
 import { loadOrgFacts } from "./obligations/applicability";
@@ -32,44 +20,6 @@ import { loadStaffDutyFactsInternal } from "./obligations/load-staff-duty-facts.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
-
-async function loadClientAssignmentFlags(
-  supabase: AnySupabase,
-  organizationId: string,
-  clientId: string,
-): Promise<ReturnType<typeof clientFlagsFromExistingSchema>> {
-  const [{ data: client }, { data: bsc }, { data: targets }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("has_abi, pcsp_signed_date, pcsp_expiration_date, pcsp_goals")
-      .eq("id", clientId)
-      .eq("organization_id", organizationId)
-      .maybeSingle(),
-    supabase
-      .from("behavior_support_clients")
-      .select("features_enabled")
-      .eq("organization_id", organizationId)
-      .eq("client_id", clientId)
-      .maybeSingle(),
-    supabase
-      .from("client_target_behaviors")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("client_id", clientId)
-      .limit(1),
-  ]);
-  const row = (client ?? {}) as {
-    has_abi?: boolean | null;
-    pcsp_signed_date?: string | null;
-    pcsp_expiration_date?: string | null;
-    pcsp_goals?: unknown;
-  };
-  return clientFlagsFromExistingSchema({
-    ...row,
-    behaviorPlanEnabled: (bsc as { features_enabled?: boolean } | null)?.features_enabled === true,
-    hasTargetBehaviors: ((targets ?? []) as Array<{ id: string }>).length > 0,
-  });
-}
 
 export async function reevaluateStaffDutiesInternal(
   supabase: AnySupabase,
@@ -160,6 +110,29 @@ export async function reevaluateStaffDutiesInternal(
   }
 }
 
+export async function reevaluateStaffAssignedToClientInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  clientId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("staff_assignments")
+    .select("staff_id")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  const staffIds = [
+    ...new Set(
+      ((data ?? []) as Array<{ staff_id: string | null }>)
+        .map((r) => r.staff_id)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  for (const staffId of staffIds) {
+    await reevaluateStaffDutiesInternal(supabase, organizationId, staffId);
+  }
+}
+
 export async function onStaffHiredInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -205,7 +178,7 @@ export async function onStaffAssignmentCreatedInternal(
   supabase: AnySupabase,
   organizationId: string,
   staffId: string,
-  clientId: string,
+  _clientId: string,
   serviceCodes: string[],
 ): Promise<void> {
   const { data: obligations, error } = await supabase
@@ -227,45 +200,6 @@ export async function onStaffAssignmentCreatedInternal(
     await generateNextInstanceInternal(supabase, organizationId, ob.id);
   }
 
-  const flags = await loadClientAssignmentFlags(supabase, organizationId, clientId);
-  const { data: prof } = await supabase
-    .from("profiles")
-    .select("requires_abi, requires_deescalation")
-    .eq("id", staffId)
-    .maybeSingle();
-  const staffFlags = {
-    requiresAbi: (prof as { requires_abi?: boolean } | null)?.requires_abi === true,
-    requiresDeescalation:
-      (prof as { requires_deescalation?: boolean } | null)?.requires_deescalation === true,
-  };
-
-  if (assignmentNeedsSupportStrategies(flags)) {
-    try {
-      await onPcspActivatedInternal(supabase, organizationId, clientId);
-    } catch (e) {
-      console.warn("[obligations] PCSP clock on assignment failed:", e);
-    }
-  }
-
-  const staff = await loadStaffForEnsure(supabase, organizationId, staffId);
-  if (staff && assignmentNeedsAbi(flags, staffFlags)) {
-    await ensureOpenStaffObligationInternal(
-      supabase,
-      organizationId,
-      [...ABI_OBLIGATION_TITLES],
-      staff,
-      { periodPrefix: "ABI" },
-    );
-  }
-  if (staff && assignmentNeedsMandt(flags, staffFlags)) {
-    await ensureOpenStaffObligationInternal(
-      supabase,
-      organizationId,
-      [...MANDT_OBLIGATION_TITLES],
-      staff,
-      { periodPrefix: "Mandt" },
-    );
-  }
   try {
     await assignMatchingPoliciesForStaffInternal(supabase, organizationId, staffId);
   } catch (e) {
@@ -352,5 +286,23 @@ export const setStaffSupervisor = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     await onSupervisorChangedInternal(supabase, data.organizationId, data.staffId, data.managerId);
+    return { ok: true };
+  });
+
+export const onClientDutyFactsChanged = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        clientId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    await reevaluateStaffAssignedToClientInternal(supabase, data.organizationId, data.clientId);
     return { ok: true };
   });

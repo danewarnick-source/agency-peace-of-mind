@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import {
+  AUTOMATION_HEARTBEAT_RECURRENCE_KEY,
   automationHeartbeatFrom,
   buildAlreadyAssigned,
   emptyAlreadyAssigned,
   formatAlreadyAssigned,
   formatAutomationLine,
   isRenewalClock,
+  loadAutomationHeartbeat,
 } from "./already-assigned.ts";
 
 const NOW = new Date("2026-09-11T18:00:00.000Z");
@@ -18,8 +20,16 @@ describe("Already assigned strip", () => {
       {
         now: NOW,
         obligations: [
-          { id: "ob-cpr", title: "CPR/First Aid Certification — Renewal", key: "cpr_first_aid_renewal" },
-          { id: "ob-bg", title: "Background Screening — Annual", key: "background_screening_annual" },
+          {
+            id: "ob-cpr",
+            title: "CPR/First Aid Certification — Renewal",
+            key: "cpr_first_aid_renewal",
+          },
+          {
+            id: "ob-bg",
+            title: "Background Screening — Annual",
+            key: "background_screening_annual",
+          },
           { id: "ob-30", title: "30-Day New Hire Orientation Training", key: "orientation_30_day" },
         ],
         instances: [
@@ -64,11 +74,19 @@ describe("Already assigned strip", () => {
 
   it("treats cert-expiration and hire-anniversary clocks as renewals", () => {
     assert.equal(
-      isRenewalClock({ id: "1", title: "CPR/First Aid Certification — Renewal", key: "cpr_first_aid_renewal" }),
+      isRenewalClock({
+        id: "1",
+        title: "CPR/First Aid Certification — Renewal",
+        key: "cpr_first_aid_renewal",
+      }),
       true,
     );
     assert.equal(
-      isRenewalClock({ id: "2", title: "30-Day New Hire Orientation Training", key: "orientation_30_day" }),
+      isRenewalClock({
+        id: "2",
+        title: "30-Day New Hire Orientation Training",
+        key: "orientation_30_day",
+      }),
       false,
     );
   });
@@ -86,17 +104,54 @@ describe("Automation heartbeat", () => {
     const failed = automationHeartbeatFrom({ lastFailedAt: "2026-09-11T14:00:00.000Z" });
     assert.equal(failed.status, "failed");
     assert.match(formatAutomationLine(failed), /failed/);
+    const retry = automationHeartbeatFrom({
+      lastSuccessfulCheckAt: "2026-09-10T14:00:00.000Z",
+      lastFailedAt: "2026-09-11T14:00:00.000Z",
+    });
+    assert.equal(retry.status, "failed");
+    assert.match(formatAutomationLine(retry), /retry pending/);
   });
 
   it("does not invent a heartbeat in This Week I/O", () => {
     const src = readFileSync(new URL("./this-week.functions.ts", import.meta.url), "utf8");
-    assert.match(src, /emptyAutomationHeartbeat|automationHeartbeatFrom/);
+    assert.match(src, /loadAutomationHeartbeat/);
     assert.doesNotMatch(src, /today 8:00 AM/);
+    assert.doesNotMatch(src, /automationHeartbeatFrom\(\{\}\)/);
     const cards = readFileSync(
       new URL("../../components/compliance/this-week-plan-cards.tsx", import.meta.url),
       "utf8",
     );
     assert.match(cards, /already-assigned/);
     assert.match(cards, /automation-line/);
+  });
+
+  it("reads last success from the existing notifications job row", async () => {
+    const supabase = {
+      from: (table: string) => {
+        assert.equal(table, "notifications");
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      body: "ok",
+                      resolved_at: "2026-09-11T14:00:00.000Z",
+                      next_remind_at: null,
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }),
+        };
+      },
+    };
+    const hb = await loadAutomationHeartbeat(supabase, "org-1");
+    assert.equal(hb.status, "ok");
+    assert.equal(hb.lastSuccessfulCheckAt, "2026-09-11T14:00:00.000Z");
+    assert.equal(AUTOMATION_HEARTBEAT_RECURRENCE_KEY, "automation_heartbeat");
   });
 });

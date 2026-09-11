@@ -10,6 +10,7 @@ import {
 import {
   buildScopeIndex,
   evvStaffIdsForScope,
+  orgWideResolvedScope,
   pickScopeAdminRecipient,
   resolveScope,
   staffInScope,
@@ -197,6 +198,16 @@ describe("getThisWeek scope wiring", () => {
     );
     assert.deepEqual(evvStaffIdsForScope(houseA)?.sort(), [LEAD, STAFF].sort());
     assert.equal(staffInScope(houseA, OTHER), false);
+  });
+});
+
+describe("orgWideResolvedScope", () => {
+  it("matches the Step 2 org-wide fallback", () => {
+    const scope = orgWideResolvedScope(TNS_ORG_ID, STAFF);
+    assert.equal(scope.isOrgWide, true);
+    assert.equal(scope.scopeGroupId, null);
+    assert.deepEqual(scope.staffUserIds, []);
+    assert.equal(evvStaffIdsForScope(scope), null);
   });
 });
 

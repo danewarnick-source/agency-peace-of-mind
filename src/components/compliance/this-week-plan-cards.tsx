@@ -17,10 +17,16 @@ import {
 } from "@/lib/obligations/remediation.functions";
 import {
   decorateDecision,
+  emptyAlreadyAssigned,
+  emptyAutomationHeartbeat,
   emptyQuietLine,
+  formatAlreadyAssigned,
+  formatAutomationLine,
   formatQuietLine,
   rollupDecisions,
   sortThisWeekItems,
+  type AlreadyAssignedStrip,
+  type AutomationHeartbeat,
   type Decision,
   type QuietLine,
   type ThisWeekItem,
@@ -66,21 +72,32 @@ export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   return null;
 }
 
-function asWeek(data: unknown): { items: Decision[]; quiet: QuietLine } {
-  if (!data) return { items: [], quiet: emptyQuietLine() };
+function asWeek(data: unknown): {
+  items: Decision[];
+  quiet: QuietLine;
+  alreadyAssigned: AlreadyAssignedStrip;
+  automation: AutomationHeartbeat;
+} {
+  const empty = {
+    items: [] as Decision[],
+    quiet: emptyQuietLine(),
+    alreadyAssigned: emptyAlreadyAssigned(),
+    automation: emptyAutomationHeartbeat(),
+  };
+  if (!data) return empty;
   if (Array.isArray(data)) {
     return {
+      ...empty,
       items: data.filter((i): i is Decision => i.kind === "decision"),
-      quiet: emptyQuietLine(),
     };
   }
-  if (typeof data !== "object") return { items: [], quiet: emptyQuietLine() };
-  const rec = data as { items?: Decision[]; quiet?: QuietLine; result?: unknown };
+  if (typeof data !== "object") return empty;
+  const rec = data as { items?: Decision[]; quiet?: QuietLine; alreadyAssigned?: AlreadyAssignedStrip; automation?: AutomationHeartbeat; result?: unknown };
   const inner = rec.result ?? rec;
   if (Array.isArray(inner)) {
     return {
+      ...empty,
       items: inner.filter((i): i is Decision => i.kind === "decision"),
-      quiet: emptyQuietLine(),
     };
   }
   if (inner && typeof inner === "object") {
@@ -88,9 +105,11 @@ function asWeek(data: unknown): { items: Decision[]; quiet: QuietLine } {
     return {
       items: week.items ?? [],
       quiet: week.quiet ?? emptyQuietLine(),
+      alreadyAssigned: week.alreadyAssigned ?? emptyAlreadyAssigned(),
+      automation: week.automation ?? emptyAutomationHeartbeat(),
     };
   }
-  return { items: [], quiet: emptyQuietLine() };
+  return empty;
 }
 
 export function ThisWeekPlanCards() {
@@ -144,6 +163,8 @@ export function ThisWeekPlanCards() {
   const visible = items.slice(0, HOME_CARD_CAP);
   const extra = Math.max(0, items.length - HOME_CARD_CAP);
   const quietText = formatQuietLine(week.quiet);
+  const assignedText = formatAlreadyAssigned(week.alreadyAssigned);
+  const automationText = formatAutomationLine(week.automation);
 
   const countLine =
     items.length === 0 ? "Nothing needs you this week." : decisionCountLine(items.length);
@@ -195,6 +216,24 @@ export function ThisWeekPlanCards() {
           {extra} more this week →
         </Link>
       ) : null}
+      {assignedText ? (
+        <div
+          data-testid="already-assigned"
+          className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+          style={{
+            background: PI_THEME.c04,
+            color: PI_THEME.c70,
+            border: `1px solid ${PI_THEME.hairlines.faint}`,
+          }}
+        >
+          <div>
+            <p className="font-medium" style={{ color: PI_THEME.cream }}>
+              Already assigned
+            </p>
+            <p>{assignedText}</p>
+          </div>
+        </div>
+      ) : null}
       <div
         data-testid="quiet-line"
         className="quiet-line"
@@ -206,6 +245,13 @@ export function ThisWeekPlanCards() {
       >
         {quietText}
       </div>
+      <p
+        data-testid="automation-line"
+        className="text-xs"
+        style={{ color: PI_THEME.c50 }}
+      >
+        {automationText}
+      </p>
       {activeItem ? (
         <>
           <LicenseRiskPlanDialog

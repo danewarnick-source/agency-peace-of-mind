@@ -89,6 +89,10 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByTestId("decision-card")).toHaveCount(3);
     await expect(page.getByRole("link", { name: /1 more this week/i })).toBeVisible();
     await expect(page.getByTestId("quiet-line")).toBeVisible();
+    await expect(page.getByTestId("already-assigned")).toBeVisible();
+    await expect(page.getByText(/4 renewals · Staff notified · Due in 30 days/i)).toBeVisible();
+    await expect(page.getByTestId("automation-line")).toBeVisible();
+    await expect(page.getByText(/Automation: Last successful check unknown/i)).toBeVisible();
     await expect(page.getByRole("tab", { name: /What changed/i })).toHaveCount(0);
     await expect(page.getByText(/Handled without you:/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
@@ -116,6 +120,10 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     const week = page.getByTestId("this-week");
     await expect(week).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByTestId("already-assigned")).toBeVisible();
+    await expect(week.getByText(/4 renewals · Staff notified · Due in 30 days/i)).toBeVisible();
+    await expect(page.getByTestId("automation-line")).toBeVisible();
+    await expect(page.getByText(/Automation: Last successful check unknown/i)).toBeVisible();
     await expect(week.getByText(/^Escalation$/i)).toHaveCount(0);
     await expect(week.getByText("License / repayment", { exact: true })).toHaveCount(0);
     await expect(week.getByText(/corrective action plan or repayment demand/i)).toHaveCount(0);
@@ -262,10 +270,12 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     page,
   }) => {
     await page.goto("/dashboard/my-obligations", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Staff file/i })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: /My tasks/i }).filter({ visible: true }).first(),
+    ).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Discrete dues on your file/i)).toBeVisible();
+    await expect(page.getByText(/Your submissions and certificates stay in your staff file/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Onboarding/i })).toHaveCount(0);
     await assertNoCrash(page, "my-obligations");
     await shot(page, "my-obligations");

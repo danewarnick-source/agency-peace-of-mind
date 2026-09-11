@@ -881,6 +881,10 @@ function serverFnName(url: string, postText: string): string | null {
     "getReviewDayMeta",
     "listPackWhatChanged",
     "getCompliancePacket",
+    "getCertReview",
+    "listPendingCertReviews",
+    "requestObligationCorrection",
+    "confirmFailedObligationCompletion",
   ];
   // Prefer the decoded export. Searching the raw /_serverFn URL for
   // name substrings false-matches other functions (base64 + shared chunks).
@@ -1339,6 +1343,16 @@ function serverFnResult(
             "EVV reconciled through Sunday",
           ],
         },
+        alreadyAssigned: {
+          renewalCount: 4,
+          staffNotified: true,
+          dueInDays: 30,
+        },
+        automation: {
+          lastSuccessfulCheckAt: null,
+          lastFailedAt: null,
+          status: "unknown",
+        },
       } };
     case "generateMyReview":
       return {
@@ -1365,6 +1379,14 @@ function serverFnResult(
       };
     case "listPackWhatChanged":
       return { result: { appliedPackVersion: "UT-2026.07", changes: [] } };
+    case "listPendingCertReviews":
+      return { result: [] };
+    case "getCertReview":
+      return { result: null };
+    case "requestObligationCorrection":
+      return { result: { ok: true } };
+    case "confirmFailedObligationCompletion":
+      return { result: { instance: null } };
     case "proposeRemediationPlan":
       return { result: { id: "e2e-plan-1" } };
     case "reviewRemediationPlan":

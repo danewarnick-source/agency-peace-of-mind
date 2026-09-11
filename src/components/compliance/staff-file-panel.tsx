@@ -1,12 +1,23 @@
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useCompliancePacket } from "@/hooks/use-compliance-packet";
 import { OrgPersonnelFileMatrix } from "@/components/personnel-file/org-personnel-file-matrix";
 import { PacketNextActionCard, PacketScopeNote } from "@/components/compliance/packet-next-action";
+import { listPendingCertReviews, type CertReviewRow } from "@/lib/company-obligations.functions";
 import { ROLE_RANK } from "@/lib/rbac";
 
 export function StaffFilePanel() {
   const { data: org, isLoading } = useCurrentOrg();
   const packetQ = useCompliancePacket(org?.organization_id, "staff");
+  const pendingFn = useServerFn(listPendingCertReviews);
+  const pendingQ = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["pending-cert-reviews", org?.organization_id],
+    queryFn: () => pendingFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 30_000,
+  });
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -29,6 +40,8 @@ export function StaffFilePanel() {
   }
 
   const packet = packetQ.data?.packet ?? null;
+  const pendingRaw = pendingQ.data as CertReviewRow[] | { result?: CertReviewRow[] } | undefined;
+  const pending = Array.isArray(pendingRaw) ? pendingRaw : (pendingRaw?.result ?? []);
 
   return (
     <div className="space-y-4">
@@ -42,6 +55,32 @@ export function StaffFilePanel() {
           this is not a separate audit system.
         </p>
       </div>
+      {pending.length > 0 ? (
+        <div
+          data-testid="pending-cert-reviews"
+          className="rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-amber-950">
+            {pending.length} certificate{pending.length === 1 ? "" : "s"} awaiting review
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {pending.slice(0, 6).map((row) => (
+              <li key={row.completionId} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate text-amber-950">
+                  {row.staffName} · {row.title}
+                </span>
+                <Link
+                  to="/dashboard/compliance/cert-review/$completionId"
+                  params={{ completionId: row.completionId }}
+                  className="shrink-0 font-medium underline-offset-2 hover:underline"
+                >
+                  Review
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <PacketNextActionCard
         nextAction={packet?.nextAction}
         emptyLabel="No open staff-file action in this scope."

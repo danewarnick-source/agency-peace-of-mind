@@ -32,8 +32,18 @@ import {
   type ThisWeekItem,
   type ThisWeekResult,
 } from "./this-week.ts";
+import {
+  automationHeartbeatFrom,
+  buildAlreadyAssigned,
+  emptyAlreadyAssigned,
+  emptyAutomationHeartbeat,
+  type AlreadyAssignedStrip,
+  type AutomationHeartbeat,
+} from "./already-assigned.ts";
 
 export type {
+  AlreadyAssignedStrip,
+  AutomationHeartbeat,
   Decision,
   DecisionAction,
   DecisionActionKind,
@@ -55,6 +65,12 @@ export {
   rollupDecisions,
   sortThisWeekItems,
 } from "./this-week.ts";
+export {
+  emptyAlreadyAssigned,
+  emptyAutomationHeartbeat,
+  formatAlreadyAssigned,
+  formatAutomationLine,
+} from "./already-assigned.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -336,10 +352,19 @@ export async function getThisWeek(
   // 6. evv_timesheets needs_review in scope — QuietLine, not a card.
   const evv = await loadEvvNeedsReviewCount(supabase, orgId, evvStaffIdsForScope(viewerScope));
   const quiet = await loadQuietCounts(supabase, orgId, input, evv?.count ?? 0, now);
+  const decisions = finalizeDecisions(raw, userId, now);
+  const decisionInstanceIds = new Set(
+    decisions.map((d) => d.instanceId).filter((id): id is string => !!id),
+  );
+  const alreadyAssigned = buildAlreadyAssigned(input, decisionInstanceIds);
+  // No persisted cron heartbeat yet — do not invent a last-check time.
+  const automation = automationHeartbeatFrom({});
 
   return {
-    items: finalizeDecisions(raw, userId, now),
+    items: decisions,
     quiet,
+    alreadyAssigned,
+    automation,
   };
 }
 

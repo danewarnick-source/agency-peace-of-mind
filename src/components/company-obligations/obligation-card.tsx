@@ -2,6 +2,7 @@
 // Shows cadence/evidence badges, assignment chips, current-instance status,
 // and always-visible per-name completion detail for the current instance.
 import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -46,7 +47,6 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import {
-  confirmFailedObligationCompletion,
   countObligationAssigneesMissingHireDate,
   deleteCompanyObligation,
   listObligationAssignees,
@@ -223,8 +223,6 @@ type CompletionRow = {
 };
 
 function ConfirmNectarOverrideButton({
-  orgId,
-  instanceId,
   completionId,
   staffName,
 }: {
@@ -233,28 +231,14 @@ function ConfirmNectarOverrideButton({
   completionId: string;
   staffName: string;
 }) {
-  const qc = useQueryClient();
-  const confirmFn = useServerFn(confirmFailedObligationCompletion);
-  const confirm = useMutation({
-    mutationFn: () => confirmFn({ data: { organizationId: orgId, instanceId, completionId } }),
-    onSuccess: () => {
-      toast.success(`Confirmed ${staffName}'s upload`);
-      qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instanceId] });
-      qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
-      qc.invalidateQueries({ queryKey: ["deadlines"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-6 px-2 text-xs"
-      disabled={confirm.isPending}
-      onClick={() => confirm.mutate()}
+    <Link
+      to="/dashboard/compliance/cert-review/$completionId"
+      params={{ completionId }}
+      className="inline-flex h-6 items-center rounded-md border border-border px-2 text-xs font-medium hover:bg-muted"
     >
-      Confirm
-    </Button>
+      Review {staffName.split(" ")[0] ?? "certificate"}
+    </Link>
   );
 }
 

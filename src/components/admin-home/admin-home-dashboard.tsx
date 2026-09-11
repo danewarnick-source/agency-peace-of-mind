@@ -15,6 +15,7 @@ import {
   useAdminHomeData,
 } from "@/components/admin-home/use-admin-home-data";
 import { AdminHomeWelcome } from "@/components/admin-home/admin-home-welcome";
+import { ThisWeekPlanCards } from "@/components/compliance/this-week-plan-cards";
 
 const SERIF = { fontFamily: PI_THEME.serif } as const;
 const SANS = { fontFamily: PI_THEME.sans } as const;
@@ -270,6 +271,10 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
             <PowerLink to="/dashboard/compliance-desk">Compliance desk</PowerLink>
           </nav>
         </div>
+
+        <Lift className="p-5">
+          <ThisWeekPlanCards />
+        </Lift>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {instancesLoading ? (

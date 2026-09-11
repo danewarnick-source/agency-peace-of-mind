@@ -6,6 +6,87 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 4: remediation_plans + compliance_overrides (2026-09-11) — Core flag
+
+Org-scoped ops tables. Additive. Never drop tables.
+Matches `supabase/migrations/20260911140000_remediation_plans.sql`
+(Tony Soft stamp lane lock — do not reuse 100000 / 101000 / 110000 / 120000 / 130000).
+
+Soft HOLD: apply **after** Steps 3 / 5 / 8 Soft (this PR does not Soft-apply).
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App skips both tables when they are missing.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'remediation_plans' AND column_name IN (
+      'id', 'organization_id', 'obligation_id', 'instance_id', 'staff_id',
+      'obligation_key', 'title', 'kind', 'status', 'plan_text', 'due_at',
+      'outcome', 'outcome_at'
+    ))
+    OR
+    (table_name = 'compliance_overrides' AND column_name IN (
+      'id', 'organization_id', 'staff_id', 'gap_type', 'gap_key',
+      'obligation_key', 'reason', 'expires_at'
+    ))
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911140000_remediation_plans.sql`.
+
+**What you'll see:** two `CREATE TABLE IF NOT EXISTS`, additive `ADD COLUMN IF NOT EXISTS`,
+CHECKs, indexes, grants, RLS on, org-scoped policies. Never drop tables.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'remediation_plans'
+       AND column_name IN (
+         'id','organization_id','kind','status','plan_text','outcome','staff_id'
+       )) AS plan_cols,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'compliance_overrides'
+       AND column_name IN (
+         'id','organization_id','staff_id','gap_key','obligation_key','reason','expires_at'
+       )) AS override_cols,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.remediation_plans'::regclass) AS plans_rls,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.compliance_overrides'::regclass) AS overrides_rls;
+```
+
+**What you'll see:** `7 | 7 | t | t`.
+
+### RLS intent (in this paste)
+
+- Both tables are **org-scoped ops**, not Hive catalog.
+- `USING (true)` is **not** used.
+- `authenticated` SELECT: `is_org_member` (overrides also allow `staff_id = auth.uid()`).
+- Writes: `is_org_admin_or_manager` + `is_hive_executive`.
+- `service_role` ALL.
+
+### Seed
+
+No seed rows. Plans are minted by the nightly evaluator (solo / scheduled-while-lapsed /
+license hits) or by the scheduler dialog. Overrides are manager-authored.
+
+---
+
 ## ACTION — Compliance revamp Step 8: organizations.state_code (2026-09-11) — Core flag
 
 Minimal Soft. Additive. No DROP. No RLS change (column on existing org-scoped

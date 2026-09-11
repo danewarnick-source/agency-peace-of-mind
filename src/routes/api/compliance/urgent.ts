@@ -5,17 +5,18 @@
  * Unauthenticated GET stays a fast no-PHI stub.
  *
  * Cron (POST or GET with x-cron-secret / Bearer) runs the Step 2
- * escalation evaluator for every active org. Idempotent: a second
- * nightly pass inserts zero new type=escalation rows while unresolved
- * keys still exist.
+ * escalation evaluator plus Step 4 plan outcomes for every active org.
+ * Idempotent: a second nightly pass inserts zero new type=escalation
+ * rows while unresolved keys still exist.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronSecret } from "@/lib/cron-auth";
-import { runNightlyEscalationEvaluator } from "@/lib/obligations/escalation";
+// Step 4 wraps Step 2's runNightlyEscalationEvaluator (plan outcomes after hits).
+import { runNightlyEscalationAndPlans } from "@/lib/obligations/remediation";
 
 async function runCron(): Promise<Response> {
-  const result = await runNightlyEscalationEvaluator(supabaseAdmin);
+  const result = await runNightlyEscalationAndPlans(supabaseAdmin);
   const status = result.errors.length ? 207 : 200;
   return Response.json(
     { ok: result.errors.length === 0, ...result },

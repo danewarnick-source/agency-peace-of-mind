@@ -5026,6 +5026,68 @@ export type Database = {
           },
         ]
       }
+      compliance_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          gap_key: string
+          gap_reference_date: string
+          gap_type: string
+          id: string
+          instance_id: string | null
+          kind: string | null
+          obligation_id: string | null
+          obligation_key: string | null
+          organization_id: string
+          reason: string
+          shift_id: string | null
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          gap_key: string
+          gap_reference_date: string
+          gap_type?: string
+          id?: string
+          instance_id?: string | null
+          kind?: string | null
+          obligation_id?: string | null
+          obligation_key?: string | null
+          organization_id: string
+          reason: string
+          shift_id?: string | null
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          gap_key?: string
+          gap_reference_date?: string
+          gap_type?: string
+          id?: string
+          instance_id?: string | null
+          kind?: string | null
+          obligation_id?: string | null
+          obligation_key?: string | null
+          organization_id?: string
+          reason?: string
+          shift_id?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contractor_monthly_pay: {
         Row: {
           additional_pay: number
@@ -14788,6 +14850,80 @@ export type Database = {
             columns: ["support_coordinator_id"]
             isOneToOne: false
             referencedRelation: "support_coordinators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      remediation_plans: {
+        Row: {
+          created_at: string
+          due_at: string | null
+          id: string
+          instance_id: string | null
+          kind: string
+          obligation_id: string | null
+          obligation_key: string | null
+          organization_id: string
+          outcome: string | null
+          outcome_at: string | null
+          outcome_note: string | null
+          plan_text: string
+          proposed_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          staff_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          instance_id?: string | null
+          kind: string
+          obligation_id?: string | null
+          obligation_key?: string | null
+          organization_id: string
+          outcome?: string | null
+          outcome_at?: string | null
+          outcome_note?: string | null
+          plan_text: string
+          proposed_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          staff_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          instance_id?: string | null
+          kind?: string
+          obligation_id?: string | null
+          obligation_key?: string | null
+          organization_id?: string
+          outcome?: string | null
+          outcome_at?: string | null
+          outcome_note?: string | null
+          plan_text?: string
+          proposed_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          staff_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remediation_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

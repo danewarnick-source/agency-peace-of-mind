@@ -152,7 +152,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
             type: "smart_import_cert_expiring",
             urgency: urgencyFor(days),
             title: `${c.cert_key} for ${subj.display_name} ${days <= 0 ? "expired" : "expires in " + days + "d"}`,
-            body: "Imported cert is approaching/past expiry. Open the personnel file to renew.",
+            body: "Imported cert is approaching/past expiry. Open the staff file to renew.",
             link_to: `/dashboard/personnel-file`,
             related_id: c.id,
             related_type: "import_cert_document",

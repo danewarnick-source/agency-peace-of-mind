@@ -92,7 +92,7 @@ function InHiveCoursePage() {
           This item does not open an in-platform course.
         </p>
         <Link to="/dashboard/my-obligations" className="text-sm font-medium text-[var(--hive-ink)] hover:underline">
-          Back to personnel file
+          Back to staff file
         </Link>
       </div>
     );
@@ -114,7 +114,7 @@ function InHiveCoursePage() {
   return (
     <div className="w-full space-y-4">
       <StaffPageHeader
-        eyebrow="Personnel file"
+        eyebrow="Staff file"
         eyebrowIcon={ClipboardList}
         title={obligation.title}
         subtitle="Complete each topic, then the competency exam. You can leave and pick up where you left off."
@@ -138,7 +138,7 @@ function InHiveCoursePage() {
               <Link to="/dashboard/hive-training">Open Training</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/dashboard/my-obligations">Back to personnel file</Link>
+              <Link to="/dashboard/my-obligations">Back to staff file</Link>
             </Button>
           </div>
         </div>

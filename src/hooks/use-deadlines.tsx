@@ -70,13 +70,13 @@ function fmtMonth(yyyyMm: string): string {
   return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
 }
 
-/** Admin lands on Agency documents for org duties, Personnel file for staff dues. */
+/** Admin lands on Agency file for org duties, Staff file for staff dues. */
 export function obligationHref(row: DeadlineObligationItem, isAdminRole: boolean): string {
   if (isAdminRole) {
     if (row.scope === "org") {
-      return `/dashboard/agency-documents`;
+      return `/dashboard/compliance?tab=agency`;
     }
-    return `/dashboard/personnel-file`;
+    return `/dashboard/compliance?tab=staff`;
   }
   if (row.evidence_type === "form" && row.linked_form_id) {
     return `/dashboard/forms/${row.linked_form_id}/fill?obligation_instance=${row.instance_id}`;

@@ -41,7 +41,7 @@ const STAFF_NAV: { label: string; icon: LucideIcon }[] = [
   { label: "My Caseload", icon: LayoutDashboard },
   { label: "Schedule", icon: CalendarDays },
   { label: "Daily Logs", icon: ClipboardCheck },
-  { label: "Personnel file", icon: ClipboardList },
+  { label: "Staff file", icon: ClipboardList },
   { label: "Nectar", icon: Sparkles },
 ];
 

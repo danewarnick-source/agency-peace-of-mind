@@ -224,7 +224,7 @@ export function StaffObligationsFilesTab({
 
   const uploadMut = useMutation({
     mutationFn: async () => {
-      if (!targetInstance) throw new Error("Choose a personnel file item.");
+      if (!targetInstance) throw new Error("Choose a staff file item.");
       if (attestationBlocked) {
         throw new Error("This item requires the staff member to attest themselves.");
       }
@@ -248,7 +248,7 @@ export function StaffObligationsFilesTab({
       });
     },
     onSuccess: () => {
-      toast.success("Evidence saved to this personnel file item.");
+      toast.success("Evidence saved to this staff file item.");
       setUploadOpen(false);
       setUploadFile(null);
       qc.invalidateQueries({ queryKey: ["staff-obligation-files", organizationId, staffId] });
@@ -259,12 +259,12 @@ export function StaffObligationsFilesTab({
   });
 
   if (listQ.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading personnel file…</p>;
+    return <p className="text-sm text-muted-foreground">Loading staff file…</p>;
   }
   if (listQ.error) {
     return (
       <p className="text-sm text-rose-700">
-        {listQ.error instanceof Error ? listQ.error.message : "Could not load this personnel file."}
+        {listQ.error instanceof Error ? listQ.error.message : "Could not load this staff file."}
       </p>
     );
   }
@@ -287,7 +287,7 @@ export function StaffObligationsFilesTab({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing on this personnel file yet.</p>
+        <p className="text-sm text-muted-foreground">Nothing on this staff file yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
@@ -297,7 +297,7 @@ export function StaffObligationsFilesTab({
                   <Checkbox
                     checked={rows.length > 0 && selected.size === rows.length}
                     onCheckedChange={(v) => toggleAll(!!v)}
-                    aria-label="Select all personnel file items"
+                    aria-label="Select all staff file items"
                   />
                 </th>
                 <th className="px-3 py-2 text-left">Item</th>
@@ -352,12 +352,12 @@ export function StaffObligationsFilesTab({
           <DialogHeader>
             <DialogTitle>{targetInstance?.status === "on_file" ? "Replace evidence" : "Upload evidence"}</DialogTitle>
             <DialogDescription>
-              File attaches to this staff member’s existing personnel file item — the same record as the org-wide Personnel file.
+              File attaches to this staff member’s existing staff file item — the same record as the org-wide Staff file.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Personnel file item</Label>
+              <Label>Staff file item</Label>
               <Select value={uploadInstanceId ?? ""} onValueChange={(v) => setUploadInstanceId(v || null)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose an item…" />
@@ -414,7 +414,7 @@ export function StaffObligationsFilesTab({
             ) : guessIsImage(viewing?.evidenceFilename ?? null) ? (
               <img src={viewUrl} alt="" className="max-h-[70vh] w-full object-contain" />
             ) : (
-              <iframe title="Personnel file evidence" src={viewUrl} className="h-[70vh] w-full border-0" />
+              <iframe title="Staff file evidence" src={viewUrl} className="h-[70vh] w-full border-0" />
             )}
           </div>
           <DialogFooter className="gap-2 sm:justify-between">

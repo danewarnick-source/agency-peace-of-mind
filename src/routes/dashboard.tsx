@@ -41,7 +41,7 @@ import {
   Activity,
   LifeBuoy,
   Receipt,
-  FolderArchive,
+  FolderCheck,
   Database,
   ShieldCheck,
   ArrowRightLeft,
@@ -261,7 +261,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/my-obligations", label: "Personnel file", icon: ClipboardList },
+  { to: "/dashboard/my-obligations", label: "Staff file", icon: ClipboardList },
   {
     to: "/dashboard/my-historical-records",
     label: "Historical Records",
@@ -284,9 +284,7 @@ const STAFF_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },
-  { to: "/dashboard/personnel-file", label: "Personnel file", icon: ClipboardList },
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
-  { to: "/dashboard/client-file", label: "Client file", icon: FolderArchive },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
   {
     to: "/dashboard/hub/documentation",
@@ -295,7 +293,7 @@ const ADMIN_NAV: NavItem[] = [
     feature: "pcsp",
   },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/agency-documents", label: "Agency documents", icon: FolderArchive },
+  { to: "/dashboard/compliance", label: "Compliance", icon: FolderCheck, exact: true },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   {
     to: "/dashboard/hub/finances",
@@ -1433,7 +1431,7 @@ function SidebarBody({
                   className="h-4 w-4"
                 />
                 <span className="flex-1">{item.label}</span>
-                {item.to === "/dashboard/personnel-file" &&
+                {item.to === "/dashboard/compliance" &&
                   !complianceQueueLoading &&
                   complianceActionCount > 0 && (
                     <span

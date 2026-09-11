@@ -126,14 +126,14 @@ export function AgencyDocumentsCards({ organizationId }: { organizationId: strin
   if (q.isLoading) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading agency documents…
+        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading agency file…
       </div>
     );
   }
   if (q.error) {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50/30 p-6 text-sm text-rose-700">
-        {q.error instanceof Error ? q.error.message : "Could not load agency documents."}
+        {q.error instanceof Error ? q.error.message : "Could not load the agency file."}
       </div>
     );
   }

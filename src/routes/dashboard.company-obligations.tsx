@@ -21,23 +21,27 @@ function parseLegacySearch(s: Record<string, unknown>): LegacySearch {
 }
 
 /**
- * Legacy company-obligations / Compliance / Obligations register.
- * Agency documents is the company surface. Staff pack dues live on Personnel file.
+ * Legacy company-obligations / Obligations register.
+ * Agency file is the company surface. Staff pack dues live on Staff file.
  */
 export const Route = createFileRoute("/dashboard/company-obligations")({
-  head: () => ({ meta: [{ title: "Agency documents — Provider Interface" }] }),
+  head: () => ({ meta: [{ title: "Agency file — Provider Interface" }] }),
   validateSearch: parseLegacySearch,
   beforeLoad: ({ search }) => {
     const tab = typeof search.tab === "string" ? search.tab : "";
     if (tab === "action-required" || tab === "onboarding" || tab === "credentials" || tab === "client") {
       throw redirect({
-        to: "/dashboard/personnel-file",
+        to: "/dashboard/compliance",
+        search: { tab: "staff" },
         replace: true,
       });
     }
     throw redirect({
-      to: "/dashboard/agency-documents",
-      search: tab === "policy-library" || tab === "policies" ? { tab: "company-policies" } : {},
+      to: "/dashboard/compliance",
+      search:
+        tab === "policy-library" || tab === "policies"
+          ? { tab: "company-policies" }
+          : { tab: "agency" },
       replace: true,
     });
   },

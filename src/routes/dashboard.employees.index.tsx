@@ -535,7 +535,7 @@ export function EmployeesPage() {
                             params={{ staffId: m.user_id }}
                             search={{ tab: "personnel" }}
                           >
-                            Personnel file
+                            Staff file
                           </Link>
                         </Button>
                         <Button

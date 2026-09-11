@@ -132,7 +132,7 @@ export function ClassRosterDialog({
       if (r.granted) {
         toast.success(
           billingExempt
-            ? "True North is never charged. Personnel file items are open for this roster."
+            ? "True North is never charged. Staff file items are open for this roster."
             : "Roster submitted with no charge.",
         );
         onSubmitted?.();
@@ -182,7 +182,7 @@ export function ClassRosterDialog({
         <p className="text-sm text-muted-foreground">
           {isExternal
             ? "One submit is one class. After payment, Exec gets one alert. Staff only see an obligation. Upload the card when the class is done."
-            : "Buying a 30-day seat assigns the in-platform 30-day course on the personnel file. This is not an external class."}
+            : "Buying a 30-day seat assigns the in-platform 30-day course on the staff file. This is not an external class."}
         </p>
         {billingExempt && (
           <p className="rounded-md border border-[#C8881E]/30 bg-[#FFF9EE] px-3 py-2 text-xs text-[#1A2B47]">

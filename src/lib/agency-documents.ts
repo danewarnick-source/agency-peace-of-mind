@@ -413,7 +413,7 @@ export function agencyDocPackHtml(
       return `<section style="page-break-after:always;margin-bottom:24px;"><h2 style="font:600 16px system-ui;">${escape(f.title)}</h2>${media}</section>`;
     })
     .join("");
-  return `<!doctype html><html><head><title>Agency documents</title></head><body>${body}</body></html>`;
+  return `<!doctype html><html><head><title>Agency file</title></head><body>${body}</body></html>`;
 }
 
 /** Internal templates only — never DSPD-encoded Agency document cards. */

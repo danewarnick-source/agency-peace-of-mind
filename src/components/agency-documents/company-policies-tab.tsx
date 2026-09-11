@@ -113,7 +113,7 @@ export function CompanyPoliciesTab({ orgId }: { orgId: string }) {
           fileSizeBytes: file?.size ?? null,
         },
       });
-      toast.success("Policy added. Staff will see it on their personnel file.");
+      toast.success("Policy added. Staff will see it on their staff file.");
       reset();
       void qc.invalidateQueries({ queryKey: ["agency-policies", orgId] });
     } catch (e) {
@@ -133,7 +133,7 @@ export function CompanyPoliciesTab({ orgId }: { orgId: string }) {
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Agency-owned internal policies and forms. These are not DSPD-encoded Agency
             document cards and are not pulled on Practice Audit as DSPD rows. Staff
-            attest from their personnel file.
+            attest from their staff file.
           </p>
         </div>
         <Button data-testid="policies-add" onClick={() => setOpen((v) => !v)} className="min-h-[44px]">
@@ -267,7 +267,7 @@ export function CompanyPoliciesTab({ orgId }: { orgId: string }) {
           <p className="mt-3 font-medium">No company policies yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Add one or start from a template. This binder is internal — it is not the
-            DSPD-encoded Agency documents pack.
+            DSPD-encoded Agency file pack.
           </p>
         </div>
       ) : (
@@ -288,7 +288,7 @@ export function CompanyPoliciesTab({ orgId }: { orgId: string }) {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {p.open_count} open on personnel file
+                  {p.open_count} open on staff file
                 </p>
               </div>
             </li>

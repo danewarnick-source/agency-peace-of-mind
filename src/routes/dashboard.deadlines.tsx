@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActionRequiredQueue } from "@/hooks/use-action-required-queue";
 
 /**
- * Legacy Deadlines page — staff dues live on Personnel file.
+ * Legacy Deadlines page — staff dues live on Staff file.
  * Keep this route file so old bookmarks resolve without a 404.
  */
 export const Route = createFileRoute("/dashboard/deadlines")({
   beforeLoad: () => {
     throw redirect({
-      to: "/dashboard/personnel-file",
+      to: "/dashboard/compliance",
+      search: { tab: "staff" },
       replace: true,
     });
   },
@@ -30,7 +31,7 @@ export function DeadlinesHomeCard() {
   );
 
   return (
-    <Link to="/dashboard/personnel-file" className="block">
+    <Link to="/dashboard/compliance" search={{ tab: "staff" }} className="block">
       <Card className="transition hover:border-[var(--hive-ink)]/40 hover:shadow-[var(--shadow-card)]">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold">

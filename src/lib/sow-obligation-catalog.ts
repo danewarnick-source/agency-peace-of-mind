@@ -18,6 +18,7 @@ import {
   CATALOG_IDENTITY_BY_TITLE,
   PACK_STATE_CODE,
   PACK_VERSION,
+  SOFT_BACKFILL_TITLE_ALIASES,
   STANDING_RECLASSIFY_REASON,
   type CatalogFormTemplate,
   type ObligationDisposition,
@@ -26,6 +27,7 @@ import {
 export {
   PACK_STATE_CODE,
   PACK_VERSION,
+  SOFT_BACKFILL_TITLE_ALIASES,
   STANDING_RECLASSIFY_REASON,
   type CatalogFormField,
   type CatalogFormTemplate,
@@ -1288,6 +1290,9 @@ for (const entry of SOW_ENTRIES) {
   for (const alias of meta?.aliases ?? []) {
     TITLE_ALIASES.set(alias, entry.key);
   }
+}
+for (const [alias, key] of Object.entries(SOFT_BACKFILL_TITLE_ALIASES)) {
+  TITLE_ALIASES.set(alias, key);
 }
 
 function entryForClientPrefixedTitle(title: string): SowCatalogEntry | null {

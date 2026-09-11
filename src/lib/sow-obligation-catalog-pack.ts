@@ -211,15 +211,7 @@ const ROOM_BOARD_FORM: CatalogFormTemplate = {
 export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
   "30-Day New Hire Orientation Training": { key: "orientation_30_day", disposition: "obligation" },
   "Annual 12-Hour Continuing Education": { key: "ce_12h_annual", disposition: "obligation" },
-  "CPR/First Aid Certification — Initial": {
-    key: "cpr_first_aid_initial",
-    disposition: "obligation",
-    // Live TNS combined Initial+Renewal into one card (20260819200000).
-    // One leftover card → Initial. If an org also still has a Renewal row,
-    // that exact title keeps cpr_first_aid_renewal; this leftover still maps
-    // to Initial (Soft UNIQUE later may collapse two Initial-keyed rows).
-    aliases: ["CPR & First Aid Certification"],
-  },
+  "CPR/First Aid Certification — Initial": { key: "cpr_first_aid_initial", disposition: "obligation" },
   "CPR/First Aid Certification — Renewal": { key: "cpr_first_aid_renewal", disposition: "obligation" },
   "Person-Centered Thinking and Practices Training": {
     key: "pct_hire_practices",
@@ -356,9 +348,6 @@ export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
   "Client-Specific Training — [Client Name]": {
     key: "client_specific_training",
     disposition: "obligation",
-    // Bare live title (no client name) is the same catalog duty as the
-    // "[Client Name]" pattern — not a provider row.
-    aliases: ["Client-Specific Training"],
     form_template: CLIENT_SPECIFIC_FORM,
   },
   "Support Strategies — [Client Name]": {
@@ -564,6 +553,24 @@ export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
     key: "hhs_billable_day",
     disposition: "by_design",
   },
+};
+
+/**
+ * App-only leftover title → hive key for Soft's later backfill.
+ * Does not apply SQL and does not block Soft. Live titles stay as written;
+ * the matcher assigns the catalog key so they are not source=provider.
+ *
+ * CPR: unsuffixed leftover (ampersand or slash) → Initial. Ampersand
+ * Initial/Renewal suffixes follow the matching slash catalog card. If an
+ * org has both slash Initial and slash Renewal rows, those exact titles
+ * keep their own keys; a leftover combined card still maps to Initial.
+ */
+export const SOFT_BACKFILL_TITLE_ALIASES: Record<string, string> = {
+  "CPR & First Aid Certification": "cpr_first_aid_initial",
+  "CPR/First Aid Certification": "cpr_first_aid_initial",
+  "CPR & First Aid Certification — Initial": "cpr_first_aid_initial",
+  "CPR & First Aid Certification — Renewal": "cpr_first_aid_renewal",
+  "Client-Specific Training": "client_specific_training",
 };
 
 export function catalogIdentityForTitle(title: string): CatalogIdentity | null {

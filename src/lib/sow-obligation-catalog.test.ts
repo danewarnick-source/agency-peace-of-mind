@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   BACKFILL_FIXTURE_ROWS,
+  SOFT_BACKFILL_TITLE_ALIASES,
   backfillObligationKeys,
 } from "../../scripts/backfill-obligation-keys.ts";
 import { HIRE_ALWAYS_TITLES } from "./obligation-auto-assign.ts";
@@ -50,6 +51,15 @@ describe("SOW catalog pack identity", () => {
     const cpr = sowCatalogEntry("CPR & First Aid Certification");
     assert.equal(cpr?.key, "cpr_first_aid_initial");
     assert.equal(cpr?.title, "CPR/First Aid Certification — Initial");
+    assert.equal(sowCatalogEntry("CPR/First Aid Certification")?.key, "cpr_first_aid_initial");
+    assert.equal(
+      sowCatalogEntry("CPR & First Aid Certification — Initial")?.key,
+      "cpr_first_aid_initial",
+    );
+    assert.equal(
+      sowCatalogEntry("CPR & First Aid Certification — Renewal")?.key,
+      "cpr_first_aid_renewal",
+    );
     assert.equal(sowCatalogEntry("CPR/First Aid Certification — Renewal")?.key, "cpr_first_aid_renewal");
 
     const clientSpecific = sowCatalogEntry("Client-Specific Training");
@@ -61,6 +71,20 @@ describe("SOW catalog pack identity", () => {
     );
     assert.equal(catalogTitleIsReserved("CPR & First Aid Certification"), true);
     assert.equal(catalogTitleIsReserved("Client-Specific Training"), true);
+  });
+
+  it("exposes Soft backfill title aliases without applying SQL", () => {
+    assert.equal(SOFT_BACKFILL_TITLE_ALIASES["CPR & First Aid Certification"], "cpr_first_aid_initial");
+    assert.equal(SOFT_BACKFILL_TITLE_ALIASES["CPR/First Aid Certification"], "cpr_first_aid_initial");
+    assert.equal(
+      SOFT_BACKFILL_TITLE_ALIASES["CPR & First Aid Certification — Renewal"],
+      "cpr_first_aid_renewal",
+    );
+    assert.equal(SOFT_BACKFILL_TITLE_ALIASES["Client-Specific Training"], "client_specific_training");
+    for (const [alias, key] of Object.entries(SOFT_BACKFILL_TITLE_ALIASES)) {
+      assert.ok(sowCatalogEntryByKey(key), `Soft alias key missing: ${alias} → ${key}`);
+      assert.equal(sowCatalogEntry(alias)?.key, key, alias);
+    }
   });
 
   it("does not create instances for non-obligation dispositions", () => {
@@ -164,6 +188,9 @@ describe("obligation key backfill", () => {
     assert.equal(result.updated.find((r) => r.id === "fix-7")?.source, "sow");
     assert.equal(result.updated.find((r) => r.id === "fix-8")?.key, "client_specific_training");
     assert.equal(result.updated.find((r) => r.id === "fix-8")?.source, "sow");
+    assert.equal(result.updated.find((r) => r.id === "fix-9")?.key, "cpr_first_aid_initial");
+    assert.equal(result.updated.find((r) => r.id === "fix-10")?.key, "cpr_first_aid_initial");
+    assert.equal(result.updated.find((r) => r.id === "fix-11")?.key, "cpr_first_aid_renewal");
     assert.deepEqual(
       result.unmatched.map((r) => r.title),
       ["Custom Agency Handbook Review"],

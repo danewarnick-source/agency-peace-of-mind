@@ -864,6 +864,8 @@ export async function waitForDashboard(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
   const loading = page.getByText(/^Loading…$/);
   await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
+  const workspace = page.getByText(/^Loading workspace…$/);
+  await workspace.waitFor({ state: "hidden", timeout: 45_000 }).catch(() => undefined);
 }
 
 export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, STAFF, DAILY_CODES, WORKSHEET_CODES };

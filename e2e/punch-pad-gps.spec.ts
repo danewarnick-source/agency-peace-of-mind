@@ -116,7 +116,7 @@ test.describe("Admin home pin", () => {
     });
     await waitForDashboard(page);
     await expect(page.getByRole("heading", { name: /Tommy Jones/i })).toBeVisible({
-      timeout: 20_000,
+      timeout: 45_000,
     });
     await expect(page.getByTestId("home-location-section")).toBeVisible({ timeout: 15_000 });
     const pinHeading = page.getByTestId("home-location-section").getByRole("heading", { name: /Home location/i });

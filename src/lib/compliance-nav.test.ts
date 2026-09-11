@@ -34,6 +34,12 @@ describe("Compliance search aliases", () => {
     assert.deepEqual(complianceRedirectSearchFromAgencyDocuments("company-policies"), {
       tab: "company-policies",
     });
+    assert.equal(resolveComplianceFileTab("sow-index"), "agency");
+    assert.equal(resolveAgencyFileSubTab("sow-index"), "contract-index");
+    assert.equal(resolveAgencyFileSubTab("contract-index"), "contract-index");
+    assert.deepEqual(complianceSearchForAgencySubTab("contract-index"), {
+      tab: "contract-index",
+    });
   });
 });
 
@@ -69,6 +75,8 @@ describe("Compliance nav lock", () => {
     );
     assert.match(panel, /Company policies/);
     assert.match(panel, /CompanyPoliciesTab/);
+    assert.match(panel, /Agency Contract/);
+    assert.match(panel, /SowIndexPanel/);
   });
 
   it("does not rename the client profile Compliance tab", () => {

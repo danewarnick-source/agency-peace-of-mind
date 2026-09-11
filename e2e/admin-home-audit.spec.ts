@@ -77,8 +77,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("heading", { name: /Recommendations/i }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Command center$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Compliance desk$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Records review$/i })).toBeVisible();
     await expect(page.locator("aside").getByRole("link", { name: /^Command center$/i })).toHaveCount(0);
+    await expect(page.locator("aside").getByRole("link", { name: /^Records review$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /^Compliance desk$/i })).toHaveCount(0);
     await expect(page.locator("aside").getByRole("link", { name: /Agency Command Center/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /The day just got smaller/i })).toHaveCount(0);
@@ -243,7 +244,7 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await page.goto("/dashboard/compliance-desk?focus=audit-readiness", {
       waitUntil: "domcontentloaded",
     });
-    await expect(page.getByRole("heading", { name: /EVV & Timesheet Control/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Records review/i })).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByRole("region", { name: /NECTAR guidance/i })).toBeVisible({

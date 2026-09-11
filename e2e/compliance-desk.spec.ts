@@ -38,7 +38,7 @@ async function openDesk(page: Page) {
   await expect(page.getByTestId("e2e-compliance-desk-harness")).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByRole("heading", { name: "EVV & Timesheet Control" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Records review" })).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByTestId("compliance-tab-pending")).toBeVisible({ timeout: 15_000 });
@@ -56,7 +56,7 @@ async function openTab(page: Page, id: string) {
   await expect(tab).toHaveClass(/bg-accent/, { timeout: 10_000 });
 }
 
-test.describe("EVV & Timesheet Control — admin harness", () => {
+test.describe("Records review — admin harness", () => {
   test("renders as admin (not staff punch pad) with approve_timesheets context", async ({
     page,
   }) => {

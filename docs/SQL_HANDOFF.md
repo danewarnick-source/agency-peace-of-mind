@@ -6,6 +6,108 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 9: threads / thread_members / thread_messages (2026-09-11) — Core flag
+
+Soft + Ask staff threads. Additive. No DROP TABLE on product tables.
+Matches `supabase/migrations/20260911150000_threads_records.sql`.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). Soft go after Dane merge. App Ask-staff /
+quick-reply / AttentionStrip degrade until these tables exist.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'threads' AND column_name IN (
+      'id', 'organization_id', 'kind', 'subject', 'timesheet_id',
+      'team_id', 'client_id', 'created_by', 'created_at', 'updated_at'
+    ))
+    OR (table_name = 'thread_members' AND column_name IN (
+      'id', 'organization_id', 'thread_id', 'user_id', 'role', 'created_at'
+    ))
+    OR (table_name = 'thread_messages' AND column_name IN (
+      'id', 'organization_id', 'thread_id', 'author_id', 'kind', 'body', 'created_at'
+    ))
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911150000_threads_records.sql`.
+
+**What you'll see:** `CREATE TABLE` × 3, CHECKs, indexes, grants, RLS on,
+policies (`threads_select_member`, `threads_write_admin`,
+`thread_members_select_member`, `thread_members_write_admin`,
+`thread_messages_select_member`, `thread_messages_insert_participant`,
+`thread_messages_update_author`).
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'threads'
+       AND column_name IN (
+         'id','organization_id','kind','subject','timesheet_id',
+         'team_id','client_id','created_by','created_at','updated_at'
+       )) AS thread_cols,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'thread_members'
+       AND column_name IN (
+         'id','organization_id','thread_id','user_id','role','created_at'
+       )) AS member_cols,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'thread_messages'
+       AND column_name IN (
+         'id','organization_id','thread_id','author_id','kind','body','created_at'
+       )) AS message_cols,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.threads'::regclass) AS threads_rls,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.thread_members'::regclass) AS members_rls,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.thread_messages'::regclass) AS messages_rls,
+  (SELECT string_agg(c.relname || ':' || p.polname, ',' ORDER BY c.relname, p.polname)
+     FROM pg_policy p
+     JOIN pg_class c ON c.oid = p.polrelid
+     WHERE c.relname IN ('threads','thread_members','thread_messages')) AS policies;
+```
+
+**What you'll see:** `10 | 6 | 7 | t | t | t` plus the seven policy names.
+No TNS seed. Do not invent rows for Harvey / Day support — those are
+created in-app on Ask staff / team thread.
+
+### RLS intent (in this paste — one Soft change)
+
+- All three tables are **org-scoped**. Not PHI: subject/body are
+  operational questions (no client names in push/chat copy).
+- `authenticated` SELECT: `is_org_member(organization_id, auth.uid())`.
+- `threads` / `thread_members` writes: `is_org_admin_or_manager`.
+- `thread_messages` INSERT: org member AND (admin/manager OR thread
+  member) so staff can quick-reply.
+- `thread_messages` UPDATE: author or admin/manager.
+- Never `USING (true)` on these tables.
+- No DROP TABLE.
+
+### Seed
+
+None. Do not backfill. True North Supports
+`7fabcf5d-f826-487f-8730-8b0c3f1969bb` is the test org for the
+Ask Harvey → reply → Trim / Day support team-thread path after Soft.
+
+---
+
 ## ACTION — Compliance revamp Step 7: nectar_requirements catalog relation (2026-09-11) — Core flag
 
 Additive columns on existing `nectar_requirements`. No DROP. No new RLS

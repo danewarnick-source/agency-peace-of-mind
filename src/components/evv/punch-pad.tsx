@@ -2663,7 +2663,7 @@ export function PunchPad({
                 {success?.correctionSubmitted
                   ? "The shift is held for supervisor review. You can track its status on My timesheets from the Caseload Nectar pay card. If approved, the corrected times replace the recorded times for billing; if denied, you'll see the reviewer's note there."
                   : success?.evvClean
-                  ? "Your timesheet has been submitted to EVV & Timesheet Control for administrative sign-off. No further action required."
+                  ? "Your timesheet has been submitted to Records review for administrative sign-off. No further action required."
                   : "Your timesheet has been submitted with a variance flag. An administrator will review the out-of-bounds justification before final approval."}
               </p>
               <div className="flex justify-end">

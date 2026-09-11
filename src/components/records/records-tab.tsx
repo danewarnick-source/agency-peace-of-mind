@@ -36,6 +36,8 @@ import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
 import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 import { RecordsExportDialog, type ExportRow } from "@/components/records/records-export-dialog";
 import { HistoricalRecordBadge } from "@/components/shared/historical-record-badge";
+import { RecordsReviewActions } from "@/components/records/records-review-actions";
+import { ThreadsPanel } from "@/components/threads/threads-panel";
 
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
@@ -720,9 +722,10 @@ export function RecordsTab() {
 
   return (
     <div className="space-y-3">
+      <ThreadsPanel variant="admin" />
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h3 className="text-base font-semibold text-[var(--hive-text)]">Records</h3>
+          <h3 className="text-base font-semibold text-[var(--hive-text)]">Records review</h3>
           <p className="text-xs text-muted-foreground">
             Every work record in one place. Click any row to view and edit every field. Switch to Needs attention to work the exception queue.
           </p>
@@ -960,14 +963,15 @@ export function RecordsTab() {
                     <th className="px-3 py-2">Manager note</th>
                     <th className="px-3 py-2">Geofence</th>
                     <th className="px-3 py-2">{mode === "attention" ? "Why flagged" : "Flags"}</th>
+                    {mode === "attention" ? <th className="px-3 py-2">Review</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {rowsQ.isLoading && (
-                    <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={mode === "attention" ? 10 : 9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
                   )}
                   {!rowsQ.isLoading && rows.length === 0 && (
-                    <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                    <tr><td colSpan={mode === "attention" ? 10 : 9} className="px-3 py-8 text-center text-muted-foreground">
                       {mode === "attention" ? "No exceptions — everything is clean for these filters." : "No records match these filters."}
                     </td></tr>
                   )}
@@ -1035,6 +1039,23 @@ export function RecordsTab() {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
+                        {mode === "attention" ? (
+                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                            <RecordsReviewActions
+                              compact
+                              row={{
+                                id: r.id,
+                                staff_id: r.staff_id,
+                                clock_in_timestamp: r.clock_in_timestamp,
+                                clock_out_timestamp: r.clock_out_timestamp,
+                                corrected_clock_out: r.corrected_clock_out,
+                                rounded_clock_out: r.rounded_clock_out,
+                                edit_audit_history_log: r.edit_audit_history_log,
+                                exceptions: r.exceptions,
+                              }}
+                            />
+                          </td>
+                        ) : null}
                       </tr>
                     );
                   })}

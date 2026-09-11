@@ -12,7 +12,10 @@ import {
   setCatalogRelationStatus,
   type AgencySourceRow,
 } from "@/lib/obligations/catalog-relation.functions";
-import type { CatalogRelationKind } from "@/lib/obligations/catalog-relation";
+import {
+  promoteOverlayStatus,
+  type CatalogRelationKind,
+} from "@/lib/obligations/catalog-relation";
 
 const KIND_COPY: Record<CatalogRelationKind, { label: string; hint: string }> = {
   match: {
@@ -174,7 +177,12 @@ export function AgencySourcesPanel({ orgId }: { orgId: string | null | undefined
                 row={row}
                 busy={setStatus.isPending}
                 onConfirm={() =>
-                  setStatus.mutate({ requirementId: row.id, status: "confirmed" })
+                  setStatus.mutate({
+                    requirementId: row.id,
+                    status: kindOf(row) === "overlay"
+                      ? promoteOverlayStatus()
+                      : "confirmed",
+                  })
                 }
                 onDismiss={() =>
                   setStatus.mutate({ requirementId: row.id, status: "dismissed" })
@@ -241,7 +249,7 @@ function AgencySourceCard({
             disabled={busy || row.catalog_relation_status === "confirmed"}
             onClick={onConfirm}
           >
-            Confirm
+            {kind === "overlay" ? "Promote overlay" : "Confirm"}
           </Button>
           <Button
             type="button"

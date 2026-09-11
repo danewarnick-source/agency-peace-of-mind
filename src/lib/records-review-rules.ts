@@ -6,7 +6,8 @@ import { isNonAnswer } from "@/lib/nectar-quality";
 export type ReviewExceptionCode =
   | "out_of_geofence"
   | "missing_note"
-  | "no_clockout_stale";
+  | "no_clockout_stale"
+  | "late_clock_out";
 
 export interface ReviewException {
   code: ReviewExceptionCode;
@@ -31,6 +32,8 @@ const REQUIRES_PCSP_GOAL = new Set([
 ]);
 
 const STALE_NO_CLOCKOUT_HOURS = 18;
+/** Same ≥16h bar the compliance-desk review queue already uses. */
+const LATE_CLOCK_OUT_HOURS = 16;
 
 export function reviewExceptions(r: ReviewRuleInput, now: Date = new Date()): ReviewException[] {
   const out: ReviewException[] = [];
@@ -76,6 +79,18 @@ export function reviewExceptions(r: ReviewRuleInput, now: Date = new Date()): Re
     const ageHrs = (now.getTime() - startedMs) / 36e5;
     if (ageHrs > STALE_NO_CLOCKOUT_HOURS) {
       out.push({ code: "no_clockout_stale", label: "No clock-out" });
+    }
+  }
+
+  // 4) Late clock-out — closed punch longer than the desk's ≥16h review bar.
+  if (r.clock_out_timestamp) {
+    const startedMs = new Date(r.clock_in_timestamp).getTime();
+    const endedMs = new Date(r.clock_out_timestamp).getTime();
+    if (Number.isFinite(startedMs) && Number.isFinite(endedMs)) {
+      const hours = (endedMs - startedMs) / 36e5;
+      if (hours >= LATE_CLOCK_OUT_HOURS) {
+        out.push({ code: "late_clock_out", label: "Late clock-out" });
+      }
     }
   }
 

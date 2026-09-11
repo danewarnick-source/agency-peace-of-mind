@@ -112,7 +112,8 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(dash, /to="\/dashboard\/hub\/employees"/);
     assert.match(dash, /to="\/dashboard\/hub\/clients"/);
     assert.match(dash, /to="\/dashboard\/compliance-desk"/);
-    assert.match(dash, /Compliance desk/);
+    assert.match(dash, /Records review/);
+    assert.doesNotMatch(dash, /Compliance desk/);
     assert.match(dash, /fontSize: 12/);
     assert.match(dash, /PI_THEME\.c50/);
     assert.match(dash, /PI_THEME\.gold/);

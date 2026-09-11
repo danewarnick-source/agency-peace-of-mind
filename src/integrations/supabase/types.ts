@@ -16948,6 +16948,102 @@ export type Database = {
           },
         ]
       }
+      thread_members: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      thread_messages: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          organization_id: string
+          thread_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind?: string
+          organization_id: string
+          thread_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          organization_id?: string
+          thread_id?: string
+        }
+        Relationships: []
+      }
+      threads: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          organization_id: string
+          subject: string
+          team_id: string | null
+          timesheet_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          organization_id: string
+          subject: string
+          team_id?: string | null
+          timesheet_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          organization_id?: string
+          subject?: string
+          team_id?: string | null
+          timesheet_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       time_off_requests: {
         Row: {
           created_at: string

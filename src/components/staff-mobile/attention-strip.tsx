@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileText, GraduationCap, ChevronRight, BellRing } from "lucide-react";
+import { FileText, GraduationCap, ChevronRight, BellRing, MessageSquare } from "lucide-react";
+import { listMyThreads } from "@/lib/threads.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
@@ -25,15 +27,24 @@ type Chip = {
  * Obligation items live on the Staff Obligations tab only.
  */
 export function AttentionStrip() {
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id ?? null;
   const fetchCe = useServerFn(getMyCeStatus);
   const fetchForms = useServerFn(listMyForms);
   const fetchBell = useServerFn(getMyFormNotifications);
   const fetchSI = useServerFn(listSmartImportReminders);
+  const fetchThreads = useServerFn(listMyThreads);
 
   const { data: ce } = useQuery({ queryKey: ["ce-status"], queryFn: () => fetchCe(), staleTime: 60_000 });
   const { data: formsData } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchForms(), staleTime: 60_000 });
   const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell(), staleTime: 60_000 });
   const { data: si } = useQuery({ queryKey: ["my-smart-import-reminders"], queryFn: () => fetchSI({ data: { scope: "mine" } }), staleTime: 60_000 });
+  const { data: threads } = useQuery({
+    queryKey: ["threads", orgId],
+    enabled: !!orgId,
+    queryFn: () => fetchThreads({ data: { organizationId: orgId as string } }),
+    staleTime: 30_000,
+  });
 
 
   const chips: Chip[] = [];
@@ -101,6 +112,17 @@ export function AttentionStrip() {
       icon: BellRing,
       tone: hasCritical ? "danger" : "warn",
       label: `${siCount} cert reminder${siCount === 1 ? "" : "s"}`,
+    });
+  }
+
+  const threadCount = (threads?.rows ?? []).filter((t) => t.unread_for_me).length;
+  if (threadCount > 0) {
+    chips.push({
+      key: "threads",
+      to: "/dashboard/my-obligations",
+      icon: MessageSquare,
+      tone: "warn",
+      label: `${threadCount} shift question${threadCount === 1 ? "" : "s"}`,
     });
   }
 

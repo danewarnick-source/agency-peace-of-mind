@@ -6,6 +6,70 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 8: organizations.state_code (2026-09-11) — Core flag
+
+Minimal Soft. Additive. No DROP. No RLS change (column on existing org-scoped
+`organizations`; existing org-member policies still apply). Matches
+`supabase/migrations/20260911110000_organizations_state_code.sql`.
+
+The column already exists on some environments (June 2026 `platform_states`
+migration + generated types). This paste is a no-op when live.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App catalog selector degrades to no empty-shell
+when `state_code` cannot be read.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'organizations'
+  AND column_name = 'state_code';
+```
+
+**What you'll see:** `organizations.state_code` if the column is already live;
+`NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911110000_organizations_state_code.sql`.
+
+**What you'll see:** `ALTER TABLE` (or a no-op notice) and `CREATE INDEX`
+(or `already exists`).
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'organizations'
+       AND column_name = 'state_code') AS org_state_col,
+  (SELECT state_code FROM public.organizations
+     WHERE id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb') AS tns_state;
+```
+
+**What you'll see:** `1 | UT` (True North Supports already stores `UT`;
+column present). Do not invent a Wyoming row.
+
+### RLS intent
+
+No new table. No new policy. `organizations` stays org-scoped via existing
+membership helpers. This paste does not use `USING (true)`.
+
+### Seed
+
+None. Do not backfill other orgs. Do not DROP the `platform_states` FK if
+it already exists.
+
+---
+
 ## ACTION — Compliance revamp Step 5: org facts + obligation_applicability (2026-09-11) — Core flag
 
 Org-scoped operational facts (null = unanswered) plus a computed applicability

@@ -66,10 +66,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Current DHHS/OL Day Treatment license (4+ persons) or Day Support certification (3 or fewer) for DSI. Check OL/UCLAPP.",
     citation: "SOW Article 8.5 (DSI)",
     applies_to_codes: ["DSI"],
-    obligation_keys: [
-      "ol_day_tx_license_4plus",
-      "ol_day_support_cert_3or_fewer",
-    ],
+    obligation_keys: ["ol_day_tx_license_4plus", "ol_day_support_cert_3or_fewer"],
     fulfillment: "external",
     note: "Issued by the Office of Licensing. Upload the current license or certification in HIVE. Community-only DSI uses the Community Based Day Support certification when serving 3 or fewer.",
   },
@@ -81,10 +78,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Current DHHS/OL Day Treatment license or Day Support certification for DSG/DSP. Check OL/UCLAPP.",
     citation: "SOW Article 7.5 (DSG & DSP)",
     applies_to_codes: ["DSG", "DSP"],
-    obligation_keys: [
-      "ol_day_tx_license_4plus",
-      "ol_day_support_cert_3or_fewer",
-    ],
+    obligation_keys: ["ol_day_tx_license_4plus", "ol_day_support_cert_3or_fewer"],
     fulfillment: "external",
     note: "Only applies if this program provides group/partial day supports.",
   },
@@ -96,10 +90,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Current DHHS/OL Residential Support license (4+) or certification (3 or fewer) for each RHS site. Check OL/UCLAPP.",
     citation: "SOW Article 21.5 (RHS)",
     applies_to_codes: ["RHS"],
-    obligation_keys: [
-      "ol_rhs_license_4plus",
-      "ol_rhs_cert_3or_fewer",
-    ],
+    obligation_keys: ["ol_rhs_license_4plus", "ol_rhs_cert_3or_fewer"],
     fulfillment: "external",
     note: "Only applies if this program provides Residential Habilitation Supports.",
   },
@@ -541,11 +532,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "ACRE training, or USU Workplace Supports / Effective Job Coach training, before providing SEI (and EPR/SED/SEE if awarded).",
     citation: "SOW Article 30.5–30.6 (SEI); 9.5 EPR; 28.4 SED; 29.4 SEE",
     applies_to_codes: ["SEI", "EPR", "SED", "SEE"],
-    obligation_keys: [
-      "acre_sei",
-      "acre_sed",
-      "customized_employment_usu",
-    ],
+    obligation_keys: ["acre_sei", "acre_sed", "customized_employment_usu"],
     fulfillment: "in_hive",
     note: "SEI: at least one ACRE-certified staff, and every SEI staff supervised by an ACRE-certified staff. USU Workplace Supports / Effective Job Coach is the current required course.",
   },
@@ -592,10 +579,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "30-day (or before working alone) orientation: 911, medical/mental-health call, IR, seizures, missing person, choking, PBS, rights/ADA, ANE, HIPAA, ID.RC/ABI orientation, communicable disease, person-specific training, policy, DSPD philosophy, Medicaid 101, OIG fraud reporting, HCBS Settings Rule, crisis de-escalation, trauma-informed care, suicide prevention.",
     citation: "SOW Article 1.8 (4) (A–W)",
     applies_to_codes: [],
-    obligation_keys: [
-      "orientation_30_day",
-      "client_specific_training",
-    ],
+    obligation_keys: ["orientation_30_day", "client_specific_training"],
     fulfillment: "in_hive",
     note: "One-time hire requirement. Person-specific training (O) is a separate instance per staff+client assignment, due 30 days after assignment.",
   },
@@ -607,11 +591,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Within 90 days of hire: current First Aid, current CPR, and person-centered thinking and practices.",
     citation: "SOW Article 1.8 (5)",
     applies_to_codes: [],
-    obligation_keys: [
-      "cpr_first_aid_initial",
-      "cpr_first_aid_renewal",
-      "pct_hire_practices",
-    ],
+    obligation_keys: ["cpr_first_aid_initial", "cpr_first_aid_renewal", "pct_hire_practices"],
     fulfillment: "in_hive",
     note: "Initial CPR/First Aid is 90 days, not 30. Renewal follows the date printed on the card.",
   },
@@ -660,10 +640,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Organization is an approved USOR vendor for job coaching, and SEI staff meet ACRE / USU Workplace Supports qualifications.",
     citation: "SOW Article 30.6",
     applies_to_codes: ["SEI"],
-    obligation_keys: [
-      "usor_job_coaching_sei",
-      "acre_sei",
-    ],
+    obligation_keys: ["usor_job_coaching_sei", "acre_sei"],
     fulfillment: "external",
     note: "Vendor approval is outside HIVE (proof to osrprovider@utah.gov). Existing SEI providers have until January 31, 2027.",
   },
@@ -671,6 +648,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
 
 export const AUDIT_INSTRUMENTS = {
   UT: DSPD_AUDIT_ITEMS,
+  ID: [] as const,
+  WY: [] as const,
 } as const;
 
 export type OrgFootprint = {

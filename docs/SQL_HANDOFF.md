@@ -6,6 +6,80 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 2: escalation_rules (2026-09-11) — Core flag
+
+Hive-authored catalog. **Read-only to orgs.** Additive. No DROP.
+Matches `supabase/migrations/20260911090000_escalation_rules.sql`.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App evaluator uses in-code seed rules until this
+table exists.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'escalation_rules'
+  AND column_name IN ('id', 'trigger', 'climbs_to', 'urgency', 'message_template', 'state_code', 'archived_at');
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911090000_escalation_rules.sql`.
+
+**What you'll see:** `CREATE TABLE`, three CHECKs, unique index, grants, RLS
+on, two policies, five seed rows (`ON CONFLICT DO UPDATE`), then a DO block
+that appends `escalation` to `notifications_type_check` if missing.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'escalation_rules'
+       AND column_name IN ('id','trigger','climbs_to','urgency','message_template','state_code','archived_at')) AS cols,
+  (SELECT count(*) FROM public.escalation_rules
+     WHERE state_code = 'UT' AND archived_at IS NULL) AS seed_rows,
+  (SELECT string_agg(trigger, ',' ORDER BY trigger)
+     FROM public.escalation_rules WHERE state_code = 'UT') AS triggers,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.escalation_rules'::regclass) AS rls_on;
+```
+
+**What you'll see:** `7 | 5 | half_window_not_started,license_or_repayment_risk,overdue,standing_record_missing_30d,would_create_finding_if_scheduled | t`.
+
+### RLS intent (in this paste — one Soft change)
+
+- Table is **Hive-authored**, not org PHI.
+- `authenticated` **SELECT only** (`USING (true)` is safe here — no org/PHI rows).
+- Writes: `is_hive_executive` (authenticated) + `service_role`.
+- Orgs cannot INSERT/UPDATE/DELETE catalog rows.
+
+### Seed list
+
+| trigger | climbs_to | urgency |
+| --- | --- | --- |
+| `half_window_not_started` | manager | normal |
+| `overdue` | manager_of_manager | high |
+| `would_create_finding_if_scheduled` | manager | high |
+| `license_or_repayment_risk` | admin_level | critical |
+| `standing_record_missing_30d` | admin_level | high |
+
+`license_or_repayment_risk` evaluator logic (app, not SQL): catalog
+`category = licensing` OR citation in `{§1.34, §1.13, §30.5, §33.5}` when
+overdue OR expiry within 14 days.
+
+---
+
 ## ACTION — Compliance revamp Step 1: catalog keys / disposition / pack version (2026-09-11) — Core flag
 
 Additive only. No deletes. No RLS in this paste. Matches

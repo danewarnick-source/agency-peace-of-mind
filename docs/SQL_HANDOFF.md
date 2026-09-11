@@ -6,6 +6,115 @@ it worked before moving on.
 
 ---
 
+## ACTION — Compliance revamp Step 5: org facts + obligation_applicability (2026-09-11) — Core flag
+
+Org-scoped operational facts (null = unanswered) plus a computed applicability
+table. Additive. No DROP TABLE / DROP COLUMN.
+Matches `supabase/migrations/20260911120000_org_facts_applicability.sql`.
+
+Do **not** apply from CI. Propose-only until Core pastes in Lovable
+(clear the editor first). App setup page and This Week source 5 degrade
+until these columns exist.
+
+### Probe
+
+Clear the editor, paste:
+
+```sql
+SELECT string_agg(table_name || '.' || column_name, ' | ' ORDER BY table_name, column_name)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'organizations' AND column_name IN (
+      'fact_operates_ol_site',
+      'fact_uses_volunteers',
+      'fact_has_governing_board',
+      'fact_answers_updated_at',
+      'fact_answers_updated_by'
+    ))
+    OR (table_name = 'obligation_applicability' AND column_name IN (
+      'id', 'organization_id', 'obligation_key', 'fact_key', 'applies',
+      'unanswered', 'source', 'decided_by', 'decided_at'
+    ))
+  );
+```
+
+**What you'll see:** `NULL` until this ACTION runs.
+
+### Apply
+
+Clear the editor, paste the full file
+`supabase/migrations/20260911120000_org_facts_applicability.sql`.
+
+**What you'll see:** `ALTER TABLE` × 5 on `organizations`, `CREATE TABLE`
+`obligation_applicability`, unique + index, grants, RLS on, two policies.
+
+### Verify
+
+Clear the editor, paste:
+
+```sql
+SELECT
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'organizations'
+       AND column_name IN (
+         'fact_operates_ol_site','fact_uses_volunteers','fact_has_governing_board',
+         'fact_answers_updated_at','fact_answers_updated_by'
+       )) AS org_fact_cols,
+  (SELECT count(*) FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'obligation_applicability'
+       AND column_name IN (
+         'id','organization_id','obligation_key','fact_key','applies',
+         'unanswered','source','decided_by','decided_at'
+       )) AS appl_cols,
+  (SELECT relrowsecurity FROM pg_class
+     WHERE oid = 'public.obligation_applicability'::regclass) AS rls_on,
+  (SELECT string_agg(polname, ',' ORDER BY polname)
+     FROM pg_policy
+     WHERE polrelid = 'public.obligation_applicability'::regclass) AS policies;
+```
+
+**What you'll see:** `5 | 9 | t | obligation_applicability_select_member,obligation_applicability_write_admin`.
+
+### RLS intent (in this paste — one Soft change)
+
+- `organizations.fact_*` inherit existing org RLS (no new policies).
+- `obligation_applicability` is **org-scoped**, not Hive catalog. Not PHI
+  (operational facts + catalog keys only).
+- `authenticated` SELECT: `is_org_member(organization_id, auth.uid())`.
+- Writes: `is_org_admin_or_manager(organization_id, auth.uid())`.
+- Never `USING (true)` on this table.
+
+### Fact columns (null = unanswered)
+
+| column | meaning |
+| --- | --- |
+| `fact_operates_ol_site` | OL-licensed or OL-certified site (zoning / Life Safety) |
+| `fact_uses_volunteers` | Regularly scheduled volunteers (not chosen natural supports) |
+| `fact_has_governing_board` | Governing or policy-making board |
+| `fact_answers_updated_at` / `_by` | Last setup save |
+
+Human Rights Plan and housemate informed-choice are **derived** from
+`services_offered` (not extra columns).
+
+### Core notes (this Soft only)
+
+1. **Do not widen `organizations` UPDATE.** Live `admins update org` is
+   `has_org_role(..., 'admin')` only. This paste inherits that (no new
+   org policies). Manager / program_manager can write
+   `obligation_applicability` (`is_org_admin_or_manager`) but `fact_*`
+   saves from those roles will no-op until a later scoped write.
+2. **No seed / no TNS prefill.** Null = unanswered. Conditional duties
+   stay visible until recorded.
+3. **One Soft is enough.** No second paste. Policy/constraint
+   `DROP IF EXISTS` is re-paste safe only.
+
+### Seed
+
+None. Orgs start unanswered. TNS is not pre-filled.
+
+---
+
 ## ACTION — Compliance revamp Step 3: obligation scope (2026-09-11) — Core flag
 
 Additive columns only. **No DROP.** No new table. No seed. No RLS rewrite

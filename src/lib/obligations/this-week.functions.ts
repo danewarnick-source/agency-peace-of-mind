@@ -1,5 +1,6 @@
-// This Week queue (Compliance revamp Step 2). Server-only. No UI.
+// This Week queue (Compliance revamp Step 2 + Step 3 scope + Step 5 source 5).
 
+import { loadOrgFacts, unansweredFactsQuietSummary } from "./applicability.ts";
 import {
   evaluateEscalations,
   isAdminLevelRole,
@@ -241,7 +242,15 @@ export async function getThisWeek(
     }
   }
 
-  // 5. Unanswered org-profile facts — Step 5 not built.
+  // 5. Unanswered org-profile facts (Step 5). Admin-level only.
+  if (adminLevel) {
+    const facts = await loadOrgFacts(supabase, orgId);
+    if (facts) {
+      const card = unansweredFactsQuietSummary(orgId, facts);
+      if (card) items.push(card);
+    }
+  }
+
   // 6. evv_timesheets needs_review in scope — count only.
   const evv = await loadEvvNeedsReviewCount(supabase, orgId, evvStaffIdsForScope(viewerScope));
   if (evv) items.push(evv);

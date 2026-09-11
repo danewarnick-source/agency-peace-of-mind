@@ -26,7 +26,13 @@ async function signedEvidenceUrl(
   return data.signedUrl;
 }
 
-export function OrgClientFileMatrix({ organizationId }: { organizationId: string }) {
+export function OrgClientFileMatrix({
+  organizationId,
+  hiddenCardKeys = [],
+}: {
+  organizationId: string;
+  hiddenCardKeys?: string[];
+}) {
   const navigate = useNavigate();
   const listFn = useServerFn(listOrgClientFileMatrix);
   const packFn = useServerFn(listOrgClientFilePack);
@@ -41,14 +47,21 @@ export function OrgClientFileMatrix({ organizationId }: { organizationId: string
   });
 
   const rows = useMemo(() => {
-    const all = q.data ?? [];
+    const hideHousemate = hiddenCardKeys.includes("housemate");
+    const all = (q.data ?? []).map((r) => {
+      if (!hideHousemate) return r;
+      const missing_items = r.missing_items.filter((i) => !/housemate/i.test(i.title));
+      const removed = r.missing_items.length - missing_items.length;
+      if (!removed) return r;
+      return { ...r, missing_items, missing: Math.max(0, r.missing - removed) };
+    });
     const term = search.trim().toLowerCase();
     if (!term) return all;
     return all.filter((r) => {
       const codes = r.service_codes.join(" ").toLowerCase();
       return r.full_name.toLowerCase().includes(term) || codes.includes(term);
     });
-  }, [q.data, search]);
+  }, [q.data, search, hiddenCardKeys]);
 
   const selectedRows = rows.filter((r) => selected.has(r.client_id));
   const exportRows = selectedRows.length ? selectedRows : rows;
@@ -168,12 +181,7 @@ export function OrgClientFileMatrix({ organizationId }: { organizationId: string
             <FileDown className="mr-1.5 h-3.5 w-3.5" />
             Export missing CSV
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void exportPack()}
-            disabled={packBusy}
-          >
+          <Button variant="outline" size="sm" onClick={() => void exportPack()} disabled={packBusy}>
             {packBusy ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -186,8 +194,8 @@ export function OrgClientFileMatrix({ organizationId }: { organizationId: string
 
       <p className="text-xs text-muted-foreground">
         Showing {rows.length} of {q.data?.length ?? 0}. Practice audit opens Internal Audit
-        {selectedRows.length ? ` for ${selectedRows.length} selected` : " for the org"}.
-        Missing CSV uses the current selection, or everyone visible if none are selected.
+        {selectedRows.length ? ` for ${selectedRows.length} selected` : " for the org"}. Missing CSV
+        uses the current selection, or everyone visible if none are selected.
       </p>
 
       {rows.length === 0 ? (
@@ -272,9 +280,7 @@ function MatrixRow({
         >
           {row.full_name}
         </Link>
-        {!row.active && (
-          <span className="ml-2 text-[11px] text-muted-foreground">Deactivated</span>
-        )}
+        {!row.active && <span className="ml-2 text-[11px] text-muted-foreground">Deactivated</span>}
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
@@ -299,13 +305,7 @@ function MatrixRow({
   );
 }
 
-function StatusCount({
-  count,
-  tone,
-}: {
-  count: number;
-  tone: "missing" | "due_soon" | "on_file";
-}) {
+function StatusCount({ count, tone }: { count: number; tone: "missing" | "due_soon" | "on_file" }) {
   const cls =
     tone === "on_file"
       ? "border-emerald-300 bg-emerald-50 text-emerald-800"
@@ -315,7 +315,9 @@ function StatusCount({
           ? "border-rose-200 bg-rose-50 text-rose-800"
           : "border-border bg-muted/40 text-muted-foreground";
   return (
-    <span className={`inline-flex min-w-[1.75rem] items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex min-w-[1.75rem] items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}
+    >
       {count}
     </span>
   );

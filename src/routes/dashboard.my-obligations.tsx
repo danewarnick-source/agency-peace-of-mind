@@ -48,6 +48,8 @@ import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.func
 import { getAgencyPolicyForInstance } from "@/lib/agency-policies.functions";
 import { policyMediaKind } from "@/lib/agency-policies";
 import { isPackSentinel, obligationIsRequired } from "@/lib/obligation-packs";
+import { PacketNextActionCard } from "@/components/compliance/packet-next-action";
+import { useCompliancePacket } from "@/hooks/use-compliance-packet";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "Staff file — Provider Interface" }] }),
@@ -257,9 +259,7 @@ function OpenCard({
   });
   const policy = policyQ.data?.policy ?? null;
   const policyUrl = policyQ.data?.signedUrl ?? null;
-  const mediaKind = policy
-    ? policyMediaKind(policy.file_mime, policy.file_name)
-    : null;
+  const mediaKind = policy ? policyMediaKind(policy.file_mime, policy.file_name) : null;
   const hasCourseProgress = (courseProgress?.completed ?? 0) > 0;
   const needsUpload =
     ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
@@ -336,7 +336,10 @@ function OpenCard({
 
   if (nectarResult?.status === "failed") {
     return (
-      <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
+      <div
+        id={`packet-${instance.id}`}
+        className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]"
+      >
         <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
         <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -353,35 +356,38 @@ function OpenCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div
+      id={`packet-${instance.id}`}
+      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
+    >
       <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
-          {ob.source === "sow" ? (
-            <p className="text-xs text-muted-foreground">
-              Required by state contract — DSPD SOW DHHS91172
-            </p>
-          ) : (
-            ob.source_policy_section && (
-              <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
-            )
-          )}
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
-          {obligationIsRequired(ob) ? (
-            <p
-              className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
-            >
-              {`${obligationFileStatusLabel(
-                obligationFileStatus({
-                  instanceStatus: instance.status,
-                  dueAt: instance.due_at,
-                  hasValidEvidence: false,
-                }),
-              )} — ${due.text}`}
-            </p>
-          ) : (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Optional — complete when you can. This does not block clock-in.
-            </p>
-          )}
+      {ob.source === "sow" ? (
+        <p className="text-xs text-muted-foreground">
+          Required by state contract — DSPD SOW DHHS91172
+        </p>
+      ) : (
+        ob.source_policy_section && (
+          <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+        )
+      )}
+      <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
+      {obligationIsRequired(ob) ? (
+        <p
+          className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
+        >
+          {`${obligationFileStatusLabel(
+            obligationFileStatus({
+              instanceStatus: instance.status,
+              dueAt: instance.due_at,
+              hasValidEvidence: false,
+            }),
+          )} — ${due.text}`}
+        </p>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Optional — complete when you can. This does not block clock-in.
+        </p>
+      )}
       {ob.description && <p className="mt-2 text-sm text-muted-foreground">{ob.description}</p>}
 
       <div className="mt-3 space-y-2">
@@ -458,8 +464,8 @@ function OpenCard({
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-sm font-medium">Form</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Open and complete this form from here. Your existing attestation is saved to this
-              same card.
+              Open and complete this form from here. Your existing attestation is saved to this same
+              card.
             </p>
             <Link
               to="/dashboard/client-training/$clientId"
@@ -542,7 +548,10 @@ function OpenCard({
               />
             )}
             {policy && (
-              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3" data-testid="policy-viewer">
+              <div
+                className="space-y-2 rounded-lg border border-border bg-muted/30 p-3"
+                data-testid="policy-viewer"
+              >
                 <p className="text-sm font-medium">Read or watch this policy</p>
                 {policy.body_text ? (
                   <div className="max-h-64 overflow-auto whitespace-pre-wrap text-sm leading-relaxed">
@@ -553,10 +562,18 @@ function OpenCard({
                   <video controls className="max-h-72 w-full rounded-md bg-black" src={policyUrl} />
                 ) : null}
                 {policyUrl && mediaKind === "image" ? (
-                  <img alt={policy.file_name ?? "Policy"} className="max-h-72 w-full rounded-md object-contain" src={policyUrl} />
+                  <img
+                    alt={policy.file_name ?? "Policy"}
+                    className="max-h-72 w-full rounded-md object-contain"
+                    src={policyUrl}
+                  />
                 ) : null}
                 {policyUrl && mediaKind === "pdf" ? (
-                  <iframe title={policy.file_name ?? "Policy"} className="h-72 w-full rounded-md border" src={policyUrl} />
+                  <iframe
+                    title={policy.file_name ?? "Policy"}
+                    className="h-72 w-full rounded-md border"
+                    src={policyUrl}
+                  />
                 ) : null}
                 {policyUrl && (mediaKind === "other" || !mediaKind) ? (
                   <a
@@ -645,6 +662,7 @@ function MyObligationsPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const packetQ = useCompliancePacket(orgId, "staff", user?.id ?? null);
   const qc = useQueryClient();
   const listFn = useServerFn(listMyObligationInstances);
   const checkFn = useServerFn(checkAndMarkOverdue);
@@ -880,7 +898,7 @@ function MyObligationsPage() {
     qc.invalidateQueries({ queryKey: ["in-hive-progress"] });
   };
 
-  if (!user || !orgId) {
+  if (!user || !org) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
@@ -894,6 +912,11 @@ function MyObligationsPage() {
           subtitle="Discrete dues on your file — On file, Missing, or Due soon."
         />
       </div>
+
+      <PacketNextActionCard
+        nextAction={packetQ.data?.packet.nextAction}
+        emptyLabel="Nothing needs you first — your file is current or waiting on an admin."
+      />
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {(

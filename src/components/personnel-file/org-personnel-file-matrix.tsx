@@ -3,13 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import {
-  ClipboardCheck,
-  FileDown,
-  Loader2,
-  Printer,
-  Search,
-} from "lucide-react";
+import { ClipboardCheck, FileDown, Loader2, Printer, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +17,20 @@ import {
 import { missingPersonnelCsv, personnelPackHtml } from "@/lib/staff-obligation-files";
 
 async function signedEvidenceUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from("obligation-evidence").createSignedUrl(path, 300);
+  const { data, error } = await supabase.storage
+    .from("obligation-evidence")
+    .createSignedUrl(path, 300);
   if (error || !data?.signedUrl) throw new Error(error?.message ?? "Could not open file");
   return data.signedUrl;
 }
 
-export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: string }) {
+export function OrgPersonnelFileMatrix({
+  organizationId,
+  staffIds = null,
+}: {
+  organizationId: string;
+  staffIds?: string[] | null;
+}) {
   const navigate = useNavigate();
   const listFn = useServerFn(listOrgPersonnelFileMatrix);
   const packFn = useServerFn(listOrgPersonnelFilePack);
@@ -43,10 +45,12 @@ export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: str
   });
 
   const rows = useMemo(() => {
-    const all = q.data ?? [];
+    const scoped = staffIds?.length
+      ? (q.data ?? []).filter((r) => staffIds.includes(r.staff_id))
+      : (q.data ?? []);
     const term = search.trim().toLowerCase();
-    if (!term) return all;
-    return all.filter((r) => {
+    if (!term) return scoped;
+    return scoped.filter((r) => {
       const codes = r.service_codes.join(" ").toLowerCase();
       return (
         r.full_name.toLowerCase().includes(term) ||
@@ -55,7 +59,7 @@ export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: str
         codes.includes(term)
       );
     });
-  }, [q.data, search]);
+  }, [q.data, search, staffIds]);
 
   const selectedRows = rows.filter((r) => selected.has(r.staff_id));
   const exportRows = selectedRows.length ? selectedRows : rows;
@@ -175,12 +179,7 @@ export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: str
             <FileDown className="mr-1.5 h-3.5 w-3.5" />
             Export missing CSV
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void exportPack()}
-            disabled={packBusy}
-          >
+          <Button variant="outline" size="sm" onClick={() => void exportPack()} disabled={packBusy}>
             {packBusy ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -193,8 +192,8 @@ export function OrgPersonnelFileMatrix({ organizationId }: { organizationId: str
 
       <p className="text-xs text-muted-foreground">
         Showing {rows.length} of {q.data?.length ?? 0}. Practice audit opens Internal Audit
-        {selectedRows.length ? ` for ${selectedRows.length} selected` : " for the org"}.
-        Missing CSV uses the current selection, or everyone visible if none are selected.
+        {selectedRows.length ? ` for ${selectedRows.length} selected` : " for the org"}. Missing CSV
+        uses the current selection, or everyone visible if none are selected.
       </p>
 
       {rows.length === 0 ? (
@@ -279,9 +278,7 @@ function MatrixRow({
         >
           {row.full_name}
         </Link>
-        {!row.active && (
-          <span className="ml-2 text-[11px] text-muted-foreground">Deactivated</span>
-        )}
+        {!row.active && <span className="ml-2 text-[11px] text-muted-foreground">Deactivated</span>}
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
@@ -292,9 +289,7 @@ function MatrixRow({
           >
             {row.role}
           </Badge>
-          {row.job_title && (
-            <span className="text-xs text-muted-foreground">{row.job_title}</span>
-          )}
+          {row.job_title && <span className="text-xs text-muted-foreground">{row.job_title}</span>}
           {codes.map((c) => (
             <Badge key={c} variant="secondary" className="font-mono text-[10px]">
               {c}
@@ -316,13 +311,7 @@ function MatrixRow({
   );
 }
 
-function StatusCount({
-  count,
-  tone,
-}: {
-  count: number;
-  tone: "missing" | "due_soon" | "on_file";
-}) {
+function StatusCount({ count, tone }: { count: number; tone: "missing" | "due_soon" | "on_file" }) {
   const cls =
     tone === "on_file"
       ? "border-emerald-300 bg-emerald-50 text-emerald-800"
@@ -332,7 +321,9 @@ function StatusCount({
           ? "border-rose-200 bg-rose-50 text-rose-800"
           : "border-border bg-muted/40 text-muted-foreground";
   return (
-    <span className={`inline-flex min-w-[1.75rem] items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex min-w-[1.75rem] items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}
+    >
       {count}
     </span>
   );

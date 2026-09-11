@@ -1,7 +1,9 @@
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useCompliancePacket } from "@/hooks/use-compliance-packet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgencyDocumentsCards } from "@/components/agency-documents/agency-documents-cards";
 import { CompanyPoliciesTab } from "@/components/agency-documents/company-policies-tab";
+import { PacketNextActionCard } from "@/components/compliance/packet-next-action";
 import { ROLE_RANK } from "@/lib/rbac";
 import type { AgencyFileSubTab } from "@/lib/compliance-nav";
 
@@ -13,6 +15,7 @@ export function AgencyFilePanel({
   onAgencyTabChange: (tab: AgencyFileSubTab) => void;
 }) {
   const { data: org, isLoading } = useCurrentOrg();
+  const packetQ = useCompliancePacket(org?.organization_id, "agency");
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -41,11 +44,15 @@ export function AgencyFilePanel({
           Agency file
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Org-wide standing flags and encoded DSPD / Practice Audit policies. One card per
-          duty; renew files the same card. Company policies are a separate internal binder.
-          Practice audit reuses Internal Audit — this is not a fourth audit product.
+          Org-wide standing flags and encoded DSPD / Practice Audit policies. One card per duty;
+          renew files the same card. Company policies are a separate internal binder. Practice audit
+          reuses Internal Audit — this is not a fourth audit product.
         </p>
       </div>
+      <PacketNextActionCard
+        nextAction={packetQ.data?.packet.nextAction}
+        emptyLabel="No open agency-file action."
+      />
       <Tabs
         value={agencyTab}
         onValueChange={(v) => {
@@ -57,7 +64,10 @@ export function AgencyFilePanel({
           <TabsTrigger value="company-policies">Company policies</TabsTrigger>
         </TabsList>
         <TabsContent value="documents" className="mt-4">
-          <AgencyDocumentsCards organizationId={org.organization_id} />
+          <AgencyDocumentsCards
+            organizationId={org.organization_id}
+            hiddenKeys={packetQ.data?.hiddenAgencyCards ?? []}
+          />
         </TabsContent>
         <TabsContent value="company-policies" className="mt-4">
           <CompanyPoliciesTab orgId={org.organization_id} />

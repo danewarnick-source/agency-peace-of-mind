@@ -64,6 +64,18 @@ export function columnMissing(message: string | undefined): boolean {
   return !!message && /does not exist|schema cache|column|scope_group_id|is_lead/i.test(message);
 }
 
+/** Step 2 fallback helper for packet builders when no snapshot is loaded. */
+export function orgWideResolvedScope(organizationId: string, userId: string): ResolvedScope {
+  return {
+    organizationId,
+    userId,
+    scopeGroupId: null,
+    leadGroupIds: [],
+    staffUserIds: [],
+    isOrgWide: true,
+  };
+}
+
 export function buildScopeIndex(
   scopeByStaffId: Record<string, string | null>,
   members: ScopeMemberRow[],

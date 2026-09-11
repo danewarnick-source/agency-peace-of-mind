@@ -12,6 +12,7 @@ import {
   agencyDocPackHtml,
   agencyDocStatusLabel,
   missingAgencyDocCsv,
+  tallyAgencyDocCards,
   type AgencyDocCard,
   type AgencyDocStatus,
 } from "@/lib/agency-documents";
@@ -31,12 +32,20 @@ function formatDue(iso: string | null): string {
 }
 
 async function signedEvidenceUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from("obligation-evidence").createSignedUrl(path, 300);
+  const { data, error } = await supabase.storage
+    .from("obligation-evidence")
+    .createSignedUrl(path, 300);
   if (error || !data?.signedUrl) throw new Error(error?.message ?? "Could not open file");
   return data.signedUrl;
 }
 
-export function AgencyDocumentsCards({ organizationId }: { organizationId: string }) {
+export function AgencyDocumentsCards({
+  organizationId,
+  hiddenKeys = [],
+}: {
+  organizationId: string;
+  hiddenKeys?: string[];
+}) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const listFn = useServerFn(listAgencyDocuments);
@@ -50,10 +59,15 @@ export function AgencyDocumentsCards({ organizationId }: { organizationId: strin
     queryFn: () => listFn({ data: { organizationId } }),
   });
 
-  const cards = useMemo(() => q.data?.cards ?? [], [q.data]);
+  const cards = useMemo(() => {
+    const all = q.data?.cards ?? [];
+    if (!hiddenKeys.length) return all;
+    const hide = new Set(hiddenKeys);
+    return all.filter((c) => !hide.has(c.key));
+  }, [q.data, hiddenKeys]);
   const flags = cards.filter((c) => c.layer === "flag");
   const encoded = cards.filter((c) => c.layer === "encoded");
-  const counts = q.data?.counts ?? { missing: 0, due_soon: 0, on_file: 0 };
+  const counts = tallyAgencyDocCards(cards);
 
   const practiceAudit = () => {
     void navigate({
@@ -142,9 +156,9 @@ export function AgencyDocumentsCards({ organizationId }: { organizationId: strin
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {counts.missing} missing · {counts.due_soon} due soon · {counts.on_file} on file.
-          Practice audit opens Internal Audit — not a separate audit system.
-          Company policies are not pulled as DSPD rows.
+          {counts.missing} missing · {counts.due_soon} due soon · {counts.on_file} on file. Practice
+          audit opens Internal Audit — not a separate audit system. Company policies are not pulled
+          as DSPD rows.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={practiceAudit}>

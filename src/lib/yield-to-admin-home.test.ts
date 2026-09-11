@@ -30,7 +30,7 @@ describe("layoutQueriesMayRun", () => {
     );
   });
 
-  it("waits on Admin Home until both home queries settle", () => {
+  it("runs immediately on Admin Home when KPI queries never start", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,
@@ -38,8 +38,11 @@ describe("layoutQueriesMayRun", () => {
         clientsStatus: undefined,
         gaveUp: false,
       }),
-      false,
+      true,
     );
+  });
+
+  it("waits on Admin Home until both home queries settle when they did start", () => {
     assert.equal(
       layoutQueriesMayRun({
         onAdminHome: true,

@@ -120,6 +120,16 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(dash, /PI_THEME\.c50/);
     assert.match(dash, /AdminHomeWelcome/);
   });
+
+  it("does not load instance or client rows for dead Home KPI tiles", () => {
+    const hook = read("../components/admin-home/use-admin-home-data.ts");
+    assert.doesNotMatch(hook, /\.from\(/);
+    assert.doesNotMatch(hook, /useQuery/);
+    assert.doesNotMatch(hook, /adminHomeInstancesQueryKey|adminHomeClientsQueryKey/);
+    assert.doesNotMatch(hook, /deriveAdminHome/);
+    assert.match(hook, /sessionFirstName/);
+    assert.match(hook, /formatDenverLongDate/);
+  });
 });
 
 describe("Admin Home Step 3 — welcome banner", () => {

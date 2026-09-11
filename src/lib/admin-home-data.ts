@@ -1,6 +1,8 @@
 /**
- * Pure Admin Home derivation helpers (no React / Supabase).
- * The hook in use-admin-home-data.ts is the query surface.
+ * Pure Admin Home helpers (no React / Supabase).
+ * Home greeting reads sessionFirstName / formatDenverLongDate / greetingWord.
+ * Instance/client KPI derivation stays here for other surfaces — Home no
+ * longer fetches company_obligation_instances or clients for dead tiles.
  */
 
 const DENVER = "America/Denver";

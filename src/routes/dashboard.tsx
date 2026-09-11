@@ -600,7 +600,7 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  // Admin Home owns the two obligation/client queries; layout fan-out waits.
+  // Home greeting no longer starts KPI instance/client queries; yield is a no-wait.
   const layoutReady = useYieldToAdminHomeQueries(
     org?.organization_id ?? null,
     isAdminCapable && isAdminHomePath(pathname),

@@ -20,9 +20,10 @@ export function isAdminHomePath(pathname: string): boolean {
 }
 
 /**
- * Layout obligation fan-out (action-required queue + deadlines/bell) may run
- * unless we are on Admin Home and those two home queries have not settled yet.
- * `gaveUp` covers the case where Admin Home never mounts.
+ * Layout obligation fan-out (action-required queue + deadlines/bell).
+ * Home greeting no longer starts instance/client KPI queries, so an unset
+ * pair means "nothing to wait for." If a caller still mounts those queries,
+ * wait until both settle. `gaveUp` covers a hung start.
  */
 export function layoutQueriesMayRun(args: {
   onAdminHome: boolean;
@@ -32,6 +33,7 @@ export function layoutQueriesMayRun(args: {
 }): boolean {
   if (!args.onAdminHome) return true;
   if (args.gaveUp) return true;
+  if (args.instancesStatus == null && args.clientsStatus == null) return true;
   return (
     args.instancesStatus != null &&
     args.instancesStatus !== "pending" &&

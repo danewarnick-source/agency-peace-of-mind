@@ -12,10 +12,9 @@ import {
 const GIVE_UP_MS = 4_000;
 
 /**
- * On Admin Home, hold the layout's obligation fan-out until the two home
- * queries finish so they are not starved on a phone radio. Other routes
- * return true immediately. If Admin Home never starts its queries, give up
- * after 4s so the sidebar badge and bell still load.
+ * Layout fan-out yield. Home greeting no longer starts instance/client KPI
+ * queries, so an unset pair is allowed immediately. If those keys still
+ * appear (other callers), wait until they settle; give up after 4s.
  */
 export function useYieldToAdminHomeQueries(
   orgId: string | null,

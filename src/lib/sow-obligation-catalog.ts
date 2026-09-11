@@ -139,7 +139,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Hire-level in-platform course (Person-centered thinking in everyday support) plus upload. NCAPPS-informed Provider Interface education — not official NCAPPS. Separate from the per-client Person-Centered Thinking form. Until release control is flipped, a certificate upload is the SOW evidence path.",
+      "Hire-level in-platform course (Person-centered thinking in everyday support) plus upload. Passing the exam marks the card On file. Paid agencies need the same purchased 30-day or pack seat as orientation; True North Supports is always free. NCAPPS-informed Provider Interface education — not official NCAPPS. Separate from the per-client Person-Centered Thinking form.",
     due_rule: { kind: "days_after_hire", days: 90 },
     owner: "staff",
     service_codes: [],

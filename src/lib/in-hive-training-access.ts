@@ -1,16 +1,37 @@
 /**
- * Who may open the in-Hive 30-day course.
+ * Who may open in-Hive courses that share the 30-day training seat.
  * True North / billing-exempt orgs never pay and never need a roster seat.
  * Paid orgs need a paid or waived 30-day or package roster seat for that staff.
+ *
+ * PCT reuses this same entitlement (no new Stripe product). ABI has an in-Hive
+ * course but is assignment-gated, not seat-gated. 12-hour ongoing is an
+ * obligation / pack column only — no course and no SKU.
  */
 
 import { isBillingExempt } from "./billing-access.ts";
+import { PCT_COURSE_ID } from "./in-hive-training-pct.ts";
 
 export type ThirtyDayAccessReason =
   | "tns_or_comped"
   | "paid_roster_seat"
   | "training_only_seat"
   | "denied";
+
+/**
+ * Intended training family (30-day + PCT + ABI + 12hr). Stripe / roster today
+ * only sell `thirty_day` and `package` / training-only `thirty_day` + `pack`.
+ * `pack` still covers CPR + 30-day + Mandt — do not invent new prices.
+ */
+export const TRAINING_SEAT_FAMILY = {
+  gatedByThirtyDaySeat: ["thirty-day", PCT_COURSE_ID],
+  inHiveCourseNoSeat: ["abi"],
+  obligationOnlyNoCourse: ["annual-ce"],
+} as const;
+
+/** 30-day orientation and hire-level PCT share one purchased seat. */
+export function courseUsesThirtyDaySeat(courseId: string | null | undefined): boolean {
+  return courseId === "thirty-day" || courseId === PCT_COURSE_ID;
+}
 
 /** Live Hive-Platform `organizations` has no `billing_exempt` column. */
 export function orgSelectMissingBillingExempt(message: string | null | undefined): boolean {

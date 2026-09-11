@@ -4921,7 +4921,8 @@ Course id `pi-person-centered-foundations` reuses existing:
 
 - `training_topic_progress` / `training_completions` (UUID namespace course byte `03` so 30-day `01` and ABI `02` stay stable)
 - hire-level obligation title `Person-Centered Thinking and Practices Training` (already seeded)
-- `company_obligation_instances` via existing `recordCompletion` only when `PCT_COURSE_FULFILLS_OBLIGATION` is flipped on
-- Upload on the same staff-file card remains the SOW evidence path until that flag is released
+- `company_obligation_instances` via existing `recordCompletion` (`evidence_type_used = in_hive_course`) when the exam passes (`PCT_COURSE_FULFILLS_OBLIGATION = true`)
+- Same 30-day seat check: `training_classes` / `training_class_roster` (`thirty_day` or `package`) and `training_only_seats` (`thirty_day` or `pack`); TNS / billing-exempt skip the seat (`thirtyDayOrgIsComped`)
+- Upload on the same staff-file card remains an alternate path (you do not need both)
 
 Answer keys stay in `src/lib/person-centered-training-content.json` and are scored only in `src/lib/in-hive-training-pct.functions.ts`.

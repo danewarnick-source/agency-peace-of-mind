@@ -12,8 +12,8 @@ export const PCT_OBLIGATION_TITLE = PCT_HIRE_COURSE_TITLE;
 /** Course button is on the hire-level PCT card. Flip off to hide Open course. */
 export const PCT_IN_HIVE_COURSE_ENABLED = true;
 
-/** Passing the exam does not write SOW evidence until this is released. */
-export const PCT_COURSE_FULFILLS_OBLIGATION = false;
+/** Passing the exam writes in_hive_course / On file on the hire-level card. */
+export const PCT_COURSE_FULFILLS_OBLIGATION = true;
 
 export const PCT_PASS_SCORE = 12;
 export const PCT_EXAM_TOTAL = 15;

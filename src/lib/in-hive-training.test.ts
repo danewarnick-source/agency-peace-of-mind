@@ -409,7 +409,7 @@ describe("staff obligations course progress", () => {
     assert.equal(topicCodesForCourse(PCT_COURSE_ID).length, 6);
     assert.equal(inHiveCourseFulfillsObligation("thirty-day"), true);
     assert.equal(inHiveCourseFulfillsObligation("abi"), true);
-    assert.equal(inHiveCourseFulfillsObligation(PCT_COURSE_ID), false);
+    assert.equal(inHiveCourseFulfillsObligation(PCT_COURSE_ID), true);
     assert.equal(staffCourseProgressLabel(19, 30), "19 of 30 topics passed");
     assert.equal(staffCourseProgressLabel(0, 30), "0 of 30 topics passed");
   });

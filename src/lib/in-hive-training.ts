@@ -38,7 +38,7 @@ export function isInHiveCourseTitle(title: string): boolean {
   return inHiveCourseIdForTitle(title) !== null;
 }
 
-/** 30-day and ABI close the SOW card. PCT does not until release control is flipped. */
+/** 30-day, ABI, and hire-level PCT close the SOW card when the course completes. */
 export function inHiveCourseFulfillsObligation(courseId: InHiveCourseId): boolean {
   if (courseId === PCT_COURSE_ID) return PCT_COURSE_FULFILLS_OBLIGATION;
   return true;

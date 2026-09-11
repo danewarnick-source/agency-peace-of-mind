@@ -64,7 +64,8 @@ describe("PCT public payload", () => {
     assert.equal("feedback" in pub.lessons[0]!, false);
     assert.equal("correct" in quiz[0]!, false);
     assert.equal("why" in quiz[0]!, false);
-    assert.equal(pub.fulfillsObligation, PCT_COURSE_FULFILLS_OBLIGATION);
+    assert.equal(PCT_COURSE_FULFILLS_OBLIGATION, true);
+    assert.equal(pub.fulfillsObligation, true);
     assert.match(pub.attribution, /not official NCAPPS/);
   });
 });

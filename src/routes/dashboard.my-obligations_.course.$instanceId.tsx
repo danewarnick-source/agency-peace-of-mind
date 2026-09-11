@@ -11,7 +11,7 @@ import {
   lastExamResetAt,
 } from "@/lib/in-hive-training";
 import { thirtyDayCourseAccessFn } from "@/lib/in-hive-training-access.functions";
-import { thirtyDayOrgIsComped } from "@/lib/in-hive-training-access";
+import { courseUsesThirtyDaySeat, thirtyDayOrgIsComped } from "@/lib/in-hive-training-access";
 import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ function InHiveCoursePage() {
 
   const accessQ = useQuery({
     queryKey: ["thirty-day-course-access", orgId, user?.id],
-    enabled: !!orgId && !!user && courseIdPreview === "thirty-day" && !orgComped,
+    enabled: !!orgId && !!user && courseUsesThirtyDaySeat(courseIdPreview) && !orgComped,
     queryFn: () => accessFn({ data: { organizationId: orgId! } }),
   });
 
@@ -106,7 +106,7 @@ function InHiveCoursePage() {
   const alreadyComplete =
     instance.status === "completed" || instance.status === "waived";
   const examResetAfterIso = lastExamResetAt(instance.admin_notes, user.id);
-  const needsPurchasedSeat = courseId === "thirty-day" && !orgComped;
+  const needsPurchasedSeat = courseUsesThirtyDaySeat(courseId) && !orgComped;
   const accessBlocked =
     needsPurchasedSeat &&
     (accessQ.isError || (accessQ.isSuccess && accessQ.data && !accessQ.data.allowed));
@@ -125,13 +125,13 @@ function InHiveCoursePage() {
         <div className="rounded-xl border bg-card p-5 text-sm space-y-3">
           <p className="font-medium">
             {accessQ.isError
-              ? "Could not confirm a 30-day training seat"
-              : "A 30-day training seat is required"}
+              ? "Could not confirm a training seat"
+              : "A training seat is required"}
           </p>
           <p className="text-muted-foreground">
             {accessQ.isError
               ? "Refresh and try again. If this continues, ask an admin to confirm your seat."
-              : "Paid agencies purchase the 30-day course ($75 per person) or the pack from Training. An admin assigns your name on the roster after checkout. True North Supports is never charged and does not need a purchased seat."}
+              : "Paid agencies purchase the 30-day course ($75 per person) or the pack from Training. That same seat unlocks 30-day orientation and Person-Centered Thinking. An admin assigns your name on the roster after checkout. True North Supports is never charged and does not need a purchased seat."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild>

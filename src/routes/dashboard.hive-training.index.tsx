@@ -950,7 +950,7 @@ function Storefront({
       {
         type: "package" as const,
         title: "Training package",
-        blurb: "CPR, Mandt, and the in-platform 30-day course for the same roster. Saves $75 versus buying each seat.",
+        blurb: "CPR, Mandt, and the in-platform 30-day seat (orientation plus Person-Centered Thinking) for the same roster. Saves $75 versus buying each seat.",
         featured: true,
       },
       {
@@ -966,7 +966,7 @@ function Storefront({
       {
         type: "thirty_day" as const,
         title: "30-day orientation",
-        blurb: "In-platform Essential Training from the staff file. A purchased 30-day or pack seat unlocks the course for that staff. True North Supports is never charged. Not an external class.",
+        blurb: "In-platform Essential Training from the staff file. A purchased 30-day or pack seat unlocks 30-day orientation and Person-Centered Thinking for that staff. True North Supports is never charged. Not an external class.",
       },
     ] as const
   ).map((card) => {

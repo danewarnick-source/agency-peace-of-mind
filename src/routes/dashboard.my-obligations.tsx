@@ -27,7 +27,6 @@ import {
 } from "@/lib/staff-obligation-files";
 import {
   IN_HIVE_COURSE_EVIDENCE,
-  inHiveCourseFulfillsObligation,
   inHiveCourseIdForTitle,
   staffCompletedTabEmptyCopy,
   staffCourseProgressLabel,
@@ -389,8 +388,8 @@ function OpenCard({
             <div className="rounded-lg border border-border bg-muted/30 p-3">
               <p className="text-sm font-medium">In-platform course</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {courseId === PCT_COURSE_ID && !inHiveCourseFulfillsObligation(courseId)
-                  ? "Open the course from here. Finish each topic, then pass the competency exam (12 of 15, three tries). Until release, a certificate upload is what clears this SOW card."
+                {courseId === PCT_COURSE_ID
+                  ? "Open the course from here. Finish each topic, then pass the competency exam (12 of 15, three tries). Completing the exam marks this same card On file."
                   : "Open the course from here. Finish each topic, then pass the competency exam (80%, three tries). Completing the exam marks this same card On file."}
               </p>
               {courseProgress && courseProgress.total > 0 ? (
@@ -412,7 +411,7 @@ function OpenCard({
                 <p className="text-sm font-medium">Or upload a certificate</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {courseId === PCT_COURSE_ID
-                    ? "A certificate upload clears this same hire-level PCT card. The in-platform course does not yet mark the SOW card On file."
+                    ? "A certificate upload clears this same hire-level PCT card. You do not need both."
                     : "A certificate upload clears this same 30-day card. You do not need both."}
                 </p>
                 <div className="mt-2 flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-3 py-2">

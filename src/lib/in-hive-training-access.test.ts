@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  TRAINING_SEAT_FAMILY,
+  courseUsesThirtyDaySeat,
   officeStaffMayTakeThirtyDay,
   orgSelectMissingBillingExempt,
   resolveThirtyDayAccess,
@@ -9,6 +12,7 @@ import {
   staffMatchesRosterRow,
   thirtyDayOrgIsComped,
 } from "./in-hive-training-access.ts";
+import { PCT_COURSE_ID } from "./in-hive-training-pct.ts";
 
 describe("thirty-day paywall", () => {
   it("Hive-Platform missing billing_exempt is a known schema gap, not a hard fail", () => {
@@ -61,6 +65,25 @@ describe("thirty-day paywall", () => {
     assert.equal(r.allowed, true);
     assert.equal(r.reason, "training_only_seat");
     assert.equal(r.charged, true);
+  });
+
+  it("gates hire-level PCT with the same 30-day seat, not ABI or 12-hour", () => {
+    assert.equal(courseUsesThirtyDaySeat("thirty-day"), true);
+    assert.equal(courseUsesThirtyDaySeat(PCT_COURSE_ID), true);
+    assert.equal(courseUsesThirtyDaySeat("abi"), false);
+    assert.deepEqual([...TRAINING_SEAT_FAMILY.gatedByThirtyDaySeat], [
+      "thirty-day",
+      PCT_COURSE_ID,
+    ]);
+    assert.deepEqual([...TRAINING_SEAT_FAMILY.inHiveCourseNoSeat], ["abi"]);
+    assert.deepEqual([...TRAINING_SEAT_FAMILY.obligationOnlyNoCourse], ["annual-ce"]);
+    const courseRoute = readFileSync(
+      new URL("../routes/dashboard.my-obligations_.course.$instanceId.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(courseRoute, /courseUsesThirtyDaySeat/);
+    assert.match(courseRoute, /thirtyDayCourseAccessFn/);
+    assert.match(courseRoute, /thirtyDayOrgIsComped/);
   });
 
   it("matches roster by user id or email", () => {

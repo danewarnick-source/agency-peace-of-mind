@@ -8,7 +8,8 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { requirePermission } from "@/lib/require-permission";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ALL_PERMISSIONS, PERMISSION_LABEL, type Permission } from "@/lib/rbac";
-import { planStaffPermissionWrites } from "@/lib/staff-permission-toggles";
+import { fillRoleGrantedMap, planStaffPermissionWrites } from "@/lib/staff-permission-toggles";
+import { buildAdminScopeRows, type AdminScopeMode } from "@/lib/admin-scope";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -342,8 +343,9 @@ export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
       .select("permission, enabled")
       .eq("organization_id", data.organizationId)
       .eq("role", member.role);
-    const roleGranted = new Map<string, boolean>(
-      (roleRows ?? []).map((r: { permission: string; enabled: boolean }) => [r.permission, !!r.enabled]),
+    const roleGranted = fillRoleGrantedMap(
+      member.role,
+      (roleRows ?? []) as Array<{ permission: string; enabled: boolean }>,
     );
 
     const { data: existingRows, error: existingErr } = await supabase
@@ -603,7 +605,7 @@ export const requestPermission = createServerFn({ method: "POST" })
       body: `${requesterName} is requesting the "${label}" permission.${
         data.pageRequested ? ` They were blocked on ${data.pageRequested}.` : ""
       } Reason: ${data.reason}`,
-      link_to: `/dashboard/employees/${userId}?tab=permissions&override_perm=${encodeURIComponent(data.permission)}`,
+      link_to: `/dashboard/employees/${userId}?override_perm=${encodeURIComponent(data.permission)}`,
       related_id: userId,
       related_type: "permission_request",
     });
@@ -614,6 +616,7 @@ export const requestPermission = createServerFn({ method: "POST" })
 
 // ─── setScopeAssignments ─────────────────────────────────────────────────
 const ScopeTypeEnum = z.enum(["all", "service_code", "staff_group", "client"]);
+const AdminScopeModeEnum = z.enum(["all", "selected", "service_code"]);
 
 export const setScopeAssignments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -622,9 +625,15 @@ export const setScopeAssignments = createServerFn({ method: "POST" })
       .object({
         organizationId: z.string().uuid(),
         targetUserId: z.string().uuid(),
-        scopeType: ScopeTypeEnum,
-        refIds: z.array(z.string()).default([]),
+        mode: AdminScopeModeEnum.optional(),
+        clientIds: z.array(z.string()).optional(),
+        staffIds: z.array(z.string()).optional(),
+        serviceCodes: z.array(z.string()).optional(),
+        // Legacy single-type payload (Settings drawer before mixed selected).
+        scopeType: ScopeTypeEnum.optional(),
+        refIds: z.array(z.string()).optional(),
       })
+      .refine((d) => d.mode || d.scopeType, { message: "mode or scopeType is required" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -639,25 +648,36 @@ export const setScopeAssignments = createServerFn({ method: "POST" })
       .eq("user_id", data.targetUserId);
     if (delErr) throw new Error(delErr.message);
 
-    const rows =
-      data.scopeType === "all"
-        ? [{
-            organization_id: data.organizationId,
-            user_id: data.targetUserId,
-            scope_type: "all" as const,
-            scope_ref_id: null,
-          }]
-        : data.refIds.map((refId) => ({
-            organization_id: data.organizationId,
-            user_id: data.targetUserId,
-            scope_type: data.scopeType,
+    const built = data.mode
+      ? buildAdminScopeRows({
+          mode: data.mode as AdminScopeMode,
+          clientIds: data.clientIds,
+          staffIds: data.staffIds,
+          serviceCodes: data.serviceCodes,
+        })
+      : data.scopeType === "all"
+        ? [{ scope_type: "all", scope_ref_id: null }]
+        : (data.refIds ?? []).map((refId) => ({
+            scope_type: data.scopeType as string,
             scope_ref_id: refId,
           }));
+
+    const rows = built.map((row) => ({
+      organization_id: data.organizationId,
+      user_id: data.targetUserId,
+      scope_type: row.scope_type,
+      scope_ref_id: row.scope_ref_id,
+    }));
 
     if (rows.length) {
       const { error } = await supabase.from("scope_assignments").insert(rows);
       if (error) throw new Error(error.message);
     }
 
-    return { scopeType: data.scopeType, refIds: data.scopeType === "all" ? [] : data.refIds };
+    return {
+      mode: data.mode ?? (data.scopeType === "all" ? "all" : data.scopeType === "service_code" ? "service_code" : "selected"),
+      clientIds: data.mode === "selected" ? (data.clientIds ?? []) : [],
+      staffIds: data.mode === "selected" ? (data.staffIds ?? []) : [],
+      serviceCodes: data.mode === "service_code" ? (data.serviceCodes ?? []) : [],
+    };
   });

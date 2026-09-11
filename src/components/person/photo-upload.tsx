@@ -26,6 +26,8 @@ export function PhotoUpload({
   onCleared,
   label = "Upload photo",
   avatarClassName = "h-16 w-16",
+  readOnly = false,
+  className = "flex items-center gap-3",
 }: {
   bucket: Bucket;
   organizationId: string;
@@ -36,6 +38,8 @@ export function PhotoUpload({
   onCleared?: () => Promise<void> | void;
   label?: string;
   avatarClassName?: string;
+  readOnly?: boolean;
+  className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +72,7 @@ export function PhotoUpload({
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className={className}>
       {bucket === "org-branding" ? null : (
         <PersonAvatar
           bucket={displayBucket}
@@ -77,6 +81,7 @@ export function PhotoUpload({
           className={avatarClassName}
         />
       )}
+      {readOnly ? null : (
       <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
@@ -121,6 +126,7 @@ export function PhotoUpload({
           </Button>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { ALL_PERMISSIONS } from "./rbac.ts";
 import {
+  fillRoleGrantedMap,
   planStaffPermissionWrites,
   staffPermissionMutationErrorMessage,
 } from "./staff-permission-toggles.ts";
@@ -10,6 +11,19 @@ import {
 function roleAllOn(): Map<string, boolean> {
   return new Map(ALL_PERMISSIONS.map((p) => [p, true]));
 }
+
+describe("fillRoleGrantedMap", () => {
+  it("uses DEFAULT_MATRIX when a key was never seeded", () => {
+    const map = fillRoleGrantedMap("employee", []);
+    assert.equal(map.get("view_own_timesheets"), true);
+    assert.equal(map.get("invite_staff"), false);
+  });
+
+  it("honors a seeded deny over DEFAULT_MATRIX", () => {
+    const map = fillRoleGrantedMap("employee", [{ permission: "view_own_timesheets", enabled: false }]);
+    assert.equal(map.get("view_own_timesheets"), false);
+  });
+});
 
 describe("planStaffPermissionWrites", () => {
   it("writes one deny override when a single Owner toggle is flipped off", () => {

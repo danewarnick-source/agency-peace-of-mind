@@ -9,32 +9,28 @@ import {
   AlertTriangle,
   ClipboardList,
   Activity as ActivityIcon,
-  Camera,
-  Contact,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 import { RequirePermission } from "@/components/rbac-guard";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
-import { usePermissions } from "@/hooks/use-permissions";
-import { StaffPermissionsTab } from "@/components/employees/staff-permissions-tab";
-import { StaffProfileIdentity } from "@/components/employees/staff-profile-identity";
+import { StaffProfilePanel } from "@/components/employees/staff-profile-panel";
 import { StaffObligationsFilesTab } from "@/components/employees/staff-obligations-files-tab";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
 
-const PROFILE_TABS = ["profile", "personnel", "permissions", "activity"] as const;
+const PROFILE_TABS = ["profile", "personnel", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
-type SearchTab = ProfileTab | "record" | "obligations";
+type SearchTab = ProfileTab | "record" | "obligations" | "permissions";
 
 function resolveTab(tab: SearchTab | undefined): ProfileTab {
   if (tab === "record" || tab === "obligations") return "personnel";
+  if (tab === "permissions") return "profile";
   if (tab && (PROFILE_TABS as readonly string[]).includes(tab)) return tab;
   return "profile";
 }
@@ -44,7 +40,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
     const out: { tab?: SearchTab; override_perm?: Permission } = {};
     if (
       typeof s.tab === "string" &&
-      (s.tab === "record" || s.tab === "obligations" || (PROFILE_TABS as readonly string[]).includes(s.tab))
+      (s.tab === "record" || s.tab === "obligations" || s.tab === "permissions" || (PROFILE_TABS as readonly string[]).includes(s.tab))
     ) {
       out.tab = s.tab as SearchTab;
     }
@@ -68,8 +64,6 @@ function StaffProfilePage() {
   const qc = useQueryClient();
   const navigate = Route.useNavigate();
   const activeTab = resolveTab(tab);
-  const { can: canManagePermissions } = usePermissions();
-  const showPermissionsTab = canManagePermissions("manage_permissions");
 
   const orgId = org?.organization_id;
 
@@ -88,7 +82,7 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, hire_date, start_date, photo_path, photo_updated_at, phone" as any)
+        .select("id, full_name, first_name, last_name, email, username, hire_date, start_date, photo_path, photo_updated_at, phone, employee_id" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
@@ -180,24 +174,18 @@ function StaffProfilePage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="personnel">Personnel file</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          {showPermissionsTab && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4 space-y-6">
-          <SectionGroup label="Identity & job" hint="Name, contact, role, hire date">
-            <SectionPanel icon={Camera} accent="indigo">
-              <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
-            </SectionPanel>
-            <SectionPanel icon={Contact} accent="violet">
-              <StaffProfileIdentity
-                orgId={orgId}
-                staffId={staffId}
-                profile={p}
-                member={m}
-                onSaved={invalidateProfile}
-              />
-            </SectionPanel>
-          </SectionGroup>
+          <StaffProfilePanel
+            orgId={orgId}
+            staffId={staffId}
+            profile={p}
+            member={m}
+            name={name}
+            highlightPermission={override_perm}
+            onSaved={invalidateProfile}
+          />
         </TabsContent>
 
         <TabsContent value="personnel" className="mt-4 space-y-6">
@@ -216,15 +204,6 @@ function StaffProfilePage() {
           </SectionGroup>
         </TabsContent>
 
-        {showPermissionsTab && (
-          <TabsContent value="permissions" className="mt-4 space-y-6">
-            <StaffPermissionsTab
-              organizationId={orgId}
-              staffId={staffId}
-              initialOverridePermission={override_perm}
-            />
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );

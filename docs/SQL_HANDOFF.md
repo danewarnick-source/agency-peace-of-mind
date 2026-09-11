@@ -6,6 +6,57 @@ it worked before moving on.
 
 ---
 
+## REVIEW — Admin scope mixed client+staff (2026-09-11) — Core flag, do not drop RLS
+
+Apex shipped Admin scope on the employee Profile. Persist path is **existing**
+`public.scope_assignments` with **multiple rows per user** (not a new table,
+not caseload).
+
+**UI works on the live CHECK today.** Selected mode writes:
+- `scope_type = 'client'` + client uuid
+- `scope_type = 'staff_group'` + `staff:<user_uuid>` so individual staff
+  picks do not collide with real `staff_groups` ids
+
+Owner stays `scope_type = 'all'`. Service code stays `service_code`.
+Do **not** bulk-drop or replace `scope_assignments` RLS.
+
+### Optional (not required for this PR)
+
+First-class `staff` type so Apex can drop the `staff:` prefix later.
+Clear the editor, paste:
+
+```sql
+SELECT conname, pg_get_constraintdef(oid) AS def
+FROM pg_constraint
+WHERE conrelid = 'public.scope_assignments'::regclass
+  AND conname = 'scope_assignments_scope_type_check';
+```
+
+**What you'll see:** `CHECK (scope_type = ANY (ARRAY['all','client','service_code','staff_group']))`.
+
+If Core adds `'staff'` to that ARRAY (additive CHECK replace only — keep
+existing policies), Apex can write `scope_type = 'staff'` + raw user id.
+The app already reads that type.
+
+### Optional read policy gap
+
+Live SELECT policy `members read scopes` allows employee / manager / admin
+via `has_org_role` (exact role match). **Program managers cannot read**
+their own rows. Owner-managed Profile still works (admin write/read).
+If PMs should read their own scope, add them to the SELECT policy only.
+Do not drop `admins manage scopes`.
+
+```sql
+SELECT polname, pg_get_expr(polqual, polrelid) AS using_expr
+FROM pg_policy
+JOIN pg_class t ON t.oid = pg_policy.polrelid
+JOIN pg_namespace n ON n.oid = t.relnamespace
+WHERE n.nspname = 'public' AND t.relname = 'scope_assignments'
+ORDER BY polname;
+```
+
+---
+
 ## ACTION — Agency documents standing rows (2026-09-10) — Core flag
 
 **No new tables.** Agency documents reads `company_obligations` + instances

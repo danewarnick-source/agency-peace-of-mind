@@ -133,7 +133,7 @@ function RoleDefaultsTab() {
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
           These are the default permissions for each role in your organization. To grant or
-          restrict access for a specific person, use the Permissions tab on their staff profile.
+          restrict access for a specific person, use Permissions on their staff Profile.
         </p>
       </div>
 

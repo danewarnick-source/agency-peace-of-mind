@@ -125,7 +125,7 @@ describe("dueLabel", () => {
 });
 
 describe("Admin employee profile lock", () => {
-  it("keeps only the four tabs and drops junk surfaces", () => {
+  it("keeps Profile / Personnel file / Activity and drops junk surfaces", () => {
     const src = readFileSync(
       new URL("../routes/dashboard.employees.$staffId.tsx", import.meta.url),
       "utf8",
@@ -133,8 +133,9 @@ describe("Admin employee profile lock", () => {
     assert.match(src, /Personnel file/);
     assert.match(src, /value="profile"/);
     assert.match(src, /value="personnel"/);
-    assert.match(src, /value="permissions"/);
     assert.match(src, /value="activity"/);
+    assert.match(src, /StaffProfilePanel/);
+    assert.doesNotMatch(src, /<TabsTrigger value="permissions">/);
     assert.doesNotMatch(src, /Obligations & files/);
     assert.doesNotMatch(src, /Document Vault/);
     assert.doesNotMatch(src, /Staff record/);
@@ -147,6 +148,24 @@ describe("Admin employee profile lock", () => {
     assert.doesNotMatch(src, /Have/);
     assert.doesNotMatch(src, /CustomAttributesSection/);
     assert.doesNotMatch(src, /LifecyclePanel/);
+  });
+
+  it("keeps Department off the edit Profile person block", () => {
+    const identity = readFileSync(
+      new URL("../components/employees/staff-profile-identity.tsx", import.meta.url),
+      "utf8",
+    );
+    const panel = readFileSync(
+      new URL("../components/employees/staff-profile-panel.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(identity, /Employee ID/);
+    assert.match(identity, /Job title/);
+    assert.match(identity, /Base role/);
+    assert.doesNotMatch(identity, /Department/);
+    assert.match(panel, /Admin scope/);
+    assert.match(panel, /Edit profile/);
+    assert.match(panel, /Save profile/);
   });
 });
 

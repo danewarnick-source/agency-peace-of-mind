@@ -154,12 +154,13 @@ test.describe("Clients + Staff roster — mocked admin", () => {
       timeout: 15_000,
     });
     await expect(page.getByRole("tab", { name: /Personnel file/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /^Permissions$/i })).toBeVisible();
-    await expect(page.getByText(/admin|employee|manager/i).first()).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^Activity$/i })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^Permissions$/i })).toHaveCount(0);
+    await expect(page.getByText(/admin|employee|manager|Owner|Staff|Supervisor/i).first()).toBeVisible();
     await assertPageNotBlank(page, "staff profile");
 
-    await page.getByRole("tab", { name: /^Permissions$/i }).click();
-    await expect(page.getByText(/Invite staff|View staff records|permission/i).first()).toBeVisible({
+    await expect(page.getByRole("button", { name: /Edit profile/i })).toBeVisible();
+    await expect(page.getByText(/people & files|Staff phone permissions|Invite staff|View staff records/i).first()).toBeVisible({
       timeout: 10_000,
     });
     await shot(page, "employees_list_and_profile");

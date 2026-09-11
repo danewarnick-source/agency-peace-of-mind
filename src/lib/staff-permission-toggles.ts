@@ -6,6 +6,8 @@
  * 504. This planner is the only write plan; the server fn batches it.
  */
 
+import { ALL_PERMISSIONS, defaultCan, type Permission, type Role } from "./rbac.ts";
+
 export type StaffPermissionToggle = {
   permission: string;
   granted: boolean;
@@ -27,6 +29,20 @@ export type StaffPermissionWritePlan = {
   upserts: PlannedOverrideUpsert[];
   deletes: PlannedOverrideDelete[];
 };
+
+/** role_permissions row if seeded, else DEFAULT_MATRIX. */
+export function fillRoleGrantedMap(
+  role: Role | null | undefined,
+  rows: readonly { permission: string; enabled: boolean }[],
+): Map<string, boolean> {
+  const fromDb = new Map(rows.map((r) => [r.permission, !!r.enabled]));
+  const out = new Map<string, boolean>();
+  for (const perm of ALL_PERMISSIONS) {
+    if (fromDb.has(perm)) out.set(perm, !!fromDb.get(perm));
+    else out.set(perm, defaultCan(role, perm as Permission));
+  }
+  return out;
+}
 
 export function planStaffPermissionWrites(opts: {
   toggles: readonly StaffPermissionToggle[];

@@ -6,22 +6,33 @@
  *      section).
  *   2. Edit each field's value inline (persists via the shared
  *      setCustomFieldValue server fn).
- *   3. Delete a field definition.
+ *   3. Delete one field or a selected set (hard-delete definitions;
+ *      values cascade). Selection uses checkboxes + Select all.
  *
  * Staff visibility is inherited entirely from the parent section's
  * toggle. There is no per-field visibility switch here on purpose.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
@@ -30,9 +41,10 @@ import { useClientCareData } from "@/hooks/use-client-care-data";
 import type { CustomFieldWithValue } from "@/lib/client-care-data.functions";
 import {
   createCustomFieldDefinition,
-  deleteCustomFieldDefinition,
+  deleteCustomFieldDefinitions,
   setCustomFieldValue,
 } from "@/lib/custom-fields.functions";
+import { chunkIds, customFieldDeleteCopy } from "@/lib/custom-field-delete";
 import { SECTION_LABEL, type SectionName } from "@/lib/client-staff-visibility";
 
 type DataType = "text" | "number" | "boolean" | "date";
@@ -46,14 +58,75 @@ export function CustomFieldsForSection({
 }) {
   const care = useClientCareData(clientId);
   const orgId = care.data?.identity.organization_id ?? null;
+  const qc = useQueryClient();
   const fields = useMemo(
     () => (care.data?.custom_fields ?? []).filter((f) => f.section === section),
     [care.data, section],
   );
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirm, setConfirm] = useState<{ ids: string[]; labels: string[] } | null>(null);
+
+  useEffect(() => {
+    const valid = new Set(fields.map((f) => f.id));
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      if (!changed && next.size === prev.size) return prev;
+      return next;
+    });
+  }, [fields]);
+
+  const deleteFn = useServerFn(deleteCustomFieldDefinitions);
+  const delMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!orgId) throw new Error("Missing organization");
+      if (!ids.length) throw new Error("Nothing selected");
+      let deleted = 0;
+      for (const batch of chunkIds(ids, 200)) {
+        const res = await deleteFn({
+          data: { organizationId: orgId, definitionIds: batch },
+        });
+        deleted += res?.deleted ?? 0;
+      }
+      return { ok: true as const, deleted };
+    },
+    onSuccess: (_res, ids) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setConfirm(null);
+      toast.success(
+        ids.length === 1 ? "Custom field deleted" : `${ids.length} custom fields deleted`,
+      );
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Failed to delete"),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["client-care-data", clientId] });
+    },
+  });
+
+  const allSelected = fields.length > 0 && fields.every((f) => selected.has(f.id));
+  const someSelected = fields.some((f) => selected.has(f.id));
+  const selectedFields = fields.filter((f) => selected.has(f.id));
+  const copy = customFieldDeleteCopy(confirm?.labels ?? []);
+
+  function requestDelete(ids: string[]) {
+    if (!ids.length) return;
+    const labels = fields.filter((f) => ids.includes(f.id)).map((f) => f.field_label);
+    setConfirm({ ids, labels });
+  }
+
   return (
     <div className="rounded-md border border-dashed border-border bg-muted/10 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium">Custom fields</div>
           <div className="text-xs text-muted-foreground">
@@ -74,17 +147,89 @@ export function CustomFieldsForSection({
           No custom fields yet.
         </div>
       ) : (
-        <ul className="space-y-2">
-          {fields.map((f) => (
-            <CustomFieldRow
-              key={f.id}
-              clientId={clientId}
-              orgId={orgId}
-              field={f}
-            />
-          ))}
-        </ul>
+        <>
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                onCheckedChange={(v) => {
+                  if (v === true) setSelected(new Set(fields.map((f) => f.id)));
+                  else setSelected(new Set());
+                }}
+                aria-label="Select all custom fields"
+              />
+              Select all
+            </label>
+            <span className="text-xs text-muted-foreground">
+              {selected.size} selected
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={!selectedFields.length || delMut.isPending}
+              onClick={() => requestDelete(selectedFields.map((f) => f.id))}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Delete selected
+              {selectedFields.length ? ` (${selectedFields.length})` : ""}
+            </Button>
+          </div>
+          <ul className="space-y-2">
+            {fields.map((f) => (
+              <CustomFieldRow
+                key={f.id}
+                clientId={clientId}
+                orgId={orgId}
+                field={f}
+                selected={selected.has(f.id)}
+                onSelectedChange={(checked) => {
+                  setSelected((prev) => {
+                    const next = new Set(prev);
+                    if (checked) next.add(f.id);
+                    else next.delete(f.id);
+                    return next;
+                  });
+                }}
+                onDelete={() => requestDelete([f.id])}
+                deletePending={delMut.isPending && (confirm?.ids.includes(f.id) ?? false)}
+              />
+            ))}
+          </ul>
+        </>
       )}
+
+      <AlertDialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open && !delMut.isPending) setConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.body}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delMut.isPending}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={delMut.isPending || !confirm?.ids.length}
+              onClick={() => {
+                if (confirm?.ids.length) delMut.mutate(confirm.ids);
+              }}
+            >
+              {delMut.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
+              )}
+              {confirm && confirm.ids.length > 1 ? "Delete selected" : "Delete field"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -93,14 +238,21 @@ function CustomFieldRow({
   clientId,
   orgId,
   field,
+  selected,
+  onSelectedChange,
+  onDelete,
+  deletePending,
 }: {
   clientId: string;
   orgId: string | null;
   field: CustomFieldWithValue;
+  selected: boolean;
+  onSelectedChange: (checked: boolean) => void;
+  onDelete: () => void;
+  deletePending: boolean;
 }) {
   const qc = useQueryClient();
   const saveFn = useServerFn(setCustomFieldValue);
-  const deleteFn = useServerFn(deleteCustomFieldDefinition);
 
   const initial = coerceInitial(field);
   const [value, setValue] = useState<string | boolean | null>(initial);
@@ -135,23 +287,13 @@ function CustomFieldRow({
       toast.error(e instanceof Error ? e.message : "Failed to save"),
   });
 
-  const delMut = useMutation({
-    mutationFn: () => {
-      if (!orgId) throw new Error("Missing organization");
-      return deleteFn({
-        data: { organizationId: orgId, definitionId: field.id },
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-care-data", clientId] });
-      toast.success("Custom field deleted");
-    },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Failed to delete"),
-  });
-
   return (
     <li className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
+      <Checkbox
+        checked={selected}
+        onCheckedChange={(v) => onSelectedChange(v === true)}
+        aria-label={`Select ${field.field_label}`}
+      />
       <Label className="min-w-[140px] text-sm font-medium">
         {field.field_label}
       </Label>
@@ -196,12 +338,8 @@ function CustomFieldRow({
         variant="ghost"
         className="h-8 w-8 text-muted-foreground hover:text-destructive"
         aria-label={`Delete ${field.field_label}`}
-        disabled={delMut.isPending}
-        onClick={() => {
-          if (confirm(`Delete the "${field.field_label}" custom field for every client?`)) {
-            delMut.mutate();
-          }
-        }}
+        disabled={deletePending}
+        onClick={onDelete}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

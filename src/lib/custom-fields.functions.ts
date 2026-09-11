@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { SECTION_NAMES } from "@/lib/client-staff-visibility";
+import { chunkIds } from "@/lib/custom-field-delete";
 
 const Kind = z.enum(["employee", "client"]);
 const Section = z.enum(SECTION_NAMES as unknown as [string, ...string[]]);
@@ -134,6 +135,30 @@ export const createCustomFieldDefinition = createServerFn({ method: "POST" })
     return { id: inserted!.id as string };
   });
 
+/**
+ * Hard-delete custom field definitions (values cascade). Matches the
+ * employee staff-fields "Remove" pattern: no soft-delete column exists.
+ * Chunks `.in("id", …)` against the existing managers-write policy.
+ */
+async function deleteDefinitionsForOrg(
+  supabase: any,
+  organizationId: string,
+  definitionIds: string[],
+): Promise<{ ok: true; deleted: number }> {
+  let deleted = 0;
+  for (const chunk of chunkIds(definitionIds)) {
+    const { data: rows, error } = await (supabase as any)
+      .from("custom_field_definitions")
+      .delete()
+      .eq("organization_id", organizationId)
+      .in("id", chunk)
+      .select("id");
+    if (error) throw new Error(error.message);
+    deleted += Array.isArray(rows) ? rows.length : 0;
+  }
+  return { ok: true, deleted };
+}
+
 export const deleteCustomFieldDefinition = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -144,13 +169,22 @@ export const deleteCustomFieldDefinition = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId) return { ok: false };
+    if (!supabase || !userId) return { ok: false, deleted: 0 };
     await assertOrgMember(supabase, userId, data.organizationId);
-    const { error } = await supabase
-      .from("custom_field_definitions")
-      .delete()
-      .eq("id", data.definitionId)
-      .eq("organization_id", data.organizationId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    return deleteDefinitionsForOrg(supabase, data.organizationId, [data.definitionId]);
+  });
+
+export const deleteCustomFieldDefinitions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      organizationId: z.string().uuid(),
+      definitionIds: z.array(z.string().uuid()).min(1).max(200),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, deleted: 0 };
+    await assertOrgMember(supabase, userId, data.organizationId);
+    return deleteDefinitionsForOrg(supabase, data.organizationId, data.definitionIds);
   });

@@ -5,11 +5,13 @@ import {
   BACKFILL_FIXTURE_ROWS,
   backfillObligationKeys,
 } from "../../scripts/backfill-obligation-keys.ts";
+import { HIRE_ALWAYS_TITLES } from "./obligation-auto-assign.ts";
 import {
   BY_KEY,
   PACK_VERSION,
   allSowCatalogEntries,
   catalogCreatesInstances,
+  catalogTitleIsReserved,
   obligationCreatesInstances,
   sowCatalogEntry,
   sowCatalogEntryByKey,
@@ -70,6 +72,8 @@ describe("SOW catalog pack identity", () => {
       }),
       true,
     );
+    assert.equal(catalogTitleIsReserved("30-Day New Hire Orientation Training"), true);
+    assert.equal(catalogTitleIsReserved("Custom Agency Handbook Review"), false);
   });
 
   it("seeds one pack_changelog added row per catalog key", () => {
@@ -82,6 +86,25 @@ describe("SOW catalog pack identity", () => {
     );
     const catalogKeys = allSowCatalogEntries().map((e) => e.key).sort();
     assert.deepEqual([...new Set(seeded)].sort(), catalogKeys);
+  });
+
+  it("blocks policy clones of catalog titles; orphan creates stay 410", () => {
+    const createSrc = readFileSync(
+      new URL("./company-obligations.functions.ts", import.meta.url),
+      "utf8",
+    );
+    const packSrc = readFileSync(new URL("./obligation-packs.functions.ts", import.meta.url), "utf8");
+    const policySrc = readFileSync(new URL("./agency-policies.functions.ts", import.meta.url), "utf8");
+    assert.match(createSrc, /ORPHAN_OBLIGATION_CREATE_GONE/);
+    assert.match(packSrc, /ORPHAN_OBLIGATION_CREATE_GONE/);
+    assert.match(policySrc, /catalogTitleIsReserved\(policy\.title\)/);
+  });
+
+  it("keeps hire-always titles on obligation disposition only", () => {
+    assert.ok(HIRE_ALWAYS_TITLES.length > 0);
+    for (const title of HIRE_ALWAYS_TITLES) {
+      assert.equal(obligationCreatesInstances({ title }), true, title);
+    }
   });
 
   it("resolves every audit instrument key", () => {

@@ -13,8 +13,10 @@ import { setMemberGrants } from "@/lib/team-access.functions";
 import { onStaffHired } from "@/lib/staff-assignment-hooks.functions";
 import { saveStaffPermissionToggles, setScopeAssignments } from "@/lib/permissions.functions";
 import {
+  existingOverridesFromEffective,
   fillRoleGrantedMap,
   staffPermissionMutationErrorMessage,
+  staffPermissionSaveToggles,
 } from "@/lib/staff-permission-toggles";
 import { ALL_PERMISSIONS, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
 import {
@@ -211,7 +213,8 @@ export function StaffProfilePanel({
           .eq("user_id", staffId);
         if (jobErr) throw new Error(jobErr.message);
 
-        if (identity.hire_date) {
+        const priorHire = routeProfile?.hire_date ?? routeProfile?.start_date ?? "";
+        if (identity.hire_date && identity.hire_date !== priorHire) {
           try {
             await hireHookFn({ data: { organizationId: orgId, staffId } });
           } catch (e) {
@@ -231,15 +234,20 @@ export function StaffProfilePanel({
       }
 
       if (canManagePerms) {
-        const toggles = ALL_PERMISSIONS.map((permission) => ({
-          permission,
-          granted: !!permDraft[permission],
-        }));
-        await savePermsFn({
-          data: { organizationId: orgId, targetUserId: staffId, toggles },
+        if (!effective) throw new Error("Permissions are still loading");
+        const toggles = staffPermissionSaveToggles({
+          draft: permDraft,
+          roleGranted,
+          existingGranted: existingOverridesFromEffective(effective.resolved),
         });
+        if (toggles.length) {
+          await savePermsFn({
+            data: { organizationId: orgId, targetUserId: staffId, toggles },
+          });
+        }
 
         const scopeRole = identity.role;
+        const savedScope = scopeQ.data ?? EMPTY_SCOPE;
         if (isAdminScopeRole(scopeRole) && !adminScopeIsLockedWholeOrg(scopeRole)) {
           if (
             scopeDraft.mode === "selected" &&
@@ -251,17 +259,19 @@ export function StaffProfilePanel({
           if (scopeDraft.mode === "service_code" && !scopeDraft.serviceCodes.length) {
             throw new Error("Select at least one service code for Admin scope.");
           }
-          await setScopeFn({
-            data: {
-              organizationId: orgId,
-              targetUserId: staffId,
-              mode: scopeDraft.mode,
-              clientIds: scopeDraft.clientIds,
-              staffIds: scopeDraft.staffIds,
-              serviceCodes: scopeDraft.serviceCodes,
-            },
-          });
-        } else if (adminScopeIsLockedWholeOrg(scopeRole)) {
+          if (!adminScopeDraftEquals(scopeDraft, savedScope)) {
+            await setScopeFn({
+              data: {
+                organizationId: orgId,
+                targetUserId: staffId,
+                mode: scopeDraft.mode,
+                clientIds: scopeDraft.clientIds,
+                staffIds: scopeDraft.staffIds,
+                serviceCodes: scopeDraft.serviceCodes,
+              },
+            });
+          }
+        } else if (adminScopeIsLockedWholeOrg(scopeRole) && savedScope.mode !== "all") {
           await setScopeFn({
             data: {
               organizationId: orgId,
@@ -284,12 +294,7 @@ export function StaffProfilePanel({
       qc.invalidateQueries({ queryKey: ["scope-assignments", orgId] });
       onSaved();
     },
-    onError: (e) =>
-      toast.error(
-        (e as Error).message.includes("Unauthorized")
-          ? "Only organization admins can change user roles."
-          : staffPermissionMutationErrorMessage(e, (e as Error).message || "Could not save"),
-      ),
+    onError: (e) => toast.error(profileSaveErrorMessage(e)),
   });
 
   const showScope = isAdminScopeRole(editing ? identity.role : routeMember.role);
@@ -307,13 +312,20 @@ export function StaffProfilePanel({
             </Button>
           ) : null}
           {editing ? (
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-                {saveMut.isPending ? "Saving…" : "Save profile"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={cancel} disabled={saveMut.isPending}>
-                Cancel
-              </Button>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+                  {saveMut.isPending ? "Saving…" : "Save profile"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={cancel} disabled={saveMut.isPending}>
+                  Cancel
+                </Button>
+              </div>
+              {saveMut.isError ? (
+                <p className="max-w-sm text-right text-sm text-destructive" role="alert">
+                  {profileSaveErrorMessage(saveMut.error)}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -383,4 +395,26 @@ function matrixRows(
   const row = matrix?.[role];
   if (!row) return [];
   return Object.entries(row).map(([permission, enabled]) => ({ permission, enabled }));
+}
+
+function sameIdList(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((id, i) => id === right[i]);
+}
+
+function adminScopeDraftEquals(a: ParsedAdminScope, b: ParsedAdminScope): boolean {
+  return (
+    a.mode === b.mode &&
+    sameIdList(a.clientIds, b.clientIds) &&
+    sameIdList(a.staffIds, b.staffIds) &&
+    sameIdList(a.serviceCodes, b.serviceCodes)
+  );
+}
+
+function profileSaveErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (raw.includes("Unauthorized")) return "Only organization admins can change user roles.";
+  return staffPermissionMutationErrorMessage(error, "Could not save");
 }

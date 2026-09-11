@@ -14,7 +14,13 @@ import { buildAdminScopeRows, type AdminScopeMode } from "@/lib/admin-scope";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
-const EDITABLE_ROLES = ["admin", "program_manager", "manager", "employee", "committee_member"] as const;
+const EDITABLE_ROLES = [
+  "admin",
+  "program_manager",
+  "manager",
+  "employee",
+  "committee_member",
+] as const;
 const EditableRoleEnum = z.enum(EDITABLE_ROLES);
 const PermissionEnum = z.custom<Permission>(
   (v) => typeof v === "string" && (ALL_PERMISSIONS as string[]).includes(v),
@@ -161,7 +167,10 @@ export const resetRoleToDefaults = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .eq("role", data.role);
     const existingMap = new Map<string, boolean>(
-      (existingRows ?? []).map((r: { permission: string; enabled: boolean }) => [r.permission, r.enabled]),
+      (existingRows ?? []).map((r: { permission: string; enabled: boolean }) => [
+        r.permission,
+        r.enabled,
+      ]),
     );
 
     const rows = data.permissions.map((p) => ({
@@ -356,7 +365,10 @@ export const saveStaffPermissionToggles = createServerFn({ method: "POST" })
     if (existingErr) throw new Error(existingErr.message);
 
     const existingGranted = new Map<string, boolean>(
-      (existingRows ?? []).map((r: { permission: string; granted: boolean }) => [r.permission, !!r.granted]),
+      (existingRows ?? []).map((r: { permission: string; granted: boolean }) => [
+        r.permission,
+        !!r.granted,
+      ]),
     );
     const plan = planStaffPermissionWrites({
       toggles: data.toggles,
@@ -548,11 +560,14 @@ export const listEffectivePermissions = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .eq("user_id", data.userId);
 
-    const resolved: Record<string, {
-      granted: boolean;
-      source: "role" | "individual_grant" | "individual_deny";
-      overrideDetails?: { by: string; reason: string; expires_at?: string };
-    }> = {};
+    const resolved: Record<
+      string,
+      {
+        granted: boolean;
+        source: "role" | "individual_grant" | "individual_deny";
+        overrideDetails?: { by: string; reason: string; expires_at?: string };
+      }
+    > = {};
 
     ALL_PERMISSIONS.forEach((perm) => {
       const override = (overrides ?? []).find((o: { permission: string }) => o.permission === perm);
@@ -567,7 +582,9 @@ export const listEffectivePermissions = createServerFn({ method: "POST" })
           },
         };
       } else {
-        const roleRow = (roleConfig ?? []).find((r: { permission: string }) => r.permission === perm);
+        const roleRow = (roleConfig ?? []).find(
+          (r: { permission: string }) => r.permission === perm,
+        );
         resolved[perm] = { granted: !!roleRow?.enabled, source: "role" };
       }
     });
@@ -675,7 +692,13 @@ export const setScopeAssignments = createServerFn({ method: "POST" })
     }
 
     return {
-      mode: data.mode ?? (data.scopeType === "all" ? "all" : data.scopeType === "service_code" ? "service_code" : "selected"),
+      mode:
+        data.mode ??
+        (data.scopeType === "all"
+          ? "all"
+          : data.scopeType === "service_code"
+            ? "service_code"
+            : "selected"),
       clientIds: data.mode === "selected" ? (data.clientIds ?? []) : [],
       staffIds: data.mode === "selected" ? (data.staffIds ?? []) : [],
       serviceCodes: data.mode === "service_code" ? (data.serviceCodes ?? []) : [],

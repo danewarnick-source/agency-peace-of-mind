@@ -82,50 +82,50 @@ export function PhotoUpload({
         />
       )}
       {readOnly ? null : (
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void upload(f);
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="mr-1.5 h-3.5 w-3.5" />
-          {busy ? "Uploading…" : label}
-        </Button>
-        {currentPath && onCleared ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+            }}
+          />
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await supabase.storage.from(bucket).remove([currentPath]);
-                await onCleared();
-                toast.success("Photo removed");
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Remove failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={() => inputRef.current?.click()}
           >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            {busy ? "Uploading…" : label}
           </Button>
-        ) : null}
-      </div>
+          {currentPath && onCleared ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await supabase.storage.from(bucket).remove([currentPath]);
+                  await onCleared();
+                  toast.success("Photo removed");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Remove failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+            </Button>
+          ) : null}
+        </div>
       )}
     </div>
   );

@@ -7,11 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { toast } from "sonner";
 import { setScopeAssignments } from "@/lib/permissions.functions";
 import { ROLE_LABEL, type ProviderRole } from "@/lib/rbac";
-import {
-  adminScopeSummary,
-  parseAdminScope,
-  type ParsedAdminScope,
-} from "@/lib/admin-scope";
+import { adminScopeSummary, parseAdminScope, type ParsedAdminScope } from "@/lib/admin-scope";
 import { AdminScopeFields } from "@/components/employees/admin-scope-fields";
 
 interface ScopedMember {
@@ -65,15 +61,17 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Admin scope is not caseload. Supervisors and program managers only see
-        clients, staff, and data inside this assignment. Owners stay whole-organization.
-        Edit the same scope on the employee Profile.
+        Admin scope is not caseload. Supervisors and program managers only see clients, staff, and
+        data inside this assignment. Owners stay whole-organization. Edit the same scope on the
+        employee Profile.
       </p>
       <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading…</div>
         ) : !members.length ? (
-          <div className="p-6 text-sm text-muted-foreground">No supervisors or program managers to scope yet.</div>
+          <div className="p-6 text-sm text-muted-foreground">
+            No supervisors or program managers to scope yet.
+          </div>
         ) : (
           <div className="divide-y divide-border">
             {members.map((m) => (
@@ -84,7 +82,9 @@ export function ScopeAssignmentsPanel({ orgId }: { orgId: string }) {
                     {ROLE_LABEL[m.role as ProviderRole] ?? m.role} · {adminScopeSummary(m.scope)}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setEditing(m)}>Edit scope</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
+                  Edit scope
+                </Button>
               </div>
             ))}
           </div>
@@ -167,7 +167,9 @@ function EditScopeDrawer({
             onChange={setDraft}
           />
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             <Button disabled={saving} onClick={() => void save()}>
               {saving ? "Saving…" : "Save scope"}
             </Button>

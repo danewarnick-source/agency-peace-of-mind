@@ -2,7 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAuth } from "./use-auth";
-import { ALL_PERMISSIONS, PROVIDER_ROLES, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
+import {
+  ALL_PERMISSIONS,
+  PROVIDER_ROLES,
+  type Permission,
+  type ProviderRole,
+  type Role,
+} from "@/lib/rbac";
 import { permissionsAreLoading, queryAwaitingFirstResult, resolveCan } from "@/lib/permissions-can";
 import { fillRoleGrantedMap } from "@/lib/staff-permission-toggles";
 
@@ -168,9 +174,7 @@ export function useEffectivePermissions(userId: string | null) {
         .eq("organization_id", org!.organization_id)
         .eq("user_id", userId!);
 
-      const activeOverrides = (overrides ?? []).filter(
-        (o) => !o.expires_at || o.expires_at > now,
-      );
+      const activeOverrides = (overrides ?? []).filter((o) => !o.expires_at || o.expires_at > now);
 
       const roleGrantedMap = fillRoleGrantedMap(
         member.role as Role,

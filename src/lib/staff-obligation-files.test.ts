@@ -107,9 +107,16 @@ describe("hasValidObligationEvidence", () => {
 
 describe("liveObligationTitle", () => {
   it("uses the live obligation name and substitutes client name", () => {
-    assert.equal(liveObligationTitle("CPR certification", "staff", "JANE DOE"), "CPR certification");
     assert.equal(
-      liveObligationTitle("Client-Specific Training — [Client Name]", "staff_per_client", "JANE DOE"),
+      liveObligationTitle("CPR certification", "staff", "JANE DOE"),
+      "CPR certification",
+    );
+    assert.equal(
+      liveObligationTitle(
+        "Client-Specific Training — [Client Name]",
+        "staff_per_client",
+        "JANE DOE",
+      ),
       "Client-Specific Training — Jane Doe",
     );
   });
@@ -237,10 +244,7 @@ describe("Staff personnel file page lock", () => {
   });
 
   it("does not assign an all-staff driving_record baseline", () => {
-    const src = readFileSync(
-      new URL("./staff-training-requirements.ts", import.meta.url),
-      "utf8",
-    );
+    const src = readFileSync(new URL("./staff-training-requirements.ts", import.meta.url), "utf8");
     assert.doesNotMatch(src, /key: "driving_record"/);
   });
 });
@@ -261,14 +265,14 @@ describe("Org-wide Personnel file lock", () => {
   });
 
   it("deletes the leftover open-every-profile HR matrix", () => {
-    const hrAdmin = readFileSync(new URL("../routes/dashboard.hr-admin.tsx", import.meta.url), "utf8");
+    const hrAdmin = readFileSync(
+      new URL("../routes/dashboard.hr-admin.tsx", import.meta.url),
+      "utf8",
+    );
     assert.doesNotMatch(hrAdmin, /HrComplianceMatrix/);
     assert.doesNotMatch(hrAdmin, /getHrAdminRollup/);
     assert.match(hrAdmin, /to="\/dashboard\/personnel-file"/);
-    const matrixFns = readFileSync(
-      new URL("./hr-staff.functions.ts", import.meta.url),
-      "utf8",
-    );
+    const matrixFns = readFileSync(new URL("./hr-staff.functions.ts", import.meta.url), "utf8");
     assert.doesNotMatch(matrixFns, /getHrComplianceMatrix/);
     assert.doesNotMatch(matrixFns, /getHrAdminRollup/);
   });

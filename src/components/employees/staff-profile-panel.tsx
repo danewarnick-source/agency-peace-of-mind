@@ -4,14 +4,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { usePermissions, useOrgPermissions, useEffectivePermissions } from "@/hooks/use-permissions";
+import {
+  usePermissions,
+  useOrgPermissions,
+  useEffectivePermissions,
+} from "@/hooks/use-permissions";
 import { setMemberGrants } from "@/lib/team-access.functions";
 import { onStaffHired } from "@/lib/staff-assignment-hooks.functions";
+import { saveStaffPermissionToggles, setScopeAssignments } from "@/lib/permissions.functions";
 import {
-  saveStaffPermissionToggles,
-  setScopeAssignments,
-} from "@/lib/permissions.functions";
-import { fillRoleGrantedMap, staffPermissionMutationErrorMessage } from "@/lib/staff-permission-toggles";
+  fillRoleGrantedMap,
+  staffPermissionMutationErrorMessage,
+} from "@/lib/staff-permission-toggles";
 import { ALL_PERMISSIONS, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
 import {
   adminScopeIsLockedWholeOrg,
@@ -19,13 +23,13 @@ import {
   parseAdminScope,
   type ParsedAdminScope,
 } from "@/lib/admin-scope";
+import { StaffProfileIdentity } from "@/components/employees/staff-profile-identity";
 import {
   identityDraftFrom,
-  StaffProfileIdentity,
   type StaffIdentityDraft,
   type StaffIdentityMember,
   type StaffIdentityProfile,
-} from "@/components/employees/staff-profile-identity";
+} from "@/lib/staff-profile-identity";
 import { AdminScopeFields } from "@/components/employees/admin-scope-fields";
 import { StaffProfilePermissions } from "@/components/employees/staff-profile-permissions";
 
@@ -82,7 +86,9 @@ export function StaffProfilePanel({
   });
 
   const [editing, setEditing] = useState(false);
-  const [identity, setIdentity] = useState<StaffIdentityDraft>(() => identityDraftFrom(profile, member));
+  const [identity, setIdentity] = useState<StaffIdentityDraft>(() =>
+    identityDraftFrom(profile, member),
+  );
   const [permDraft, setPermDraft] = useState<Record<string, boolean>>({});
   const [scopeDraft, setScopeDraft] = useState<ParsedAdminScope>(EMPTY_SCOPE);
 
@@ -157,9 +163,9 @@ export function StaffProfilePanel({
     mutationFn: async () => {
       if (canEditIdentity) {
         const fullName = `${identity.first_name.trim()} ${identity.last_name.trim()}`.trim();
-        const { error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any)
           .from("profiles")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .update({
             first_name: identity.first_name.trim() || null,
             last_name: identity.last_name.trim() || null,
@@ -169,14 +175,13 @@ export function StaffProfilePanel({
             hire_date: identity.hire_date || null,
             start_date: identity.hire_date || null,
             employee_id: identity.employee_id.trim() || null,
-          } as any)
+          })
           .eq("id", staffId);
         if (error) throw new Error(error.message);
 
         const { error: jobErr } = await supabase
           .from("organization_members")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .update({ job_title: identity.job_title.trim() || null } as any)
+          .update({ job_title: identity.job_title.trim() || null })
           .eq("id", member.id);
         if (jobErr) throw new Error(jobErr.message);
 
@@ -210,7 +215,11 @@ export function StaffProfilePanel({
 
         const scopeRole = identity.role;
         if (isAdminScopeRole(scopeRole) && !adminScopeIsLockedWholeOrg(scopeRole)) {
-          if (scopeDraft.mode === "selected" && !scopeDraft.clientIds.length && !scopeDraft.staffIds.length) {
+          if (
+            scopeDraft.mode === "selected" &&
+            !scopeDraft.clientIds.length &&
+            !scopeDraft.staffIds.length
+          ) {
             throw new Error("Select at least one client or staff member for Admin scope.");
           }
           if (scopeDraft.mode === "service_code" && !scopeDraft.serviceCodes.length) {
@@ -262,7 +271,9 @@ export function StaffProfilePanel({
     <div className="space-y-6">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Profile</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Profile
+          </h2>
           {canEdit && !editing ? (
             <Button size="sm" variant="outline" onClick={startEdit}>
               Edit profile
@@ -299,7 +310,8 @@ export function StaffProfilePanel({
           <div>
             <h2 className="text-sm font-semibold">Permissions</h2>
             <p className="text-sm text-muted-foreground">
-              Changing base role resets toggles to that role&apos;s defaults. Save stores overrides only.
+              Changing base role resets toggles to that role&apos;s defaults. Save stores overrides
+              only.
             </p>
           </div>
 
@@ -310,7 +322,11 @@ export function StaffProfilePanel({
                 orgId={orgId}
                 role={editing ? identity.role : member.role}
                 editing={editing}
-                draft={adminScopeIsLockedWholeOrg(editing ? identity.role : member.role) ? EMPTY_SCOPE : scopeDraft}
+                draft={
+                  adminScopeIsLockedWholeOrg(editing ? identity.role : member.role)
+                    ? EMPTY_SCOPE
+                    : scopeDraft
+                }
                 onChange={setScopeDraft}
               />
             </div>

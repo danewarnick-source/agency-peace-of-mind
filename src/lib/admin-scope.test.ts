@@ -55,7 +55,16 @@ describe("admin scope persist", () => {
   });
 
   it("summarizes and locks Owner to whole-org", () => {
-    assert.equal(adminScopeSummary({ mode: "all", clientIds: [], staffIds: [], serviceCodes: [], legacyStaffGroupIds: [] }), "Whole organization");
+    assert.equal(
+      adminScopeSummary({
+        mode: "all",
+        clientIds: [],
+        staffIds: [],
+        serviceCodes: [],
+        legacyStaffGroupIds: [],
+      }),
+      "Whole organization",
+    );
     assert.equal(
       adminScopeSummary({
         mode: "selected",

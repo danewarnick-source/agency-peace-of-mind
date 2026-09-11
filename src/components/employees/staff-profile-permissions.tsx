@@ -43,9 +43,13 @@ export function StaffProfilePermissions({
                 type="button"
                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold"
               >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                />
                 {group.label}
-                <span className="text-xs font-normal text-muted-foreground">({group.permissions.length})</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({group.permissions.length})
+                </span>
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -60,7 +64,9 @@ export function StaffProfilePermissions({
                       key={perm}
                       id={highlight ? "staff-perm-highlight" : undefined}
                       className={`flex items-start justify-between gap-3 rounded-lg px-2 py-2 ${
-                        highlight ? "bg-[var(--hive-gold)]/10 ring-1 ring-[var(--hive-gold)]/40" : ""
+                        highlight
+                          ? "bg-[var(--hive-gold)]/10 ring-1 ring-[var(--hive-gold)]/40"
+                          : ""
                       }`}
                     >
                       <div className="min-w-0">
@@ -77,7 +83,9 @@ export function StaffProfilePermissions({
                           aria-label={PERMISSION_LABEL[perm]}
                         />
                       ) : (
-                        <span className="text-sm text-muted-foreground">{granted ? "On" : "Off"}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {granted ? "On" : "Off"}
+                        </span>
                       )}
                     </div>
                   );

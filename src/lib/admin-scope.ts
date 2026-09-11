@@ -121,10 +121,72 @@ export function adminScopeSummary(scope: ParsedAdminScope): string {
     parts.push(`${scope.staffIds.length} staff`);
   }
   if (scope.legacyStaffGroupIds.length) {
-    parts.push(`${scope.legacyStaffGroupIds.length} staff group${scope.legacyStaffGroupIds.length === 1 ? "" : "s"}`);
+    parts.push(
+      `${scope.legacyStaffGroupIds.length} staff group${scope.legacyStaffGroupIds.length === 1 ? "" : "s"}`,
+    );
   }
   if (!parts.length) return "Selected clients and staff: none selected";
   return `Selected clients and staff: ${parts.join(", ")}`;
+}
+
+export type AdminScopeClientOption = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+export type AdminScopeStaffOption = {
+  user_id: string;
+  role: string;
+  full_name: string;
+};
+
+/** Org client list for Admin scope pickers — not a care-data read. */
+export async function listAdminScopeClients(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  clientSearch: string,
+): Promise<AdminScopeClientOption[]> {
+  let q = supabase
+    .from("clients")
+    .select("id, first_name, last_name")
+    .eq("organization_id", orgId)
+    .limit(40);
+  if (clientSearch.trim()) q = q.ilike("first_name", `%${clientSearch.trim()}%`);
+  const { data } = await q;
+  return (data ?? []) as AdminScopeClientOption[];
+}
+
+export async function listAdminScopeStaff(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+): Promise<AdminScopeStaffOption[]> {
+  const { data: members } = await supabase
+    .from("organization_members")
+    .select("user_id, role")
+    .eq("organization_id", orgId)
+    .eq("active", true);
+  const ids = ((members ?? []) as Array<{ user_id: string; role: string }>).map((m) => m.user_id);
+  if (!ids.length) return [];
+  const { data: profiles } = await supabase
+    .from("org_member_directory")
+    .select("id, full_name")
+    .in("id", ids);
+  const nameById = new Map(
+    ((profiles ?? []) as Array<{ id: string; full_name: string | null }>).map((p) => [
+      p.id,
+      p.full_name ?? "Unknown",
+    ]),
+  );
+  return ((members ?? []) as Array<{ user_id: string; role: string }>)
+    .map((m) => ({
+      user_id: m.user_id,
+      role: m.role,
+      full_name: nameById.get(m.user_id) ?? "Unknown",
+    }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 }
 
 function uniqueIds(ids: readonly string[] | undefined): string[] {

@@ -85,12 +85,7 @@ const GATEWAY_NOISE =
 
 /** Map server-fn / gateway failures to a short toast. Never dump CloudFront HTML. */
 export function staffPermissionMutationErrorMessage(error: unknown, fallback: string): string {
-  const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const trimmed = raw.replace(/\s+/g, " ").trim();
   if (!trimmed) return fallback;
   if (GATEWAY_NOISE.test(trimmed) || trimmed.length > 240) return fallback;

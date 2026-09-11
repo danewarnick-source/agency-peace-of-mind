@@ -9,11 +9,7 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { CLIENTS, STAFF } from "./fixtures/tns-roster";
-import {
-  assertPageNotBlank,
-  installHiveMocks,
-  waitForDashboard,
-} from "./helpers/mock-hive";
+import { assertPageNotBlank, installHiveMocks, waitForDashboard } from "./helpers/mock-hive";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -44,9 +40,7 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await installHiveMocks(page, { persona: "admin" });
   });
 
-  test("1. Clients list loads; search/filter; open a chart without crash", async ({
-    page,
-  }) => {
+  test("1. Clients list loads; search/filter; open a chart without crash", async ({ page }) => {
     await gotoAdmin(page, "/dashboard/clients");
     await expect(page.getByRole("heading", { name: /Client Directory/i })).toBeVisible({
       timeout: 20_000,
@@ -68,7 +62,10 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await search.fill("");
     await expect(rosterName(page, "Blake Stevens")).toBeVisible();
 
-    await page.getByRole("link", { name: /Tommy Jones/i }).first().click();
+    await page
+      .getByRole("link", { name: /Tommy Jones/i })
+      .first()
+      .click();
     await page.waitForURL(/\/dashboard\/clients\/00000000-0000-4000-a000-000000000101/);
     await expect(page.getByRole("heading", { name: /Tommy Jones/i })).toBeVisible({
       timeout: 15_000,
@@ -77,9 +74,7 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await shot(page, "clients_list_and_chart");
   });
 
-  test("2. Client chart shows DSPD codes, home, and key care tabs", async ({
-    page,
-  }) => {
+  test("2. Client chart shows DSPD codes, home, and key care tabs", async ({ page }) => {
     await gotoAdmin(page, `/dashboard/clients/${CLIENTS.tommy.id}`);
     await expect(page.getByRole("heading", { name: /Tommy Jones/i })).toBeVisible({
       timeout: 20_000,
@@ -124,9 +119,7 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await shot(page, "pending_clients");
   });
 
-  test("4. Employees list loads; staff profile shows role at a glance", async ({
-    page,
-  }) => {
+  test("4. Employees list loads; staff profile shows role at a glance", async ({ page }) => {
     await gotoAdmin(page, "/dashboard/employees");
     await expect(page.getByRole("heading", { name: /Team members/i })).toBeVisible({
       timeout: 20_000,
@@ -145,8 +138,18 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(rosterName(page, "Harvey Alisa")).toBeVisible();
     await expect(rosterName(page, "Tom Jones")).toBeVisible();
     await expect(rosterName(page, "Dane Warnick")).toBeVisible();
-    await expect(page.locator("table").getByText(/^admin$/i).first()).toBeVisible();
-    await expect(page.locator("table").getByText(/^employee$/i).first()).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByText(/^admin$/i)
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("table")
+        .getByText(/^employee$/i)
+        .first(),
+    ).toBeVisible();
 
     await page.locator("table a[href*='/dashboard/employees/']").first().click();
     await page.waitForURL(/\/dashboard\/employees\/00000000-0000-4000-a000-/);
@@ -156,11 +159,17 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("tab", { name: /Personnel file/i })).toBeVisible();
     await expect(page.getByRole("tab", { name: /^Activity$/i })).toBeVisible();
     await expect(page.getByRole("tab", { name: /^Permissions$/i })).toHaveCount(0);
-    await expect(page.getByText(/admin|employee|manager|Owner|Staff|Supervisor/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/admin|employee|manager|Owner|Staff|Supervisor/i).first(),
+    ).toBeVisible();
     await assertPageNotBlank(page, "staff profile");
 
     await expect(page.getByRole("button", { name: /Edit profile/i })).toBeVisible();
-    await expect(page.getByText(/people & files|Staff phone permissions|Invite staff|View staff records/i).first()).toBeVisible({
+    await expect(
+      page
+        .getByText(/people & files|Staff phone permissions|Invite staff|View staff records/i)
+        .first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
     await shot(page, "employees_list_and_profile");

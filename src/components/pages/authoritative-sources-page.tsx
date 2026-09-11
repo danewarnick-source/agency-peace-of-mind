@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileCheck,
   FileText,
+  Layers,
   Loader2,
   RefreshCw,
   ShieldCheck,
@@ -23,6 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { AgencySourcesPanel } from "@/components/nectar/agency-sources-panel";
 import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { RequirementCard } from "@/components/nectar/requirement-card";
 import { activateCodeRequirements } from "@/lib/nectar-requirement-usage.functions";
@@ -253,6 +255,9 @@ export function AuthoritativeSourcesPage() {
             <FileCheck className="h-3.5 w-3.5" /> Requirements
             <PendingConfirmationsBadge orgId={orgId ?? undefined} />
           </TabsTrigger>
+          <TabsTrigger value="agency-sources" className="gap-1">
+            <Layers className="h-3.5 w-3.5" /> Agency Sources
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -272,6 +277,9 @@ export function AuthoritativeSourcesPage() {
           ) : (
             <LoadingCard />
           )}
+        </TabsContent>
+        <TabsContent value="agency-sources">
+          <AgencySourcesPanel orgId={orgId} />
         </TabsContent>
       </Tabs>
     </div>

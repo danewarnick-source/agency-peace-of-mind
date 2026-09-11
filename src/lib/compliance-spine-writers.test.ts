@@ -27,6 +27,22 @@ describe("Compliance spine — parallel writers killed", () => {
     assert.match(src, /if \(skipMutations \|\| opts\?\.generateMissing === false\)/);
   });
 
+  it("intake does not write nectar_compliance_rules", () => {
+    const punch = read("./nectar-compliance.functions.ts");
+    const proposeStart = punch.indexOf("export const proposeComplianceRule");
+    const propose = punch.slice(
+      proposeStart,
+      punch.indexOf("export const updateComplianceRule"),
+    );
+    assert.match(propose, /return \{ id: "" \}/);
+    assert.doesNotMatch(propose, /\.from\(["']nectar_compliance_rules/);
+
+    const draftStart = punch.indexOf("export const draftStaffPrerequisiteRules");
+    const draft = punch.slice(draftStart);
+    assert.match(draft, /inserted: 0/);
+    assert.doesNotMatch(draft, /\.insert\(\{/);
+  });
+
   it("nectar_compliance_* punch-pad / shift / incident writers no-op", () => {
     const punch = read("./nectar-compliance.functions.ts");
     const raiseStart = punch.indexOf("export const raiseComplianceFlag");
@@ -79,5 +95,10 @@ describe("Compliance spine — parallel writers killed", () => {
     const note = read("../../docs/SQL_HANDOFF.md");
     assert.match(note, /Do not DROP tables\. Do not run Soft SQL for this change/);
     assert.doesNotMatch(note.slice(0, 1800), /DROP TABLE/);
+    const step7 = read(
+      "../../supabase/migrations/20260911130000_nectar_requirement_catalog_relation.sql",
+    );
+    assert.doesNotMatch(step7, /DROP TABLE/);
+    assert.match(step7, /catalog_relation/);
   });
 });

@@ -13,10 +13,11 @@ import { PCT_HIRE_COURSE_TITLE } from "./client-form-obligations.ts";
 export const CODE_OF_CONDUCT_TITLE = "DHHS Code of Conduct — Signed";
 export const CONFLICT_OF_INTEREST_TITLE = "Staff Conflict of Interest Process";
 
-/** Always assigned on hire. Titles must match seeded company_obligations rows. */
+/** Always assigned on hire. Titles must match seeded company_obligations rows.
+ * Standing catalog duties (e.g. Staff Conflict of Interest Process) stay
+ * off this list — they must not get a hire clock. */
 export const HIRE_ALWAYS_TITLES = [
   CODE_OF_CONDUCT_TITLE,
-  CONFLICT_OF_INTEREST_TITLE,
   THIRTY_DAY_OBLIGATION_TITLE,
   CPR_OBLIGATION_TITLES[1],
   PCT_HIRE_COURSE_TITLE,
@@ -24,7 +25,6 @@ export const HIRE_ALWAYS_TITLES = [
 
 export const HIRE_ALWAYS_TITLE_ALIASES: Record<string, readonly string[]> = {
   [CODE_OF_CONDUCT_TITLE]: [CODE_OF_CONDUCT_TITLE],
-  [CONFLICT_OF_INTEREST_TITLE]: [CONFLICT_OF_INTEREST_TITLE],
   [THIRTY_DAY_OBLIGATION_TITLE]: [THIRTY_DAY_OBLIGATION_TITLE],
   [CPR_OBLIGATION_TITLES[1]]: [...CPR_OBLIGATION_TITLES],
   [PCT_HIRE_COURSE_TITLE]: [PCT_HIRE_COURSE_TITLE],

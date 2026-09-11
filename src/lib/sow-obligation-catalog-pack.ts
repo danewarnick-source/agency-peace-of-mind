@@ -555,6 +555,24 @@ export const CATALOG_IDENTITY_BY_TITLE: Record<string, CatalogIdentity> = {
   },
 };
 
+/**
+ * App-only leftover title → hive key for Soft's later backfill.
+ * Does not apply SQL and does not block Soft. Live titles stay as written;
+ * the matcher assigns the catalog key so they are not source=provider.
+ *
+ * CPR: unsuffixed leftover (ampersand or slash) → Initial. Ampersand
+ * Initial/Renewal suffixes follow the matching slash catalog card. If an
+ * org has both slash Initial and slash Renewal rows, those exact titles
+ * keep their own keys; a leftover combined card still maps to Initial.
+ */
+export const SOFT_BACKFILL_TITLE_ALIASES: Record<string, string> = {
+  "CPR & First Aid Certification": "cpr_first_aid_initial",
+  "CPR/First Aid Certification": "cpr_first_aid_initial",
+  "CPR & First Aid Certification — Initial": "cpr_first_aid_initial",
+  "CPR & First Aid Certification — Renewal": "cpr_first_aid_renewal",
+  "Client-Specific Training": "client_specific_training",
+};
+
 export function catalogIdentityForTitle(title: string): CatalogIdentity | null {
   return CATALOG_IDENTITY_BY_TITLE[title] ?? null;
 }

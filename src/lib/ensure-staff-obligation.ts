@@ -2,10 +2,14 @@
  * Idempotent open-instance writer for a staff member.
  * Used by hire/assignment auto-assign and class-roster fulfillment.
  * Never duplicates an open (pending/overdue) row for the same staff + duty.
+ * Catalog standing / intake / by_design / retired duties do not get a clock —
+ * only the keyed engine (`generateNextInstanceInternal`) creates catalog instances,
+ * and only when disposition is obligation.
  */
 
 import { hireDueDaysForTitle } from "./obligation-auto-assign.ts";
 import { addDaysUTC, endOfDayUTC, formatShort } from "./obligation-due-dates.ts";
+import { obligationCreatesInstances } from "./sow-obligation-catalog.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -16,20 +20,39 @@ export type EnsureStaff = {
   role: string;
 };
 
+export type FoundObligation = {
+  id: string;
+  title: string;
+  key?: string | null;
+  disposition?: string | null;
+  source?: string | null;
+};
+
 export async function findObligationByTitles(
   supabase: AnySupabase,
   organizationId: string,
   titles: string[],
-): Promise<{ id: string; title: string } | null> {
+): Promise<FoundObligation | null> {
   if (!titles.length) return null;
-  const { data, error } = await supabase
+  const query = supabase
     .from("company_obligations")
-    .select("id, title")
+    .select("id, title, key, disposition, source")
     .eq("organization_id", organizationId)
     .eq("active", true)
     .in("title", titles);
+  let { data, error } = await query;
+  if (error && /column|schema cache|disposition|state_code/i.test(error.message)) {
+    const retry = await supabase
+      .from("company_obligations")
+      .select("id, title, source")
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .in("title", titles);
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{ id: string; title: string }>;
+  const rows = (data ?? []) as FoundObligation[];
   for (const title of titles) {
     const hit = rows.find((r) => r.title === title);
     if (hit) return hit;
@@ -46,6 +69,7 @@ export async function ensureOpenStaffObligationInternal(
 ): Promise<{ id: string } | null> {
   const ob = await findObligationByTitles(supabase, organizationId, titles);
   if (!ob) return null;
+  if (!obligationCreatesInstances(ob)) return null;
 
   const { data: existing, error: openErr } = await supabase
     .from("company_obligation_instances")

@@ -106,7 +106,10 @@ function row(
   };
 }
 
-export function dutyKeyForObligation(ob: { key?: string | null; title?: string | null }): string | null {
+export function dutyKeyForObligation(ob: {
+  key?: string | null;
+  title?: string | null;
+}): string | null {
   if (ob.key && ob.key.trim()) return ob.key.trim();
   if (ob.title) return sowCatalogEntry(ob.title)?.key ?? null;
   return null;
@@ -195,11 +198,7 @@ export function evaluateStaffDuty(input: {
   if (serviceCodes.length > 0) {
     if (!staff.assignmentsKnown) return row(dutyKey, "unanswered");
     if (codesOverlap(serviceCodes, staff.assignedServiceCodes)) {
-      if (
-        dutyKey === "acre_sei" &&
-        staff.managerIdKnown &&
-        !staff.managerId
-      ) {
+      if (dutyKey === "acre_sei" && staff.managerIdKnown && !staff.managerId) {
         return row(dutyKey, "applies", "missing_supervisor");
       }
       return row(dutyKey, "applies");
@@ -249,7 +248,11 @@ export function assignmentGapsForStaff(input: {
   for (const duty of input.duties) {
     if (duty.status === "does_not_apply") continue;
     if (duty.gap === "missing_supervisor") {
-      gaps.push({ staffId: input.staff.staffId, dutyKey: duty.dutyKey, kind: "missing_supervisor" });
+      gaps.push({
+        staffId: input.staff.staffId,
+        dutyKey: duty.dutyKey,
+        kind: "missing_supervisor",
+      });
     }
     if (duty.status === "unanswered") {
       gaps.push({

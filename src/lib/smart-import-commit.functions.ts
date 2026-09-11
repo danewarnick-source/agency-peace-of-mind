@@ -262,8 +262,9 @@ export const commitSingleSubject = createServerFn({ method: "POST" })
 // server-fn boundary. `opts.subjectId` narrows the commit to a single
 // subject (workspace per-row finalize); without it, all ready subjects in
 // the job are attempted as before.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export async function runJobCommit(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sbIn: any,
   userId: string,
   jobId: string,
@@ -647,7 +648,7 @@ async function commitClient(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const insertClient = async (payload: Record<string, any>): Promise<{ id: string }> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let p: Record<string, any> = { ...payload };
+    const p: Record<string, any> = { ...payload };
     for (let attempt = 0; attempt < 8; attempt++) {
       const { data: row, error } = await sb.from("clients").insert(p).select("id").single();
       if (!error && row) return row;
@@ -675,7 +676,7 @@ async function commitClient(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateClient = async (id: string, payload: Record<string, any>): Promise<void> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let p: Record<string, any> = { ...payload };
+    const p: Record<string, any> = { ...payload };
     for (let attempt = 0; attempt < 8; attempt++) {
       if (Object.keys(p).length === 0) return;
       const { error } = await sb
@@ -934,7 +935,7 @@ async function commitClient(
           gaps.push(`PCSP copy skipped (${doc.file_name}): ${dl.error?.message ?? "no file"}`);
           continue;
         }
-        const safe = (doc.file_name || "pcsp.pdf").replace(/[^\w.\-]+/g, "_");
+        const safe = (doc.file_name || "pcsp.pdf").replace(/[^\w.-]+/g, "_");
         const destPath = `${orgId}/${recordId}/pcsp/${Date.now()}_${safe}`;
         const up = await sb.storage.from("client-documents").upload(destPath, dl.data, {
           contentType: doc.file_type || "application/pdf",
@@ -1175,7 +1176,9 @@ async function commitEmployee(
         email,
         phone: extractedFieldValue(fields, "phone"),
         temporaryPassword: generateTempPassword(),
-        role: importedStaffRole(extractedFieldValue(fields, "position") || extractedFieldValue(fields, "role")),
+        role: importedStaffRole(
+          extractedFieldValue(fields, "position") || extractedFieldValue(fields, "role"),
+        ),
         hireDate: extractedFieldValue(fields, "hire_date"),
         startDate: extractedFieldValue(fields, "hire_date"),
         department: extractedFieldValue(fields, "department"),
@@ -1602,8 +1605,9 @@ async function applyAssignmentMap(
 }
 
 // --------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 async function audit(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   jobId: string,
   orgId: string,
@@ -1651,7 +1655,9 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       .eq("import_job_id", data.jobId)
       .order("created_at");
 
-    const employeeSubjects = (subjects ?? []).filter((s: { subject_type: string }) => s.subject_type === "employee");
+    const employeeSubjects = (subjects ?? []).filter(
+      (s: { subject_type: string }) => s.subject_type === "employee",
+    );
     const employeeIds = employeeSubjects.map((s: { id: string }) => s.id);
     const emailBySubject = new Map<string, string>();
     if (employeeIds.length) {
@@ -1717,10 +1723,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
     }
     const inviteEmails = [
       ...new Set(
-        [
-          ...emailBySubject.values(),
-          ...[...loginById.values()].map((p) => p.email ?? ""),
-        ]
+        [...emailBySubject.values(), ...[...loginById.values()].map((p) => p.email ?? "")]
           .map((e) => e.trim().toLowerCase())
           .filter((e) => e.includes("@")),
       ),
@@ -1810,7 +1813,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
           email: inviteEmail,
           mustChangePassword: login?.mustChange ?? (s.committed_record_id ? null : true),
           invitationStatus: inviteEmail
-            ? inviteStatusByEmail.get(inviteEmail.trim().toLowerCase()) ?? null
+            ? (inviteStatusByEmail.get(inviteEmail.trim().toLowerCase()) ?? null)
             : null,
         });
         const row = {

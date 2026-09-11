@@ -351,11 +351,6 @@ export const setStaffSupervisor = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
-    await onSupervisorChangedInternal(
-      supabase,
-      data.organizationId,
-      data.staffId,
-      data.managerId,
-    );
+    await onSupervisorChangedInternal(supabase, data.organizationId, data.staffId, data.managerId);
     return { ok: true };
   });

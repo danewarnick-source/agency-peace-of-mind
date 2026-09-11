@@ -23,7 +23,8 @@ function decision(partial: Partial<Decision> & Pick<Decision, "id" | "title">): 
     dueAt: null,
     ownerUserId: "admin-1",
     ownerLabel: "admin_level",
-    consequence: "This is a licensing or repayment item (§1.13). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
+    consequence:
+      "This is a licensing or repayment item (§1.13). Missing it risks a corrective action plan or repayment demand, not just a note on file.",
     source: "escalation",
     ...partial,
   };
@@ -133,7 +134,10 @@ describe("rollupDecisions", () => {
     });
     const rolled = rollupDecisions([overdue, license]);
     assert.equal(rolled.length, 1);
-    assert.deepEqual(new Set(rolled[0]?.mergedTriggers), new Set(["overdue", "license_or_repayment_risk"]));
+    assert.deepEqual(
+      new Set(rolled[0]?.mergedTriggers),
+      new Set(["overdue", "license_or_repayment_risk"]),
+    );
   });
 
   it("lets a remediation plan win over the raw escalation", () => {

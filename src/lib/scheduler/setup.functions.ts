@@ -25,23 +25,31 @@ import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 //   • { assignments: [{staff_id, service_codes|null}], ... } → per-staff scope
 export const setClientCaseload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organization_id: string;
-    client_id: string;
-    staff_ids?: string[];
-    assignments?: Array<{ staff_id: string; service_codes: string[] | null }>;
-  }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      client_id: z.string().uuid(),
-      staff_ids: z.array(z.string().uuid()).optional(),
-      assignments: z.array(z.object({
-        staff_id: z.string().uuid(),
-        service_codes: z.array(z.string()).nullable(),
-      })).optional(),
-    }).refine((v) => Array.isArray(v.staff_ids) || Array.isArray(v.assignments), {
-      message: "Provide either staff_ids or assignments",
-    }).parse(d),
+  .inputValidator(
+    (d: {
+      organization_id: string;
+      client_id: string;
+      staff_ids?: string[];
+      assignments?: Array<{ staff_id: string; service_codes: string[] | null }>;
+    }) =>
+      z
+        .object({
+          organization_id: z.string().uuid(),
+          client_id: z.string().uuid(),
+          staff_ids: z.array(z.string().uuid()).optional(),
+          assignments: z
+            .array(
+              z.object({
+                staff_id: z.string().uuid(),
+                service_codes: z.array(z.string()).nullable(),
+              }),
+            )
+            .optional(),
+        })
+        .refine((v) => Array.isArray(v.staff_ids) || Array.isArray(v.assignments), {
+          message: "Provide either staff_ids or assignments",
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,10 +62,15 @@ export const setClientCaseload = createServerFn({ method: "POST" })
       .select("authorized_dspd_codes, job_code")
       .eq("id", data.client_id)
       .maybeSingle();
-    const allCodes: string[] = Array.from(new Set([
-      ...(((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes) ?? []),
-      ...(((clientRow as { job_code?: string[] } | null)?.job_code) ?? []),
-    ].filter(Boolean)));
+    const allCodes: string[] = Array.from(
+      new Set(
+        [
+          ...((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes ??
+            []),
+          ...((clientRow as { job_code?: string[] } | null)?.job_code ?? []),
+        ].filter(Boolean),
+      ),
+    );
     const allCodesSet = new Set(allCodes);
 
     // Desired state per staff_id.
@@ -93,11 +106,16 @@ export const setClientCaseload = createServerFn({ method: "POST" })
     const existingByStaff = new Map<string, Existing>();
     for (const r of (existing ?? []) as Existing[]) existingByStaff.set(r.staff_id, r);
 
-    let added = 0, removed = 0, updated = 0;
+    let added = 0,
+      removed = 0,
+      updated = 0;
 
     const toInsert: Array<{
-      organization_id: string; client_id: string; staff_id: string;
-      is_group_home_assignment: boolean; service_codes: string[] | null;
+      organization_id: string;
+      client_id: string;
+      staff_id: string;
+      is_group_home_assignment: boolean;
+      service_codes: string[] | null;
     }> = [];
     for (const [staffId, codes] of desired.entries()) {
       const prev = existingByStaff.get(staffId);
@@ -167,6 +185,7 @@ export const setClientCaseload = createServerFn({ method: "POST" })
 // touch exactly one staff/code pairing and leave every other assignment on
 // the client untouched.
 // ──────────────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadClientAuthorizedCodes(supabase: any, clientId: string): Promise<Set<string>> {
   const { data: clientRow } = await supabase
     .from("clients")
@@ -175,26 +194,24 @@ async function loadClientAuthorizedCodes(supabase: any, clientId: string): Promi
     .maybeSingle();
   return new Set<string>(
     [
-      ...(((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes) ?? []),
-      ...(((clientRow as { job_code?: string[] } | null)?.job_code) ?? []),
+      ...((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes ?? []),
+      ...((clientRow as { job_code?: string[] } | null)?.job_code ?? []),
     ].filter(Boolean),
   );
 }
 
 export const addStaffToClientCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organization_id: string;
-    client_id: string;
-    staff_id: string;
-    service_code: string;
-  }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      client_id: z.string().uuid(),
-      staff_id: z.string().uuid(),
-      service_code: z.string().min(1),
-    }).parse(d),
+  .inputValidator(
+    (d: { organization_id: string; client_id: string; staff_id: string; service_code: string }) =>
+      z
+        .object({
+          organization_id: z.string().uuid(),
+          client_id: z.string().uuid(),
+          staff_id: z.string().uuid(),
+          service_code: z.string().min(1),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,7 +243,11 @@ export const addStaffToClientCode = createServerFn({ method: "POST" })
       });
       if (iErr) throw iErr;
       await onStaffAssignmentCreatedInternal(
-        supabase, data.organization_id, data.staff_id, data.client_id, [code],
+        supabase,
+        data.organization_id,
+        data.staff_id,
+        data.client_id,
+        [code],
       );
       return { ok: true };
     }
@@ -254,18 +275,16 @@ export const addStaffToClientCode = createServerFn({ method: "POST" })
 
 export const removeStaffFromClientCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organization_id: string;
-    client_id: string;
-    staff_id: string;
-    service_code: string;
-  }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      client_id: z.string().uuid(),
-      staff_id: z.string().uuid(),
-      service_code: z.string().min(1),
-    }).parse(d),
+  .inputValidator(
+    (d: { organization_id: string; client_id: string; staff_id: string; service_code: string }) =>
+      z
+        .object({
+          organization_id: z.string().uuid(),
+          client_id: z.string().uuid(),
+          staff_id: z.string().uuid(),
+          service_code: z.string().min(1),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -315,9 +334,7 @@ export const removeStaffFromClientCode = createServerFn({ method: "POST" })
 // ──────────────────────────────────────────────────────────────────────────────
 export const takeOpenShift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { shift_id: string }) =>
-    z.object({ shift_id: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d: { shift_id: string }) => z.object({ shift_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
@@ -325,15 +342,12 @@ export const takeOpenShift = createServerFn({ method: "POST" })
 
     const { data: shift, error: sErr } = await supabase
       .from("scheduled_shifts")
-      .select(
-        "id, organization_id, staff_id, client_id, starts_at, ends_at, service_code, status",
-      )
+      .select("id, organization_id, staff_id, client_id, starts_at, ends_at, service_code, status")
       .eq("id", data.shift_id)
       .maybeSingle();
     if (sErr) throw sErr;
     if (!shift) throw new Error("Shift no longer available.");
-    if (shift.staff_id)
-      throw new Error("Someone already took this shift.");
+    if (shift.staff_id) throw new Error("Someone already took this shift.");
     if (!["open", "pending"].includes(shift.status))
       throw new Error("This shift isn't open anymore.");
 
@@ -345,8 +359,7 @@ export const takeOpenShift = createServerFn({ method: "POST" })
       .eq("staff_id", userId)
       .eq("client_id", shift.client_id)
       .maybeSingle();
-    if (!assign)
-      throw new Error("This client isn't on your caseload.");
+    if (!assign) throw new Error("This client isn't on your caseload.");
 
     // Time-off check
     const day = (shift.starts_at as string).slice(0, 10);
@@ -372,12 +385,17 @@ export const takeOpenShift = createServerFn({ method: "POST" })
     if (cErr) throw cErr;
     if ((conflicts ?? []).length > 0) {
       const c = conflicts![0] as {
-        starts_at: string; ends_at: string; service_code: string | null;
+        starts_at: string;
+        ends_at: string;
+        service_code: string | null;
       };
       const when = `${new Date(c.starts_at).toLocaleString(undefined, {
-        weekday: "short", hour: "numeric", minute: "2-digit",
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
       })}–${new Date(c.ends_at).toLocaleTimeString(undefined, {
-        hour: "numeric", minute: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
       })}`;
       throw new Error(
         `Can't take this shift — it conflicts with your ${c.service_code ?? "shift"} on ${when}.`,
@@ -418,16 +436,14 @@ type DraftShift = {
 
 export const nectarDraftShifts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organization_id: string;
-    prompt: string;
-    week_start_iso: string;
-  }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      prompt: z.string().min(3).max(4000),
-      week_start_iso: z.string().min(8),
-    }).parse(d),
+  .inputValidator((d: { organization_id: string; prompt: string; week_start_iso: string }) =>
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        prompt: z.string().min(3).max(4000),
+        week_start_iso: z.string().min(8),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -453,27 +469,40 @@ export const nectarDraftShifts = createServerFn({ method: "POST" })
         .eq("organization_id", data.organization_id),
     ]);
 
-    type StaffRow = { profiles: { id: string; first_name: string | null; last_name: string | null; full_name: string | null } };
+    type StaffRow = {
+      profiles: {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        full_name: string | null;
+      };
+    };
     const staffList = ((staffRes.data ?? []) as unknown as StaffRow[])
       .map((m) => m.profiles)
       .filter(Boolean)
       .map((p) => ({
         id: p.id,
         name:
-          (p.full_name?.trim()) ||
+          p.full_name?.trim() ||
           [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
           "Staff",
       }));
-    const clientList = ((clientsRes.data ?? []) as Array<{
-      id: string; first_name: string; last_name: string;
-    }>).map((c) => ({
+    const clientList = (
+      (clientsRes.data ?? []) as Array<{
+        id: string;
+        first_name: string;
+        last_name: string;
+      }>
+    ).map((c) => ({
       id: c.id,
       name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim(),
     }));
     const today = new Date().toISOString().slice(0, 10);
     const authsByClient = new Map<string, Set<string>>();
     for (const a of (authsRes.data ?? []) as Array<{
-      client_id: string; service_code: string; service_end_date: string | null;
+      client_id: string;
+      service_code: string;
+      service_end_date: string | null;
     }>) {
       if (a.service_end_date && a.service_end_date <= today) continue;
       const set = authsByClient.get(a.client_id) ?? new Set<string>();
@@ -501,14 +530,17 @@ SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG
     });
     if (!aiRes.ok) {
       const txt = await aiRes.text().catch(() => "");
-      if (aiRes.status === 429)
-        throw new Error("Nectar is rate-limited — try again shortly.");
+      if (aiRes.status === 429) throw new Error("Nectar is rate-limited — try again shortly.");
       throw new Error(`Nectar error: ${txt.slice(0, 200)}`);
     }
     const aiJson = await aiRes.json();
     const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
     let parsed: { drafts?: Array<Record<string, string | null>> } = {};
-    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      parsed = {};
+    }
 
     const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
     const staffByName = new Map(staffList.map((s) => [norm(s.name), s.id]));
@@ -519,8 +551,8 @@ SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG
       const staffName = d.staff_name ?? null;
       const clientName = d.client_name ?? null;
       const code = (d.service_code ?? "")?.toUpperCase() || null;
-      const staffId = staffName ? staffByName.get(norm(staffName)) ?? null : null;
-      const clientId = clientName ? clientByName.get(norm(clientName)) ?? null : null;
+      const staffId = staffName ? (staffByName.get(norm(staffName)) ?? null) : null;
+      const clientId = clientName ? (clientByName.get(norm(clientName)) ?? null) : null;
       if (staffName && !staffId) flags.push("unknown staff");
       if (clientName && !clientId) flags.push("unknown client");
       if (clientId && code && !authsByClient.get(clientId)?.has(code))
@@ -549,17 +581,20 @@ SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG
 export const autoFillOpenShifts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { organization_id: string; week_start_iso: string }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      week_start_iso: z.string().min(8),
-    }).parse(d),
+    z
+      .object({
+        organization_id: z.string().uuid(),
+        week_start_iso: z.string().min(8),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
     if (!supabase) return { proposals: [] };
     const start = new Date(data.week_start_iso);
-    const end = new Date(start); end.setDate(end.getDate() + 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
 
     const [openRes, allShiftRes, assignRes, offRes] = await Promise.all([
       supabase
@@ -592,17 +627,25 @@ export const autoFillOpenShifts = createServerFn({ method: "POST" })
     if (openRes.error) throw openRes.error;
 
     const open = (openRes.data ?? []) as Array<{
-      id: string; client_id: string; service_code: string;
-      starts_at: string; ends_at: string;
+      id: string;
+      client_id: string;
+      service_code: string;
+      starts_at: string;
+      ends_at: string;
     }>;
     const taken = (allShiftRes.data ?? []) as Array<{
-      staff_id: string; starts_at: string; ends_at: string;
+      staff_id: string;
+      starts_at: string;
+      ends_at: string;
     }>;
     const assigns = (assignRes.data ?? []) as Array<{
-      staff_id: string; client_id: string;
+      staff_id: string;
+      client_id: string;
     }>;
     const off = (offRes.data ?? []) as Array<{
-      staff_id: string; start_date: string; end_date: string;
+      staff_id: string;
+      start_date: string;
+      end_date: string;
     }>;
 
     const staffByClient = new Map<string, Set<string>>();
@@ -622,9 +665,13 @@ export const autoFillOpenShifts = createServerFn({ method: "POST" })
       new Date(aS) < new Date(bE) && new Date(aE) > new Date(bS);
 
     type Proposal = {
-      shift_id: string; client_id: string; service_code: string;
-      starts_at: string; ends_at: string;
-      staff_id: string | null; reason: string;
+      shift_id: string;
+      client_id: string;
+      service_code: string;
+      starts_at: string;
+      ends_at: string;
+      staff_id: string | null;
+      reason: string;
     };
     const proposals: Proposal[] = open.map((s) => {
       const candidates = Array.from(staffByClient.get(s.client_id) ?? []);
@@ -656,8 +703,8 @@ export const autoFillOpenShifts = createServerFn({ method: "POST" })
         reason: pick
           ? "Eligible — caseload, no conflict, not on time off."
           : candidates.length === 0
-          ? "No staff on this client's caseload."
-          : "All caseload staff conflict or are off.",
+            ? "No staff on this client's caseload."
+            : "All caseload staff conflict or are off.",
       };
     });
 
@@ -667,32 +714,37 @@ export const autoFillOpenShifts = createServerFn({ method: "POST" })
 // Accept a batch of nectar/auto-fill drafts — writes through createShift-equivalent.
 export const applyDrafts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organization_id: string;
-    drafts: Array<{
-      // For Nectar new shifts
-      staff_id?: string | null;
-      client_id?: string | null;
-      service_code?: string | null;
-      starts_at?: string | null;
-      ends_at?: string | null;
-      notes?: string | null;
-      // For auto-fill: update existing open shift
-      assign_to_shift_id?: string | null;
-    }>;
-  }) =>
-    z.object({
-      organization_id: z.string().uuid(),
-      drafts: z.array(z.object({
-        staff_id: z.string().uuid().nullable().optional(),
-        client_id: z.string().uuid().nullable().optional(),
-        service_code: z.string().nullable().optional(),
-        starts_at: z.string().nullable().optional(),
-        ends_at: z.string().nullable().optional(),
-        notes: z.string().nullable().optional(),
-        assign_to_shift_id: z.string().uuid().nullable().optional(),
-      })),
-    }).parse(d),
+  .inputValidator(
+    (d: {
+      organization_id: string;
+      drafts: Array<{
+        // For Nectar new shifts
+        staff_id?: string | null;
+        client_id?: string | null;
+        service_code?: string | null;
+        starts_at?: string | null;
+        ends_at?: string | null;
+        notes?: string | null;
+        // For auto-fill: update existing open shift
+        assign_to_shift_id?: string | null;
+      }>;
+    }) =>
+      z
+        .object({
+          organization_id: z.string().uuid(),
+          drafts: z.array(
+            z.object({
+              staff_id: z.string().uuid().nullable().optional(),
+              client_id: z.string().uuid().nullable().optional(),
+              service_code: z.string().nullable().optional(),
+              starts_at: z.string().nullable().optional(),
+              ends_at: z.string().nullable().optional(),
+              notes: z.string().nullable().optional(),
+              assign_to_shift_id: z.string().uuid().nullable().optional(),
+            }),
+          ),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -729,7 +781,10 @@ export const applyDrafts = createServerFn({ method: "POST" })
           created_from: "nectar",
         };
         const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
-        await gateScheduledShiftInsert(supabase, [insertRow as never], { mode: "bulk_auto", userId });
+        await gateScheduledShiftInsert(supabase, [insertRow as never], {
+          mode: "bulk_auto",
+          userId,
+        });
         const { error } = await supabase.from("scheduled_shifts").insert(insertRow);
         if (error) throw error;
         created++;

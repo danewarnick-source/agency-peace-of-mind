@@ -1,10 +1,7 @@
 // Load StaffDutyFacts from live tables only. Missing table/column → *Known=false
 // or null flags (unanswered). Never invent SEI columns or a second assignment table.
 
-import {
-  UNKNOWN_STAFF_DUTY_FACTS,
-  type StaffDutyFacts,
-} from "./duty-applicability.ts";
+import { UNKNOWN_STAFF_DUTY_FACTS, type StaffDutyFacts } from "./duty-applicability.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -113,9 +110,7 @@ export async function loadStaffDutyFactsInternal(
 
   const abiClientIds = new Set<string>();
   const abiCaseloadKnown = { value: false };
-  const allClientIds = unique(
-    [...assignedByStaff.values()].flatMap((b) => [...b.clientIds]),
-  );
+  const allClientIds = unique([...assignedByStaff.values()].flatMap((b) => [...b.clientIds]));
   if (allClientIds.length) {
     const { data, error } = await supabase
       .from("clients")

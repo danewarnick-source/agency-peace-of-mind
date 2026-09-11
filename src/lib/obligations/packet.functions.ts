@@ -132,11 +132,9 @@ export async function assembleCompliancePacket(args: {
 
   let staffDutyFacts = null;
   if (args.subject === "staff" && args.subjectId) {
-    const map = await loadStaffDutyFactsInternal(
-      args.supabase,
-      args.organizationId,
-      [args.subjectId],
-    );
+    const map = await loadStaffDutyFactsInternal(args.supabase, args.organizationId, [
+      args.subjectId,
+    ]);
     staffDutyFacts = map.get(args.subjectId) ?? null;
   }
 

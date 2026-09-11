@@ -27,6 +27,9 @@ export function homePeriodKey(teamName: string, teamId: string, catalogPeriodKey
   return `${teamName} [${teamId.slice(0, 8)}] — ${catalogPeriodKey}`;
 }
 
-export function obligationDutyKey(ob: { key?: string | null; title?: string | null }): string | null {
+export function obligationDutyKey(ob: {
+  key?: string | null;
+  title?: string | null;
+}): string | null {
   return dutyKeyForObligation(ob);
 }

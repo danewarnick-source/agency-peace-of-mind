@@ -205,7 +205,10 @@ describe("unknown facts stay unanswered, never N/A", () => {
       evaluationIsCompliant({ evaluationComplete: false, gaps: [], failed: false }),
       false,
     );
-    assert.equal(evaluationIsCompliant({ evaluationComplete: true, gaps: [], failed: true }), false);
+    assert.equal(
+      evaluationIsCompliant({ evaluationComplete: true, gaps: [], failed: true }),
+      false,
+    );
     const gaps = assignmentGapsForStaff({
       staff: UNKNOWN,
       duties: [evaluateStaffDuty({ dutyKey: "abi_training", staff: UNKNOWN })],
@@ -228,7 +231,11 @@ describe("assignment change reevaluates without dupes", () => {
     });
     assert.equal(before.find((d) => d.dutyKey === "abi_training")?.status, "does_not_apply");
 
-    const afterStaff: StaffDutyFacts = { ...DSP, hasAbiCaseload: true, assignedClientIds: ["c1", "c2"] };
+    const afterStaff: StaffDutyFacts = {
+      ...DSP,
+      hasAbiCaseload: true,
+      assignedClientIds: ["c1", "c2"],
+    };
     const after = evaluateStaffDuties({
       dutyKeys: ["abi_training", "orientation_30_day"],
       staff: afterStaff,
@@ -256,11 +263,10 @@ describe("assignment change reevaluates without dupes", () => {
       assignedDutyKeys: new Set(UNIVERSAL_STAFF_KEYS),
       evaluationComplete: true,
     });
-    assert.ok(gaps.some((g) => g.dutyKey === "orientation_30_day" && g.kind === "missing_assignment"));
-    assert.equal(
-      evaluationIsCompliant({ evaluationComplete: true, gaps, failed: false }),
-      false,
+    assert.ok(
+      gaps.some((g) => g.dutyKey === "orientation_30_day" && g.kind === "missing_assignment"),
     );
+    assert.equal(evaluationIsCompliant({ evaluationComplete: true, gaps, failed: false }), false);
   });
 });
 
@@ -292,7 +298,10 @@ describe("SEI stays on assignment codes, not a fact_key", () => {
   it("does not invent an SEI fact_key on the org-fact module", () => {
     const src = readFileSync(fileURLToPath(new URL("./applicability.ts", import.meta.url)), "utf8");
     assert.doesNotMatch(src, /sei_applicable|fact_sei/);
-    const duty = readFileSync(fileURLToPath(new URL("./duty-applicability.ts", import.meta.url)), "utf8");
+    const duty = readFileSync(
+      fileURLToPath(new URL("./duty-applicability.ts", import.meta.url)),
+      "utf8",
+    );
     assert.doesNotMatch(duty, /person_applicability|duty_assignments|sei_applicable/);
   });
 });

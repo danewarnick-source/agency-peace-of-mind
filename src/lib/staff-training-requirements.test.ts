@@ -16,10 +16,7 @@ describe("isBaselineApplicable — unknown is not N/A", () => {
     };
     assert.equal(isBaselineApplicable(abi, unknown), true);
     assert.equal(isBaselineApplicable(behavior, unknown), true);
-    assert.equal(
-      isBaselineApplicable(abi, { ...unknown, requiresAbi: false }),
-      false,
-    );
+    assert.equal(isBaselineApplicable(abi, { ...unknown, requiresAbi: false }), false);
   });
 
   it("does not treat missing assignedCodes as an empty caseload", () => {
@@ -30,13 +27,7 @@ describe("isBaselineApplicable — unknown is not N/A", () => {
       requiresAbi: false,
     };
     assert.equal(isBaselineApplicable(codes, unknownCodes), true);
-    assert.equal(
-      isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: null }),
-      true,
-    );
-    assert.equal(
-      isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: [] }),
-      false,
-    );
+    assert.equal(isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: null }), true);
+    assert.equal(isBaselineApplicable(codes, { ...unknownCodes, assignedCodes: [] }), false);
   });
 });

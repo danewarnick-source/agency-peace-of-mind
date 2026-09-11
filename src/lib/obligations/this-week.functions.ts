@@ -350,7 +350,7 @@ export async function getThisWeek(
     }
   }
 
-  // 5. Org-profile facts + assignment gaps stay loadable (QuietLine, not cards).
+  // 5. Org-profile facts (source org_profile_facts) + assignment gaps stay loadable.
   if (adminLevel) {
     const facts = await loadOrgFacts(supabase, orgId);
     if (facts) unansweredFactsQuietSummary(orgId, facts);

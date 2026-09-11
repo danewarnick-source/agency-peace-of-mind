@@ -9,12 +9,7 @@
  * Pure module — no DB, no server imports — safe to use from client or server.
  */
 
-export type ConditionalRule =
-  | "all"
-  | "behavior"
-  | "abi"
-  | "after_year_one"
-  | "codes";
+export type ConditionalRule = "all" | "behavior" | "abi" | "after_year_one" | "codes";
 
 export interface BaselineValidationRule {
   /** Human-readable certificate type name Nectar expects to see. */
@@ -121,8 +116,7 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
   },
   {
     key: "deescalation",
-    title:
-      "De-escalation Certification (MANDT, SOAR, CPI, PART, or Safety Care)",
+    title: "De-escalation Certification (MANDT, SOAR, CPI, PART, or Safety Care)",
     due_days: 180,
     tracks_expiration: true,
     default_validity_months: 12,
@@ -241,13 +235,7 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       required_keyword_groups: [
         {
           label: "OIG / exclusion list wording",
-          any_of: [
-            "oig",
-            "exclusion",
-            "medicaid fraud",
-            "leie",
-            "excluded individuals",
-          ],
+          any_of: ["oig", "exclusion", "medicaid fraud", "leie", "excluded individuals"],
         },
       ],
       requires_completion_date: true,
@@ -357,7 +345,12 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       required_keyword_groups: [
         {
           label: "Customized Employment / CE training wording",
-          any_of: ["customized employment", "ce training", "ceiutah", "utah state university customized"],
+          any_of: [
+            "customized employment",
+            "ce training",
+            "ceiutah",
+            "utah state university customized",
+          ],
         },
       ],
       requires_completion_date: true,
@@ -555,10 +548,7 @@ export interface ApplicabilityContext {
 }
 
 /** Is this baseline training applicable to a given staffer right now? */
-export function isBaselineApplicable(
-  t: BaselineTraining,
-  ctx: ApplicabilityContext,
-): boolean {
+export function isBaselineApplicable(t: BaselineTraining, ctx: ApplicabilityContext): boolean {
   if (t.conditional === "all") return true;
   if (t.conditional === "behavior") return ctx.requiresDeescalation !== false;
   if (t.conditional === "abi") return ctx.requiresAbi !== false;
@@ -579,10 +569,7 @@ export function isBaselineApplicable(
 }
 
 /** Compute due date (YYYY-MM-DD) from hire_date + due_days. */
-export function trainingDueDateFor(
-  t: BaselineTraining,
-  hireDate: Date | null,
-): string | null {
+export function trainingDueDateFor(t: BaselineTraining, hireDate: Date | null): string | null {
   if (!hireDate) return null;
   const d = new Date(hireDate.getTime() + t.due_days * 86400_000);
   return d.toISOString().slice(0, 10);

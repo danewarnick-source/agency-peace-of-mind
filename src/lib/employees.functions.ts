@@ -35,7 +35,6 @@ export const CreateEmployeeInput = z.object({
 
 export type HireEmployeeInput = z.infer<typeof CreateEmployeeInput>;
 
-
 async function assertOrgManager(actorId: string, orgId: string) {
   const { data, error } = await supabaseAdmin
     .from("organization_members")
@@ -120,8 +119,8 @@ export async function hireEmployeeInternal(
         .eq("id", data.organizationId)
         .maybeSingle();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields?.custom_fields ?? []) as
-        Array<{ id: string; name: string }>;
+      const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields
+        ?.custom_fields ?? []) as Array<{ id: string; name: string }>;
       const nameById = new Map(customFieldDefs.map((f) => [f.id, f.name]));
       for (const [fieldId, value] of customFieldEntries) {
         const name = nameById.get(fieldId);
@@ -161,32 +160,37 @@ export async function hireEmployeeInternal(
     }
     if (Object.keys(customAttributes).length) profileRow.custom_attributes = customAttributes;
 
-    const { error: profErr } = await supabaseAdmin.from("profiles").upsert(
-      profileRow as any,
-      { onConflict: "id" },
-    );
+    const { error: profErr } = await supabaseAdmin
+      .from("profiles")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .upsert(profileRow as any, { onConflict: "id" });
 
     if (profErr) throw new Error(profErr.message);
 
-    await supabaseAdmin.from("organization_members")
+    await supabaseAdmin
+      .from("organization_members")
       .update({ active: false })
       .eq("user_id", newUserId)
       .neq("organization_id", data.organizationId);
 
-    const { error: memErr } = await supabaseAdmin.from("organization_members").upsert({
-      organization_id: data.organizationId,
-      user_id: newUserId,
-      role: data.role,
-      job_title: data.department || null,
-      active: true,
-      ...(data.managerId !== undefined ? { manager_id: data.managerId } : {}),
-    }, { onConflict: "organization_id,user_id" });
+    const { error: memErr } = await supabaseAdmin.from("organization_members").upsert(
+      {
+        organization_id: data.organizationId,
+        user_id: newUserId,
+        role: data.role,
+        job_title: data.department || null,
+        active: true,
+        ...(data.managerId !== undefined ? { manager_id: data.managerId } : {}),
+      },
+      { onConflict: "organization_id,user_id" },
+    );
     if (memErr) throw new Error(memErr.message);
 
     await supabaseAdmin.from("role_change_audit_log").insert({
       organization_id: data.organizationId,
       changed_by_user_id: actorUserId,
-      changed_by_name: createdVia === "smart_import" ? "Admin (smart import)" : "Admin (staff creation)",
+      changed_by_name:
+        createdVia === "smart_import" ? "Admin (smart import)" : "Admin (staff creation)",
       target_user_id: newUserId,
       target_user_name: `${data.firstName} ${data.lastName}`.trim(),
       previous_role: "none",
@@ -278,6 +282,7 @@ async function updateExistingRosterMember(
   }
   const { error: profErr } = await supabaseAdmin
     .from("profiles")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update(profilePatch as any)
     .eq("id", userId);
   if (profErr) throw new Error(profErr.message);
@@ -300,13 +305,16 @@ async function updateExistingRosterMember(
     return;
   }
 
-  const { error: memErr } = await supabaseAdmin.from("organization_members").upsert({
-    organization_id: data.organizationId,
-    user_id: userId,
-    role: data.role,
-    job_title: data.department || null,
-    active: true,
-  }, { onConflict: "organization_id,user_id" });
+  const { error: memErr } = await supabaseAdmin.from("organization_members").upsert(
+    {
+      organization_id: data.organizationId,
+      user_id: userId,
+      role: data.role,
+      job_title: data.department || null,
+      active: true,
+    },
+    { onConflict: "organization_id,user_id" },
+  );
   if (memErr) throw new Error(memErr.message);
   try {
     await reevaluateStaffDutiesInternal(supabaseAdmin, data.organizationId, userId);
@@ -320,7 +328,12 @@ export const applyEmployeeRosterRow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => RosterApplyInput.parse(d))
   .handler(async ({ data, context }): Promise<RosterApplyResult> => {
-    const empty: RosterApplyResult = { userId: "", email: data.email.trim().toLowerCase(), action: "skipped", reason: "Not signed in." };
+    const empty: RosterApplyResult = {
+      userId: "",
+      email: data.email.trim().toLowerCase(),
+      action: "skipped",
+      reason: "Not signed in.",
+    };
     if (!context.userId) return empty;
     await assertOrgManager(context.userId, data.organizationId);
 
@@ -382,7 +395,12 @@ export const applyEmployeeRosterRow = createServerFn({ method: "POST" })
         context.userId,
         "manual_admin",
       );
-      return { userId: hired.userId, email: hired.email, action: hired.created ? "created" : "updated", reason: null };
+      return {
+        userId: hired.userId,
+        email: hired.email,
+        action: hired.created ? "created" : "updated",
+        reason: null,
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (/already exists/i.test(msg)) {
@@ -423,8 +441,12 @@ export const adminResetEmployeePassword = createServerFn({ method: "POST" })
     await assertOrgManager(context.userId, data.organizationId);
 
     // Confirm target user belongs to that org
-    const { data: mem } = await supabaseAdmin.from("organization_members")
-      .select("id").eq("user_id", data.userId).eq("organization_id", data.organizationId).maybeSingle();
+    const { data: mem } = await supabaseAdmin
+      .from("organization_members")
+      .select("id")
+      .eq("user_id", data.userId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
     if (!mem) throw new Error("Employee not found in this organization");
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
@@ -432,7 +454,8 @@ export const adminResetEmployeePassword = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    await supabaseAdmin.from("profiles")
+    await supabaseAdmin
+      .from("profiles")
       .update({ must_change_password: true })
       .eq("id", data.userId);
 
@@ -473,9 +496,12 @@ export const listStaffHireDates = createServerFn({ method: "GET" })
 
     const { data: profiles } = await supabaseAdmin
       .from("profiles")
-      .select("id, full_name, first_name, last_name, email, department, hire_date, start_date, is_active")
+      .select(
+        "id, full_name, first_name, last_name, email, department, hire_date, start_date, is_active",
+      )
       .in("id", ids);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const byId = new Map((profiles ?? []).map((p) => [p.id, p as any]));
 
     return (members ?? [])
@@ -525,7 +551,10 @@ export const bulkSetStaffHireDates = createServerFn({ method: "POST" })
       .select("user_id")
       .eq("organization_id", data.organizationId)
       .eq("active", true)
-      .in("user_id", data.updates.map((u) => u.userId));
+      .in(
+        "user_id",
+        data.updates.map((u) => u.userId),
+      );
     if (error) throw new Error(error.message);
     const allowed = new Set((members ?? []).map((m) => m.user_id));
 
@@ -534,6 +563,7 @@ export const bulkSetStaffHireDates = createServerFn({ method: "POST" })
       if (!allowed.has(u.userId)) continue;
       const { error: upErr } = await supabaseAdmin
         .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({ hire_date: u.hireDate, start_date: u.hireDate } as any)
         .eq("id", u.userId);
       if (upErr) throw new Error(upErr.message);
@@ -546,5 +576,3 @@ export const bulkSetStaffHireDates = createServerFn({ method: "POST" })
     }
     return { updated };
   });
-
-

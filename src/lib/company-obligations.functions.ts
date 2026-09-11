@@ -387,13 +387,7 @@ export async function snapshotAssigneesInternal(
   const byId = new Map<string, ResolvedStaffMember>();
   for (const m of [...groupMembers, ...directMembers]) byId.set(m.staff_id, m);
   const all = Array.from(byId.values());
-  const filtered = await filterAssigneesByDutyInternal(
-    supabase,
-    organizationId,
-    ob,
-    all,
-    "clock",
-  );
+  const filtered = await filterAssigneesByDutyInternal(supabase, organizationId, ob, all, "clock");
 
   if (filtered.length) {
     const rows = filtered.map((m) => ({
@@ -608,13 +602,7 @@ async function generatePerPersonInstancesInternal(
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
   let assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
   if (!assignees.length) return [];
-  assignees = await filterAssigneesByDutyInternal(
-    supabase,
-    organizationId,
-    ob,
-    assignees,
-    "clock",
-  );
+  assignees = await filterAssigneesByDutyInternal(supabase, organizationId, ob, assignees, "clock");
   if (!assignees.length) return [];
 
   const hireDates = await fetchAssigneeHireDates(
@@ -1213,8 +1201,7 @@ async function waiveStandingInstancesInternal(
   organizationId: string,
   ob: CompanyObligationRow,
 ): Promise<void> {
-  const catalog =
-    (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
+  const catalog = (ob.key ? sowCatalogEntryByKey(ob.key) : null) ?? sowCatalogEntry(ob.title);
   const disposition = ob.disposition ?? catalog?.disposition ?? null;
   if (disposition !== "standing") return;
 
@@ -1225,7 +1212,10 @@ async function waiveStandingInstancesInternal(
     .eq("obligation_id", ob.id)
     .in("status", ["pending", "overdue"]);
   if (error) {
-    console.warn(`[obligations] could not waive standing instances for "${ob.title}":`, error.message);
+    console.warn(
+      `[obligations] could not waive standing instances for "${ob.title}":`,
+      error.message,
+    );
   }
 }
 
@@ -1506,8 +1496,7 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
     const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
 
     const formNeeded = (obligations ?? []).some(
-      (o: CompanyObligationRow) =>
-        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+      (o: CompanyObligationRow) => o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
     );
     let publishedForms: Array<{ id: string; name: string }> = [];
     if (formNeeded) {
@@ -1625,8 +1614,7 @@ export const listStaffObligationInstances = createServerFn({ method: "POST" })
     const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
 
     const formNeeded = (obligations ?? []).some(
-      (o: CompanyObligationRow) =>
-        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+      (o: CompanyObligationRow) => o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
     );
     let publishedForms: Array<{ id: string; name: string }> = [];
     if (formNeeded) {
@@ -1656,7 +1644,10 @@ export const listStaffObligationInstances = createServerFn({ method: "POST" })
         completionByInstance.set(row.instance_id, row);
         continue;
       }
-      if (existing.nectar_validation_status === "failed" && row.nectar_validation_status !== "failed") {
+      if (
+        existing.nectar_validation_status === "failed" &&
+        row.nectar_validation_status !== "failed"
+      ) {
         completionByInstance.set(row.instance_id, row);
       }
     }
@@ -1906,11 +1897,7 @@ async function bootstrapVisibleObligationInstancesInternal(
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
 }> {
   try {
-    return await bootstrapVisibleObligationInstancesInternalUnsafe(
-      supabase,
-      organizationId,
-      opts,
-    );
+    return await bootstrapVisibleObligationInstancesInternalUnsafe(supabase, organizationId, opts);
   } catch (e) {
     console.warn("[bootstrap] obligation bootstrap failed; continuing without clocks:", e);
     return { visibleObligations: [], instancesByObligation: new Map() };
@@ -2078,10 +2065,14 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
     let visibleObligations: CompanyObligationRow[] = [];
     let instancesByObligation: Map<string, ObligationInstanceRow[]> = new Map();
     try {
-      const boot = await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
-        generateMissing: false,
-        skipMutations: true,
-      });
+      const boot = await bootstrapVisibleObligationInstancesInternal(
+        supabase,
+        data.organizationId,
+        {
+          generateMissing: false,
+          skipMutations: true,
+        },
+      );
       visibleObligations = boot.visibleObligations;
       instancesByObligation = boot.instancesByObligation;
     } catch (e) {
@@ -3109,7 +3100,9 @@ export const confirmFailedObligationCompletion = createServerFn({ method: "POST"
       confirmedExpiresOn: data.confirmedExpiresDate ?? null,
     };
     if (!canAcceptCertEvidence(decision)) {
-      throw new Error(certReviewAcceptBlockReason(decision) ?? "Confirm expiration before accepting.");
+      throw new Error(
+        certReviewAcceptBlockReason(decision) ?? "Confirm expiration before accepting.",
+      );
     }
     const expiresOn = resolvedCertExpiration(decision);
 
@@ -3269,7 +3262,8 @@ export const requestObligationCorrection = createServerFn({ method: "POST" })
     if (!inst) throw new Error("Instance not found.");
     const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
 
-    const note = data.note?.trim() || "Please re-upload a clearer certificate that shows the expiration date.";
+    const note =
+      data.note?.trim() || "Please re-upload a clearer certificate that shows the expiration date.";
     const { error: upErr } = await supabase
       .from("company_obligation_completions")
       .update({
@@ -3394,14 +3388,19 @@ export const listPendingCertReviews = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!rows?.length) return [];
 
-    const instanceIds = Array.from(new Set(rows.map((r: { instance_id: string }) => r.instance_id)));
+    const instanceIds = Array.from(
+      new Set(rows.map((r: { instance_id: string }) => r.instance_id)),
+    );
     const { data: insts, error: iErr } = await supabase
       .from("company_obligation_instances")
       .select("id, obligation_id, status")
       .in("id", instanceIds);
     if (iErr) throw new Error(iErr.message);
     const instById = new Map(
-      ((insts ?? []) as Array<{ id: string; obligation_id: string; status: string }>).map((i) => [i.id, i]),
+      ((insts ?? []) as Array<{ id: string; obligation_id: string; status: string }>).map((i) => [
+        i.id,
+        i,
+      ]),
     );
     const obligationIds = Array.from(new Set([...instById.values()].map((i) => i.obligation_id)));
     const { data: obs, error: oErr } = await supabase

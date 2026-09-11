@@ -22,10 +22,7 @@ import {
   type OrgFacts,
 } from "./applicability.ts";
 import { evvStaffIdsForScope, resolveScope, staffInScope, type ResolvedScope } from "./scope.ts";
-import {
-  evaluateStaffDuty,
-  type StaffDutyFacts,
-} from "./duty-applicability.ts";
+import { evaluateStaffDuty, type StaffDutyFacts } from "./duty-applicability.ts";
 
 export { resolveScope, staffInScope, evvStaffIdsForScope };
 export { computeObligationApplicability, obligationFactApplicability };

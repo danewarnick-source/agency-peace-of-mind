@@ -859,7 +859,9 @@ export async function loadEvaluateInput(
         obs
           .filter((o) => {
             const catalog = catalogForObligation(o);
-            return o.scope === "staff" || o.scope === "staff_per_client" || catalog?.owner === "staff";
+            return (
+              o.scope === "staff" || o.scope === "staff_per_client" || catalog?.owner === "staff"
+            );
           })
           .map((o) => dutyKeyForObligation(o))
           .filter((k): k is string => !!k),

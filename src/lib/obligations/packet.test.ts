@@ -15,10 +15,7 @@ import {
   type PacketClock,
 } from "./packet.ts";
 import { allSowCatalogEntries, sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
-import {
-  UNKNOWN_STAFF_DUTY_FACTS,
-  type StaffDutyFacts,
-} from "./duty-applicability.ts";
+import { UNKNOWN_STAFF_DUTY_FACTS, type StaffDutyFacts } from "./duty-applicability.ts";
 
 const VIEWER = "55555555-5555-5555-5555-555555555555";
 const STAFF = "11111111-1111-1111-1111-111111111111";
@@ -36,7 +33,9 @@ const members: ScopeMemberRow[] = [
   { group_id: HOUSE_A, staff_id: VIEWER, is_lead: false },
 ];
 
-function clock(partial: Partial<PacketClock> & Pick<PacketClock, "obligationKey" | "title">): PacketClock {
+function clock(
+  partial: Partial<PacketClock> & Pick<PacketClock, "obligationKey" | "title">,
+): PacketClock {
   return {
     instanceId: partial.instanceId ?? `inst-${partial.obligationKey}`,
     instanceStatus: partial.instanceStatus ?? "pending",
@@ -93,7 +92,10 @@ describe("buildPacket", () => {
     assert.ok(packet.nextAction);
     assert.equal(packet.nextAction.obligationKey, "cpr_first_aid_initial");
     assert.equal(packet.nextAction.urgency, "critical");
-    assert.equal(packet.nextAction.href, "/dashboard/my-obligations#packet-inst-cpr_first_aid_initial");
+    assert.equal(
+      packet.nextAction.href,
+      "/dashboard/my-obligations#packet-inst-cpr_first_aid_initial",
+    );
   });
 
   it("agency packet hides zoning when the OL-site fact is no", () => {
@@ -112,7 +114,9 @@ describe("buildPacket", () => {
       packet.items.some((i) => i.obligationKey === "zoning_life_safety"),
       false,
     );
-    assert.ok(hiddenAgencyCardKeys(packet).includes(AGENCY_CARD_KEY_BY_OBLIGATION.zoning_life_safety));
+    assert.ok(
+      hiddenAgencyCardKeys(packet).includes(AGENCY_CARD_KEY_BY_OBLIGATION.zoning_life_safety),
+    );
   });
 
   it("agency packet keeps zoning visible while the OL-site fact is unanswered", () => {

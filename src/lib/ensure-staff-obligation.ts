@@ -73,7 +73,7 @@ export async function findObligationByKey(
     .eq("active", true)
     .eq("key", key)
     .maybeSingle();
-  let { data, error } = await query;
+  const { data, error } = await query;
   if (error && /column|schema cache|key|disposition|state_code/i.test(error.message)) {
     const title = sowCatalogEntryByKey(key)?.title;
     if (!title) return null;

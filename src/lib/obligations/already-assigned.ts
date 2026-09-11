@@ -18,6 +18,9 @@ export type AutomationHeartbeat = {
   status: "ok" | "failed" | "unknown";
 };
 
+/** Stable recurrence_key on notifications.type=escalation — the nightly job log. */
+export const AUTOMATION_HEARTBEAT_RECURRENCE_KEY = "automation_heartbeat";
+
 export function emptyAlreadyAssigned(): AlreadyAssignedStrip {
   return { renewalCount: 0, staffNotified: false, dueInDays: null };
 }
@@ -84,6 +87,14 @@ export function automationHeartbeatFrom(args: {
 }): AutomationHeartbeat {
   const lastSuccessfulCheckAt = args.lastSuccessfulCheckAt ?? null;
   const lastFailedAt = args.lastFailedAt ?? null;
+  if (lastSuccessfulCheckAt && lastFailedAt) {
+    const successMs = Date.parse(lastSuccessfulCheckAt);
+    const failedMs = Date.parse(lastFailedAt);
+    if (!Number.isNaN(failedMs) && (Number.isNaN(successMs) || failedMs > successMs)) {
+      return { lastSuccessfulCheckAt, lastFailedAt, status: "failed" };
+    }
+    return { lastSuccessfulCheckAt, lastFailedAt, status: "ok" };
+  }
   if (lastSuccessfulCheckAt) {
     return { lastSuccessfulCheckAt, lastFailedAt, status: "ok" };
   }
@@ -91,6 +102,40 @@ export function automationHeartbeatFrom(args: {
     return { lastSuccessfulCheckAt: null, lastFailedAt, status: "failed" };
   }
   return emptyAutomationHeartbeat();
+}
+
+function tableMissing(message: string | undefined): boolean {
+  return (
+    !!message && /does not exist|schema cache|relation|could not find the table/i.test(message)
+  );
+}
+
+/** Read the existing nightly job row. Does not invent a time when none exists. */
+export async function loadAutomationHeartbeat(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  organizationId: string,
+): Promise<AutomationHeartbeat> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("body, resolved_at, next_remind_at")
+    .eq("organization_id", organizationId)
+    .eq("type", "escalation")
+    .eq("recurrence_key", AUTOMATION_HEARTBEAT_RECURRENCE_KEY)
+    .maybeSingle();
+  if (error) {
+    if (tableMissing(error.message)) return emptyAutomationHeartbeat();
+    throw new Error(error.message);
+  }
+  const row = data as {
+    body?: string | null;
+    resolved_at?: string | null;
+    next_remind_at?: string | null;
+  } | null;
+  if (!row) return emptyAutomationHeartbeat();
+  const lastSuccessfulCheckAt = row.resolved_at ?? null;
+  const lastFailedAt = row.body === "failed" ? (row.next_remind_at ?? null) : null;
+  return automationHeartbeatFrom({ lastSuccessfulCheckAt, lastFailedAt });
 }
 
 function formatWhen(iso: string): string {

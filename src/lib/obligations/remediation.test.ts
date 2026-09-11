@@ -443,6 +443,62 @@ describe("nightly plan outcomes", () => {
     assert.equal(store.inserts[0]?.status, "awaiting_approval");
     assert.ok(!String(store.inserts[0]?.plan_text ?? "").includes("Ada"));
   });
+
+  it("does not complete the underlying instance when a plan is approved", async () => {
+    const plan: RemediationPlanRow = {
+      id: "p3",
+      organization_id: TNS_ORG_ID,
+      obligation_id: "ob-cpr",
+      instance_id: "inst-cpr",
+      staff_id: STAFF,
+      obligation_key: "cpr_first_aid_renewal",
+      title: "CPR/First Aid Certification — Renewal",
+      kind: "overdue",
+      status: "approved",
+      plan_text: "Restore CPR.",
+      due_at: "2026-10-01T00:00:00.000Z",
+      proposed_by: null,
+      reviewed_by: ADMIN,
+      reviewed_at: now.toISOString(),
+      outcome: "approved",
+      outcome_note: null,
+      outcome_at: now.toISOString(),
+    };
+    const store = {
+      plans: [plan as unknown as FakeRow],
+      instances: [{ id: "inst-cpr", status: "overdue", completed_at: null }],
+      notifications: [
+        {
+          id: "n2",
+          organization_id: TNS_ORG_ID,
+          type: "escalation",
+          related_id: "inst-cpr",
+          resolved_at: null,
+        },
+      ],
+      inserts: [] as FakeRow[],
+    };
+    await applyRemediationPlanOutcomes(fakeSupabase(store), TNS_ORG_ID, [], now);
+    assert.equal(store.instances[0]?.status, "overdue");
+    assert.equal(store.instances[0]?.completed_at, null);
+    assert.notEqual(store.plans[0]?.status, "completed");
+  });
+});
+
+describe("remediation plan does not close the requirement", () => {
+  it("review and propose writers never complete company_obligation_instances", () => {
+    const src = readFileSync(new URL("./remediation.functions.ts", import.meta.url), "utf8");
+    assert.match(src, /export const reviewRemediationPlan/);
+    assert.match(src, /export const proposeRemediationPlan/);
+    assert.doesNotMatch(src, /from\("company_obligation_instances"\)[\s\S]{0,800}status:\s*"completed"/);
+    assert.doesNotMatch(src, /\.update\(\{[\s\S]{0,200}status:\s*"completed"/);
+    const nightly = readFileSync(new URL("./remediation.ts", import.meta.url), "utf8");
+    assert.match(nightly, /markPlanOutcome/);
+    assert.doesNotMatch(
+      nightly,
+      /from\("company_obligation_instances"\)[\s\S]{0,400}\.update\(/,
+    );
+  });
 });
 
 describe("Soft SQL locks", () => {

@@ -1349,9 +1349,9 @@ function serverFnResult(
           dueInDays: 30,
         },
         automation: {
-          lastSuccessfulCheckAt: null,
+          lastSuccessfulCheckAt: "2026-09-11T14:00:00.000Z",
           lastFailedAt: null,
-          status: "unknown",
+          status: "ok",
         },
       } };
     case "generateMyReview":

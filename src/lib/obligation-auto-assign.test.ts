@@ -40,8 +40,27 @@ describe("hire auto-assign", () => {
       "utf8",
     );
     assert.match(hireHook, /reevaluateStaffDutiesInternal/);
+    assert.match(hireHook, /reevaluateStaffAssignedToClientInternal/);
     assert.doesNotMatch(hireHook, /titleGroupsForHire\(\)/);
     assert.doesNotMatch(hireHook, /PCT_HIRE_COURSE_TITLE/);
+    assert.doesNotMatch(hireHook, /assignmentNeedsAbi/);
+    assert.doesNotMatch(hireHook, /assignmentNeedsMandt/);
+    assert.doesNotMatch(hireHook, /ensureOpenStaffObligationInternal\(/);
+    const roleWriter = readFileSync(
+      fileURLToPath(new URL("./team-access.functions.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(roleWriter, /reevaluateStaffDutiesInternal/);
+    const empCaseload = readFileSync(
+      fileURLToPath(new URL("../routes/dashboard.employees.index.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(empCaseload, /onStaffAssignmentRemoved/);
+    const nightly = readFileSync(
+      fileURLToPath(new URL("./obligations/remediation.ts", import.meta.url)),
+      "utf8",
+    );
+    assert.match(nightly, /persistAutomationHeartbeat/);
   });
 
   it("uses existing due windows (30 / 90 / 180) instead of a second cadence", () => {

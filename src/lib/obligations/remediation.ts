@@ -6,6 +6,7 @@ import {
   evaluateOrgEscalations,
   isAdminLevelRole,
   listActiveOrganizationIds,
+  persistAutomationHeartbeat,
   pickAdminLevelRecipient,
   type EscalationHit,
   type EscalationUrgency,
@@ -472,9 +473,19 @@ export async function runNightlyEscalationAndPlans(
       summary.plansEnsured += plans.ensured;
       summary.plansCompleted += plans.completed;
       summary.plansExpired += plans.expired;
+      try {
+        await persistAutomationHeartbeat(supabase, orgId, { ok: true, at: now });
+      } catch (hbErr) {
+        console.warn("[obligations] automation heartbeat write failed:", hbErr);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       summary.errors.push(`${orgId}: ${msg}`);
+      try {
+        await persistAutomationHeartbeat(supabase, orgId, { ok: false, at: now });
+      } catch (hbErr) {
+        console.warn("[obligations] automation heartbeat fail write failed:", hbErr);
+      }
     }
   }
   return summary;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
+import { reevaluateStaffDutiesInternal } from "@/lib/staff-assignment-hooks.functions";
 
 const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
 const InviteRoleEnum = z.enum(["admin", "program_manager", "manager", "employee"]);
@@ -198,6 +199,17 @@ export const setMemberGrants = createServerFn({ method: "POST" })
         newRole: nextRole,
         changeMethod: "setMemberGrants",
       });
+      if (data.target_user_id) {
+        try {
+          await reevaluateStaffDutiesInternal(
+            supabase,
+            data.organization_id,
+            data.target_user_id,
+          );
+        } catch (e) {
+          console.warn("[obligations] role-change reevaluate failed:", e);
+        }
+      }
     }
 
     if (data.explicit_role) {

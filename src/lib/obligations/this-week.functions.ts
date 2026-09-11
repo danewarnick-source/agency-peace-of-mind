@@ -34,10 +34,10 @@ import {
   type ThisWeekResult,
 } from "./this-week.ts";
 import {
-  automationHeartbeatFrom,
   buildAlreadyAssigned,
   emptyAlreadyAssigned,
   emptyAutomationHeartbeat,
+  loadAutomationHeartbeat,
   type AlreadyAssignedStrip,
   type AutomationHeartbeat,
 } from "./already-assigned.ts";
@@ -365,8 +365,7 @@ export async function getThisWeek(
     decisions.map((d) => d.instanceId).filter((id): id is string => !!id),
   );
   const alreadyAssigned = buildAlreadyAssigned(input, decisionInstanceIds);
-  // No persisted cron heartbeat yet — do not invent a last-check time.
-  const automation = automationHeartbeatFrom({});
+  const automation = await loadAutomationHeartbeat(supabase, orgId);
 
   return {
     items: decisions,

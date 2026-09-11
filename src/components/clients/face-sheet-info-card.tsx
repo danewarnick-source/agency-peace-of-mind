@@ -9,9 +9,12 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Pencil, IdCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { onClientDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +88,8 @@ function toIntOrNull(v: string): number | null {
 
 export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
+  const dutyFactsFn = useServerFn(onClientDutyFactsChanged);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
 
@@ -150,6 +155,16 @@ export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase.from("clients").update(patch as any).eq("id", clientId);
       if (error) throw error;
+      const priorSigned = toStr((q.data as Row | undefined)?.pcsp_signed_date);
+      if (org?.organization_id && form.pcsp_signed_date !== priorSigned) {
+        try {
+          await dutyFactsFn({
+            data: { organizationId: org.organization_id, clientId },
+          });
+        } catch (e) {
+          console.warn("[obligations] face-sheet PCSP duty reevaluate failed:", e);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Face sheet info saved");

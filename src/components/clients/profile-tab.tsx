@@ -50,6 +50,7 @@ import {
 import { listUpiAttestations, recordUpiAttestation } from "@/lib/upi-attestations.functions";
 import { formatPeriodMonthYear } from "@/lib/progress-summaries";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
+import { onClientDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 
 type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
@@ -959,6 +960,8 @@ function ClinicalAlertBanner({ clientId, client }: { clientId: string; client: C
 
 function IdentityCard({ clientId, client }: { clientId: string; client: ClientRow }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
+  const dutyFactsFn = useServerFn(onClientDutyFactsChanged);
   const [editing, setEditing] = useState(false);
   const baseline = () => ({
     first_name: (client.first_name as string) ?? "",
@@ -1004,6 +1007,15 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase.from("clients").update(payload as any).eq("id", clientId);
       if (error) throw error;
+      if (org?.organization_id && draft.has_abi !== (client.has_abi === true)) {
+        try {
+          await dutyFactsFn({
+            data: { organizationId: org.organization_id, clientId },
+          });
+        } catch (e) {
+          console.warn("[obligations] client ABI duty reevaluate failed:", e);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Saved.");
@@ -1246,6 +1258,8 @@ function ContactsCard({
 
 function AtGlanceCard({ clientId, client }: { clientId: string; client: ClientRow }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
+  const dutyFactsFn = useServerFn(onClientDutyFactsChanged);
   const [editing, setEditing] = useState(false);
   const diagnoses = Array.isArray(client.diagnoses) ? (client.diagnoses as string[]) : [];
   const primaryDx = diagnoses[0] ?? "";
@@ -1268,6 +1282,16 @@ function AtGlanceCard({ clientId, client }: { clientId: string; client: ClientRo
         pcsp_expiration_date: draft.pcsp_expiration_date || null,
       }).eq("id", clientId);
       if (error) throw error;
+      const priorExp = (client.pcsp_expiration_date as string) ?? "";
+      if (org?.organization_id && draft.pcsp_expiration_date !== priorExp) {
+        try {
+          await dutyFactsFn({
+            data: { organizationId: org.organization_id, clientId },
+          });
+        } catch (e) {
+          console.warn("[obligations] client PCSP duty reevaluate failed:", e);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Saved.");

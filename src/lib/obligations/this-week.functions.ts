@@ -9,6 +9,7 @@ import {
   type EscalationUrgency,
   type OrgMemberRow,
 } from "./escalation.ts";
+import { evvStaffIdsForScope, resolveScopeFromSnapshot } from "./scope.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -140,12 +141,16 @@ async function loadProposedNectarRequirements(
 async function loadEvvNeedsReviewCount(
   supabase: AnySupabase,
   organizationId: string,
+  staffIdsInScope: string[] | null,
 ): Promise<QuietSummary | null> {
-  const { data, error } = await supabase
+  if (staffIdsInScope && staffIdsInScope.length === 0) return null;
+  let q = supabase
     .from("evv_timesheets")
-    .select("id")
+    .select("id, staff_id")
     .eq("organization_id", organizationId)
     .eq("review_status", "needs_review");
+  if (staffIdsInScope) q = q.in("staff_id", staffIdsInScope);
+  const { data, error } = await q;
   if (error) {
     if (tableMissing(error.message)) return null;
     throw new Error(error.message);
@@ -205,6 +210,13 @@ export async function getThisWeek(
 
   const input = await loadEvaluateInput(supabase, orgId, now);
   const hits = evaluateEscalations(input);
+  const viewerScope = resolveScopeFromSnapshot(orgId, userId, {
+    available: true,
+    groups: [],
+    members: input.scopeMembers ?? [],
+    scopeByStaffId: input.scopeByStaffId ?? {},
+    leadsByGroupId: input.leadsByGroupId ?? {},
+  });
 
   // 2. Escalation triggers true AND resolveRecipient = this user.
   for (const hit of hits) {
@@ -231,7 +243,7 @@ export async function getThisWeek(
 
   // 5. Unanswered org-profile facts — Step 5 not built.
   // 6. evv_timesheets needs_review in scope — count only.
-  const evv = await loadEvvNeedsReviewCount(supabase, orgId);
+  const evv = await loadEvvNeedsReviewCount(supabase, orgId, evvStaffIdsForScope(viewerScope));
   if (evv) items.push(evv);
 
   return sortThisWeekItems(items);

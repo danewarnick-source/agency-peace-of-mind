@@ -59,16 +59,26 @@ async function assertNoCrash(page: Page, label: string) {
   await expect(crash, `Unhandled error heading on ${label}`).toHaveCount(0);
 }
 
+/** Cold Vite / SSR hydration can leave the shell on "Loading workspace…". One reload only. */
+async function waitForAdminGreeting(page: Page) {
+  const greeting = page.getByText(/Good (morning|afternoon|evening), Dana/i);
+  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+  if (await greeting.isVisible().catch(() => false)) return;
+  try {
+    await expect(greeting).toBeVisible({ timeout: 12_000 });
+  } catch {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(greeting).toBeVisible({ timeout: 20_000 });
+  }
+}
+
 test.describe("Admin Home + obligations / audit-readiness", () => {
   test.beforeEach(async ({ page }) => {
     await installHiveMocks(page, { role: "admin" });
   });
 
   test("Admin Home loads obligation cards and True North org", async ({ page }) => {
-    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
-      timeout: 25_000,
-    });
+    await waitForAdminGreeting(page);
     await expect(page.getByText(/True North Supports/i).first()).toBeVisible();
     await expect(page.getByTestId("this-week")).toBeVisible();
     await expect(page.getByRole("heading", { name: /^This week$/i })).toBeVisible();

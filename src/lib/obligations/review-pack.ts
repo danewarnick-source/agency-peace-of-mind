@@ -1,3 +1,4 @@
+import { denverYmd } from "../admin-home-data.ts";
 import { PACK_STATE_CODE, PACK_VERSION } from "../sow-obligation-catalog-pack.ts";
 import type { Decision, ThisWeekItem } from "./this-week.ts";
 
@@ -21,6 +22,69 @@ export type ReviewPack = {
   changes: PackChangeRow[];
   text: string;
 };
+
+export type ReviewDayMeta = {
+  period: string | null;
+  sites: number | null;
+  samplePeople: number | null;
+  sampleStaff: number | null;
+};
+
+const SNAKE_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+const KIND_KEY_RE = /^(added|retired|changed|removed):\s*[a-z0-9_]+$/i;
+
+export function isHumanPackNote(note: string | null | undefined): boolean {
+  if (!note) return false;
+  const t = note.trim();
+  if (!t) return false;
+  if (SNAKE_KEY_RE.test(t)) return false;
+  if (KIND_KEY_RE.test(t)) return false;
+  return true;
+}
+
+export function humanPackChanges<T extends { note: string | null }>(changes: T[]): T[] {
+  return changes.filter((c) => isHumanPackNote(c.note));
+}
+
+export function showWhatChangedTab(
+  changes: Array<{ note: string | null }>,
+  appliedPackVersion: string | null,
+  packVersion: string = PACK_VERSION,
+): boolean {
+  if (appliedPackVersion === packVersion) return false;
+  return humanPackChanges(changes).length > 0;
+}
+
+export function whatChangedTitle(packVersion: string = PACK_VERSION): string {
+  return `What changed — pack ${packVersion}`;
+}
+
+export function reviewPeriodLabel(now: Date = new Date()): string {
+  const ymd = denverYmd(now);
+  const parts = /^(\d{4})-(\d{2})/.exec(ymd);
+  const year = Number(parts?.[1]);
+  const month = Number(parts?.[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return "This week";
+  const quarter = Math.ceil(month / 3);
+  return `Q${quarter} ${year}`;
+}
+
+export function formatReviewDayMeta(meta: ReviewDayMeta): string | null {
+  const parts: string[] = [];
+  if (meta.period) parts.push(meta.period);
+  if (meta.sites != null && meta.sites > 0) {
+    parts.push(`${meta.sites} site${meta.sites === 1 ? "" : "s"}`);
+  }
+  const peopleBits: string[] = [];
+  if (meta.samplePeople != null && meta.samplePeople > 0) {
+    peopleBits.push(`${meta.samplePeople} people`);
+  }
+  if (meta.sampleStaff != null && meta.sampleStaff > 0) {
+    peopleBits.push(`${meta.sampleStaff} staff`);
+  }
+  if (peopleBits.length) parts.push(peopleBits.join(", "));
+  return parts.length ? parts.join(" · ") : null;
+}
 
 function tableMissing(message: string | undefined): boolean {
   return (
@@ -63,12 +127,12 @@ export function generateReviewText(
     }
   }
   lines.push("", "What changed");
-  if (changes.length === 0) {
-    lines.push("No pack changelog rows for this version.");
+  const notes = humanPackChanges(changes);
+  if (notes.length === 0) {
+    lines.push("No pack changelog notes for this version.");
   } else {
-    for (const c of changes) {
-      const note = c.note ? ` — ${c.note}` : "";
-      lines.push(`- ${c.change_kind}: ${c.obligation_key}${note}`);
+    for (const c of notes) {
+      lines.push(`- ${c.note!.trim()}`);
     }
   }
   return lines.join("\n");
@@ -81,6 +145,7 @@ export function assembleReviewPack(
   generatedAt: string = new Date().toISOString(),
 ): ReviewPack {
   const packVersion = appliedPackVersion || PACK_VERSION;
+  const notes = humanPackChanges(changes);
   return {
     draft: true,
     generatedAt,
@@ -89,8 +154,8 @@ export function assembleReviewPack(
     appliedPackVersion,
     decisions: items.filter((i) => i.kind === "decision").length,
     quiet: items.filter((i) => i.kind === "quiet_summary").length,
-    changes,
-    text: generateReviewText(items, changes, packVersion, generatedAt),
+    changes: notes,
+    text: generateReviewText(items, notes, packVersion, generatedAt),
   };
 }
 
@@ -122,6 +187,45 @@ export async function loadPackChangelog(
   }
   return {
     appliedPackVersion: applied,
-    changes: (data ?? []) as PackChangeRow[],
+    changes: humanPackChanges((data ?? []) as PackChangeRow[]),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadReviewDayMeta(
+  supabase: any,
+  organizationId: string,
+  now: Date = new Date(),
+): Promise<ReviewDayMeta> {
+  const empty: ReviewDayMeta = {
+    period: reviewPeriodLabel(now),
+    sites: null,
+    samplePeople: null,
+    sampleStaff: null,
+  };
+  if (!supabase) return empty;
+
+  const [teamsRes, peopleRes, staffRes] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId),
+    supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("account_status", "active"),
+    supabase
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("active", true),
+  ]);
+
+  return {
+    period: empty.period,
+    sites: teamsRes.error ? null : (teamsRes.count ?? 0),
+    samplePeople: peopleRes.error ? null : (peopleRes.count ?? 0),
+    sampleStaff: staffRes.error ? null : (staffRes.count ?? 0),
   };
 }

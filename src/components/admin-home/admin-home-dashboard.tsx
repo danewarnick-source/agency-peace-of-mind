@@ -10,7 +10,14 @@ import { cn } from "@/lib/utils";
 import { greetingWord, useAdminHomeData } from "@/components/admin-home/use-admin-home-data";
 import { AdminHomeWelcome } from "@/components/admin-home/admin-home-welcome";
 import { ThisWeekPlanCards } from "@/components/compliance/this-week-plan-cards";
-import { generateMyReview, listPackWhatChanged } from "@/lib/obligations/review-pack.functions";
+import { generateMyReview, getReviewDayMeta, listPackWhatChanged } from "@/lib/obligations/review-pack.functions";
+import {
+  formatReviewDayMeta,
+  isHumanPackNote,
+  showWhatChangedTab,
+  whatChangedTitle,
+  type ReviewDayMeta,
+} from "@/lib/obligations/review-pack";
 import { PACK_VERSION } from "@/lib/sow-obligation-catalog-pack";
 import { isAdminLevelRole } from "@/lib/obligations/escalation";
 import "@/components/compliance/decision-card.css";
@@ -56,13 +63,23 @@ function Skeleton({ className }: { className?: string }) {
 
 function ReviewDayPanel({ orgId }: { orgId: string }) {
   const generate = useServerFn(generateMyReview);
+  const loadMeta = useServerFn(getReviewDayMeta);
   const mut = useMutation({
     mutationFn: () => generate({ data: { organizationId: orgId } }),
+  });
+  const metaQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["review-day-meta", orgId],
+    queryFn: () => loadMeta({ data: { organizationId: orgId } }),
+    staleTime: 60_000,
   });
   const reviewText =
     mut.data?.text ??
     (mut.data as { result?: { text?: string } } | undefined)?.result?.text ??
     "";
+  const metaPayload = metaQ.data as ReviewDayMeta | { result?: ReviewDayMeta } | undefined;
+  const meta = metaPayload && "period" in metaPayload ? metaPayload : metaPayload?.result;
+  const metaLine = meta ? formatReviewDayMeta(meta) : null;
 
   return (
     <section data-testid="review-day" className="space-y-4">
@@ -72,6 +89,11 @@ function ReviewDayPanel({ orgId }: { orgId: string }) {
       <p className="text-sm" style={{ color: PI_THEME.c50 }}>
         Draft a DSPD review from this week. A human must attest. Nothing publishes itself.
       </p>
+      {metaLine ? (
+        <p data-testid="review-day-meta" className="text-sm" style={{ color: PI_THEME.c50 }}>
+          {metaLine}
+        </p>
+      ) : null}
       <button
         type="button"
         className="act-btn"
@@ -112,16 +134,16 @@ function WhatChangedPanel({
 }: {
   changes: Array<{ change_kind: string; obligation_key: string; note: string | null }>;
 }) {
+  const notes = changes.filter((c) => isHumanPackNote(c.note));
   return (
     <section data-testid="what-changed" className="space-y-3">
       <h2 className="text-[22px] font-semibold leading-tight" style={{ color: PI_THEME.cream }}>
-        What changed
+        {whatChangedTitle(PACK_VERSION)}
       </h2>
       <ul className="space-y-2">
-        {changes.map((c) => (
+        {notes.map((c) => (
           <li key={`${c.change_kind}:${c.obligation_key}`} className="text-sm" style={{ color: PI_THEME.c70 }}>
-            {c.change_kind}: {c.obligation_key}
-            {c.note ? ` — ${c.note}` : ""}
+            {c.note!.trim()}
           </li>
         ))}
       </ul>
@@ -152,7 +174,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
   const changed = changedPayload?.changes ? changedPayload : changedPayload?.result;
   const changes = changed?.changes ?? [];
   const applied = changed?.appliedPackVersion ?? null;
-  const showWhatChanged = changes.length > 0 && applied !== PACK_VERSION;
+  const showWhatChanged = showWhatChangedTab(changes, applied, PACK_VERSION);
 
   if (!orgId && !orgLoading) return null;
 
@@ -161,6 +183,7 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
     { id: "review-day", label: "Review day" },
     { id: "what-changed", label: "What changed", hidden: !showWhatChanged },
   ];
+  const activeTab: HomeTab = tab === "what-changed" && !showWhatChanged ? "this-week" : tab;
 
   return (
     <section
@@ -192,8 +215,8 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                 type="button"
                 role="tab"
                 className="home-tab"
-                aria-selected={tab === t.id}
-                style={{ color: tab === t.id ? PI_THEME.cream : PI_THEME.c50 }}
+                aria-selected={activeTab === t.id}
+                style={{ color: activeTab === t.id ? PI_THEME.cream : PI_THEME.c50 }}
                 onClick={() => setTab(t.id)}
               >
                 {t.label}
@@ -201,9 +224,9 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
             ))}
         </nav>
 
-        {tab === "this-week" ? <ThisWeekPlanCards /> : null}
-        {tab === "review-day" && orgId ? <ReviewDayPanel orgId={orgId} /> : null}
-        {tab === "what-changed" && showWhatChanged ? <WhatChangedPanel changes={changes} /> : null}
+        {activeTab === "this-week" ? <ThisWeekPlanCards /> : null}
+        {activeTab === "review-day" && orgId ? <ReviewDayPanel orgId={orgId} /> : null}
+        {activeTab === "what-changed" && showWhatChanged ? <WhatChangedPanel changes={changes} /> : null}
       </div>
     </section>
   );

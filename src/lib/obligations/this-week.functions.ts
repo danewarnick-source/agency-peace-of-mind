@@ -51,6 +51,7 @@ export {
   hasForbiddenDecisionCopy,
   HEADLINE_VERB_RE,
   humanDue,
+  licenseTypeKey,
   rollupDecisions,
   sortThisWeekItems,
 } from "./this-week.ts";

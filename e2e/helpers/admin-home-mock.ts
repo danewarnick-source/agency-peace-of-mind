@@ -878,6 +878,7 @@ function serverFnName(url: string, postText: string): string | null {
     "proposeRemediationPlan",
     "reviewRemediationPlan",
     "generateMyReview",
+    "getReviewDayMeta",
     "listPackWhatChanged",
     "getCompliancePacket",
   ];
@@ -1351,6 +1352,15 @@ function serverFnResult(
           quiet: 5,
           changes: [],
           text: "This week review (draft)\nGenerated 2026-09-11T12:00:00.000Z. Not a published record. A human must attest.\nPack UT-2026.07.\n\nDecisions\n- Renew HHS Inspection\n- Read and sign the discharge process\n- Close Annual Continuing Education\n\nQuiet\nHandled without you.\n",
+        },
+      };
+    case "getReviewDayMeta":
+      return {
+        result: {
+          period: "Q3 2026",
+          sites: 2,
+          samplePeople: 4,
+          sampleStaff: 3,
         },
       };
     case "listPackWhatChanged":

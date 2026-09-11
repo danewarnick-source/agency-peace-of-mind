@@ -36,6 +36,11 @@ type PlanDialogKind = "license" | "standing" | "overdue";
 
 const HOME_CARD_CAP = 3;
 
+function decisionCountLine(n: number): string {
+  const word = n === 1 ? "One" : n === 2 ? "Two" : n === 3 ? "Three" : String(n);
+  return `${word} decision${n === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
+}
+
 export function logPlanDialogKind(item: Decision): PlanDialogKind | null {
   if (item.planId) return null;
   if (item.action?.kind === "log_renewal" || item.trigger === "license_or_repayment_risk") {
@@ -141,9 +146,7 @@ export function ThisWeekPlanCards() {
   const quietText = formatQuietLine(week.quiet);
 
   const countLine =
-    items.length === 0
-      ? "Nothing needs you this week."
-      : `${items.length} decision${items.length === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
+    items.length === 0 ? "Nothing needs you this week." : decisionCountLine(items.length);
 
   return (
     <section data-testid="this-week" className="space-y-4">

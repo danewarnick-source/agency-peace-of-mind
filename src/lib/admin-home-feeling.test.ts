@@ -73,6 +73,17 @@ describe("feeling-hero B (parked for Step 3)", () => {
     assert.match(markSlot, /HiveMark/);
     assert.doesNotMatch(markSlot, /HiveWordmark|NECTAR|PiWordmark/);
   });
+
+  it("wraps the shell org subtitle and keeps the full name on title", () => {
+    const shell = read("../routes/dashboard.tsx");
+    assert.match(shell, /data-testid="shell-org-subtitle"/);
+    assert.match(shell, /whitespace-normal break-words/);
+    assert.match(shell, /title=\{/);
+    assert.doesNotMatch(
+      shell.slice(shell.indexOf("data-testid=\"shell-org-subtitle\""), shell.indexOf("data-testid=\"shell-org-subtitle\"") + 800),
+      /className="truncate text-xs"/,
+    );
+  });
 });
 
 describe("Admin Home Step 2 — demote command-center and compliance-desk", () => {
@@ -116,6 +127,10 @@ describe("Admin Home Step 2 — demote command-center and compliance-desk", () =
     assert.match(dash, /ThisWeekPlanCards/);
     assert.match(dash, /Generate my DSPD review/);
     assert.match(dash, /listPackWhatChanged/);
+    assert.match(dash, /showWhatChangedTab/);
+    assert.match(dash, /whatChangedTitle/);
+    assert.match(dash, /review-day-meta/);
+    assert.doesNotMatch(dash, /\{c\.change_kind\}: \{c\.obligation_key\}/);
     assert.match(dash, /home-column/);
     assert.match(dash, /PI_THEME\.c50/);
     assert.match(dash, /AdminHomeWelcome/);

@@ -80,10 +80,16 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
   test("Admin Home loads obligation cards and True North org", async ({ page }) => {
     await waitForAdminGreeting(page);
     await expect(page.getByText(/True North Supports/i).first()).toBeVisible();
+    await expect(page.getByTestId("shell-org-subtitle")).toHaveAttribute(
+      "title",
+      /True North Supports/,
+    );
     await expect(page.getByTestId("this-week")).toBeVisible();
     await expect(page.getByRole("heading", { name: /^This week$/i })).toBeVisible();
     await expect(page.getByTestId("decision-card")).toHaveCount(3);
+    await expect(page.getByRole("link", { name: /1 more this week/i })).toBeVisible();
     await expect(page.getByTestId("quiet-line")).toBeVisible();
+    await expect(page.getByRole("tab", { name: /What changed/i })).toHaveCount(0);
     await expect(page.getByText(/Handled without you:/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
     await expect(page.getByText(/Staff with overdue/i)).toHaveCount(0);
@@ -175,6 +181,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toHaveCount(0);
     await page.getByRole("tab", { name: /^Review day$/i }).click();
     await expect(page.getByTestId("review-day")).toBeVisible();
+    await expect(page.getByTestId("review-day-meta")).toHaveText(
+      /Q3 2026 · 2 sites · 4 people, 3 staff/,
+    );
     await page.getByRole("button", { name: /Generate my DSPD review/i }).click();
     await expect(page.getByTestId("review-pack-text")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("review-pack-text")).toContainText(/This week review \(draft\)/);

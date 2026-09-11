@@ -177,6 +177,53 @@ describe("rollupDecisions", () => {
     const decorated = decorateDecision(rolled[0]!, { now: NOW });
     assert.match(decorated.headline ?? "", HEADLINE_VERB_RE);
   });
+
+  it("rolls same-type OL license instances into one Owner card", () => {
+    const rows = [1, 2, 3].map((n) =>
+      decision({
+        id: `license:ol-${n}`,
+        title: "OL Day Support Certification",
+        trigger: "license_or_repayment_risk",
+        instanceId: `inst-ol-${n}`,
+        obligationId: "ob-ol-day",
+        obligationKey: "ol_day_support_cert_3or_fewer",
+        urgency: "critical",
+        dueAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    const rolled = rollupDecisions(rows);
+    assert.equal(rolled.length, 1);
+    assert.equal(rolled[0]?.count, 3);
+    const decorated = decorateDecision(rolled[0]!, { now: NOW, viewerUserId: "admin-1" });
+    assert.match(decorated.headline ?? "", /Renew 3 OL licenses/);
+    assert.match(decorated.why ?? "", /3 license clocks/);
+  });
+
+  it("collapses mixed OL license types into one card, not 38", () => {
+    const support = [1, 2].map((n) =>
+      decision({
+        id: `license:support-${n}`,
+        title: "OL Day Support Certification",
+        trigger: "license_or_repayment_risk",
+        instanceId: `inst-support-${n}`,
+        obligationKey: "ol_day_support_cert_3or_fewer",
+      }),
+    );
+    const treatment = [1, 2].map((n) =>
+      decision({
+        id: `license:tx-${n}`,
+        title: "OL Day Treatment License",
+        trigger: "license_or_repayment_risk",
+        instanceId: `inst-tx-${n}`,
+        obligationKey: "ol_day_tx_license_4plus",
+      }),
+    );
+    const rolled = rollupDecisions([...support, ...treatment]);
+    assert.equal(rolled.length, 1);
+    assert.equal(rolled[0]?.count, 4);
+    const decorated = decorateDecision(rolled[0]!, { now: NOW });
+    assert.match(decorated.headline ?? "", /Renew 4 overdue licenses|Renew 4 OL licenses/);
+  });
 });
 
 describe("QuietLine I/O lock", () => {

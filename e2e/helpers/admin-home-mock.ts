@@ -892,6 +892,10 @@ function serverFnName(url: string, postText: string): string | null {
     "getThisWeekForUser",
     "proposeRemediationPlan",
     "reviewRemediationPlan",
+    "recordObligationOverride",
+    "recordSoloOverride",
+    "listOverridesForStaff",
+    "listOverridesForOrg",
     "generateMyReview",
     "getReviewDayMeta",
     "listPackWhatChanged",
@@ -1407,6 +1411,12 @@ function serverFnResult(
       return { result: { id: "e2e-plan-1" } };
     case "reviewRemediationPlan":
       return { result: { ok: true } };
+    case "recordObligationOverride":
+    case "recordSoloOverride":
+      return { result: { id: "e2e-override-1" } };
+    case "listOverridesForStaff":
+    case "listOverridesForOrg":
+      return { result: [] };
     default:
       break;
   }

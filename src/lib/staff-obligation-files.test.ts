@@ -113,6 +113,14 @@ describe("hasValidObligationEvidence", () => {
       true,
     );
     assert.equal(
+      hasValidObligationEvidence({
+        instanceStatus: "overdue",
+        hasCompletion: false,
+        nectarValidationStatus: null,
+      }),
+      false,
+    );
+    assert.equal(
       isAwaitingEvidenceReview({
         instanceStatus: "pending",
         nectarValidationStatus: "needs_review",
@@ -324,6 +332,13 @@ describe("Org-wide Staff file lock", () => {
     assert.match(panel, /OrgPersonnelFileMatrix/);
     assert.doesNotMatch(panel, /EVV/);
     assert.doesNotMatch(panel, /HRC/);
+    const filesTab = readFileSync(
+      new URL("../components/employees/staff-obligations-files-tab.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(filesTab, /Record override/);
+    assert.match(filesTab, /override-state/);
+    assert.match(filesTab, /OVERRIDE_STILL_REQUIRED/);
   });
 
   it("deletes the leftover open-every-profile HR matrix", () => {

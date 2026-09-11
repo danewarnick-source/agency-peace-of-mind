@@ -20,6 +20,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toDisplayNameCase } from "@/lib/person-name";
 import { buildStaffTask } from "@/lib/staff-my-tasks";
 import { MyTasksQueue } from "@/components/staff-tasks/my-tasks-queue";
+import { useStaffOverrides } from "@/hooks/use-obligation-overrides";
+import {
+  activeOverrideForTarget,
+  dutyKeyFromObligation,
+  overrideUntilLabel,
+} from "@/lib/obligations/overrides";
 
 function resolveTitle(row: MyObligationInstanceRow): string {
   if (row.obligation.scope === "staff_per_client" && row.client_name) {
@@ -41,6 +47,7 @@ export function StaffHomeMyTasks() {
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
     staleTime: 30_000,
   });
+  const overridesQ = useStaffOverrides(orgId, user?.id ?? null);
 
   const instances = useMemo(
     () =>
@@ -60,6 +67,7 @@ export function StaffHomeMyTasks() {
     enabled: !!user && instanceIds.length > 0,
     queryKey: ["my-obligation-completions", orgId, user?.id, instanceIds],
     queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("company_obligation_completions")
         .select("instance_id, nectar_validation_status, admin_notes")
@@ -93,15 +101,24 @@ export function StaffHomeMyTasks() {
   });
 
   const completionByInstance = useMemo(() => {
-    const m = new Map<string, { nectar_validation_status: string | null; admin_notes: string | null }>();
+    const m = new Map<
+      string,
+      { nectar_validation_status: string | null; admin_notes: string | null }
+    >();
     for (const row of completionsQ.data ?? []) m.set(row.instance_id, row);
     return m;
   }, [completionsQ.data]);
 
   const tasks = instances
     .filter((row) => completionByInstance.get(row.id)?.nectar_validation_status !== "passed")
-    .map((row) =>
-      buildStaffTask({
+    .map((row) => {
+      const override = activeOverrideForTarget(overridesQ.data ?? [], {
+        instanceId: row.id,
+        obligationId: row.obligation_id,
+        obligationKey: dutyKeyFromObligation(row.obligation),
+        staffId: user?.id ?? null,
+      });
+      return buildStaffTask({
         instanceId: row.id,
         title: resolveTitle(row),
         description: row.obligation.description,
@@ -116,8 +133,10 @@ export function StaffHomeMyTasks() {
           "Correction requested:",
         ),
         courseProgress: progressQ.data?.get(row.id) ?? null,
-      }),
-    );
+        overridden: !!override,
+        overrideUntil: overrideUntilLabel(override?.expires_at),
+      });
+    });
 
   if (!orgId || !user) return null;
   if (listQ.isLoading || (instances.length > 0 && completionsQ.isLoading)) return null;

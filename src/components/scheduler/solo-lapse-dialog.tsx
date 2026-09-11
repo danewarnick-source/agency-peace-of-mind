@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -39,6 +40,11 @@ export function SoloLapseDialog({
   onAllowSchedule,
 }: Props) {
   const [reason, setReason] = useState("");
+  const [expiresAt, setExpiresAt] = useState(() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
   const [mode, setMode] = useState<"choose" | "override" | "plan">("choose");
   const overrideFn = useServerFn(recordSoloOverride);
   const planFn = useServerFn(proposeRemediationPlan);
@@ -48,6 +54,7 @@ export function SoloLapseDialog({
       if (!organizationId) throw new Error("No active organization");
       const trimmed = reason.trim();
       if (trimmed.length < 8) throw new Error("Override reason must be at least 8 characters.");
+      if (!expiresAt) throw new Error("Override expiration is required.");
       for (const lapse of lapses) {
         await overrideFn({
           data: {
@@ -57,6 +64,8 @@ export function SoloLapseDialog({
             obligationId: lapse.obligationId,
             instanceId: lapse.instanceId,
             reason: trimmed,
+            expiresAt: new Date(`${expiresAt}T23:59:59.000Z`).toISOString(),
+            scope: lapse.instanceId ? "instance" : "staff_clock",
           },
         });
       }
@@ -115,8 +124,8 @@ export function SoloLapseDialog({
         <DialogHeader>
           <DialogTitle>Cannot work alone</DialogTitle>
           <DialogDescription>
-            {staffName} has a lapsed requirement that blocks working alone. Reassign the
-            shift, record a manager override, or submit a remediation plan.
+            {staffName} has a lapsed requirement that blocks working alone. Reassign the shift,
+            record a manager override, or submit a remediation plan.
           </DialogDescription>
         </DialogHeader>
         <ul className="space-y-1 text-sm">
@@ -143,6 +152,20 @@ export function SoloLapseDialog({
                   : "How this clock will be restored, and by when."
               }
             />
+            {mode === "override" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="solo-lapse-expires">Expires</Label>
+                <Input
+                  id="solo-lapse-expires"
+                  type="date"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Override on file. The requirement is not complete.
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <DialogFooter className="flex-col gap-2 sm:flex-row">
@@ -160,7 +183,12 @@ export function SoloLapseDialog({
             </>
           ) : (
             <>
-              <Button type="button" variant="outline" disabled={busy} onClick={() => setMode("choose")}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setMode("choose")}
+              >
                 Back
               </Button>
               <Button

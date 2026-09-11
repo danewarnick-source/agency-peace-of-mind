@@ -54,6 +54,12 @@ import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { ThreadsPanel } from "@/components/threads/threads-panel";
 import { MyTasksQueue } from "@/components/staff-tasks/my-tasks-queue";
 import { buildStaffTask, STAFF_TASKS_FOOTER } from "@/lib/staff-my-tasks";
+import { useStaffOverrides } from "@/hooks/use-obligation-overrides";
+import {
+  activeOverrideForTarget,
+  dutyKeyFromObligation,
+  overrideUntilLabel,
+} from "@/lib/obligations/overrides";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "Staff file — Provider Interface" }] }),
@@ -230,11 +236,15 @@ function OpenCard({
   instance,
   onCompleted,
   courseProgress,
+  overridden = false,
+  overrideUntil = null,
 }: {
   orgId: string;
   instance: MyObligationInstanceRow;
   onCompleted: () => void;
   courseProgress?: { completed: number; total: number } | null;
+  overridden?: boolean;
+  overrideUntil?: string | null;
 }) {
   const recordFn = useServerFn(recordCompletion);
   const policyFn = useServerFn(getAgencyPolicyForInstance);
@@ -400,6 +410,12 @@ function OpenCard({
           Optional — complete when you can. This does not block clock-in.
         </p>
       )}
+      {overridden ? (
+        <p data-testid="override-state" className="mt-1 text-sm font-medium text-amber-800">
+          Overridden{overrideUntil ? ` until ${overrideUntil}` : ""}. Override on file. The
+          requirement is not complete.
+        </p>
+      ) : null}
       {ob.description && <p className="mt-2 text-sm text-muted-foreground">{ob.description}</p>}
 
       <div className="mt-3 space-y-2">
@@ -692,6 +708,7 @@ function MyObligationsPage() {
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
   });
+  const overridesQ = useStaffOverrides(orgId ?? null, user?.id ?? null);
   const instances = (Array.isArray(instancesRaw) ? instancesRaw : []).filter(
     (row) => !isPackSentinel(row.obligation),
   );
@@ -800,6 +817,14 @@ function MyObligationsPage() {
     for (const c of myCompletions) m.set(c.instance_id, c);
     return m;
   }, [myCompletions]);
+
+  const overrideFor = (inst: MyObligationInstanceRow) =>
+    activeOverrideForTarget(overridesQ.data ?? [], {
+      instanceId: inst.id,
+      obligationId: inst.obligation_id,
+      obligationKey: dutyKeyFromObligation(inst.obligation),
+      staffId: user?.id ?? null,
+    });
 
   const [tab, setTab] = useState<"all" | "missing" | "due_soon" | "on_file">("all");
 
@@ -947,6 +972,8 @@ function MyObligationsPage() {
                 completionByInstance.get(inst.id)?.admin_notes ?? "",
               ).startsWith("Correction requested:"),
               courseProgress: courseProgressByInstance.get(inst.id) ?? null,
+              overridden: !!overrideFor(inst),
+              overrideUntil: overrideUntilLabel(overrideFor(inst)?.expires_at),
             }),
           )}
           staffLabel={user.email ? `${user.email} · Staff` : "Staff"}
@@ -1080,6 +1107,8 @@ function MyObligationsPage() {
                   instance={inst}
                   onCompleted={onCompleted}
                   courseProgress={courseProgressByInstance.get(inst.id) ?? null}
+                  overridden={!!overrideFor(inst)}
+                  overrideUntil={overrideUntilLabel(overrideFor(inst)?.expires_at)}
                 />
               );
             };

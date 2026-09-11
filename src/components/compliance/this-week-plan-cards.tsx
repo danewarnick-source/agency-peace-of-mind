@@ -7,14 +7,18 @@ import { DecisionCard } from "@/components/compliance/decision-card";
 import { LicenseRiskPlanDialog } from "@/components/compliance/license-risk-plan-dialog";
 import { OverdueObligationPlanDialog } from "@/components/compliance/overdue-obligation-plan-dialog";
 import { StandingRecordPlanDialog } from "@/components/compliance/standing-record-plan-dialog";
+import { RecordOverrideDialog } from "@/components/compliance/record-override-dialog";
+import { useOrgOverrides } from "@/hooks/use-obligation-overrides";
+import {
+  activeOverrideForTarget,
+  isWaivableObligationKey,
+  overrideUntilLabel,
+} from "@/lib/obligations/overrides";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { isAdminLevelRole } from "@/lib/obligations/escalation";
 import { kindFromEscalationTrigger } from "@/lib/obligations/remediation";
-import {
-  getThisWeekForUser,
-  reviewRemediationPlan,
-} from "@/lib/obligations/remediation.functions";
+import { getThisWeekForUser, reviewRemediationPlan } from "@/lib/obligations/remediation.functions";
 import {
   decorateDecision,
   emptyAlreadyAssigned,
@@ -88,7 +92,13 @@ function asWeek(data: unknown): {
     };
   }
   if (typeof data !== "object") return empty;
-  const rec = data as { items?: Decision[]; quiet?: QuietLine; alreadyAssigned?: AlreadyAssignedStrip; automation?: AutomationHeartbeat; result?: unknown };
+  const rec = data as {
+    items?: Decision[];
+    quiet?: QuietLine;
+    alreadyAssigned?: AlreadyAssignedStrip;
+    automation?: AutomationHeartbeat;
+    result?: unknown;
+  };
   const inner = rec.result ?? rec;
   if (Array.isArray(inner)) {
     return {
@@ -116,6 +126,7 @@ export function ThisWeekPlanCards() {
   const review = useServerFn(reviewRemediationPlan);
   const [openKind, setOpenKind] = useState<PlanDialogKind | null>(null);
   const [activeItem, setActiveItem] = useState<Decision | null>(null);
+  const [overrideItem, setOverrideItem] = useState<Decision | null>(null);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
   const orgId = org?.organization_id ?? null;
@@ -123,6 +134,7 @@ export function ThisWeekPlanCards() {
     ? isAdminLevelRole(org.role) || org.role === "manager" || org.role === "program_manager"
     : false;
   const viewerId = user?.id ?? null;
+  const overridesQ = useOrgOverrides(orgId, canManage);
 
   const q = useQuery({
     enabled: !!orgId && canManage,
@@ -154,7 +166,22 @@ export function ThisWeekPlanCards() {
 
   const week = asWeek(q.data);
   const items = sortThisWeekItems(
-    rollupDecisions(week.items).map((d) => decorateDecision(d, { viewerUserId: viewerId })),
+    rollupDecisions(week.items).map((d) => {
+      const override = activeOverrideForTarget(overridesQ.data ?? [], {
+        instanceId: d.instanceId,
+        obligationId: d.obligationId,
+        obligationKey: d.obligationKey,
+        staffId: d.staffUserId,
+      });
+      return decorateDecision(
+        {
+          ...d,
+          overridden: !!override,
+          overrideUntil: overrideUntilLabel(override?.expires_at),
+        },
+        { viewerUserId: viewerId },
+      );
+    }),
   );
   const visible = items.slice(0, HOME_CARD_CAP);
   const extra = Math.max(0, items.length - HOME_CARD_CAP);
@@ -203,6 +230,11 @@ export function ThisWeekPlanCards() {
                 setActiveItem(item);
                 setOpenKind(logKind);
               }}
+              onRecordOverride={
+                item.staffUserId && isWaivableObligationKey(item.obligationKey)
+                  ? () => setOverrideItem(item)
+                  : undefined
+              }
             />
           ))}
         </ul>
@@ -245,11 +277,7 @@ export function ThisWeekPlanCards() {
       >
         {quietText}
       </div>
-      <p
-        data-testid="automation-line"
-        className="text-xs"
-        style={{ color: PI_THEME.c50 }}
-      >
+      <p data-testid="automation-line" className="text-xs" style={{ color: PI_THEME.c50 }}>
         {automationText}
       </p>
       {activeItem ? (
@@ -283,13 +311,26 @@ export function ThisWeekPlanCards() {
           />
         </>
       ) : null}
+      {overrideItem?.staffUserId && overrideItem.obligationKey ? (
+        <RecordOverrideDialog
+          open={!!overrideItem}
+          organizationId={orgId}
+          staffId={overrideItem.staffUserId}
+          title={overrideItem.title}
+          obligationKey={overrideItem.obligationKey}
+          obligationId={overrideItem.obligationId}
+          instanceId={overrideItem.instanceId}
+          scope={overrideItem.instanceId ? "instance" : "staff_clock"}
+          onOpenChange={(open) => {
+            if (!open) setOverrideItem(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
 
-export function thisWeekDecisionCount(
-  items: ThisWeekItem[] | ThisWeekResult | undefined,
-): number {
+export function thisWeekDecisionCount(items: ThisWeekItem[] | ThisWeekResult | undefined): number {
   if (!items) return 0;
   if (Array.isArray(items)) return items.filter((i) => i.kind === "decision").length;
   return items.items.length;

@@ -44,6 +44,17 @@ import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
 import { loadInHiveCourseCertificate } from "@/lib/in-hive-training.functions";
 import { InHiveCertificate } from "@/components/training/in-hive-certificate";
 import type { ThirtyDayCertificateRecord } from "@/lib/in-hive-training";
+import { RecordOverrideDialog } from "@/components/compliance/record-override-dialog";
+import { useStaffOverrides } from "@/hooks/use-obligation-overrides";
+import {
+  OVERRIDE_STATE_LABEL,
+  OVERRIDE_STILL_REQUIRED,
+  activeOverrideForTarget,
+  auditOverrideHistory,
+  dutyKeyFromObligation,
+  isWaivableObligationKey,
+  overrideUntilLabel,
+} from "@/lib/obligations/overrides";
 
 type FileRow = {
   instance: StaffObligationFileRow;
@@ -55,9 +66,17 @@ type FileRow = {
   awaitingReview: boolean;
   evidenceTypeUsed: string | null;
   canUpload: boolean;
+  overridden: boolean;
+  overrideUntil: string | null;
+  waivable: boolean;
+  dutyKey: string | null;
 };
 
-function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
+function buildRows(
+  raw: StaffObligationFileRow[],
+  overrides: Parameters<typeof activeOverrideForTarget>[0] = [],
+  staffId?: string,
+): FileRow[] {
   return raw.map((instance) => {
     const completion = instance.completion;
     const hasCompletion = !!(
@@ -89,6 +108,13 @@ function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
       nectarValidationStatus: completion?.nectar_validation_status ?? null,
     });
     const evidenceTypeUsed = completion?.evidence_type_used ?? null;
+    const dutyKey = dutyKeyFromObligation(instance.obligation);
+    const override = activeOverrideForTarget(overrides, {
+      instanceId: instance.id,
+      obligationId: instance.obligation_id,
+      obligationKey: dutyKey,
+      staffId: staffId ?? instance.assignee_staff_id,
+    });
     return {
       instance,
       title: liveObligationTitle(
@@ -110,6 +136,10 @@ function buildRows(raw: StaffObligationFileRow[]): FileRow[] {
         cycle === "current" &&
         (instance.status === "pending" || instance.status === "overdue") &&
         instance.obligation.evidence_type !== "attestation",
+      overridden: !!override,
+      overrideUntil: overrideUntilLabel(override?.expires_at),
+      waivable: isWaivableObligationKey(dutyKey),
+      dutyKey,
     };
   });
 }
@@ -159,6 +189,8 @@ export function StaffObligationsFilesTab({
   const [viewIndex, setViewIndex] = useState(0);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [nativeCert, setNativeCert] = useState<ThirtyDayCertificateRecord | null>(null);
+  const [overrideRow, setOverrideRow] = useState<FileRow | null>(null);
+  const overridesQ = useStaffOverrides(organizationId, staffId);
 
   const listQ = useQuery({
     queryKey: ["staff-obligation-files", organizationId, staffId],
@@ -167,13 +199,13 @@ export function StaffObligationsFilesTab({
   });
 
   const rows = useMemo(() => {
-    const built = buildRows(listQ.data ?? []);
+    const built = buildRows(listQ.data ?? [], overridesQ.data ?? [], staffId);
     return built.sort((a, b) => {
       if (a.title !== b.title) return a.title.localeCompare(b.title);
       if (a.cycle !== b.cycle) return a.cycle === "current" ? -1 : 1;
       return b.instance.due_at.localeCompare(a.instance.due_at);
     });
-  }, [listQ.data]);
+  }, [listQ.data, overridesQ.data, staffId]);
   const uploadableRows = rows.filter((r) => r.canUpload);
   const selectedRows = rows.filter((r) => selected.has(r.instance.id));
   const viewQueue = useMemo(
@@ -423,11 +455,26 @@ export function StaffObligationsFilesTab({
                     {row.awaitingReview ? (
                       <p className="mt-1 text-xs text-amber-900">Awaiting review</p>
                     ) : null}
+                    {row.overridden ? (
+                      <p
+                        data-testid="override-state"
+                        className="mt-1 text-xs font-medium text-amber-900"
+                      >
+                        {OVERRIDE_STATE_LABEL}
+                        {row.overrideUntil ? ` until ${row.overrideUntil}` : ""}.{" "}
+                        {OVERRIDE_STILL_REQUIRED}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                     {formatDue(row.instance.due_at)}
                   </td>
                   <td className="px-3 py-2 text-right">
+                    {row.waivable && row.cycle === "current" && row.dutyKey ? (
+                      <Button size="sm" variant="outline" onClick={() => setOverrideRow(row)}>
+                        Record override
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -584,6 +631,38 @@ export function StaffObligationsFilesTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {overridesQ.data && overridesQ.data.length > 0 ? (
+        <div data-testid="override-audit" className="rounded-lg border border-border p-3">
+          <p className="text-sm font-medium">Override history</p>
+          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+            {auditOverrideHistory(overridesQ.data).map((entry) => (
+              <li key={entry.id}>
+                {entry.created_at ? new Date(entry.created_at).toLocaleDateString() : "—"} ·{" "}
+                {entry.authorized_by ?? "Manager"} · {entry.reason}
+                {entry.expires_at ? ` · expires ${overrideUntilLabel(entry.expires_at)}` : ""}
+                {entry.active ? "" : " · expired"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {overrideRow?.dutyKey ? (
+        <RecordOverrideDialog
+          open={!!overrideRow}
+          organizationId={organizationId}
+          staffId={staffId}
+          title={overrideRow.title}
+          obligationKey={overrideRow.dutyKey}
+          obligationId={overrideRow.instance.obligation_id}
+          instanceId={overrideRow.instance.id}
+          scope="instance"
+          onOpenChange={(open) => {
+            if (!open) setOverrideRow(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

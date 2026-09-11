@@ -188,6 +188,8 @@ describe("plan kinds and owners", () => {
     assert.match(src, /LicenseRiskPlanDialog/);
     assert.match(src, /StandingRecordPlanDialog/);
     assert.match(src, /OverdueObligationPlanDialog/);
+    assert.match(src, /RecordOverrideDialog/);
+    assert.match(card, /override-state/);
     assert.match(src, /HOME_CARD_CAP = 3/);
     assert.match(src, /thisWeekStatusLine/);
     assert.match(decorate, /"Three"/);

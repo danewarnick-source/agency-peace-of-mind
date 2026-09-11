@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { STAFF_TASKS_FOOTER, type StaffTask, type StaffTaskActionKind } from "@/lib/staff-my-tasks";
+import { OVERRIDE_STATE_LABEL, OVERRIDE_STILL_REQUIRED } from "@/lib/obligations/overrides";
 
 export function MyTasksQueue({
   tasks,
@@ -31,9 +32,7 @@ export function MyTasksQueue({
         >
           My tasks
         </h2>
-        {staffLabel ? (
-          <p className="mt-0.5 text-sm text-muted-foreground">{staffLabel}</p>
-        ) : null}
+        {staffLabel ? <p className="mt-0.5 text-sm text-muted-foreground">{staffLabel}</p> : null}
       </div>
       {shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
@@ -55,13 +54,20 @@ export function MyTasksQueue({
                       Pending review
                     </p>
                   ) : null}
+                  {task.overridden ? (
+                    <p
+                      data-testid="override-state"
+                      className="text-sm font-medium text-amber-800 dark:text-amber-200"
+                    >
+                      {OVERRIDE_STATE_LABEL}
+                      {task.overrideUntil ? ` until ${task.overrideUntil}` : ""}.{" "}
+                      {OVERRIDE_STILL_REQUIRED}
+                    </p>
+                  ) : null}
                   {task.progressLabel ? (
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{task.progressLabel}</p>
-                      <div
-                        className="h-1.5 overflow-hidden rounded-full bg-muted"
-                        aria-hidden
-                      >
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
                         <div
                           className="h-full rounded-full bg-emerald-600"
                           style={{

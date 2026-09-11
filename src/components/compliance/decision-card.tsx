@@ -1,6 +1,7 @@
 import { PI_THEME } from "@/lib/pi-theme";
 import type { Decision, DecisionActionKind } from "@/lib/obligations/this-week";
 import { decorateDecision } from "@/lib/obligations/this-week";
+import { OVERRIDE_STATE_LABEL, OVERRIDE_STILL_REQUIRED } from "@/lib/obligations/overrides";
 import { cn } from "@/lib/utils";
 import "./decision-card.css";
 
@@ -24,12 +25,14 @@ export function DecisionCard({
   reviewing = false,
   viewerUserId,
   onAction,
+  onRecordOverride,
 }: {
   item: Decision;
   done?: boolean;
   reviewing?: boolean;
   viewerUserId?: string | null;
   onAction: (kind: DecisionActionKind, decision: "approved" | "rejected" | "open") => void;
+  onRecordOverride?: () => void;
 }) {
   const decorated = decorateDecision(item, { viewerUserId });
   const headline = decorated.headline ?? decorated.title;
@@ -52,7 +55,11 @@ export function DecisionCard({
       }}
     >
       <div className="act-head">
-        <div data-testid="decision-headline" className="act-headline" style={{ color: PI_THEME.cream }}>
+        <div
+          data-testid="decision-headline"
+          className="act-headline"
+          style={{ color: PI_THEME.cream }}
+        >
           {headline}
         </div>
         <span
@@ -66,6 +73,12 @@ export function DecisionCard({
       <p data-testid="decision-why" className="act-why" style={{ color: PI_THEME.c70 }}>
         {why}
       </p>
+      {item.overridden ? (
+        <p data-testid="override-state" className="act-why" style={{ color: PI_THEME.amber }}>
+          {OVERRIDE_STATE_LABEL}
+          {item.overrideUntil ? ` until ${item.overrideUntil}` : ""}. {OVERRIDE_STILL_REQUIRED}
+        </p>
+      ) : null}
       <div className="act-meta" style={{ color: PI_THEME.c50 }}>
         <span data-testid="decision-owner">Owner: {ownerText}</span>
         <span data-testid="decision-if-missed">If missed: {ifMissed}</span>
@@ -100,7 +113,7 @@ export function DecisionCard({
           </button>
         </div>
       ) : (
-        <div data-testid="decision-action">
+        <div data-testid="decision-action" className="flex flex-wrap gap-2">
           <button
             type="button"
             className="act-btn"
@@ -113,6 +126,20 @@ export function DecisionCard({
           >
             {action.label}
           </button>
+          {onRecordOverride ? (
+            <button
+              type="button"
+              className="act-btn"
+              style={{
+                background: PI_THEME.buttons.secondaryBg,
+                color: PI_THEME.buttons.secondaryFg,
+                border: `1px solid ${PI_THEME.buttons.secondaryBorder}`,
+              }}
+              onClick={onRecordOverride}
+            >
+              Record override
+            </button>
+          ) : null}
         </div>
       )}
     </li>

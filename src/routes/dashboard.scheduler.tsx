@@ -43,6 +43,9 @@ import { RequestsPanel } from "@/components/schedule-preview/requests-panel";
 import { NectarBar } from "@/components/scheduler/nectar-bar";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { createRecurringShifts } from "@/lib/scheduler/repeat.functions";
+import { SoloLapseDialog } from "@/components/scheduler/solo-lapse-dialog";
+import { listSoloLapsesForStaff } from "@/lib/obligations/remediation.functions";
+import type { SoloLapse } from "@/lib/obligations/solo-lapse";
 import { denverYmd } from "@/lib/denver-date";
 import { layoutShiftBars } from "@/lib/scheduler/recurrence";
 import { HiveMark } from "@/components/brand/hive-mark";
@@ -895,6 +898,8 @@ function AddShiftDialog({
   const recur = useServerFn(createRecurringShifts);
   const missingThirtyDayFn = useServerFn(getMissingThirtyDayStaffIds);
   const missingAbiFn = useServerFn(getMissingAbiStaffIds);
+  const listSoloLapses = useServerFn(listSoloLapsesForStaff);
+  const [lapseOpen, setLapseOpen] = useState(false);
   const { data: missingData } = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["sow-r3", org?.organization_id],
@@ -971,6 +976,22 @@ function AddShiftDialog({
   const selectedStaffMissing30Day =
     staffId !== "__open__" && missingThirtyDay.has(staffId);
 
+  const { data: soloLapses = [] } = useQuery({
+    enabled: !!org?.organization_id && staffId !== "__open__",
+    queryKey: ["solo-lapses", org?.organization_id, staffId, clientHasAbi],
+    queryFn: () =>
+      listSoloLapses({
+        data: {
+          organizationId: org!.organization_id,
+          staffId,
+          hasAbi: clientHasAbi,
+        },
+      }),
+    staleTime: 60_000,
+  });
+  const selectedStaffName =
+    sched.staff.find((s) => s.id === staffId)?.name ?? "This staff member";
+
   const toggleWeekday = (n: number) =>
     setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
 
@@ -1034,6 +1055,7 @@ function AddShiftDialog({
   })();
 
   return (
+    <>
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg max-h-[90dvh] max-md:max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0 max-md:overflow-hidden">
         <DialogHeader className="shrink-0 px-6 pt-6 pb-3 pr-12">
@@ -1220,7 +1242,13 @@ function AddShiftDialog({
         >
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
-            onClick={() => saveMut.mutate()}
+            onClick={() => {
+              if (staffId !== "__open__" && soloLapses.length > 0) {
+                setLapseOpen(true);
+                return;
+              }
+              saveMut.mutate();
+            }}
             disabled={
               !clientId ||
               !code ||
@@ -1235,6 +1263,18 @@ function AddShiftDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {org?.organization_id && staffId !== "__open__" ? (
+      <SoloLapseDialog
+        open={lapseOpen}
+        organizationId={org.organization_id}
+        staffId={staffId}
+        staffName={selectedStaffName}
+        lapses={soloLapses}
+        onOpenChange={setLapseOpen}
+        onAllowSchedule={() => saveMut.mutate()}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -1262,6 +1302,9 @@ function ShiftDetailPanel({
   const del = useServerFn(deleteShift);
   const add = useServerFn(addToCaseload);
   const missingThirtyDayFn = useServerFn(getMissingThirtyDayStaffIds);
+  const listSoloLapses = useServerFn(listSoloLapsesForStaff);
+  const [lapseOpen, setLapseOpen] = useState(false);
+  const [pendingStaffId, setPendingStaffId] = useState<string | null>(null);
   const { data: missingData } = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["sow-r3", org?.organization_id],
@@ -1290,6 +1333,9 @@ function ShiftDetailPanel({
   const { can } = usePermissions();
   const canManageSchedule = can("create_shifts");
 
+  const clientHasAbi = !!client?.has_abi;
+  const [pendingLapses, setPendingLapses] = useState<SoloLapse[]>([]);
+
   const assign = useMutation({
     mutationFn: (newStaffId: string | null) => {
       if (!canManageSchedule) throw new Error("You don't have permission to edit shifts.");
@@ -1314,6 +1360,32 @@ function ShiftDetailPanel({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const tryAssign = async (newStaffId: string | null) => {
+    if (!newStaffId || !org?.organization_id) {
+      assign.mutate(newStaffId);
+      return;
+    }
+    try {
+      const lapses = await listSoloLapses({
+        data: {
+          organizationId: org.organization_id,
+          staffId: newStaffId,
+          hasAbi: clientHasAbi,
+        },
+      });
+      if (lapses.length > 0) {
+        setPendingStaffId(newStaffId);
+        setPendingLapses(lapses);
+        setLapseOpen(true);
+        return;
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not check solo-lapse status.");
+      return;
+    }
+    assign.mutate(newStaffId);
+  };
 
   const dupMut = useMutation({
     mutationFn: () => {
@@ -1368,7 +1440,11 @@ function ShiftDetailPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const pendingName =
+    (pendingStaffId && staffById.get(pendingStaffId)?.name) || "This staff member";
+
   return (
+    <>
     <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-white border-l shadow-xl flex flex-col" style={{ borderColor: LINE }}>
       <div className="flex items-center gap-2 p-3 border-b" style={{ borderColor: LINE, background: "#fbfaf6" }}>
         <span style={{ background: codeColor(code), color: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 800, fontSize: 11 }}>{code}</span>
@@ -1395,7 +1471,7 @@ function ShiftDetailPanel({
         <Field label="ASSIGNED STAFF">
           <Select
             value={shift.staff_id ?? "__open__"}
-            onValueChange={(v) => assign.mutate(v === "__open__" ? null : v)}
+            onValueChange={(v) => void tryAssign(v === "__open__" ? null : v)}
             disabled={!canManageSchedule}
           >
             <SelectTrigger>
@@ -1458,10 +1534,10 @@ function ShiftDetailPanel({
                         {s.name}
                       </div>
                       {onCaseload ? (
-                        <Button size="sm" variant="outline" onClick={() => assign.mutate(s.id)}>Assign</Button>
+                        <Button size="sm" variant="outline" onClick={() => void tryAssign(s.id)}>Assign</Button>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" onClick={async () => { await addCl.mutateAsync(s.id); assign.mutate(s.id); }}>
+                          <Button size="sm" variant="outline" onClick={async () => { await addCl.mutateAsync(s.id); await tryAssign(s.id); }}>
                             Add to caseload
                           </Button>
                           <Link to="/dashboard/employees/$staffId" params={{ staffId: s.id }} aria-label="Open profile">
@@ -1482,6 +1558,21 @@ function ShiftDetailPanel({
         </div>
       </div>
     </div>
+    {org?.organization_id && pendingStaffId ? (
+      <SoloLapseDialog
+        open={lapseOpen}
+        organizationId={org.organization_id}
+        staffId={pendingStaffId}
+        staffName={pendingName}
+        lapses={pendingLapses}
+        onOpenChange={(next) => {
+          setLapseOpen(next);
+          if (!next) setPendingStaffId(null);
+        }}
+        onAllowSchedule={() => assign.mutate(pendingStaffId)}
+      />
+    ) : null}
+    </>
   );
 }
 

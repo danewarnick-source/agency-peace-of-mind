@@ -10,6 +10,14 @@ import {
   type EscalationUrgency,
   type OrgMemberRow,
 } from "./escalation.ts";
+import {
+  consequenceForPlanKind,
+  loadAwaitingApprovalPlans,
+  pickPlanOwner,
+  planOwnerLabel,
+  urgencyForPlan,
+  type RemediationPlanKind,
+} from "./remediation.ts";
 import { evvStaffIdsForScope, resolveScopeFromSnapshot } from "./scope.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +39,8 @@ export type Decision = {
   obligationId?: string | null;
   obligationKey?: string | null;
   subjectName?: string | null;
+  planId?: string | null;
+  planKind?: RemediationPlanKind | null;
 };
 
 export type QuietSummary = {
@@ -91,16 +101,30 @@ function hitToDecision(hit: EscalationHit): Decision {
 async function loadRemediationPlansAwaitingApproval(
   supabase: AnySupabase,
   organizationId: string,
+  members: OrgMemberRow[],
+  now: Date,
 ): Promise<Decision[]> {
-  // Step 4 is not built. Skip if the table is missing.
-  const { error } = await supabase
-    .from("remediation_plans")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .limit(1);
-  if (error && tableMissing(error.message)) return [];
-  if (error) return [];
-  return [];
+  const rows = await loadAwaitingApprovalPlans(supabase, organizationId);
+  return rows.map((row) => {
+    const overdue = !!(row.due_at && new Date(row.due_at).getTime() < now.getTime());
+    return {
+      kind: "decision" as const,
+      id: `remediation_plan:${row.id}`,
+      title: row.title,
+      body: row.plan_text,
+      urgency: urgencyForPlan(row.kind, overdue),
+      dueAt: row.due_at,
+      ownerUserId: pickPlanOwner(row.kind, row.staff_id, members),
+      ownerLabel: planOwnerLabel(row.kind),
+      consequence: consequenceForPlanKind(row.kind),
+      source: "remediation_plan" as const,
+      instanceId: row.instance_id,
+      obligationId: row.obligation_id,
+      obligationKey: row.obligation_key,
+      planId: row.id,
+      planKind: row.kind,
+    };
+  });
 }
 
 async function loadProposedNectarRequirements(
@@ -206,9 +230,6 @@ export async function getThisWeek(
 
   const adminLevel = membership ? isAdminLevelRole(membership.role) : false;
 
-  // 1. Open remediation_plans awaiting approval — Step 4 not built.
-  items.push(...(await loadRemediationPlansAwaitingApproval(supabase, orgId)));
-
   const input = await loadEvaluateInput(supabase, orgId, now);
   const hits = evaluateEscalations(input);
   const viewerScope = resolveScopeFromSnapshot(orgId, userId, {
@@ -218,6 +239,16 @@ export async function getThisWeek(
     scopeByStaffId: input.scopeByStaffId ?? {},
     leadsByGroupId: input.leadsByGroupId ?? {},
   });
+
+  // 1. Open remediation_plans awaiting approval (Step 4). Owner-scoped
+  // like the other sources so each manager sees their cards.
+  const planDecisions = await loadRemediationPlansAwaitingApproval(
+    supabase,
+    orgId,
+    input.members as OrgMemberRow[],
+    now,
+  );
+  items.push(...planDecisions.filter((d) => d.ownerUserId === userId));
 
   // 2. Escalation triggers true AND resolveRecipient = this user.
   for (const hit of hits) {

@@ -32,6 +32,7 @@ import {
   staffCourseProgressLabel,
   topicCodesForCourse,
 } from "@/lib/in-hive-training";
+import { ANNUAL_CE_COURSE_ID } from "@/lib/in-hive-training-annual-ce";
 import { PCT_COURSE_ID } from "@/lib/in-hive-training-pct";
 import {
   completedCodesFromProgress,
@@ -265,7 +266,8 @@ function OpenCard({
   const needsAttestation =
     ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
   const isThirtyDay = courseId === "thirty-day";
-  const showUploadAlternative = courseId === "thirty-day" || courseId === PCT_COURSE_ID;
+  const showUploadAlternative =
+    courseId === "thirty-day" || courseId === PCT_COURSE_ID || courseId === ANNUAL_CE_COURSE_ID;
   const canSubmit =
     ob.evidence_type === "form"
       ? true
@@ -388,9 +390,11 @@ function OpenCard({
             <div className="rounded-lg border border-border bg-muted/30 p-3">
               <p className="text-sm font-medium">In-platform course</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {courseId === PCT_COURSE_ID
-                  ? "Open the course from here. Finish each topic, then pass the competency exam (12 of 15, three tries). Completing the exam marks this same card On file."
-                  : "Open the course from here. Finish each topic, then pass the competency exam (80%, three tries). Completing the exam marks this same card On file."}
+                {courseId === ANNUAL_CE_COURSE_ID
+                  ? "Coming soon — the in-platform 12-hour course is not built yet. A training seat opens this placeholder. Upload CE certificates on this card to mark it On file."
+                  : courseId === PCT_COURSE_ID
+                    ? "Open the course from here. Finish each topic, then pass the competency exam (12 of 15, three tries). Completing the exam marks this same card On file."
+                    : "Open the course from here. Finish each topic, then pass the competency exam (80%, three tries). Completing the exam marks this same card On file."}
               </p>
               {courseProgress && courseProgress.total > 0 ? (
                 <p className="mt-1 text-sm font-medium">
@@ -410,9 +414,11 @@ function OpenCard({
               <div className="rounded-lg border border-dashed border-border p-3">
                 <p className="text-sm font-medium">Or upload a certificate</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {courseId === PCT_COURSE_ID
-                    ? "A certificate upload clears this same hire-level PCT card. You do not need both."
-                    : "A certificate upload clears this same 30-day card. You do not need both."}
+                  {courseId === ANNUAL_CE_COURSE_ID
+                    ? "Upload CE certificates here. The placeholder course does not mark this card On file."
+                    : courseId === PCT_COURSE_ID
+                      ? "A certificate upload clears this same hire-level PCT card. You do not need both."
+                      : "A certificate upload clears this same 30-day card. You do not need both."}
                 </p>
                 <div className="mt-2 flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-3 py-2">
                   <Button

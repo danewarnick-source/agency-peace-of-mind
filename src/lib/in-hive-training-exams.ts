@@ -1,3 +1,4 @@
+import { ANNUAL_CE_COURSE_ID } from "./in-hive-training-annual-ce.ts";
 import type { ExamQuestion } from "./in-hive-training";
 import type { InHiveCourseId } from "./in-hive-training";
 
@@ -533,5 +534,6 @@ export function examQuestionsFor(courseId: InHiveCourseId): ExamQuestion[] {
 export function examTitleFor(courseId: InHiveCourseId): string {
   if (courseId === "thirty-day") return "30-day orientation competency exam";
   if (courseId === "abi") return "ABI competency exam";
+  if (courseId === ANNUAL_CE_COURSE_ID) return "Annual 12-hour continuing education (coming soon)";
   return "Person-centered thinking competency exam";
 }

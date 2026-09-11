@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   TRAINING_SEAT_FAMILY,
+  courseUsesTrainingSeat,
   courseUsesThirtyDaySeat,
   officeStaffMayTakeThirtyDay,
   orgSelectMissingBillingExempt,
@@ -12,6 +13,7 @@ import {
   staffMatchesRosterRow,
   thirtyDayOrgIsComped,
 } from "./in-hive-training-access.ts";
+import { ANNUAL_CE_COURSE_ID } from "./in-hive-training-annual-ce.ts";
 import { PCT_COURSE_ID } from "./in-hive-training-pct.ts";
 
 describe("thirty-day paywall", () => {
@@ -67,21 +69,23 @@ describe("thirty-day paywall", () => {
     assert.equal(r.charged, true);
   });
 
-  it("gates hire-level PCT with the same 30-day seat, not ABI or 12-hour", () => {
-    assert.equal(courseUsesThirtyDaySeat("thirty-day"), true);
-    assert.equal(courseUsesThirtyDaySeat(PCT_COURSE_ID), true);
-    assert.equal(courseUsesThirtyDaySeat("abi"), false);
-    assert.deepEqual([...TRAINING_SEAT_FAMILY.gatedByThirtyDaySeat], [
+  it("gates 30-day, PCT, ABI, and 12-hour CE on the same training seat", () => {
+    assert.equal(courseUsesTrainingSeat("thirty-day"), true);
+    assert.equal(courseUsesTrainingSeat(PCT_COURSE_ID), true);
+    assert.equal(courseUsesTrainingSeat("abi"), true);
+    assert.equal(courseUsesTrainingSeat(ANNUAL_CE_COURSE_ID), true);
+    assert.equal(courseUsesThirtyDaySeat("abi"), true);
+    assert.deepEqual([...TRAINING_SEAT_FAMILY.gatedByTrainingSeat], [
       "thirty-day",
       PCT_COURSE_ID,
+      "abi",
+      ANNUAL_CE_COURSE_ID,
     ]);
-    assert.deepEqual([...TRAINING_SEAT_FAMILY.inHiveCourseNoSeat], ["abi"]);
-    assert.deepEqual([...TRAINING_SEAT_FAMILY.obligationOnlyNoCourse], ["annual-ce"]);
     const courseRoute = readFileSync(
       new URL("../routes/dashboard.my-obligations_.course.$instanceId.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(courseRoute, /courseUsesThirtyDaySeat/);
+    assert.match(courseRoute, /courseUsesTrainingSeat/);
     assert.match(courseRoute, /thirtyDayCourseAccessFn/);
     assert.match(courseRoute, /thirtyDayOrgIsComped/);
   });

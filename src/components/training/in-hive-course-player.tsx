@@ -36,6 +36,7 @@ import {
   type InHiveCourseId,
   type SegmentProof,
 } from "@/lib/in-hive-training";
+import { ANNUAL_CE_COURSE_ID } from "@/lib/in-hive-training-annual-ce";
 import {
   PCT_COURSE_ID,
   pctTopicsFromPublic,
@@ -82,7 +83,8 @@ type Props = {
 function topicsForCourse(courseId: InHiveCourseId, pctLessons: PctPublicLesson[] | undefined): Topic[] {
   if (courseId === "thirty-day") return thirtyDayTopicsInSowOrder();
   if (courseId === "abi") return ABI_TOPICS;
-  return pctTopicsFromPublic(pctLessons ?? []);
+  if (courseId === PCT_COURSE_ID) return pctTopicsFromPublic(pctLessons ?? []);
+  return [];
 }
 
 export function InHiveCoursePlayer({
@@ -128,6 +130,7 @@ export function InHiveCoursePlayer({
 
   const examQ = useQuery({
     queryKey: ["in-hive-exam", userId, courseId, examResetAfterIso],
+    enabled: courseId !== ANNUAL_CE_COURSE_ID,
     queryFn: () => loadInHiveExamAttempts(userId, courseId, examResetAfterIso),
   });
 
@@ -397,6 +400,22 @@ export function InHiveCoursePlayer({
     const next = topics[idx + 1];
     setActiveCode(next ? next.code : "exam");
   };
+
+  if (courseId === ANNUAL_CE_COURSE_ID) {
+    return (
+      <div className="rounded-xl border bg-card p-5 text-sm space-y-3">
+        <p className="font-medium">Coming soon</p>
+        <p className="text-muted-foreground">
+          The 12-hour continuing education course is not built yet. Upload certificates on this
+          staff-file card, or log hours in the CE ledger. This placeholder does not mark the card
+          On file.
+        </p>
+        <Button variant="outline" asChild>
+          <Link to="/dashboard/my-obligations">Back to staff file</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (
     progressQ.isLoading ||

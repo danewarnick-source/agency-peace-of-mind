@@ -4923,6 +4923,7 @@ Course id `pi-person-centered-foundations` reuses existing:
 - hire-level obligation title `Person-Centered Thinking and Practices Training` (already seeded)
 - `company_obligation_instances` via existing `recordCompletion` (`evidence_type_used = in_hive_course`) when the exam passes (`PCT_COURSE_FULFILLS_OBLIGATION = true`)
 - Same 30-day seat check: `training_classes` / `training_class_roster` (`thirty_day` or `package`) and `training_only_seats` (`thirty_day` or `pack`); TNS / billing-exempt skip the seat (`thirtyDayOrgIsComped`)
+- That same seat also unlocks ABI (existing course) and the 12-hour CE placeholder (`pi-annual-ce-12hr`, UUID course byte `04`). Placeholder does not write On file.
 - Upload on the same staff-file card remains an alternate path (you do not need both)
 
 Answer keys stay in `src/lib/person-centered-training-content.json` and are scored only in `src/lib/in-hive-training-pct.functions.ts`.

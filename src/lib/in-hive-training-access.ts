@@ -1,14 +1,14 @@
 /**
- * Who may open in-Hive courses that share the 30-day training seat.
+ * Who may open in-Hive courses that share the orientation / compliance seat.
  * True North / billing-exempt orgs never pay and never need a roster seat.
  * Paid orgs need a paid or waived 30-day or package roster seat for that staff.
  *
- * PCT reuses this same entitlement (no new Stripe product). ABI has an in-Hive
- * course but is assignment-gated, not seat-gated. 12-hour ongoing is an
- * obligation / pack column only — no course and no SKU.
+ * Family: 30-day + hire-level PCT + ABI + 12-hour CE. No new Stripe product.
+ * Stripe `pack` is still CPR + 30-day + Mandt; that seat unlocks this family.
  */
 
 import { isBillingExempt } from "./billing-access.ts";
+import { ANNUAL_CE_COURSE_ID } from "./in-hive-training-annual-ce.ts";
 import { PCT_COURSE_ID } from "./in-hive-training-pct.ts";
 
 export type ThirtyDayAccessReason =
@@ -18,20 +18,26 @@ export type ThirtyDayAccessReason =
   | "denied";
 
 /**
- * Intended training family (30-day + PCT + ABI + 12hr). Stripe / roster today
- * only sell `thirty_day` and `package` / training-only `thirty_day` + `pack`.
+ * Orientation / compliance pack family. Stripe / roster today only sell
+ * `thirty_day` and `package` / training-only `thirty_day` + `pack`.
  * `pack` still covers CPR + 30-day + Mandt — do not invent new prices.
  */
 export const TRAINING_SEAT_FAMILY = {
-  gatedByThirtyDaySeat: ["thirty-day", PCT_COURSE_ID],
-  inHiveCourseNoSeat: ["abi"],
-  obligationOnlyNoCourse: ["annual-ce"],
+  gatedByTrainingSeat: ["thirty-day", PCT_COURSE_ID, "abi", ANNUAL_CE_COURSE_ID],
 } as const;
 
-/** 30-day orientation and hire-level PCT share one purchased seat. */
-export function courseUsesThirtyDaySeat(courseId: string | null | undefined): boolean {
-  return courseId === "thirty-day" || courseId === PCT_COURSE_ID;
+/** 30-day, PCT, ABI, and 12-hour CE share one purchased seat (TNS comped). */
+export function courseUsesTrainingSeat(courseId: string | null | undefined): boolean {
+  return (
+    courseId === "thirty-day" ||
+    courseId === PCT_COURSE_ID ||
+    courseId === "abi" ||
+    courseId === ANNUAL_CE_COURSE_ID
+  );
 }
+
+/** @deprecated Use courseUsesTrainingSeat — same family. */
+export const courseUsesThirtyDaySeat = courseUsesTrainingSeat;
 
 /** Live Hive-Platform `organizations` has no `billing_exempt` column. */
 export function orgSelectMissingBillingExempt(message: string | null | undefined): boolean {

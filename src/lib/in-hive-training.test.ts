@@ -47,6 +47,7 @@ import {
   type ExamQuestion,
 } from "./in-hive-training.ts";
 import { examQuestionsFor } from "./in-hive-training-exams.ts";
+import { ANNUAL_CE_COURSE_ID, ANNUAL_CE_OBLIGATION_TITLE } from "./in-hive-training-annual-ce.ts";
 import { PCT_COURSE_ID, PCT_OBLIGATION_TITLE } from "./in-hive-training-pct.ts";
 import { PCT_CLIENT_OBLIGATION_TITLE } from "./client-form-obligations.ts";
 
@@ -81,6 +82,7 @@ describe("inHiveCourseIdForTitle", () => {
     assert.equal(inHiveCourseIdForTitle("CPR/First Aid Certification — Initial"), null);
     assert.equal(inHiveCourseIdForTitle(PCT_OBLIGATION_TITLE), PCT_COURSE_ID);
     assert.equal(inHiveCourseIdForTitle(PCT_CLIENT_OBLIGATION_TITLE), null);
+    assert.equal(inHiveCourseIdForTitle(ANNUAL_CE_OBLIGATION_TITLE), ANNUAL_CE_COURSE_ID);
   });
 });
 
@@ -107,6 +109,8 @@ describe("progress refs", () => {
     assert.equal(inHiveRefUuid(PCT_COURSE_ID, "A"), "a11ce000-1e8f-4000-8000-000000000341");
     assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "A"), inHiveRefUuid("abi", "A"));
     assert.notEqual(inHiveRefUuid(PCT_COURSE_ID, "__exam__"), inHiveRefUuid("abi", "__exam__"));
+    assert.equal(inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"), "a11ce000-1e8f-4000-8000-0000000004ff");
+    assert.notEqual(inHiveRefUuid(ANNUAL_CE_COURSE_ID, "__exam__"), inHiveRefUuid(PCT_COURSE_ID, "__exam__"));
   });
 });
 
@@ -139,6 +143,7 @@ describe("exam coverage", () => {
     );
     assert.ok(abi.every((q) => q.sowCite.startsWith("1.8(8)")));
     assert.equal(examQuestionsFor(PCT_COURSE_ID).length, 0);
+    assert.equal(examQuestionsFor(ANNUAL_CE_COURSE_ID).length, 0);
   });
 });
 
@@ -407,9 +412,11 @@ describe("staff obligations course progress", () => {
     assert.equal(topicCodesForCourse("thirty-day").length, 30);
     assert.equal(topicCodesForCourse("abi").length, 6);
     assert.equal(topicCodesForCourse(PCT_COURSE_ID).length, 6);
+    assert.equal(topicCodesForCourse(ANNUAL_CE_COURSE_ID).length, 0);
     assert.equal(inHiveCourseFulfillsObligation("thirty-day"), true);
     assert.equal(inHiveCourseFulfillsObligation("abi"), true);
     assert.equal(inHiveCourseFulfillsObligation(PCT_COURSE_ID), true);
+    assert.equal(inHiveCourseFulfillsObligation(ANNUAL_CE_COURSE_ID), false);
     assert.equal(staffCourseProgressLabel(19, 30), "19 of 30 topics passed");
     assert.equal(staffCourseProgressLabel(0, 30), "0 of 30 topics passed");
   });

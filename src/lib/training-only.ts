@@ -53,7 +53,7 @@ export function trainingOnlySkuLabel(sku: TrainingOnlySku): string {
   return quoteSignupTrainingAddon(sku).name;
 }
 
-/** Paid thirty_day or pack SKUs unlock 30-day orientation and hire-level PCT. */
+/** Paid thirty_day or pack SKUs unlock the orientation/compliance family (30-day, PCT, ABI, 12hr). */
 export function trainingOnlyIncludesThirtyDay(sku: TrainingOnlySku): boolean {
   return sku === "thirty_day" || sku === "pack";
 }

@@ -24,9 +24,9 @@ Hire-level PCT is already in the all-staff hire catalog — same path as Code of
 
 Not per-client. Not gated by assignment flags.
 
-## Seat paywall (same as 30-day)
+## Seat paywall (orientation / compliance family)
 
-Opening the PCT course uses `thirtyDayCourseAccessFn` / `courseUsesThirtyDaySeat`:
+Opening PCT, 30-day, ABI, or the 12-hour CE placeholder uses `thirtyDayCourseAccessFn` / `courseUsesTrainingSeat`:
 
 | Org | Unlock |
 | --- | --- |
@@ -34,20 +34,28 @@ Opening the PCT course uses `thirtyDayCourseAccessFn` / `courseUsesThirtyDaySeat
 | Paid org | Paid or waived roster seat with `training_type` `thirty_day` or `package` |
 | Training-only buyer | Paid `training_only_seats` SKU `thirty_day` or `pack` |
 
-No new Stripe product or price. The existing 30-day / pack seat unlocks both courses.
+No new Stripe product or price. Existing 30-day / pack seats unlock the family.
 
 ## Training family (30-day + PCT + ABI + 12hr)
 
 Documented in `TRAINING_SEAT_FAMILY` (`in-hive-training-access.ts`):
 
-| Item | In-Hive course | Seat-gated | How it exists today |
-| --- | --- | --- | --- |
-| 30-day orientation | Yes | Yes (this seat) | Stripe / roster `thirty_day` + `package`; training-only `thirty_day` / `pack` |
-| Hire-level PCT | Yes | Yes (same seat) | Reuses the 30-day check above |
-| ABI | Yes | No | Assignment-gated (`assignmentNeedsAbi`). No ABI Stripe SKU |
-| 12-hour ongoing | No | No | Obligation / pack column `annual-ce` — upload + CE ledger only |
+| Item | In-Hive course | Seat-gated | Auto-assign | Today |
+| --- | --- | --- | --- | --- |
+| 30-day orientation | Yes (complete) | Yes | Hire-always | Stripe / roster `thirty_day` + `package`; training-only `thirty_day` / `pack` |
+| Hire-level PCT | Yes (complete) | Yes | Hire-always | Same seat |
+| ABI | Yes (complete — not a placeholder) | Yes (open course) | Assignment-only (`assignmentNeedsAbi`) | Same seat. Obligation may exist before a seat is purchased; Open course still needs the seat. TNS free. |
+| 12-hour ongoing | Placeholder `pi-annual-ce-12hr` | Yes (open placeholder) | Hire-anniversary year 2 (existing cadence) | Coming soon. Upload / CE ledger remain the SOW path. Fulfill flag off. No invented lessons or keys. |
 
-Stripe `pack` is still CPR + 30-day + Mandt (`trainingOnlyPackCovers`). Buying that pack (or a 30-day seat) now also unlocks PCT. It does **not** invent ABI or 12-hour course content, and it does not add new prices.
+Stripe `pack` is still CPR + 30-day + Mandt (`trainingOnlyPackCovers`). Buying that pack or a 30-day seat unlocks this family. No new prices.
+
+### ABI double-gate (intentional)
+
+SOW still assigns ABI only when the staff/client needs it. The in-app course additionally requires the shared training seat (same as 30-day / PCT). Do not auto-assign ABI to every staff.
+
+### 12-hour placeholder
+
+`ANNUAL_CE_COURSE_FULFILLS_OBLIGATION = false`. Opening the shell shows **Coming soon**. Upload on the staff-file card still clears On file.
 
 ## Release control
 
@@ -55,7 +63,9 @@ Stripe `pack` is still CPR + 30-day + Mandt (`trainingOnlyPackCovers`). Buying t
 | --- | --- | --- | --- |
 | `PCT_IN_HIVE_COURSE_ENABLED` | `src/lib/in-hive-training-pct.ts` | `true` | Show Open course on the hire-level card |
 | `PCT_COURSE_FULFILLS_OBLIGATION` | same | `true` | Passing the exam writes `in_hive_course` evidence / On file |
+| `ANNUAL_CE_IN_HIVE_COURSE_ENABLED` | `src/lib/in-hive-training-annual-ce.ts` | `true` | Show Open course on the annual CE card (placeholder) |
+| `ANNUAL_CE_COURSE_FULFILLS_OBLIGATION` | same | `false` | Placeholder does **not** write On file |
 
 ## Stay off
 
-No Core SQL. No `scope_assignments`, Admin Profile permissions, or Compliance nav work in this change. Do not replace `person-centered-training-content.json`.
+No Core SQL. No `scope_assignments`, Admin Profile permissions, or Compliance nav work in this change. Do not replace `person-centered-training-content.json`. Do not invent ABI or 12-hour curriculum.

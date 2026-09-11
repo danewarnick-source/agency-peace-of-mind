@@ -102,7 +102,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Upload CE certificates in HIVE. Hours can also be logged in the CE ledger. Due on the hire anniversary starting the year after hire — not a calendar year.",
+      "Upload CE certificates in HIVE, or log hours in the CE ledger. The in-platform 12-hour course is a Coming-soon placeholder and does not mark the card On file. Opening the placeholder uses the same 30-day / pack training seat as orientation; True North Supports is always free. Due on the hire anniversary starting the year after hire — not a calendar year.",
     due_rule: { kind: "hire_anniversary", start_year: 2 },
     owner: "staff",
     service_codes: [],
@@ -706,7 +706,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Required before working alone with a person with acquired brain injury. Assigned only to staff on an ABI caseload (or flagged requires_abi). Staff open this from the staff file and complete the in-Hive ABI course plus competency exam.",
+      "Required before working alone with a person with acquired brain injury. Assigned only to staff on an ABI caseload (or flagged requires_abi). Staff open this from the staff file and complete the in-Hive ABI course plus competency exam. Opening the course uses the same 30-day / pack training seat as orientation; True North Supports is always free.",
     due_rule: { kind: "days_after_hire", days: 0 },
     owner: "staff",
     service_codes: [],

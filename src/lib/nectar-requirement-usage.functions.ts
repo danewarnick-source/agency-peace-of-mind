@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { skipRequirementUsageWrite } from "./nectar-requirement-usage/stop-writes";
 
 const OBLIGATION_CATEGORIES = [
   "admin_internal",
@@ -28,39 +29,11 @@ export const saveRequirementUsageNote = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data: _data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId) return { ok: false as const, usage: null };
-    const { data: req, error: rErr } = await supabase
-      .from("nectar_requirements")
-      .select("id, organization_id")
-      .eq("id", data.requirementId)
-      .single();
-    if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
-
-    const { data: prev } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_requirement_usage_current_v" as any)
-      .select("usage_id")
-      .eq("requirement_id", data.requirementId)
-      .maybeSingle();
-
-    const { data: inserted, error: iErr } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_requirement_usage" as any)
-      .insert({
-        organization_id: req.organization_id,
-        requirement_id: data.requirementId,
-        usage_note: data.usageNote.trim(),
-        edit_reason: data.editReason?.trim() || null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        supersedes_id: (prev as any)?.usage_id ?? null,
-        edited_by: userId,
-      })
-      .select("id, edited_at")
-      .single();
-    if (iErr) throw new Error(iErr.message);
-    return { ok: true as const, usage: inserted };
+    if (!supabase || !userId) return skipRequirementUsageWrite();
+    // Parallel nectar_requirement_usage writer disabled. Table stays.
+    return skipRequirementUsageWrite();
   });
 
 /** Recategorize obligation type; logs to category_history. */

@@ -1,5 +1,18 @@
 # SQL Handoff — run these in Lovable's SQL editor
 
+## NOTE — Compliance revamp Step 10: stop-writes only (2026-09-11)
+
+No Soft migration. Do not DROP tables. Do not run Soft SQL for this change.
+
+Do **not** DROP `nectar_compliance_*` or `nectar_requirement_usage` (that is
+Step 10h, 30 days later). App writers for `nectar_compliance_rules` /
+`_rule_history` / `_flags` / `_instances` and `nectar_requirement_usage` are
+no-ops. Tables stay in place. Command Center and standalone External
+compliance are redirects only.
+
+---
+
+
 Each block is copy-paste ready. **Clear the editor before pasting each block.**
 Run blocks top to bottom; each has a "what you'll see" note so you can confirm
 it worked before moving on.

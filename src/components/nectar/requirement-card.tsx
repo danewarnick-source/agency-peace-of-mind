@@ -106,7 +106,11 @@ export function RequirementCard({
       saveNote({
         data: { requirementId: requirement.id, usageNote: noteDraft.trim() },
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      if (!res?.ok) {
+        toast.error("Usage notes are retired. This was not saved.");
+        return;
+      }
       toast.success("Usage note saved");
       qc.invalidateQueries({ queryKey: ["req-usage-history", requirement.id] });
       setEditing(false);

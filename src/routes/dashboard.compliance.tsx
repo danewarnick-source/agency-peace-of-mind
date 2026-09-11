@@ -1,10 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StaffFilePanel } from "@/components/compliance/staff-file-panel";
 import { ClientFilePanel } from "@/components/compliance/client-file-panel";
 import { AgencyFilePanel } from "@/components/compliance/agency-file-panel";
 import { StateCatalogEmptyShell } from "@/components/compliance/state-catalog-empty-shell";
-import { RequirePermission } from "@/components/rbac-guard";
 import { useOrgStateCatalog } from "@/hooks/use-org-state-catalog";
 import {
   complianceSearchForAgencySubTab,
@@ -50,6 +49,14 @@ function CompliancePage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
+        <Link to="/dashboard/state-audit" className="underline-offset-2 hover:underline">
+          State Audit
+        </Link>
+        <Link to="/dashboard/reports" className="underline-offset-2 hover:underline">
+          Reports
+        </Link>
+      </div>
       <Tabs value={fileTab} onValueChange={onFileTabChange}>
         <TabsList className="h-auto">
           <TabsTrigger value="staff">Staff file</TabsTrigger>
@@ -57,18 +64,10 @@ function CompliancePage() {
           <TabsTrigger value="agency">Agency file</TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="mt-4">
-          {fileTab === "staff" ? (
-            <RequirePermission perm="view_staff_records">
-              <StaffFilePanel />
-            </RequirePermission>
-          ) : null}
+          {fileTab === "staff" ? <StaffFilePanel /> : null}
         </TabsContent>
         <TabsContent value="client" className="mt-4">
-          {fileTab === "client" ? (
-            <RequirePermission perm="view_clients">
-              <ClientFilePanel />
-            </RequirePermission>
-          ) : null}
+          {fileTab === "client" ? <ClientFilePanel /> : null}
         </TabsContent>
         <TabsContent value="agency" className="mt-4">
           {fileTab === "agency" ? (

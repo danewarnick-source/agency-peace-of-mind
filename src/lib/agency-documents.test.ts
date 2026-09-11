@@ -212,8 +212,7 @@ describe("Agency file surface lock", () => {
   it("folds Agency file under Admin Compliance and keeps Company policies", () => {
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
     assert.match(nav, /to: "\/dashboard\/compliance", label: "Compliance"/);
-    assert.match(nav, /to: "\/dashboard\/state-audit"/);
-    assert.match(nav, /label: "State Audit"/);
+    assert.doesNotMatch(nav, /label: "State Audit"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/agency-documents", label: "/);
     assert.doesNotMatch(nav, /label: "Agency documents"/);
     assert.doesNotMatch(nav, /to: "\/dashboard\/company-obligations", label: "Compliance"/);

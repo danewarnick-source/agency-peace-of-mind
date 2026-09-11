@@ -373,8 +373,8 @@ export function NotificationBell({
             <div className="border-t border-border px-4 py-2.5">
               <Button variant="ghost" size="sm"
                 className="h-7 w-full text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => { setOpen(false); navigate({ to: "/dashboard/command-center" as never }); }}>
-                View Agency Command Center →
+                onClick={() => { setOpen(false); navigate({ to: "/dashboard" }); }}>
+                View This week →
               </Button>
             </div>
           )}

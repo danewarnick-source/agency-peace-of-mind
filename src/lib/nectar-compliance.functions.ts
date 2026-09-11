@@ -15,6 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { resolveStaffQualifications, qualificationKey, type QualificationKind } from "./staff-qualifications.functions";
+import { skipNectarComplianceMutation, skipNectarComplianceWrite } from "./nectar-compliance/stop-writes";
 
 const RULE_TYPES = ["billing_conflict", "staff_prerequisite", "deadline", "activity"] as const;
 const ACTIVE_STATES = ["active", "active_by_code"] as const;
@@ -94,73 +95,11 @@ export const updateComplianceRule = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data: _data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId) return { ok: false };
-    const { data: existing, error: eErr } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_rules" as any)
-      .select("id, organization_id, rule_definition, status")
-      .eq("id", data.ruleId)
-      .single();
-    if (eErr || !existing) throw new Error(eErr?.message ?? "Rule not found");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ex = existing as any;
-
-    const patch: Record<string, unknown> = {};
-    let historyAction: "edited" | "confirmed" | "dismissed" | "reopened" = "edited";
-    const now = new Date().toISOString();
-
-    if (data.action === "edit") {
-      if (!data.ruleDefinition) throw new Error("ruleDefinition required for edit");
-      patch.rule_definition = data.ruleDefinition;
-      historyAction = "edited";
-    } else if (data.action === "confirm") {
-      if (data.ruleDefinition) patch.rule_definition = data.ruleDefinition;
-      patch.status = "confirmed";
-      patch.confirmed_by = userId;
-      patch.confirmed_at = now;
-      patch.dismissed_by = null;
-      patch.dismissed_at = null;
-      historyAction = "confirmed";
-    } else if (data.action === "dismiss") {
-      patch.status = "dismissed";
-      patch.dismissed_by = userId;
-      patch.dismissed_at = now;
-      historyAction = "dismissed";
-    } else if (data.action === "reopen") {
-      patch.status = "proposed";
-      patch.confirmed_by = null;
-      patch.confirmed_at = null;
-      patch.dismissed_by = null;
-      patch.dismissed_at = null;
-      historyAction = "reopened";
-    }
-
-    const { error: uErr } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_rules" as any)
-      .update(patch)
-      .eq("id", data.ruleId);
-    if (uErr) throw new Error(uErr.message);
-
-    await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_rule_history" as any)
-      .insert({
-        rule_id: data.ruleId,
-        organization_id: ex.organization_id,
-        action: historyAction,
-        actor_id: userId,
-        actor_label: "provider",
-        snapshot: {
-          previous: { rule_definition: ex.rule_definition, status: ex.status },
-          next: patch,
-        },
-        note: data.note ?? null,
-      });
-
-    return { ok: true };
+    if (!supabase || !userId) return skipNectarComplianceMutation();
+    // Parallel nectar_compliance_rules writer disabled. Rules stay readable.
+    return skipNectarComplianceMutation();
   });
 
 export const listRuleHistory = createServerFn({ method: "POST" })
@@ -326,7 +265,7 @@ export const raiseComplianceFlag = createServerFn({ method: "POST" })
     if (!supabase || !userId) return null;
     // Parallel nectar_compliance_flags writer disabled. Punch-pad still
     // detects and blocks; it must not persist a second compliance register.
-    return null;
+    return skipNectarComplianceWrite();
   });
 
 export const resolveComplianceFlag = createServerFn({ method: "POST" })
@@ -340,22 +279,11 @@ export const resolveComplianceFlag = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data: _data, context }) => {
     const { supabase, userId } = context;
-    if (!supabase || !userId) return { ok: false };
-    const { error } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("nectar_compliance_flags" as any)
-      .update({
-        resolution: data.resolution,
-        resolved_by: userId,
-        resolved_at: new Date().toISOString(),
-        resolution_note: data.note ?? null,
-      })
-      .eq("id", data.flagId)
-      .is("resolution", null);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    if (!supabase || !userId) return skipNectarComplianceMutation();
+    // Parallel nectar_compliance_flags writer disabled.
+    return skipNectarComplianceMutation();
   });
 
 export const listComplianceFlags = createServerFn({ method: "POST" })

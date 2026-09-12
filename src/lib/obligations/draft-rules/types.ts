@@ -1,6 +1,6 @@
 /**
- * In-app draft rule model for DHHS91172 workbook Stages 1–4.
- * Lifecycle is encoded here. Fixtures stay draft / not_published.
+ * In-app draft rule model for DHHS91172 workbook Stages 1–5.
+ * Lifecycle is encoded here. Fixtures and catalog rows stay draft / not_published.
  * No live activation. No invented renewal intervals.
  */
 
@@ -217,8 +217,10 @@ export type DraftRule = {
   unresolvedRenewals: string[];
   /** Known workbook publication gaps. Do not invent the missing legal fact. */
   releaseGaps: string[];
+  /** Workbook publication_gap cell. When set, canPublish is false. */
+  publicationGap: string | null;
   approval: ApprovalRecord | null;
 };
 
-/** Activation stays locked for every draft fixture (Stages 1–4). */
+/** Activation stays locked for every draft fixture and catalog row (Stages 1–5). */
 export const STAGE1_ACTIVATION_LOCKED = true;

@@ -163,6 +163,14 @@ describe("publication gate", () => {
     assert.ok(activationBlockReasons(unresolved).some((g) => g.key === "unresolved_renewals"));
   });
 
+  it("canPublish is false when publication_gap is set", () => {
+    const gapped = clone(REQ_1_8_4_ORIENTATION);
+    gapped.publicationGap = "1.32 transition date unknown";
+    assert.equal(canPublish(gapped), false);
+    assert.ok(structuralPublicationGaps(gapped).some((g) => g.key === "publication_gap"));
+    assert.equal(canActivate(gapped), false);
+  });
+
   it("never treats source_index as publication permission", () => {
     assert.equal(sourceIndexGrantsPublication(WORKBOOK_SOURCE_INDEX), false);
     const reviewed = clone(REQ_1_8_4_ORIENTATION);

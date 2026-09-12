@@ -1,0 +1,52 @@
+{
+  "sheet": "Applicability_Facts",
+  "design_revision": "2026-09-12",
+  "unknown_policy": "question_or_missing_information",
+  "never": "automatic_compliance",
+  "rows": [
+    {
+      "fact": "direct_support_assignment",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "abi_caseload",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "sei_assignment",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "org_acre_coverage",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "staff_acre_supervisor",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "behavior_risk_assignment",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "designated_benefits_staff",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "usor_sei_vendor",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "cmp_cms_assignment",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "sjd_assignment",
+      "unknown": "missing-information"
+    },
+    {
+      "fact": "pba_assignment",
+      "unknown": "missing-information"
+    }
+  ]
+}

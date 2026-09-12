@@ -8,6 +8,11 @@ import type { RuleSourceLink, SourceIndexMeta } from "./types.ts";
 export const WORKBOOK_SOURCE_ID = "dhhs91172-workbook";
 export const WORKBOOK_SOURCE_TITLE = "DHHS91172 compliance workbook";
 export const WORKBOOK_DESIGN_REVISION = "2026-09-12";
+/** Dane-finalized workbook hash. Archive identity, not a publish bit. */
+export const WORKBOOK_SHA256 = "aba9f6c4debc0b19e207a55f1a2f1fc2b3397d94f8f18a52c6fbc6b0f9d2dbd6";
+export const WORKBOOK_CATALOG_PARENT_COUNT = 760;
+export const WORKBOOK_REQUIREMENTS_ROW_COUNT = 1367;
+export const WORKBOOK_RELEASE_GAPS_OPEN = 12;
 
 export const WORKBOOK_SOURCE_INDEX: SourceIndexMeta = {
   label: "ARCHIVE METADATA",

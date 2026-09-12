@@ -1,0 +1,80 @@
+{
+  "sheet": "Release_Gaps",
+  "status": "open",
+  "open_count": 12,
+  "note": "Publication blockers. Do not invent the missing legal fact. Leave each gap open until a reviewed source/version exists.",
+  "rows": [
+    {
+      "id": "RG-1.12-EVV",
+      "topic": "EVV mapping / UEVV / state integration",
+      "clause": "SOW §1.12",
+      "gap": "needs EVV mapping review — do not invent UEVV / state integration success"
+    },
+    {
+      "id": "RG-SCREENING-INTERVAL",
+      "topic": "Screening interval",
+      "clause": null,
+      "gap": "Annual (or other) screening interval is not published. Do not invent a renewal from completion."
+    },
+    {
+      "id": "RG-1.32-DATE",
+      "topic": "1.32 transition date",
+      "clause": "SOW §1.32",
+      "gap": "Transition date is unknown. Do not invent a 1.32 date."
+    },
+    {
+      "id": "RG-USOR-EMAIL",
+      "topic": "USOR destination email",
+      "clause": "SOW §30.6(a)",
+      "gap": "Published destination stays osrprovider@utah.gov. Do not invent a corrected address."
+    },
+    {
+      "id": "RG-SJB-TYPO",
+      "topic": "SJB typo",
+      "clause": "SOW §33.5",
+      "gap": "Workbook typo SJB is a publication gap. Encoded service code is SJD. Do not treat SJB as a live code."
+    },
+    {
+      "id": "RG-CHA",
+      "topic": "CHA",
+      "clause": null,
+      "gap": "CHA is not encoded. Do not invent CHA operational rules."
+    },
+    {
+      "id": "RG-RP2",
+      "topic": "RP2",
+      "clause": null,
+      "gap": "RP2 is not encoded. Do not invent RP2 operational rules."
+    },
+    {
+      "id": "RG-RP3",
+      "topic": "RP3",
+      "clause": null,
+      "gap": "RP3 is not encoded. Do not invent RP3 operational rules."
+    },
+    {
+      "id": "RG-RETENTION",
+      "topic": "Universal retention period",
+      "clause": "Workbook System_Design — Audit export",
+      "gap": "Universal retention period is unknown. Field stays from applicable authority. Do not invent a default interval."
+    },
+    {
+      "id": "RG-REMINDERS-PRODUCT",
+      "topic": "Reminder / escalation offsets",
+      "clause": "Workbook System_Design — Reminders (product defaults)",
+      "gap": "Offsets are product defaults, not SOW mandates. Do not publish them as legal intervals."
+    },
+    {
+      "id": "RG-MAR-EMAR",
+      "topic": "MAR / eMAR",
+      "clause": null,
+      "gap": "MAR/eMAR is not encoded as a published rule. Do not invent medication-administration compliance."
+    },
+    {
+      "id": "RG-SOFT-SEI",
+      "topic": "Soft SEI columns",
+      "clause": "SOW §30",
+      "gap": "Soft SEI columns are not published. Do not invent them."
+    }
+  ]
+}

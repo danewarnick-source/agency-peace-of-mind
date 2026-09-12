@@ -1,0 +1,10 @@
+{
+  "sheet": "Requirement_Catalog",
+  "rolls": "parents+elements",
+  "canonical_parents_from": "Requirements",
+  "expected_parent_count": 760,
+  "ingest_status": "awaiting_batches",
+  "rule_status": "draft",
+  "execution_status": "not_published",
+  "rows": []
+}

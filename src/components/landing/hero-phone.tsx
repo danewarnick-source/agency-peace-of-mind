@@ -35,16 +35,43 @@ function InitialsAvatar({
   );
 }
 
-export function HeroPhone({ className = "" }: { className?: string }) {
+export function HeroPhone({
+  className = "",
+  slim = false,
+}: {
+  className?: string;
+  /** Marketing demos only — iPhone 15 Pro slim/tall frame. Live `/` stays the default width. */
+  slim?: boolean;
+}) {
   return (
-    <div className={`relative mx-auto w-full max-w-[340px] ${className}`}>
+    <div
+      className={`relative mx-auto w-full ${slim ? "max-w-[260px]" : "max-w-[340px]"} ${className}`}
+    >
       <div
-        className="relative overflow-hidden rounded-[2.4rem] border-[10px] border-[#2a333c] bg-[var(--hive-canvas)] shadow-[var(--shadow-elegant)]"
+        className={`relative overflow-hidden bg-[var(--hive-canvas)] shadow-[var(--shadow-elegant)] ${
+          slim
+            ? "rounded-[2.75rem] border-[7px] border-[#1c232b]"
+            : "rounded-[2.4rem] border-[10px] border-[#2a333c]"
+        }`}
         style={{ boxShadow: "0 28px 60px -28px rgba(36, 48, 64, 0.45), 0 0 0 1px #1c232b" }}
       >
-        <div className="absolute left-1/2 top-2 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-[#1c232b]" />
+        {slim ? (
+          <div className="relative bg-[var(--hive-canvas)] px-5 pb-1 pt-2.5">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-[var(--hive-text)]">
+              <span>9:41</span>
+              <span className="tracking-tight">●●●●</span>
+            </div>
+            <div className="absolute left-1/2 top-[8px] z-10 h-[22px] w-[74px] -translate-x-1/2 rounded-full bg-[#0b0f14]" />
+          </div>
+        ) : (
+          <div className="absolute left-1/2 top-2 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-[#1c232b]" />
+        )}
 
-        <div className="flex items-center justify-between bg-[var(--hive-sidebar)] px-3 pb-2.5 pt-8">
+        <div
+          className={`flex items-center justify-between bg-[var(--hive-sidebar)] px-3 pb-2.5 ${
+            slim ? "pt-2.5" : "pt-8"
+          }`}
+        >
           <div className="flex items-center gap-1.5">
             <HiveMark className="h-5 w-5" />
             <span className="font-display text-[15px] font-semibold tracking-tight text-[var(--hive-chrome-text)]">
@@ -70,7 +97,9 @@ export function HeroPhone({ className = "" }: { className?: string }) {
             </div>
           </div>
 
-          <h3 className="font-display mt-3 text-lg font-semibold text-[var(--hive-text)]">My Caseload</h3>
+          <h3 className="font-display mt-3 text-lg font-semibold text-[var(--hive-text)]">
+            My Caseload
+          </h3>
 
           <div className="mt-2 flex items-center gap-2 rounded-full border border-[var(--hive-border)] bg-[var(--hive-surface)] px-3 py-2">
             <Hexagon className="h-3.5 w-3.5 text-[var(--hive-gold)]" strokeWidth={1.6} />
@@ -118,7 +147,9 @@ export function HeroPhone({ className = "" }: { className?: string }) {
           </div>
         </div>
 
-        <nav className="grid grid-cols-6 bg-[var(--hive-sidebar)] px-1 pb-3 pt-2 text-center">
+        <nav
+          className={`grid grid-cols-6 bg-[var(--hive-sidebar)] px-1 pt-2 text-center ${slim ? "pb-2" : "pb-3"}`}
+        >
           {[
             { icon: FolderOpen, label: "Caseload", on: true },
             { icon: CalendarDays, label: "Schedule", on: false },
@@ -138,6 +169,11 @@ export function HeroPhone({ className = "" }: { className?: string }) {
             </div>
           ))}
         </nav>
+        {slim ? (
+          <div className="flex justify-center bg-[var(--hive-sidebar)] pb-2 pt-0.5" aria-hidden>
+            <span className="h-1 w-24 rounded-full bg-[var(--hive-chrome-text)]/35" />
+          </div>
+        ) : null}
       </div>
     </div>
   );

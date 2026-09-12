@@ -123,6 +123,10 @@ describe("draft simulation writes nothing live", () => {
       "./notes.ts",
       "./billing-restrictions.ts",
       "./evidence-reuse.ts",
+      "./pba-reviews.ts",
+      "./reminders.ts",
+      "./offboarding.ts",
+      "./audit-export.ts",
     ]) {
       const src = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
       assert.doesNotMatch(src, /supabase/, file);
@@ -182,6 +186,7 @@ describe("unknown facts stay missing-information", () => {
       "REQ-30.6.c",
       ...STAGE2_RULE_IDS,
       ...STAGE3_RULE_IDS,
+      "REQ-15.3",
     ]) {
       const row = ruleFor(result, "unknown-1", id);
       assert.equal(row.applicability, "unanswered", id);

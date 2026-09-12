@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { EMPTY_ORG_FACTS, type OrgFacts } from "./applicability.ts";
+import {
+  EMPTY_ORG_FACTS,
+  computeObligationApplicability,
+  type OrgFacts,
+} from "./applicability.ts";
+import { catalogIsSeiOnly } from "./catalog-exceptions.ts";
 import {
   ABI_DUTY_KEYS,
   DIRECT_SUPPORT_HIRE_KEYS,
@@ -318,5 +323,29 @@ describe("SEI stays on assignment codes, not a fact_key", () => {
       "utf8",
     );
     assert.doesNotMatch(duty, /person_applicability|duty_assignments|sei_applicable/);
+    assert.equal(catalogIsSeiOnly("acre_sei"), true);
+    const orgRows = computeObligationApplicability({ ...EMPTY_ORG_FACTS });
+    assert.equal(
+      orgRows.some((r) => r.obligationKey === "acre_sei"),
+      false,
+    );
+  });
+
+  it("empty awarded codes cannot clear an assignment-gated staff duty", () => {
+    const emptyOrg: OrgFacts = { ...EMPTY_ORG_FACTS, servicesOffered: [] };
+    const sei = evaluateStaffDuty({
+      dutyKey: "acre_sei",
+      staff: { ...DSP, assignedServiceCodes: ["SEI"] },
+      orgFacts: emptyOrg,
+    });
+    const unknown = evaluateStaffDuty({
+      dutyKey: "acre_sei",
+      staff: UNKNOWN,
+      orgFacts: emptyOrg,
+    });
+    assert.equal(sei.status, "applies");
+    assert.equal(unknown.status, "unanswered");
+    assert.equal(unknown.applies, true);
+    assert.equal(staffReceivesDutyClock(unknown), false);
   });
 });

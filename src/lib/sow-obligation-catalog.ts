@@ -15,20 +15,24 @@
 
 import { dueRuleFromConfig, explainDueRule, type DueRule } from "./obligation-due-dates.ts";
 import {
+  CATALOG_EXCEPTIONS_BY_KEY,
   CATALOG_IDENTITY_BY_TITLE,
   PACK_STATE_CODE,
   PACK_VERSION,
   SOFT_BACKFILL_TITLE_ALIASES,
   STANDING_RECLASSIFY_REASON,
+  type CatalogExceptions,
   type CatalogFormTemplate,
   type ObligationDisposition,
 } from "./sow-obligation-catalog-pack.ts";
 
 export {
+  CATALOG_EXCEPTIONS_BY_KEY,
   PACK_STATE_CODE,
   PACK_VERSION,
   SOFT_BACKFILL_TITLE_ALIASES,
   STANDING_RECLASSIFY_REASON,
+  type CatalogExceptions,
   type CatalogFormField,
   type CatalogFormTemplate,
   type ObligationDisposition,
@@ -82,6 +86,8 @@ export type SowCatalogEntry = {
    */
   applicability?: "always" | "when_applicable";
   applicability_note?: string;
+  /** Live-path exceptions. Missing keys infer; never invent a second table. */
+  exceptions?: CatalogExceptions;
 };
 
 export const CATEGORY_LABEL: Record<ObligationCategory, string> = {
@@ -1266,6 +1272,7 @@ function finalizeCatalogEntry(raw: SowCatalogDraft): SowCatalogEntry {
   if (!meta) {
     throw new Error(`Missing catalog key/disposition for "${raw.title}"`);
   }
+  const exceptions = CATALOG_EXCEPTIONS_BY_KEY[meta.key];
   return {
     ...raw,
     key: meta.key,
@@ -1275,6 +1282,7 @@ function finalizeCatalogEntry(raw: SowCatalogDraft): SowCatalogEntry {
     ...(meta.retired_in ? { retired_in: meta.retired_in } : {}),
     ...(meta.evidence_template ? { evidence_template: meta.evidence_template } : {}),
     ...(meta.form_template ? { form_template: meta.form_template } : {}),
+    ...(exceptions ? { exceptions } : {}),
   };
 }
 

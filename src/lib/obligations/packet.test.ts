@@ -163,6 +163,24 @@ describe("buildPacket", () => {
     assert.ok(agency.hiddenKeys.includes("human_rights_plan"));
   });
 
+  it("keeps code-gated agency rows unanswered when awarded codes are empty", () => {
+    const packet = buildPacket({
+      organizationId: TNS_ORG_ID,
+      subject: "agency",
+      subjectId: null,
+      viewerUserId: VIEWER,
+      scope: orgWideResolvedScope(TNS_ORG_ID, VIEWER),
+      facts: { ...EMPTY_ORG_FACTS },
+      clocks: [],
+      now: NOW,
+    });
+    const sei = packet.items.find((i) => i.obligationKey === "sei_monthly_summary_upi");
+    assert.ok(sei);
+    assert.equal(sei.status, "unanswered");
+    assert.equal(sei.applies, true);
+    assert.equal(packet.hiddenKeys.includes("sei_monthly_summary_upi"), false);
+  });
+
   it("scoped viewer does not see another house's staff packet", () => {
     const scope = resolveScope({
       organizationId: TNS_ORG_ID,

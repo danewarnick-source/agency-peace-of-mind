@@ -2,7 +2,12 @@
 // Catalog `when_applicable` rows stay visible until the matching fact is
 // recorded. Service-code hides stay in obligationAppliesToFootprint.
 
-import { sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
+import { allSowCatalogEntries, sowCatalogEntryByKey } from "../sow-obligation-catalog.ts";
+import {
+  AWARDED_CODES_QUESTION,
+  AWARDED_SERVICE_CODES_FACT_KEY,
+  awardedCodesUnanswered,
+} from "./setup-facts.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -31,6 +36,20 @@ export type OrgFactDefinition = {
   question: string;
   help: string;
   obligationKeys: string[];
+};
+
+export type SetupFactDefinition = {
+  key: string;
+  question: string;
+  help: string;
+  obligationKeys: string[];
+};
+
+export const AWARDED_CODES_FACT: SetupFactDefinition = {
+  key: AWARDED_SERVICE_CODES_FACT_KEY,
+  question: AWARDED_CODES_QUESTION.question,
+  help: AWARDED_CODES_QUESTION.help,
+  obligationKeys: [],
 };
 
 export const ORG_FACT_DEFINITIONS: OrgFactDefinition[] = [
@@ -76,7 +95,11 @@ export type ApplicabilityStatus = "applies" | "does_not_apply" | "unanswered";
 export type ObligationApplicability = {
   obligationKey: string;
   title: string;
-  factKey: OrgFactKey | "services_only_cha_hsq_pba" | "residential_housemates";
+  factKey:
+    | OrgFactKey
+    | "services_only_cha_hsq_pba"
+    | "residential_housemates"
+    | typeof AWARDED_SERVICE_CODES_FACT_KEY;
   status: ApplicabilityStatus;
   applies: boolean;
   unanswered: boolean;
@@ -91,8 +114,12 @@ export function parseFactAnswer(value: unknown): FactAnswer {
   return null;
 }
 
-export function listUnansweredFacts(facts: OrgFacts): OrgFactDefinition[] {
-  return ORG_FACT_DEFINITIONS.filter((def) => facts[def.key] === null);
+export function listUnansweredFacts(facts: OrgFacts): SetupFactDefinition[] {
+  const rows: SetupFactDefinition[] = ORG_FACT_DEFINITIONS.filter((def) => facts[def.key] === null);
+  if (awardedCodesUnanswered(facts.servicesOffered)) {
+    rows.unshift(AWARDED_CODES_FACT);
+  }
+  return rows;
 }
 
 function statusFromAnswer(answer: FactAnswer): ApplicabilityStatus {
@@ -133,6 +160,20 @@ export function housemateStatus(servicesOffered: string[]): ApplicabilityStatus 
   return codes.some((c) => residential.has(c)) ? "applies" : "does_not_apply";
 }
 
+/** Agency / host rows gated by awarded codes. Empty codes stay unanswered — never N/A. */
+export function awardedCodeDutyStatus(
+  targetCodes: string[],
+  servicesOffered: string[],
+): ApplicabilityStatus {
+  if (!targetCodes.length) return "applies";
+  const have = normalizeCodes(servicesOffered);
+  if (have.length === 0) return "unanswered";
+  const awarded = new Set(have);
+  return targetCodes.some((c) => awarded.has(c.trim().toUpperCase()))
+    ? "applies"
+    : "does_not_apply";
+}
+
 export function computeObligationApplicability(facts: OrgFacts): ObligationApplicability[] {
   const rows: ObligationApplicability[] = [];
 
@@ -157,6 +198,23 @@ export function computeObligationApplicability(facts: OrgFacts): ObligationAppli
       housemateStatus(facts.servicesOffered),
     ),
   );
+
+  const already = new Set(rows.map((row) => row.obligationKey));
+  for (const entry of allSowCatalogEntries()) {
+    if (already.has(entry.key)) continue;
+    if (entry.disposition === "retired") continue;
+    // Staff duties follow assignment / caseload facts — never an invented SEI fact_key.
+    if (entry.owner === "staff") continue;
+    if (entry.service_codes.length === 0) continue;
+    already.add(entry.key);
+    rows.push(
+      rowForFact(
+        entry.key,
+        AWARDED_SERVICE_CODES_FACT_KEY,
+        awardedCodeDutyStatus(entry.service_codes, facts.servicesOffered),
+      ),
+    );
+  }
 
   return rows;
 }
@@ -187,14 +245,17 @@ export function unansweredFactsQuietSummary(
   if (unanswered.length === 0) return null;
   const count = unanswered.length;
   const labels = unanswered.map((d) => d.question.replace(/\?$/, "")).join("; ");
+  const awardedOpen = unanswered.some((d) => d.key === AWARDED_SERVICE_CODES_FACT_KEY);
+  const orgOpen = unanswered.filter((d) => d.key !== AWARDED_SERVICE_CODES_FACT_KEY).length;
+  const noun = awardedOpen && orgOpen > 0 ? "setup facts" : awardedOpen ? "setup facts" : "org-profile facts";
   return {
     kind: "quiet_summary",
     id: `org_profile_facts:${orgId}`,
     title: "Unanswered compliance setup facts",
     body:
       count === 1
-        ? `1 org-profile fact is unanswered. ${labels}. Conditional duties stay visible until this is recorded.`
-        : `${count} org-profile facts are unanswered. ${labels}. Conditional duties stay visible until these are recorded.`,
+        ? `1 ${noun.replace(/s$/, "")} is unanswered. ${labels}. Conditional duties stay visible until this is recorded.`
+        : `${count} ${noun} are unanswered. ${labels}. Conditional duties stay visible until these are recorded.`,
     count,
     urgency: "high",
     dueAt: null,
@@ -236,6 +297,7 @@ export type PersistOrgFactsInput = {
   operates_ol_site: FactAnswer;
   uses_volunteers: FactAnswer;
   has_governing_board: FactAnswer;
+  servicesOffered?: string[];
 };
 
 export async function persistOrgFacts(
@@ -251,12 +313,18 @@ export async function persistOrgFacts(
     .maybeSingle();
   if (readErr && !columnsMissing(readErr.message)) throw new Error(readErr.message);
 
+  const servicesOffered = normalizeCodes(
+    answers.servicesOffered ??
+      (Array.isArray(existing?.services_offered) ? existing.services_offered : []),
+  );
+
   const { error: updateErr } = await supabase
     .from("organizations")
     .update({
       fact_operates_ol_site: answers.operates_ol_site,
       fact_uses_volunteers: answers.uses_volunteers,
       fact_has_governing_board: answers.has_governing_board,
+      ...(answers.servicesOffered !== undefined ? { services_offered: servicesOffered } : {}),
       fact_answers_updated_at: new Date().toISOString(),
       fact_answers_updated_by: userId,
     })
@@ -274,9 +342,7 @@ export async function persistOrgFacts(
     operates_ol_site: answers.operates_ol_site,
     uses_volunteers: answers.uses_volunteers,
     has_governing_board: answers.has_governing_board,
-    servicesOffered: normalizeCodes(
-      Array.isArray(existing?.services_offered) ? existing.services_offered : [],
-    ),
+    servicesOffered,
   };
   const applicability = computeObligationApplicability(facts);
   await persistApplicabilityRows(supabase, organizationId, userId, applicability);

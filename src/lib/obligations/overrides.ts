@@ -2,6 +2,7 @@
 // Insert-only. Never completes the underlying instance or remediation plan.
 
 import { sowCatalogEntry } from "../sow-obligation-catalog.ts";
+import { catalogIsNonwaivable } from "./catalog-exceptions.ts";
 import { isBlocksSoloWhenLapsedKey, overrideIsActive } from "./solo-lapse.ts";
 
 export const OVERRIDE_SCOPES = ["instance", "staff_clock", "shift"] as const;
@@ -11,7 +12,7 @@ export const OVERRIDE_STATE_LABEL = "Overridden";
 export const OVERRIDE_STILL_REQUIRED = "Override on file. The requirement is not complete.";
 export const NONWAIVABLE_REJECT = "This requirement cannot be overridden.";
 
-/** Catalog has no nonwaivable column — conservative allowlist only. */
+/** Catalog exceptions.nonwaivable is the record; solo-lapse remains the allowlist. */
 export function dutyKeyFromObligation(ob: {
   key?: string | null;
   title?: string | null;
@@ -22,6 +23,8 @@ export function dutyKeyFromObligation(ob: {
 }
 
 export function isWaivableObligationKey(key: string | null | undefined): boolean {
+  if (!key) return false;
+  if (catalogIsNonwaivable(key)) return false;
   return isBlocksSoloWhenLapsedKey(key);
 }
 

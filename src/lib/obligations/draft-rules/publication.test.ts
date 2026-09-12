@@ -4,9 +4,11 @@ import {
   CORE_RULE_LOGIC_SLICE,
   STAGE1_RULE_IDS,
   STAGE2_RULE_IDS,
+  STAGE3_RULE_IDS,
   USOR_PROOF_DESTINATION_AS_PUBLISHED,
   allDraftRulesAreUnpublished,
   REQ_1_8_4_ORIENTATION,
+  REQ_1_12_EVV,
   REQ_30_6_A_USOR,
   REQ_33_5_SJD,
 } from "./fixtures.ts";
@@ -26,7 +28,7 @@ function clone(rule: DraftRule): DraftRule {
 
 describe("Stage 1 draft fixtures stay unpublished", () => {
   it("marks every Core_Rule_Logic rule draft / not_published with no approval", () => {
-    assert.equal(CORE_RULE_LOGIC_SLICE.length, 12);
+    assert.equal(CORE_RULE_LOGIC_SLICE.length, 18);
     assert.equal(allDraftRulesAreUnpublished(), true);
     for (const rule of CORE_RULE_LOGIC_SLICE) {
       assert.equal(rule.lifecycle, "draft");
@@ -43,7 +45,7 @@ describe("Stage 1 draft fixtures stay unpublished", () => {
 
   it("encodes the required slice ids and group shapes", () => {
     const ids = CORE_RULE_LOGIC_SLICE.map((r) => r.id);
-    assert.deepEqual(ids, [...STAGE1_RULE_IDS, ...STAGE2_RULE_IDS]);
+    assert.deepEqual(ids, [...STAGE1_RULE_IDS, ...STAGE2_RULE_IDS, ...STAGE3_RULE_IDS]);
     const o = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.8.4");
     assert.equal(o?.group.logic, "ALL");
     assert.equal(o?.group.parentAssignment, "one");
@@ -73,6 +75,15 @@ describe("Stage 1 draft fixtures stay unpublished", () => {
       sjd?.group.members.some((m) => /workplace supports|effective job coach/i.test(m.label)),
       false,
     );
+    const notes = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.10.7");
+    assert.equal(notes?.group.logic, "ALL");
+    assert.equal(notes?.group.members.filter((m) => !m.condition).length, 5);
+    const evv = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.12");
+    assert.ok(evv?.releaseGaps.some((g) => /needs EVV mapping review/i.test(g)));
+    const art2 = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-ART2");
+    assert.equal(art2?.group.members.length, 5);
+    const cprReuse = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.8.5-cpr-current");
+    assert.equal(cprReuse?.group.members[0]?.evidenceMatch?.scope, "cpr");
   });
 });
 
@@ -99,6 +110,8 @@ describe("publication gate", () => {
       REQ_30_6_A_USOR.releaseGaps.some((g) => g.includes(USOR_PROOF_DESTINATION_AS_PUBLISHED)),
     );
     assert.ok(REQ_33_5_SJD.releaseGaps.some((g) => /SJB/.test(g)));
+    assert.ok(REQ_1_12_EVV.releaseGaps.some((g) => /needs EVV mapping review/i.test(g)));
+    assert.equal(canPublish(REQ_1_12_EVV), false);
     assert.match(USOR_PROOF_DESTINATION_AS_PUBLISHED, /osrprovider@utah\.gov/);
   });
 

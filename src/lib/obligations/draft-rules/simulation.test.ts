@@ -20,6 +20,7 @@ import {
   REQ_SEI_30_6_B,
   REQ_SEI_30_6_C,
   STAGE2_RULE_IDS,
+  STAGE3_RULE_IDS,
   USOR_EXISTING_PROVIDER_DEADLINE,
   USOR_PROOF_DESTINATION_AS_PUBLISHED,
 } from "./fixtures.ts";
@@ -108,17 +109,27 @@ describe("draft simulation writes nothing live", () => {
     assert.equal(result.createdLiveAssignments, false);
     assert.equal(result.createdClaimBlocks, false);
     assert.equal(result.activatedRules, false);
+    assert.equal(result.rejectedClaims, false);
+    assert.deepEqual(result.notes, []);
+    assert.deepEqual(result.claims, []);
     for (const rule of CORE_RULE_LOGIC_SLICE) {
       assert.equal(canActivate(rule), false);
     }
   });
 
   it("simulation module has no supabase or instance inserts", () => {
-    const src = readFileSync(fileURLToPath(new URL("./simulation.ts", import.meta.url)), "utf8");
-    assert.doesNotMatch(src, /supabase/);
-    assert.doesNotMatch(src, /company_obligation_instances/);
-    assert.doesNotMatch(src, /\.from\(/);
-    assert.doesNotMatch(src, /insert\(/);
+    for (const file of [
+      "./simulation.ts",
+      "./notes.ts",
+      "./billing-restrictions.ts",
+      "./evidence-reuse.ts",
+    ]) {
+      const src = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+      assert.doesNotMatch(src, /supabase/, file);
+      assert.doesNotMatch(src, /company_obligation_instances/, file);
+      assert.doesNotMatch(src, /\.from\(/, file);
+      assert.doesNotMatch(src, /insert\(/, file);
+    }
   });
 });
 
@@ -170,6 +181,7 @@ describe("unknown facts stay missing-information", () => {
       "REQ-30.6.b",
       "REQ-30.6.c",
       ...STAGE2_RULE_IDS,
+      ...STAGE3_RULE_IDS,
     ]) {
       const row = ruleFor(result, "unknown-1", id);
       assert.equal(row.applicability, "unanswered", id);

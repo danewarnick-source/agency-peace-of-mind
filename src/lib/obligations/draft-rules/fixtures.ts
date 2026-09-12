@@ -1,9 +1,10 @@
 /**
- * Core_Rule_Logic slice — Stage 1 + Stage 2 draft fixtures.
+ * Core_Rule_Logic slice — Stage 1 + Stage 2 + Stage 3 draft fixtures.
  * Every imported rule is draft / not_published. Source_index is archive
  * metadata. Clause ids come from the workbook / encoded SOW articles already
  * cited on the live pack. No invented renewal intervals. Release_Gaps stay
- * unresolved (USOR email spelling, SJB typo) — do not invent a fix.
+ * unresolved (USOR email spelling, SJB typo, EVV mapping review) — do not
+ * invent a fix.
  */
 
 import { THIRTY_DAY_SOW_LETTERS, THIRTY_DAY_TOPIC_CITE } from "../../in-hive-training.ts";
@@ -83,6 +84,7 @@ function sowLetterMembers(
     catalogKey: null,
     topicCode: code,
     completionRoutes: routes,
+    evidenceMatch: { scope: "orientation", requiredCoverage: [code] },
   }));
 }
 
@@ -178,6 +180,7 @@ export const REQ_1_8_5_FA_CPR_PCT: DraftRule = draftBase({
         catalogKey: "cpr_first_aid_initial",
         timing: CPR_TIMING,
         completionRoutes: ["UPLOAD"],
+        evidenceMatch: { scope: "cpr" },
       },
       {
         id: "person_centered",
@@ -780,6 +783,355 @@ export const REQ_1_25_PERIODIC: DraftRule = draftBase({
   ]),
 });
 
+const DOC_PRED: DraftPredicate = {
+  kind: "service_documentation",
+  catalogKey: "timesheets_attendance",
+};
+const TIMESHEET_PRED: DraftPredicate = {
+  kind: "payroll_timesheet",
+  catalogKey: "timesheets_attendance",
+};
+const EVV_PRED: DraftPredicate = { kind: "evv_mandated", catalogKey: "evv_visit_verification" };
+const SIGN_PRED: DraftPredicate = {
+  kind: "signature_attestation",
+  catalogKey: "timesheets_attendance",
+};
+const ART2_PRED: DraftPredicate = {
+  kind: "billing_restriction",
+  catalogKey: "billing_service_match",
+};
+
+export const REQ_1_10_7_NOTES: DraftRule = draftBase({
+  id: "REQ-1.10.7",
+  version: 1,
+  title: "Service documentation / notes — general schema unless explicit override",
+  catalogKeys: ["timesheets_attendance", "hhs_billable_day"],
+  source: linkWorkbookSource(["SOW §1.10(7)", "SOW Article 11", "CST 55", "CST 56"]),
+  predicates: [DOC_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Select the template by the actual service code + service date. General five-field note unless an explicit HHS override applies. Completing the note does not satisfy EVV, timesheet, signature, or reporting.",
+    members: [
+      {
+        id: "note-person",
+        label: "Person",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+      {
+        id: "note-date",
+        label: "Date",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+      {
+        id: "note-service-code",
+        label: "Service code",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+      {
+        id: "note-staff",
+        label: "Staff",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+      {
+        id: "note-summary",
+        label: "Summary note",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+      {
+        id: "note-start-end",
+        label: "Start/end time (quarter-hour codes)",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+        condition: "quarter_hour_code",
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason:
+      "Per instance of service. Template is chosen on the service date. No invented extra interval.",
+  },
+  evidence: evidence(
+    "General five-field note (Person, date, service code, staff, summary). Start/end is CONDITIONAL for quarter-hour codes. HHS uses the encoded host-home daily note + overnight confirmation, not this punch schema. Completing the note never absorbs EVV, payroll/timesheet, signature, or reporting.",
+    ["IN_PLATFORM"],
+    "In-platform note is the default handling path; it is not equivalency for EVV, timesheet, signature, or reporting.",
+  ),
+  completionRoutes: ["IN_PLATFORM"],
+  tests: tests("REQ-1.10.7", [
+    [
+      "positive",
+      "SLN on a post-7/1/26 date uses the general five-field template; all ALL fields plus start/end complete the note.",
+    ],
+    [
+      "negative",
+      "Wrong service code selects the wrong template (HHS override vs general). A five-field note does not complete EVV, timesheet, signature, or reporting.",
+    ],
+    [
+      "boundary",
+      "Missing any required field leaves the note incomplete. Pre-7/1/26 dates have no invented historical schema.",
+    ],
+  ]),
+});
+
+export const REQ_1_10_7_TIMESHEET: DraftRule = draftBase({
+  id: "REQ-1.10.7-timesheet",
+  version: 1,
+  title: "Payroll / timesheet attendance record — independent of the note",
+  catalogKeys: ["timesheets_attendance"],
+  source: linkWorkbookSource(["SOW §1.10(7)", "CST 55", "CST 56"]),
+  predicates: [TIMESHEET_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Time entry is the attendance record. Independent of the service-documentation note.",
+    members: [
+      {
+        id: "timesheet-entry",
+        label: "Attendance / timesheet entry recorded",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["SYSTEM", "IN_PLATFORM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Per instance of service. Independent of the five-field note.",
+  },
+  evidence: evidence(
+    "HIVE time entries are the attendance record. Completing a daily note does not satisfy this lane.",
+    ["SYSTEM", "IN_PLATFORM"],
+    "Clock / timesheet is the default handling path, not equivalency for a narrative note.",
+  ),
+  completionRoutes: ["SYSTEM", "IN_PLATFORM"],
+  tests: tests("REQ-1.10.7-timesheet", [
+    ["positive", "A recorded timesheet entry satisfies the payroll/attendance lane."],
+    ["negative", "A complete five-field note without a timesheet leaves this lane incomplete."],
+    [
+      "boundary",
+      "Unknown assignment is missing-information. HHS host-home days still need the attendance artifact.",
+    ],
+  ]),
+});
+
+export const REQ_1_12_EVV: DraftRule = draftBase({
+  id: "REQ-1.12",
+  version: 1,
+  title: "EVV-mandated codes — independent of the service note",
+  catalogKeys: ["evv_visit_verification"],
+  source: linkWorkbookSource(["SOW §1.12"]),
+  predicates: [EVV_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Applies only when the assigned code is EVV-mandated (src/lib/evv-codes.ts). A note never absorbs this lane.",
+    members: [
+      {
+        id: "evv-geofence",
+        label: "EVV geofence-valid punch",
+        sourceClauseId: "SOW §1.12",
+        catalogKey: "evv_visit_verification",
+        completionRoutes: ["SYSTEM"],
+        condition: "evv_mandated_code",
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Per EVV-mandated visit. Do not invent UEVV integration success.",
+  },
+  evidence: evidence(
+    "EVV is a separate requirement from the service note and the payroll timesheet. Mapping / state transmission is a publication gap.",
+    ["SYSTEM"],
+    "Geofence punch is the handling path, not equivalency for a narrative note.",
+  ),
+  completionRoutes: ["SYSTEM"],
+  releaseGaps: [
+    "needs EVV mapping review — do not invent UEVV / state integration success (Release_Gaps 1.12).",
+  ],
+  tests: tests("REQ-1.12", [
+    ["positive", "SLN/SLH with a geofence-valid punch satisfy the EVV lane."],
+    [
+      "negative",
+      "HHS/DSI/SEI are not EVV-mandated. A complete five-field note does not satisfy EVV.",
+    ],
+    [
+      "boundary",
+      "Unknown assignment is missing-information. Publication stays blocked on EVV mapping review.",
+    ],
+  ]),
+});
+
+export const REQ_1_10_SIGNATURE: DraftRule = draftBase({
+  id: "REQ-1.10-signature",
+  version: 1,
+  title: "Staff attestation / signature — independent of the note fields",
+  catalogKeys: ["timesheets_attendance"],
+  source: linkWorkbookSource(["SOW §1.10(7)"]),
+  predicates: [SIGN_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    members: [
+      {
+        id: "signature-attested",
+        label: "Staff attestation (signature) recorded",
+        sourceClauseId: "SOW §1.10(7)",
+        catalogKey: "timesheets_attendance",
+        completionRoutes: ["IN_PLATFORM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Per documented service instance. Independent of note field completeness.",
+  },
+  evidence: evidence(
+    "Attestation is a separate lane from the five-field note. Completing the note fields does not attest.",
+    ["IN_PLATFORM"],
+    "In-platform attestation is the handling path, not equivalency for a filled note form.",
+  ),
+  completionRoutes: ["IN_PLATFORM"],
+  tests: tests("REQ-1.10-signature", [
+    ["positive", "Recorded staff attestation satisfies the signature lane."],
+    ["negative", "A complete note without attestation leaves the signature lane incomplete."],
+    ["boundary", "Unknown assignment is missing-information."],
+  ]),
+});
+
+export const REQ_ART2_BILLING: DraftRule = draftBase({
+  id: "REQ-ART2",
+  version: 1,
+  title: "Article 2 general billing restrictions — evaluate on service date",
+  catalogKeys: ["billing_service_match"],
+  source: linkWorkbookSource(["SOW Article 2"]),
+  predicates: [ART2_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Authorization, hospitalization, incarceration, overlapping services, exception approvals. Overlap is not automatically prohibited. Encoded exceptions only; otherwise review / missing-information. Draft simulation may raise review holds and must not silently reject claims while activation is locked.",
+    members: [
+      {
+        id: "art2-authorization",
+        label: "Active authorization (1056) on the service date",
+        sourceClauseId: "SOW Article 2",
+        catalogKey: "billing_service_match",
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "art2-hospitalization",
+        label: "Hospitalization status known and reviewed",
+        sourceClauseId: "SOW Article 2",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "art2-incarceration",
+        label: "Incarceration status known and reviewed",
+        sourceClauseId: "SOW Article 2",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "art2-overlap",
+        label: "Overlapping services reviewed (encoded exceptions only)",
+        sourceClauseId: "SOW Article 2",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "art2-exception",
+        label: "Exception approvals applied only when encoded",
+        sourceClauseId: "SOW Article 2",
+        catalogKey: null,
+        completionRoutes: ["UPLOAD", "SYSTEM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Judged on the service date. Do not invent a 1.32 transition date.",
+  },
+  evidence: evidence(
+    "Evaluate each claim on the service date. Overlap is not an automatic denial. Unencoded pairs stay review / missing-information. Activation lock forbids silent claim rejection.",
+    ["SYSTEM", "UPLOAD"],
+    "Review hold with a claim-specific explanation and resolution link is the handling path, not a live claim block.",
+  ),
+  completionRoutes: ["SYSTEM", "UPLOAD"],
+  tests: tests("REQ-ART2", [
+    [
+      "positive",
+      "Active 1056, known not hospitalized/incarcerated, and only encoded overlap exceptions (back-to-back / segment / 2:1 with review) leave the claim eligible.",
+    ],
+    [
+      "negative",
+      "Missing authorization is a review hold. Unknown hospitalization or incarceration is missing-information, never an invented denial.",
+    ],
+    [
+      "boundary",
+      "Unencoded overlap is missing-information / review, not a prohibition. Locked activation never silently rejects the claim.",
+    ],
+  ]),
+});
+
+export const REQ_1_8_5_CPR_CURRENT: DraftRule = draftBase({
+  id: "REQ-1.8.5-cpr-current",
+  version: 1,
+  title: "Current CPR on file — reuse target for the same subject",
+  catalogKeys: ["cpr_first_aid_renewal"],
+  source: linkWorkbookSource(["SOW §1.8(5)(B)"]),
+  predicates: [{ kind: "direct_support_assignment", catalogKey: "cpr_first_aid_renewal" }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    members: [
+      {
+        id: "cpr",
+        label: "Current CPR",
+        sourceClauseId: "SOW §1.8(5)(B)",
+        catalogKey: "cpr_first_aid_renewal",
+        timing: CPR_TIMING,
+        completionRoutes: ["UPLOAD"],
+        evidenceMatch: { scope: "cpr" },
+      },
+    ],
+  },
+  timing: { kind: "certificate_expiry", certKey: "cpr" },
+  evidence: evidence(
+    "Same printed CPR credential may satisfy every CPR-linked requirement for this subject. No cross-tenant reuse. Upload is submitted until accepted.",
+    ["UPLOAD"],
+    "Upload of the official CPR card is the handling path; one accepted record may link to multiple CPR-scoped members.",
+  ),
+  completionRoutes: ["UPLOAD"],
+  tests: tests("REQ-1.8.5-cpr-current", [
+    [
+      "positive",
+      "One accepted CPR record covers this rule and REQ-1.8.5 CPR for the same subject.",
+    ],
+    ["negative", "A different tenant or a different subject cannot reuse the card."],
+    [
+      "boundary",
+      "Submitted (not accepted) upload does not change compliance. Expired card does not.",
+    ],
+  ]),
+});
+
 export const STAGE1_RULE_IDS = [
   "REQ-1.8.4",
   "REQ-1.8.5",
@@ -798,6 +1150,15 @@ export const STAGE2_RULE_IDS = [
   "REQ-1.25",
 ] as const;
 
+export const STAGE3_RULE_IDS = [
+  "REQ-1.10.7",
+  "REQ-1.10.7-timesheet",
+  "REQ-1.12",
+  "REQ-1.10-signature",
+  "REQ-ART2",
+  "REQ-1.8.5-cpr-current",
+] as const;
+
 export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_1_8_4_ORIENTATION,
   REQ_1_8_5_FA_CPR_PCT,
@@ -811,6 +1172,12 @@ export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_32_5_CAREGIVER,
   REQ_33_5_SJD,
   REQ_1_25_PERIODIC,
+  REQ_1_10_7_NOTES,
+  REQ_1_10_7_TIMESHEET,
+  REQ_1_12_EVV,
+  REQ_1_10_SIGNATURE,
+  REQ_ART2_BILLING,
+  REQ_1_8_5_CPR_CURRENT,
 ];
 
 export function draftRuleById(id: string): DraftRule | null {

@@ -115,6 +115,7 @@ function hitToDecision(hit: EscalationHit): Decision {
     obligationId: hit.obligationId,
     obligationKey: hit.obligationKey,
     subjectName: hit.subject.displayName,
+    staffUserId: hit.subject.staffUserId,
   };
 }
 
@@ -143,6 +144,7 @@ async function loadRemediationPlansAwaitingApproval(
       obligationKey: row.obligation_key,
       planId: row.id,
       planKind: row.kind,
+      staffUserId: row.staff_id,
     };
   });
 }

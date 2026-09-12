@@ -21,6 +21,13 @@ import {
   type RemediationPlanRow,
 } from "./remediation.ts";
 import {
+  buildOverrideInsert,
+  overrideIsActive,
+  parseOverrideScope,
+  type OverrideRow,
+  type OverrideScope,
+} from "./overrides.ts";
+import {
   BLOCKS_SOLO_WHEN_LAPSED_KEYS,
   filterSoloLapsesForClient,
   soloLapseLabel,
@@ -49,9 +56,7 @@ async function requireManager(
 
 export const getThisWeekForUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z.object({ organizationId: z.string().uuid() }).parse(i),
-  )
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }): Promise<ThisWeekResult> => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) {
@@ -165,6 +170,111 @@ export const listSoloLapsesForStaff = createServerFn({ method: "POST" })
     });
   });
 
+const OVERRIDE_SCOPE_Z = z.enum(["instance", "staff_clock", "shift"]);
+
+const OVERRIDE_SELECT =
+  "id, organization_id, staff_id, obligation_id, instance_id, obligation_key, gap_key, gap_type, kind, reason, expires_at, created_by, created_at, shift_id";
+
+export type ObligationOverrideView = OverrideRow & {
+  scope: OverrideScope | null;
+  active: boolean;
+  authorized_by: string | null;
+};
+
+async function insertObligationOverride(
+  supabase: AnySupabase,
+  userId: string,
+  data: {
+    organizationId: string;
+    staffId: string;
+    obligationKey: string;
+    obligationId?: string | null;
+    instanceId?: string | null;
+    shiftId?: string | null;
+    scope: OverrideScope;
+    reason: string;
+    expiresAt: string;
+  },
+  now: Date = new Date(),
+): Promise<{ id: string }> {
+  const payload = buildOverrideInsert({
+    organizationId: data.organizationId,
+    staffId: data.staffId,
+    obligationKey: data.obligationKey,
+    obligationId: data.obligationId,
+    instanceId: data.instanceId,
+    shiftId: data.shiftId,
+    scope: data.scope,
+    reason: data.reason,
+    expiresAt: data.expiresAt,
+    createdBy: userId,
+    now,
+  });
+  const { data: row, error } = await supabase
+    .from("compliance_overrides")
+    .insert(payload)
+    .select("id")
+    .single();
+  if (error) {
+    if (tableMissing(error.message)) {
+      throw new Error("Overrides are not available yet.");
+    }
+    throw new Error(error.message);
+  }
+  return { id: (row as { id: string }).id };
+}
+
+async function mapOverrideViews(
+  supabase: AnySupabase,
+  rows: OverrideRow[],
+  now: Date,
+): Promise<ObligationOverrideView[]> {
+  const actorIds = Array.from(
+    new Set(rows.map((r) => r.created_by).filter((id): id is string => !!id)),
+  );
+  const names = new Map<string, string>();
+  if (actorIds.length) {
+    const { data: dir, error } = await supabase
+      .from("org_member_directory")
+      .select("id, full_name")
+      .in("id", actorIds);
+    if (error && !tableMissing(error.message)) throw new Error(error.message);
+    for (const person of (dir ?? []) as Array<{ id: string | null; full_name: string | null }>) {
+      if (person.id && person.full_name) names.set(person.id, person.full_name);
+    }
+  }
+  return rows.map((row) => ({
+    ...row,
+    scope: parseOverrideScope(row.gap_type) ?? parseOverrideScope(row.kind),
+    active: overrideIsActive(row.expires_at, now),
+    authorized_by: row.created_by ? (names.get(row.created_by) ?? row.created_by) : null,
+  }));
+}
+
+export const recordObligationOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+        obligationKey: z.string().min(1).max(80),
+        obligationId: z.string().uuid().nullable().optional(),
+        instanceId: z.string().uuid().nullable().optional(),
+        reason: z.string().min(8).max(500),
+        scope: OVERRIDE_SCOPE_Z,
+        expiresAt: z.string().min(1),
+        shiftId: z.string().uuid().nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<{ id: string }> => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) throw new Error("Not authenticated");
+    await requireManager(supabase, userId, data.organizationId);
+    return insertObligationOverride(supabase, userId, data);
+  });
+
 export const recordSoloOverride = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -177,7 +287,8 @@ export const recordSoloOverride = createServerFn({ method: "POST" })
         instanceId: z.string().uuid().nullable().optional(),
         reason: z.string().min(8).max(500),
         shiftId: z.string().uuid().nullable().optional(),
-        expiresAt: z.string().nullable().optional(),
+        expiresAt: z.string().min(1),
+        scope: OVERRIDE_SCOPE_Z.optional(),
       })
       .parse(i),
   )
@@ -185,33 +296,60 @@ export const recordSoloOverride = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) throw new Error("Not authenticated");
     await requireManager(supabase, userId, data.organizationId);
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: row, error } = await supabase
-      .from("compliance_overrides")
-      .insert({
-        organization_id: data.organizationId,
-        staff_id: data.staffId,
-        gap_type: "solo_lapse",
-        gap_reference_date: today,
-        gap_key: data.obligationKey,
-        obligation_key: data.obligationKey,
-        obligation_id: data.obligationId ?? null,
-        instance_id: data.instanceId ?? null,
-        kind: "solo_lapse",
-        shift_id: data.shiftId ?? null,
-        reason: data.reason,
-        expires_at: data.expiresAt ?? null,
-        created_by: userId,
+    return insertObligationOverride(supabase, userId, {
+      ...data,
+      scope: data.scope ?? (data.instanceId ? "instance" : "staff_clock"),
+    });
+  });
+
+export const listOverridesForStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
       })
-      .select("id")
-      .single();
+      .parse(i),
+  )
+  .handler(async ({ data, context }): Promise<ObligationOverrideView[]> => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [];
+    if (data.staffId === userId) {
+      await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    } else {
+      await requireManager(supabase, userId, data.organizationId);
+    }
+    const { data: rows, error } = await supabase
+      .from("compliance_overrides")
+      .select(OVERRIDE_SELECT)
+      .eq("organization_id", data.organizationId)
+      .eq("staff_id", data.staffId)
+      .order("created_at", { ascending: true });
     if (error) {
-      if (tableMissing(error.message)) {
-        throw new Error("Overrides table is not live yet. Soft Core must apply Step 4 SQL.");
-      }
+      if (tableMissing(error.message)) return [];
       throw new Error(error.message);
     }
-    return { id: (row as { id: string }).id };
+    return mapOverrideViews(supabase, (rows ?? []) as OverrideRow[], new Date());
+  });
+
+export const listOverridesForOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }): Promise<ObligationOverrideView[]> => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [];
+    await requireManager(supabase, userId, data.organizationId);
+    const { data: rows, error } = await supabase
+      .from("compliance_overrides")
+      .select(OVERRIDE_SELECT)
+      .eq("organization_id", data.organizationId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      if (tableMissing(error.message)) return [];
+      throw new Error(error.message);
+    }
+    return mapOverrideViews(supabase, (rows ?? []) as OverrideRow[], new Date());
   });
 
 export const proposeRemediationPlan = createServerFn({ method: "POST" })
@@ -272,14 +410,18 @@ export const proposeRemediationPlan = createServerFn({ method: "POST" })
       .single();
     if (error) {
       if (tableMissing(error.message)) {
-        throw new Error("Remediation plans table is not live yet. Soft Core must apply Step 4 SQL.");
+        throw new Error(
+          "Remediation plans table is not live yet. Soft Core must apply Step 4 SQL.",
+        );
       }
       if (/duplicate|unique/i.test(error.message)) {
         const existing = await loadAwaitingApprovalPlans(supabase, data.organizationId);
         const match = existing.find(
           (p) =>
             p.kind === data.kind &&
-            (data.instanceId ? p.instance_id === data.instanceId : p.obligation_id === data.obligationId),
+            (data.instanceId
+              ? p.instance_id === data.instanceId
+              : p.obligation_id === data.obligationId),
         );
         if (match) return { id: match.id };
       }
@@ -317,7 +459,9 @@ export const reviewRemediationPlan = createServerFn({ method: "POST" })
       .maybeSingle();
     if (getErr) {
       if (tableMissing(getErr.message)) {
-        throw new Error("Remediation plans table is not live yet. Soft Core must apply Step 4 SQL.");
+        throw new Error(
+          "Remediation plans table is not live yet. Soft Core must apply Step 4 SQL.",
+        );
       }
       throw new Error(getErr.message);
     }

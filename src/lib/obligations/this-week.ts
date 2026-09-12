@@ -50,6 +50,9 @@ export type Decision = {
   subjectName?: string | null;
   planId?: string | null;
   planKind?: RemediationPlanKind | null;
+  staffUserId?: string | null;
+  overridden?: boolean;
+  overrideUntil?: string | null;
   mergedTriggers?: EscalationTrigger[];
   count?: number;
   headline?: string;
@@ -232,7 +235,10 @@ export function quietLineIsClean(quiet: QuietLine): boolean {
 
 export function formatQuietLine(quiet: QuietLine): string {
   if (!quietLineIsClean(quiet)) {
-    const body = quiet.segments.length > 0 ? quiet.segments.join(" · ") : "this is not a clean compliance result";
+    const body =
+      quiet.segments.length > 0
+        ? quiet.segments.join(" · ")
+        : "this is not a clean compliance result";
     return `Needs an answer: ${body}`;
   }
   if (quiet.segments.length === 0) return "Handled without you: operations are current.";
@@ -262,10 +268,7 @@ export function thisWeekStatusLine(input: {
   return `${word} decision${n === 1 ? "" : "s"}. Everything else is delegated and quiet.`;
 }
 
-export function decisionFromQuietSummary(
-  summary: QuietSummary,
-  ownerUserId: string,
-): Decision {
+export function decisionFromQuietSummary(summary: QuietSummary, ownerUserId: string): Decision {
   return {
     kind: "decision",
     id: summary.id,

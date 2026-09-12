@@ -123,6 +123,20 @@ describe("staff My tasks engine", () => {
     });
     assert.equal(awaiting.pendingReview, true);
     assert.equal(awaiting.action, "upload_certificate");
+
+    const overridden = buildStaffTask({
+      instanceId: "i4",
+      title: "CPR/First Aid Certification — Renewal",
+      evidenceType: "upload",
+      dueAt: "2026-09-20T00:00:00.000Z",
+      instanceStatus: "overdue",
+      overridden: true,
+      overrideUntil: "Sep 18, 2026",
+      now: NOW,
+    });
+    assert.equal(overridden.overridden, true);
+    assert.equal(overridden.overrideUntil, "Sep 18, 2026");
+    assert.equal(overridden.action, "upload_certificate");
   });
 
   it("prefers policy section then description for non-SOW why", () => {
@@ -144,12 +158,18 @@ describe("Staff My tasks surface lock", () => {
       "utf8",
     );
     const home = readFileSync(new URL("../routes/dashboard.index.tsx", import.meta.url), "utf8");
+    const homeTasks = readFileSync(
+      new URL("../components/staff-tasks/staff-home-my-tasks.tsx", import.meta.url),
+      "utf8",
+    );
     const nav = readFileSync(new URL("../routes/dashboard.tsx", import.meta.url), "utf8");
     assert.match(page, /MyTasksQueue/);
     assert.match(page, /My tasks/);
     assert.match(page, /STAFF_TASKS_FOOTER/);
     assert.match(page, /title: "Staff file/);
     assert.match(home, /StaffHomeMyTasks/);
+    assert.match(page, /overridden/);
+    assert.match(homeTasks, /overridden/);
     assert.match(nav, /to: "\/dashboard\/my-obligations", label: "Staff file"/);
     assert.doesNotMatch(page, /from\("staff_tasks"\)/);
     assert.doesNotMatch(page, /from\("my_tasks"\)/);

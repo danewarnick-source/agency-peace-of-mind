@@ -42,6 +42,8 @@ export type StaffTaskInput = {
   nectarValidationStatus?: string | null;
   correctionRequested?: boolean;
   courseProgress?: { completed: number; total: number } | null;
+  overridden?: boolean;
+  overrideUntil?: string | null;
   now?: Date;
 };
 
@@ -56,6 +58,8 @@ export type StaffTask = {
   progressLabel: string | null;
   pendingReview: boolean;
   evidence: StaffTaskEvidence;
+  overridden: boolean;
+  overrideUntil: string | null;
 };
 
 export function isPendingCertReview(status: string | null | undefined): boolean {
@@ -121,6 +125,8 @@ export function buildStaffTask(input: StaffTaskInput): StaffTask {
     progressLabel: staffTaskProgressLabel(input),
     pendingReview,
     evidence: staffTaskEvidence(input),
+    overridden: !!input.overridden,
+    overrideUntil: input.overrideUntil ?? null,
   };
 }
 

@@ -139,6 +139,7 @@ import { Route as DashboardSettingsPhiAccessAuditRouteImport } from './routes/da
 import { Route as DashboardSettingsLicensingRouteImport } from './routes/dashboard.settings.licensing'
 import { Route as DashboardSettingsGmailRouteImport } from './routes/dashboard.settings.gmail'
 import { Route as DashboardSettingsEmailRouteImport } from './routes/dashboard.settings.email'
+import { Route as DashboardSettingsDraftRulesRouteImport } from './routes/dashboard.settings.draft-rules'
 import { Route as DashboardSettingsComplianceSetupRouteImport } from './routes/dashboard.settings.compliance-setup'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
 import { Route as DashboardSettingsAutomationRulesRouteImport } from './routes/dashboard.settings.automation-rules'
@@ -916,6 +917,12 @@ const DashboardSettingsEmailRoute = DashboardSettingsEmailRouteImport.update({
   path: '/email',
   getParentRoute: () => DashboardSettingsRoute,
 } as any)
+const DashboardSettingsDraftRulesRoute =
+  DashboardSettingsDraftRulesRouteImport.update({
+    id: '/draft-rules',
+    path: '/draft-rules',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardSettingsComplianceSetupRoute =
   DashboardSettingsComplianceSetupRouteImport.update({
     id: '/compliance-setup',
@@ -1631,6 +1638,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/compliance-setup': typeof DashboardSettingsComplianceSetupRoute
+  '/dashboard/settings/draft-rules': typeof DashboardSettingsDraftRulesRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
@@ -1851,6 +1859,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/compliance-setup': typeof DashboardSettingsComplianceSetupRoute
+  '/dashboard/settings/draft-rules': typeof DashboardSettingsDraftRulesRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
@@ -2079,6 +2088,7 @@ export interface FileRoutesById {
   '/dashboard/settings/automation-rules': typeof DashboardSettingsAutomationRulesRoute
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/compliance-setup': typeof DashboardSettingsComplianceSetupRoute
+  '/dashboard/settings/draft-rules': typeof DashboardSettingsDraftRulesRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
@@ -2308,6 +2318,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/compliance-setup'
+    | '/dashboard/settings/draft-rules'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
@@ -2528,6 +2539,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/compliance-setup'
+    | '/dashboard/settings/draft-rules'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
@@ -2755,6 +2767,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/automation-rules'
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/compliance-setup'
+    | '/dashboard/settings/draft-rules'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
@@ -3774,6 +3787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsEmailRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/draft-rules': {
+      id: '/dashboard/settings/draft-rules'
+      path: '/draft-rules'
+      fullPath: '/dashboard/settings/draft-rules'
+      preLoaderRoute: typeof DashboardSettingsDraftRulesRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/compliance-setup': {
       id: '/dashboard/settings/compliance-setup'
       path: '/compliance-setup'
@@ -4671,6 +4691,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsAutomationRulesRoute: typeof DashboardSettingsAutomationRulesRoute
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
   DashboardSettingsComplianceSetupRoute: typeof DashboardSettingsComplianceSetupRoute
+  DashboardSettingsDraftRulesRoute: typeof DashboardSettingsDraftRulesRoute
   DashboardSettingsEmailRoute: typeof DashboardSettingsEmailRoute
   DashboardSettingsGmailRoute: typeof DashboardSettingsGmailRoute
   DashboardSettingsLicensingRoute: typeof DashboardSettingsLicensingRoute
@@ -4687,6 +4708,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsAutomationRulesRoute: DashboardSettingsAutomationRulesRoute,
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
   DashboardSettingsComplianceSetupRoute: DashboardSettingsComplianceSetupRoute,
+  DashboardSettingsDraftRulesRoute: DashboardSettingsDraftRulesRoute,
   DashboardSettingsEmailRoute: DashboardSettingsEmailRoute,
   DashboardSettingsGmailRoute: DashboardSettingsGmailRoute,
   DashboardSettingsLicensingRoute: DashboardSettingsLicensingRoute,

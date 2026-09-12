@@ -86,13 +86,18 @@ describe("publication gate", () => {
       assert.ok(row.gaps.some((g) => g.key === "not_published_flag"));
       if (rule.releaseGaps.length > 0) {
         assert.equal(canPublish(rule), false, rule.id);
-        assert.ok(structuralPublicationGaps(rule).some((g) => g.key === "release_gaps"), rule.id);
+        assert.ok(
+          structuralPublicationGaps(rule).some((g) => g.key === "release_gaps"),
+          rule.id,
+        );
       } else {
         assert.equal(structuralPublicationGaps(rule).length, 0, rule.id);
         assert.equal(canPublish(rule), true, rule.id);
       }
     }
-    assert.ok(REQ_30_6_A_USOR.releaseGaps.some((g) => g.includes(USOR_PROOF_DESTINATION_AS_PUBLISHED)));
+    assert.ok(
+      REQ_30_6_A_USOR.releaseGaps.some((g) => g.includes(USOR_PROOF_DESTINATION_AS_PUBLISHED)),
+    );
     assert.ok(REQ_33_5_SJD.releaseGaps.some((g) => /SJB/.test(g)));
     assert.match(USOR_PROOF_DESTINATION_AS_PUBLISHED, /osrprovider@utah\.gov/);
   });

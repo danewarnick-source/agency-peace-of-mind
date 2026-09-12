@@ -636,7 +636,10 @@ describe("REQ-33.5.b-c SJD ACRE + Discovery CE", () => {
     assert.equal(row.applicability, "applies");
     assert.equal(row.parentComplete, false);
     assert.equal(row.members.find((m) => m.memberId === "sjd-supervision-pending")?.complete, true);
-    assert.equal(row.members.find((m) => m.memberId === "sjd-customized-employment")?.applicable, false);
+    assert.equal(
+      row.members.find((m) => m.memberId === "sjd-customized-employment")?.applicable,
+      false,
+    );
 
     const discovery = run({
       staff: [{ ...sjd, sjdPerformsDiscovery: true, acreCertified: true }],

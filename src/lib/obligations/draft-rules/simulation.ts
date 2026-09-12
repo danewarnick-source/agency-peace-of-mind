@@ -17,10 +17,7 @@ import {
   staffSeesDuty,
   type StaffDutyFacts,
 } from "../duty-applicability.ts";
-import {
-  PERIODIC_MONTHLY_CODES,
-  PERIODIC_QUARTERLY_CODES,
-} from "./fixtures.ts";
+import { PERIODIC_MONTHLY_CODES, PERIODIC_QUARTERLY_CODES } from "./fixtures.ts";
 import type {
   CompletionRoute,
   DraftPredicate,
@@ -219,7 +216,10 @@ function looksLikeGenericQuiz(ev: SyntheticEvidence | undefined): boolean {
   return !!ev.courseName && GENERIC_QUIZ.test(ev.courseName);
 }
 
-function officialProgramAccepted(ev: SyntheticEvidence | undefined, officialName?: string): boolean {
+function officialProgramAccepted(
+  ev: SyntheticEvidence | undefined,
+  officialName?: string,
+): boolean {
   if (!ev || !ev.completed) return false;
   if (looksLikeGenericQuiz(ev)) return false;
   if (ev.isOfficialProgram === false) return false;
@@ -428,11 +428,17 @@ function memberComplete(
     );
   }
   if (member.id === "qualified-designated") {
-    return factMember(rule.id, member, staff.benefitsQualified ?? null, "Designated staff qualification");
+    return factMember(
+      rule.id,
+      member,
+      staff.benefitsQualified ?? null,
+      "Designated staff qualification",
+    );
   }
   if (member.id === "official-usor-proof") {
     if (usorOfficialProofOnFile === true || ev?.completed) {
-      if (looksLikeGenericQuiz(ev)) return { complete: false, issue: genericQuizIssue(rule.id, member) };
+      if (looksLikeGenericQuiz(ev))
+        return { complete: false, issue: genericQuizIssue(rule.id, member) };
       return { complete: true, issue: null };
     }
     if (usorOfficialProofOnFile === null && !ev) {
@@ -467,8 +473,7 @@ function memberComplete(
   if (member.id === "sjd-supervision-pending") {
     const acreEv = evidenceFor(allEvidence, staff.staffId, rule.id, "sjd-acre");
     const acreDone =
-      staff.acreCertified === true ||
-      (acreEv?.completed === true && !looksLikeGenericQuiz(acreEv));
+      staff.acreCertified === true || (acreEv?.completed === true && !looksLikeGenericQuiz(acreEv));
     if (acreDone) return { complete: true, issue: null };
     if (staff.supervisorAcreCertified === null) {
       return factMember(rule.id, member, null, "Qualified ACRE supervision while pending");
@@ -538,7 +543,10 @@ function memberComplete(
       },
     };
   }
-  if (looksLikeGenericQuiz(ev) && (member.requiresOfficialProgram || member.id === "cpr" || member.id === "first_aid")) {
+  if (
+    looksLikeGenericQuiz(ev) &&
+    (member.requiresOfficialProgram || member.id === "cpr" || member.id === "first_aid")
+  ) {
     return { complete: false, issue: genericQuizIssue(rule.id, member) };
   }
   if (member.requiresOfficialProgram && ev.isOfficialProgram === false) {
@@ -640,15 +648,23 @@ function evaluateRoute(
   if (looksLikeGenericQuiz(routeEv)) {
     return {
       complete: false,
-      issues: [genericQuizIssue(rule.id, { ...route.conditions[0]!, id: route.id, label: route.label })],
+      issues: [
+        genericQuizIssue(rule.id, { ...route.conditions[0]!, id: route.id, label: route.label }),
+      ],
       members: conditionMembers,
     };
   }
-  if (routeEv && officialProgramAccepted(routeEv, route.officialProgram) === false && routeEv.completed) {
+  if (
+    routeEv &&
+    officialProgramAccepted(routeEv, route.officialProgram) === false &&
+    routeEv.completed
+  ) {
     if (routeEv.isOfficialProgram !== true && looksLikeGenericQuiz(routeEv)) {
       return {
         complete: false,
-        issues: [genericQuizIssue(rule.id, { ...route.conditions[0]!, id: route.id, label: route.label })],
+        issues: [
+          genericQuizIssue(rule.id, { ...route.conditions[0]!, id: route.id, label: route.label }),
+        ],
         members: conditionMembers,
       };
     }
@@ -716,7 +732,13 @@ function evaluateRuleForStaff(
         memberId: member.id,
         label: member.label,
         complete: false,
-        dueAt: dueFromAnchor(member.timing ?? rule.timing, staff, input.now, ev, input.seiAwardDate),
+        dueAt: dueFromAnchor(
+          member.timing ?? rule.timing,
+          staff,
+          input.now,
+          ev,
+          input.seiAwardDate,
+        ),
         issue: null,
         applicable: cond.applicable,
       };
@@ -732,7 +754,13 @@ function evaluateRuleForStaff(
         memberId: member.id,
         label: member.label,
         complete: false,
-        dueAt: dueFromAnchor(member.timing ?? rule.timing, staff, input.now, ev, input.seiAwardDate),
+        dueAt: dueFromAnchor(
+          member.timing ?? rule.timing,
+          staff,
+          input.now,
+          ev,
+          input.seiAwardDate,
+        ),
         issue,
         applicable: true,
       };
@@ -793,7 +821,10 @@ function evaluateRuleForStaff(
     }
   }
 
-  const membersOk = groupComplete(rule.group.logic, members.filter((m) => !m.selectedRouteId));
+  const membersOk = groupComplete(
+    rule.group.logic,
+    members.filter((m) => !m.selectedRouteId),
+  );
   const parentComplete = applicability === "applies" && membersOk && routesOk;
   if (applicability === "applies" && !parentComplete) {
     issues.push({

@@ -538,7 +538,8 @@ export const REQ_30_5_SEI_BENEFITS: DraftRule = draftBase({
   },
   timing: {
     kind: "none",
-    reason: "Required of the designated qualified person before providing SEI. No invented renewal.",
+    reason:
+      "Required of the designated qualified person before providing SEI. No invented renewal.",
   },
   evidence: evidence(
     "Agency must have at least one qualified designated staff member. Knowledge is acquired outside HIVE; HIVE records the designated person's qualification. Not assigned to every SEI or office staff member.",
@@ -650,7 +651,10 @@ export const REQ_32_5_CAREGIVER: DraftRule = draftBase({
       "positive",
       "Staff assigned CMP or CMS who complete the official DSPD course satisfy the rule.",
     ],
-    ["negative", "SLN alone does not trigger. Office staff without CMP/CMS do not receive the duty."],
+    [
+      "negative",
+      "SLN alone does not trigger. Office staff without CMP/CMS do not receive the duty.",
+    ],
     [
       "boundary",
       "A generic quiz cannot replace the official DSPD course. Unknown CMP/CMS assignment is missing-information.",
@@ -767,10 +771,7 @@ export const REQ_1_25_PERIODIC: DraftRule = draftBase({
   ),
   completionRoutes: ["IN_PLATFORM", "SYSTEM"],
   tests: tests("REQ-1.25", [
-    [
-      "positive",
-      "HHS/SLN receive quarterly only. SEI/SJD/CMP/CMS/PN1/PN2 receive monthly only.",
-    ],
+    ["positive", "HHS/SLN receive quarterly only. SEI/SJD/CMP/CMS/PN1/PN2 receive monthly only."],
     ["negative", "Office staff with no assigned codes do not receive a periodic report clock."],
     [
       "boundary",

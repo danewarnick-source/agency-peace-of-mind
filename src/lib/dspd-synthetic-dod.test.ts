@@ -59,6 +59,12 @@ import {
 } from "./obligations/remediation.ts";
 import { orgWideResolvedScope } from "./obligations/scope.ts";
 import { buildQuietLine, quietLineIsClean, thisWeekStatusLine } from "./obligations/this-week.ts";
+import {
+  CORE_RULE_LOGIC_SLICE,
+  canActivate,
+  simulateDraftRules,
+  type SyntheticStaff,
+} from "./obligations/draft-rules/index.ts";
 import { sowCatalogEntryByKey } from "./sow-obligation-catalog.ts";
 import { buildStaffTask } from "./staff-my-tasks.ts";
 import {
@@ -722,5 +728,57 @@ describe("DoD 5: evidence upload ≠ accept; Accept still needs expiration; rene
     });
     assert.equal(awaiting.pendingReview, true);
     assert.equal(awaiting.action, "upload_certificate");
+  });
+});
+
+describe("DoD 6: draft Core_Rule_Logic simulation — same engine, not a second checklist", () => {
+  it("walks the live duty keys through draft rules without activating or writing", () => {
+    const toSynthetic = (facts: StaffDutyFacts, id: string): SyntheticStaff => ({
+      ...facts,
+      staffId: id,
+      hireDate: "2024-07-01",
+      acreCertified: null,
+      supervisorAcreCertified: null,
+    });
+    const result = simulateDraftRules({
+      rules: CORE_RULE_LOGIC_SLICE,
+      orgFacts: TNS_FACTS,
+      staff: [
+        toSynthetic(DSP, "dsp-1"),
+        toSynthetic(OFFICE, "office-1"),
+        toSynthetic(UNKNOWN, "unknown-1"),
+      ],
+      evidence: [],
+      now: NOW,
+      orgHasAcreCoverage: null,
+    });
+    assert.equal(result.wroteDatabase, false);
+    assert.equal(result.createdLiveAssignments, false);
+    assert.equal(result.createdClaimBlocks, false);
+    assert.equal(result.activatedRules, false);
+    assert.ok(CORE_RULE_LOGIC_SLICE.every((r) => canActivate(r) === false));
+
+    const dsp = result.staff.find((s) => s.staffId === "dsp-1");
+    const office = result.staff.find((s) => s.staffId === "office-1");
+    const unknown = result.staff.find((s) => s.staffId === "unknown-1");
+    assert.ok(dsp && office && unknown);
+
+    const dspOri = dsp.rules.find((r) => r.ruleId === "REQ-1.8.4");
+    const officeOri = office.rules.find((r) => r.ruleId === "REQ-1.8.4");
+    assert.equal(dspOri?.applicability, "applies");
+    assert.equal(dspOri?.parentTaskCount, 1);
+    assert.equal(officeOri?.applicability, "does_not_apply");
+    assert.equal(officeOri?.parentTaskCount, 0);
+    assert.ok(applyingKeys(DSP).includes("orientation_30_day"));
+    assert.equal(applyingKeys(OFFICE).includes("orientation_30_day"), false);
+
+    const unknownOri = unknown.rules.find((r) => r.ruleId === "REQ-1.8.4");
+    assert.equal(unknownOri?.applicability, "unanswered");
+    assert.ok(unknownOri?.issues.some((i) => i.kind === "missing_information"));
+    assert.equal(unknownOri?.parentComplete, false);
+
+    const dspAll = dsp.rules.find((r) => r.ruleId === "REQ-1.8.4");
+    assert.equal(dspAll?.parentComplete, false);
+    assert.ok(dspAll?.issues.some((i) => i.kind === "group_incomplete"));
   });
 });

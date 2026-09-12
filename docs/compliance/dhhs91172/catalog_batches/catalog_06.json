@@ -1431,7 +1431,7 @@
       "fact_ids": "FACT-007",
       "extra_facts_needed": "Agency awarded RHS?",
       "required_evidence": "Reflected in service notes",
-      "requirement_name": "the Person is not isolate. Assist the Person in choosing and participating…"
+      "requirement_name": "the Person is not isolated. Assist the Person in choosing and participating…"
     },
     {
       "requirement_key": "REQ-21.2.3",
@@ -1764,7 +1764,7 @@
       "category": "actionable",
       "service_codes": "RHS",
       "applies_to": "agency",
-      "creates_user_task": "yes",
+      "creates_user_task": "no",
       "task_type": "applicability_fact",
       "deadline": "",
       "deadline_trigger": "",

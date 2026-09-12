@@ -10,6 +10,7 @@ import { HIRE_ALWAYS_TITLES } from "./obligation-auto-assign.ts";
 import {
   BY_KEY,
   PACK_VERSION,
+  CATALOG_EXCEPTIONS_BY_KEY,
   allSowCatalogEntries,
   catalogCreatesInstances,
   catalogTitleIsReserved,
@@ -19,6 +20,13 @@ import {
 } from "./sow-obligation-catalog.ts";
 
 describe("SOW catalog pack identity", () => {
+  it("attaches explicit exceptions only to keys that exist on the pack", () => {
+    for (const key of Object.keys(CATALOG_EXCEPTIONS_BY_KEY)) {
+      assert.ok(sowCatalogEntryByKey(key), `exception key missing from catalog: ${key}`);
+      assert.deepEqual(sowCatalogEntryByKey(key)?.exceptions, CATALOG_EXCEPTIONS_BY_KEY[key]);
+    }
+  });
+
   it("gives every entry a unique key, UT state, disposition, and pack version", () => {
     const entries = allSowCatalogEntries();
     const keys = entries.map((e) => e.key);

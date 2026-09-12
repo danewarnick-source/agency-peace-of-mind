@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ClipboardList } from "lucide-react";
-import type { OrgFactDefinition } from "@/lib/obligations/applicability";
+import type { SetupFactDefinition } from "@/lib/obligations/applicability";
 
 type Props = {
-  unanswered: OrgFactDefinition[];
+  unanswered: SetupFactDefinition[];
   setupHref?: "/dashboard/settings/compliance-setup";
   showSetupLink?: boolean;
 };
@@ -29,8 +29,8 @@ export function UnansweredFactsCard({
           <h2 className="text-base font-semibold">This week: unanswered setup facts</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {count === 1
-              ? "1 org-profile fact is still unanswered. Conditional duties stay visible on the register until you record it."
-              : `${count} org-profile facts are still unanswered. Conditional duties stay visible on the register until you record them.`}
+              ? "1 setup fact is still unanswered. Conditional duties stay visible on the register until you record it."
+              : `${count} setup facts are still unanswered. Conditional duties stay visible on the register until you record them.`}
           </p>
         </div>
       </header>

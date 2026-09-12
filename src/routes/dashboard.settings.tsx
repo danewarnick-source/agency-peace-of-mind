@@ -363,7 +363,7 @@ function SettingsPage() {
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><ClipboardList className="h-5 w-5" /></div>
               <div>
                 <h2 className="text-base font-semibold">Compliance setup</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Answer operational facts (OL site, volunteers, governing board) so conditional SOW duties apply only when they should.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Answer awarded service codes and operational facts (OL site, volunteers, governing board). Unknowns stay unanswered — never a yes/no on whether a SOW article applies.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

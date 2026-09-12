@@ -10,6 +10,7 @@ import {
   type ApplicabilityStatus,
   type OrgFacts,
 } from "./applicability.ts";
+import { resolveCatalogExceptions } from "./catalog-exceptions.ts";
 
 export const DIRECT_SUPPORT_HIRE_KEYS = [
   "orientation_30_day",
@@ -149,11 +150,20 @@ export function evaluateStaffDuty(input: {
 }): DutyApplicability {
   const { dutyKey, staff } = input;
   const catalog = sowCatalogEntryByKey(dutyKey);
+  const exceptions = resolveCatalogExceptions(catalog ?? dutyKey);
   const serviceCodes = input.catalogServiceCodes ?? catalog?.service_codes ?? [];
+  const gatedCodes = exceptions.sei_only
+    ? serviceCodes.length > 0
+      ? serviceCodes
+      : ["SEI"]
+    : serviceCodes;
 
   const orgFact = input.orgFacts ? obligationFactApplicability(dutyKey, input.orgFacts) : null;
-  if (orgFact?.status === "does_not_apply") return row(dutyKey, "does_not_apply");
-  if (orgFact?.status === "unanswered") return row(dutyKey, "unanswered");
+  // Staff SEI / assignment duties are not org awarded-code rows. Ignore that fact_key.
+  if (orgFact && orgFact.factKey !== "awarded_service_codes") {
+    if (orgFact.status === "does_not_apply") return row(dutyKey, "does_not_apply");
+    if (orgFact.status === "unanswered") return row(dutyKey, "unanswered");
+  }
 
   if (hasKey(UNIVERSAL_STAFF_KEYS, dutyKey)) return row(dutyKey, "applies");
 
@@ -195,9 +205,9 @@ export function evaluateStaffDuty(input: {
 
   const footprint = staffDutyFootprint(staff);
 
-  if (serviceCodes.length > 0) {
+  if (gatedCodes.length > 0) {
     if (!staff.assignmentsKnown) return row(dutyKey, "unanswered");
-    if (codesOverlap(serviceCodes, staff.assignedServiceCodes)) {
+    if (codesOverlap(gatedCodes, staff.assignedServiceCodes)) {
       if (dutyKey === "acre_sei" && staff.managerIdKnown && !staff.managerId) {
         return row(dutyKey, "applies", "missing_supervisor");
       }
@@ -210,7 +220,11 @@ export function evaluateStaffDuty(input: {
     return row(dutyKey, "does_not_apply");
   }
 
-  if (hasKey(DIRECT_SUPPORT_HIRE_KEYS, dutyKey) || catalog?.owner === "staff") {
+  if (
+    exceptions.assignment_gated ||
+    hasKey(DIRECT_SUPPORT_HIRE_KEYS, dutyKey) ||
+    catalog?.owner === "staff"
+  ) {
     if (footprint === "direct_support") return row(dutyKey, "applies");
     if (footprint === "office") return row(dutyKey, "does_not_apply");
     return row(dutyKey, "unanswered", "missing_assignment");

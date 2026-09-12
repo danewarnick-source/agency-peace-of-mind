@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveCatalogExceptions } from "@/lib/obligations/catalog-exceptions";
 import {
   EMPTY_ORG_FACTS,
   ORG_FACT_DEFINITIONS,
@@ -18,6 +19,10 @@ import {
   type OrgFacts,
   type PersistOrgFactsInput,
 } from "@/lib/obligations/applicability";
+import {
+  AWARDED_CODE_CHOICES,
+  LIVE_PATH_SETUP_QUESTIONS,
+} from "@/lib/obligations/setup-facts";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/settings/compliance-setup")({
@@ -44,7 +49,7 @@ function ComplianceSetupPage() {
     enabled: !!orgId,
     queryFn: async () => {
       if (!orgId) return EMPTY_ORG_FACTS;
-      const loaded = await loadOrgFacts(supabase, orgId);
+      const loaded = await loadOrgFacts(supabase as any, orgId);
       return loaded ?? EMPTY_ORG_FACTS;
     },
   });
@@ -53,6 +58,7 @@ function ComplianceSetupPage() {
     operates_ol_site: null,
     uses_volunteers: null,
     has_governing_board: null,
+    servicesOffered: [],
   });
 
   useEffect(() => {
@@ -61,13 +67,14 @@ function ComplianceSetupPage() {
       operates_ol_site: factsQuery.data.operates_ol_site,
       uses_volunteers: factsQuery.data.uses_volunteers,
       has_governing_board: factsQuery.data.has_governing_board,
+      servicesOffered: factsQuery.data.servicesOffered,
     });
   }, [factsQuery.data]);
 
   const save = useMutation({
     mutationFn: async () => {
       if (!orgId || !user?.id) throw new Error("No organization selected.");
-      return persistOrgFacts(supabase, orgId, user.id, draft);
+      return persistOrgFacts(supabase as any, orgId, user.id, draft);
     },
     onSuccess: async () => {
       toast.success("Compliance setup saved");
@@ -88,7 +95,10 @@ function ComplianceSetupPage() {
 
   const merged: OrgFacts = {
     ...(factsQuery.data ?? EMPTY_ORG_FACTS),
-    ...draft,
+    operates_ol_site: draft.operates_ol_site,
+    uses_volunteers: draft.uses_volunteers,
+    has_governing_board: draft.has_governing_board,
+    servicesOffered: draft.servicesOffered ?? [],
   };
   const unanswered = listUnansweredFacts(merged);
   const preview = computeObligationApplicability(merged);
@@ -109,8 +119,8 @@ function ComplianceSetupPage() {
           <ClipboardList className="h-5 w-5" /> Compliance setup
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Record operational facts so conditional SOW duties apply only when they should. Unanswered
-          facts keep those rows visible on the register.
+          Record awarded service codes and operational facts. Questions are concrete — never whether
+          a SOW article applies. Unanswered facts stay unanswered and keep those rows visible.
         </p>
       </div>
 
@@ -132,6 +142,52 @@ function ComplianceSetupPage() {
             save.mutate();
           }}
         >
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">
+              Which DSPD service codes is this contractor awarded?
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              Same codes as the company profile. Leave empty until known — empty is unanswered, not
+              N/A. Extra codes already stored stay listed.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(
+                new Set([
+                  ...AWARDED_CODE_CHOICES,
+                  ...(draft.servicesOffered ?? []).map((c) => c.toUpperCase()),
+                ]),
+              ).map((code) => {
+                const selected = (draft.servicesOffered ?? []).includes(code);
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    disabled={!canEdit}
+                    aria-pressed={selected}
+                    className={`rounded-md border px-3 py-1.5 text-sm ${
+                      selected
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground"
+                    }`}
+                    onClick={() =>
+                      setDraft((prev) => {
+                        const current = prev.servicesOffered ?? [];
+                        return {
+                          ...prev,
+                          servicesOffered: selected
+                            ? current.filter((c) => c !== code)
+                            : [...current, code],
+                        };
+                      })
+                    }
+                  >
+                    {code}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
           {ORG_FACT_DEFINITIONS.map((def) => (
             <fieldset key={def.key} className="space-y-2">
               <legend className="text-sm font-medium">{def.question}</legend>
@@ -180,8 +236,11 @@ function ComplianceSetupPage() {
       <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <h2 className="text-sm font-semibold">What this means for the register</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Service-code hides are separate. These rows follow the facts above plus awarded services (
-          {merged.servicesOffered.length ? merged.servicesOffered.join(", ") : "none recorded"}).
+          Awarded codes{" "}
+          {merged.servicesOffered.length
+            ? merged.servicesOffered.join(", ")
+            : "are unanswered"}.
+          Empty codes keep code-gated rows visible until recorded.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -212,6 +271,43 @@ function ComplianceSetupPage() {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <h2 className="text-sm font-semibold">Live paths on the current catalog</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Each path uses a concrete fact the engine already reads. Exceptions are on the catalog
+          record. SOW CSV import is still deferred.
+        </p>
+        <ul className="mt-4 space-y-3">
+          {LIVE_PATH_SETUP_QUESTIONS.map((path) => {
+            const flags = path.dutyKeys.map((key) => ({
+              key,
+              ...resolveCatalogExceptions(key),
+            }));
+            const labels = [
+              flags.some((f) => f.nonwaivable) ? "Nonwaivable" : null,
+              flags.some((f) => f.sei_only) ? "SEI-only" : null,
+              flags.some((f) => f.assignment_gated) ? "Assignment-gated" : null,
+            ].filter(Boolean);
+            return (
+              <li key={path.path} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <p className="text-sm font-medium">{path.question}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{path.help}</p>
+                {labels.length > 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{labels.join(" · ")}</p>
+                ) : null}
+                {path.ownerAnswers ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Recorded on this page.</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Read from live assignments, person records, or 1056 authorizations.
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </section>
     </div>
   );

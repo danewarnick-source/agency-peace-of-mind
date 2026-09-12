@@ -25,6 +25,15 @@ export type CatalogFormTemplate = {
   fields: CatalogFormField[];
 };
 
+export type CatalogExceptions = {
+  /** Override is rejected. Solo-lapse keys are the only waivable set. */
+  nonwaivable: boolean;
+  /** Applies from an SEI assignment, never an invented SEI fact_key. */
+  sei_only: boolean;
+  /** Unknown assignment stays unanswered — never coerced to N/A. */
+  assignment_gated: boolean;
+};
+
 export type CatalogIdentity = {
   key: string;
   disposition: ObligationDisposition;
@@ -32,6 +41,32 @@ export type CatalogIdentity = {
   aliases?: string[];
   evidence_template?: string;
   form_template?: CatalogFormTemplate;
+};
+
+/**
+ * Explicit exceptions on the live paths the engine already walks.
+ * Other catalog keys infer from owner / service_codes / solo-lapse allowlist.
+ */
+export const CATALOG_EXCEPTIONS_BY_KEY: Record<string, CatalogExceptions> = {
+  orientation_30_day: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  cpr_first_aid_initial: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  cpr_first_aid_renewal: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  abi_training: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  behavior_intervention_cert: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  client_specific_training: { nonwaivable: false, sei_only: false, assignment_gated: true },
+  support_strategies: { nonwaivable: true, sei_only: false, assignment_gated: true },
+  driving_record_transport: { nonwaivable: true, sei_only: false, assignment_gated: true },
+  acre_sei: { nonwaivable: true, sei_only: true, assignment_gated: true },
+  sei_ssi_benefits: { nonwaivable: true, sei_only: true, assignment_gated: true },
+  dhhs_code_of_conduct_signed: { nonwaivable: true, sei_only: false, assignment_gated: true },
+  zoning_life_safety: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  volunteer_training_file: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  governing_board_records: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  human_rights_plan: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  housemate_informed_choice: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  usteps_upi_accounts: { nonwaivable: true, sei_only: false, assignment_gated: false },
+  ce_12h_annual: { nonwaivable: true, sei_only: false, assignment_gated: true },
+  medicaid_enrollment: { nonwaivable: true, sei_only: false, assignment_gated: false },
 };
 
 export const STANDING_RECLASSIFY_REASON = "reclassified: standing record";

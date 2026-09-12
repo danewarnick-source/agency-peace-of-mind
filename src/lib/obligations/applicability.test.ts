@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assembleThisWeekFromHits } from "./this-week.functions.ts";
 import {
+  AWARDED_CODES_FACT,
   CHA_HSQ_PBA,
   EMPTY_ORG_FACTS,
   ORG_FACT_DEFINITIONS,
   TNS_ORG_ID,
+  awardedCodeDutyStatus,
   computeObligationApplicability,
   housemateStatus,
   humanRightsPlanStatus,
@@ -15,6 +17,7 @@ import {
   unansweredFactsQuietSummary,
   type OrgFacts,
 } from "./applicability.ts";
+import { AWARDED_SERVICE_CODES_FACT_KEY } from "./setup-facts.ts";
 
 const TNS_SERVICES = ["HHS", "SLN", "SLH", "SEI", "DSI"];
 
@@ -49,6 +52,12 @@ describe("org-profile facts", () => {
     };
     assert.equal(listUnansweredFacts(facts).length, 0);
     assert.equal(unansweredFactsQuietSummary(TNS_ORG_ID, facts), null);
+  });
+
+  it("treats empty awarded codes as an unanswered setup fact", () => {
+    const unanswered = listUnansweredFacts({ ...EMPTY_ORG_FACTS });
+    assert.ok(unanswered.some((d) => d.key === AWARDED_SERVICE_CODES_FACT_KEY));
+    assert.equal(unanswered[0]?.question, AWARDED_CODES_FACT.question);
   });
 });
 
@@ -125,6 +134,32 @@ describe("when_applicable computation", () => {
     assert.deepEqual(
       ORG_FACT_DEFINITIONS.flatMap((d) => d.obligationKeys),
       ["zoning_life_safety", "volunteer_training_file", "governing_board_records"],
+    );
+  });
+
+  it("cannot silently N/A a code-gated agency duty when awarded codes are unanswered", () => {
+    assert.equal(awardedCodeDutyStatus(["SEI"], []), "unanswered");
+    assert.equal(awardedCodeDutyStatus(["HHS"], ["HHS", "SEI"]), "applies");
+    assert.equal(awardedCodeDutyStatus(["RHS"], TNS_SERVICES), "does_not_apply");
+
+    const empty = computeObligationApplicability({ ...EMPTY_ORG_FACTS });
+    const seiMonthly = empty.find((r) => r.obligationKey === "sei_monthly_summary_upi");
+    assert.ok(seiMonthly);
+    assert.equal(seiMonthly.factKey, AWARDED_SERVICE_CODES_FACT_KEY);
+    assert.equal(seiMonthly.status, "unanswered");
+    assert.equal(seiMonthly.applies, true);
+
+    const acre = empty.find((r) => r.obligationKey === "acre_sei");
+    assert.equal(acre, undefined);
+
+    const tns = computeObligationApplicability(tnsUnanswered());
+    assert.equal(
+      tns.find((r) => r.obligationKey === "sei_monthly_summary_upi")?.status,
+      "applies",
+    );
+    assert.equal(
+      tns.find((r) => r.obligationKey === "rhs_evac_drills_quarterly")?.status,
+      "does_not_apply",
     );
   });
 });

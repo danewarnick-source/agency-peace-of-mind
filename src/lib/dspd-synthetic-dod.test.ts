@@ -17,12 +17,18 @@ import {
 import { evaluateEntryReadiness } from "./dspd-entry-readiness.ts";
 import { completenessFromChecks } from "./nectar-completeness.ts";
 import { TNS_ORG_ID } from "./obligations/escalation.ts";
+import { resolveCatalogExceptions } from "./obligations/catalog-exceptions.ts";
 import {
   EMPTY_ORG_FACTS,
+  awardedCodeDutyStatus,
   computeObligationApplicability,
   listUnansweredFacts,
   type OrgFacts,
 } from "./obligations/applicability.ts";
+import {
+  LIVE_PATH_SETUP_QUESTIONS,
+  setupQuestionAsksWhetherSectionApplies,
+} from "./obligations/setup-facts.ts";
 import {
   ABI_DUTY_KEYS,
   CLIENT_SCOPED_DUTY_KEYS,
@@ -239,6 +245,29 @@ describe("synthetic DoD — current catalog", () => {
       assert.equal(entry.key, key);
       assert.equal(entry.state_code, "UT");
     }
+  });
+
+  it("wires concrete setup facts and explicit exceptions on those records", () => {
+    for (const q of LIVE_PATH_SETUP_QUESTIONS) {
+      assert.equal(setupQuestionAsksWhetherSectionApplies(q.question), false, q.path);
+    }
+    const acre = resolveCatalogExceptions("acre_sei");
+    assert.equal(acre.sei_only, true);
+    assert.equal(acre.assignment_gated, true);
+    assert.equal(acre.nonwaivable, true);
+    assert.equal(resolveCatalogExceptions("orientation_30_day").assignment_gated, true);
+    assert.equal(resolveCatalogExceptions("orientation_30_day").nonwaivable, false);
+    assert.equal(resolveCatalogExceptions("cpr_first_aid_renewal").nonwaivable, false);
+    assert.equal(resolveCatalogExceptions("dhhs_code_of_conduct_signed").assignment_gated, true);
+    assert.equal(awardedCodeDutyStatus(["SEI"], []), "unanswered");
+    const emptyCodes = computeObligationApplicability({ ...EMPTY_ORG_FACTS });
+    const unansweredAgency = emptyCodes.filter((r) => r.factKey === "awarded_service_codes");
+    assert.ok(unansweredAgency.length > 0);
+    assert.ok(unansweredAgency.every((r) => r.status === "unanswered" && r.applies === true));
+    assert.equal(
+      emptyCodes.some((r) => r.obligationKey === "acre_sei"),
+      false,
+    );
   });
 });
 

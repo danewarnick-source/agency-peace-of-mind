@@ -2,6 +2,8 @@
  * Draft-rule simulation. Evaluates Core_Rule_Logic fixtures for synthetic
  * subjects without minting live assignments or claim blocks.
  * Reuses duty applicability + My tasks. Unknown facts → missing-information.
+ * Stage 3 adds note templates, Article 2 review holds, evidence reuse, and
+ * evidence lifecycle — still this runner, never a second engine.
  */
 
 import { addDaysUTC, addMonthsUTC, addYearsUTC, utcDay } from "../../obligation-due-dates.ts";
@@ -17,11 +19,33 @@ import {
   staffSeesDuty,
   type StaffDutyFacts,
 } from "../duty-applicability.ts";
+import { isEvvLockedCode } from "../../evv-codes.ts";
+import { isDailyServiceCode } from "../../service-billing.ts";
+import {
+  evaluateClaimRestrictions,
+  type SimulatedClaimResult,
+  type SyntheticClaim,
+} from "./billing-restrictions.ts";
+import {
+  applyEvidenceReuse,
+  evidenceChangesCompliance,
+  firstMatchingEvidence,
+  type EvidenceMatchResult,
+  type EvidenceRequirementLink,
+  type ReusableEvidenceRecord,
+} from "./evidence-reuse.ts";
 import { PERIODIC_MONTHLY_CODES, PERIODIC_QUARTERLY_CODES } from "./fixtures.ts";
+import {
+  evaluateNoteCompleteness,
+  independentLaneStatus,
+  type IndependentLaneStatus,
+  type NoteFieldValues,
+} from "./notes.ts";
 import type {
   CompletionRoute,
   DraftPredicate,
   DraftRule,
+  EvidenceLifecycle,
   GroupMember,
   MemberCondition,
   NestedRoute,
@@ -56,13 +80,54 @@ export type SyntheticEvidence = {
   writtenDspdApproval?: boolean;
   reviewedForNewRisk?: boolean;
   route?: CompletionRoute;
+  /** Stage 3 lifecycle. Omitted + completed still means complete for Stage 1–2 fixtures. */
+  lifecycle?: EvidenceLifecycle;
+  organizationId?: string;
+};
+
+export type SyntheticServiceNote = {
+  noteId: string;
+  organizationId: string;
+  staffId: string;
+  clientId: string;
+  serviceCode: string;
+  serviceDate: string;
+  fields: NoteFieldValues;
+  submittedTemplateId?: string | null;
+  evvSatisfied?: boolean | null;
+  timesheetSatisfied?: boolean | null;
+  signatureSatisfied?: boolean | null;
+  reportingSatisfied?: boolean | null;
+};
+
+export type SimulatedNoteResult = {
+  noteId: string;
+  serviceCode: string;
+  serviceDate: string;
+  selectedTemplateId: string | null;
+  templateMatch: boolean;
+  noteComplete: boolean;
+  missingFieldIds: string[];
+  independent: {
+    evv: IndependentLaneStatus;
+    payroll_timesheet: IndependentLaneStatus;
+    signature: IndependentLaneStatus;
+    reporting: IndependentLaneStatus;
+  };
+  issues: SimulationIssue[];
 };
 
 export type SimulationIssueKind =
   | "missing_information"
   | "group_incomplete"
   | "member_incomplete"
-  | "expired_certificate";
+  | "expired_certificate"
+  | "wrong_template"
+  | "note_incomplete"
+  | "review_hold"
+  | "cross_tenant"
+  | "evidence_mismatch"
+  | "lifecycle_not_accepted";
 
 export type SimulationIssue = {
   kind: SimulationIssueKind;
@@ -103,7 +168,11 @@ export type SimulationResult = {
   createdLiveAssignments: false;
   createdClaimBlocks: false;
   activatedRules: false;
+  rejectedClaims: false;
   staff: SimulatedStaffResult[];
+  notes: SimulatedNoteResult[];
+  claims: SimulatedClaimResult[];
+  evidenceReuse: EvidenceMatchResult[];
 };
 
 export type SimulationInput = {
@@ -116,6 +185,11 @@ export type SimulationInput = {
   /** REQ-30.6.a cohort. Null / omitted = unanswered — never invent the live-UI fallback. */
   seiAwardDate?: string | null;
   usorOfficialProofOnFile?: boolean | null;
+  organizationId?: string;
+  notes?: SyntheticServiceNote[];
+  claims?: SyntheticClaim[];
+  reusableEvidence?: ReusableEvidenceRecord[];
+  evidenceLinks?: EvidenceRequirementLink[];
 };
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -310,6 +384,26 @@ function predicateStatus(
     const hasQuarterly = codesOverlapSet(codes, PERIODIC_QUARTERLY_CODES);
     return hasMonthly || hasQuarterly ? "applies" : "does_not_apply";
   }
+  if (
+    predicate.kind === "service_documentation" ||
+    predicate.kind === "payroll_timesheet" ||
+    predicate.kind === "signature_attestation" ||
+    predicate.kind === "billing_restriction"
+  ) {
+    if (!staff.assignmentsKnown) return "unanswered";
+    if (staff.assignedServiceCodes.length === 0) {
+      return staffDutyFootprint(staff) === "office" ? "does_not_apply" : "unanswered";
+    }
+    return "applies";
+  }
+  if (predicate.kind === "evv_mandated") {
+    if (!staff.assignmentsKnown) return "unanswered";
+    const codes = staff.assignedServiceCodes;
+    if (codes.length === 0) {
+      return staffDutyFootprint(staff) === "office" ? "does_not_apply" : "unanswered";
+    }
+    return codes.some((c) => isEvvLockedCode(c)) ? "applies" : "does_not_apply";
+  }
   const catalogKey = predicate.catalogKey;
   if (!catalogKey) return "unanswered";
   const duty = evaluateStaffDuty({ dutyKey: catalogKey, staff, orgFacts });
@@ -380,6 +474,27 @@ function memberConditionKnown(
       unanswered: !staff.assignmentsKnown,
     };
   }
+  if (condition === "quarter_hour_code") {
+    if (!staff.assignmentsKnown) return { applicable: true, unanswered: true };
+    return {
+      applicable: staff.assignedServiceCodes.some((c) => !isDailyServiceCode(c)),
+      unanswered: false,
+    };
+  }
+  if (condition === "hhs_daily_note") {
+    if (!staff.assignmentsKnown) return { applicable: true, unanswered: true };
+    return {
+      applicable: staff.assignedServiceCodes.some((c) => c.trim().toUpperCase() === "HHS"),
+      unanswered: false,
+    };
+  }
+  if (condition === "evv_mandated_code") {
+    if (!staff.assignmentsKnown) return { applicable: true, unanswered: true };
+    return {
+      applicable: staff.assignedServiceCodes.some((c) => isEvvLockedCode(c)),
+      unanswered: false,
+    };
+  }
   return { applicable: true, unanswered: false };
 }
 
@@ -392,6 +507,26 @@ function genericQuizIssue(ruleId: string, member: GroupMember): SimulationIssue 
   };
 }
 
+function reuseForMember(
+  input: SimulationInput,
+  staff: SyntheticStaff,
+  rule: DraftRule,
+  member: GroupMember,
+): EvidenceMatchResult | null {
+  const records = input.reusableEvidence ?? [];
+  if (records.length === 0 || !member.evidenceMatch) return null;
+  const orgId = input.organizationId;
+  if (!orgId) return null;
+  return firstMatchingEvidence(records, {
+    organizationId: orgId,
+    subjectId: staff.staffId,
+    asOf: isoDay(input.now),
+    requirementId: rule.id,
+    memberId: member.id,
+    match: member.evidenceMatch,
+  });
+}
+
 function memberComplete(
   rule: DraftRule,
   member: GroupMember,
@@ -401,6 +536,7 @@ function memberComplete(
   orgHasAcreCoverage: boolean | null,
   usorOfficialProofOnFile: boolean | null,
   allEvidence: SyntheticEvidence[],
+  input?: SimulationInput,
 ): { complete: boolean; issue: SimulationIssue | null } {
   if (member.id === "agency-acre-coverage") {
     return factMember(rule.id, member, orgHasAcreCoverage, "Agency ACRE coverage");
@@ -532,7 +668,42 @@ function memberComplete(
           },
         };
   }
+  if (ev?.lifecycle && !evidenceChangesCompliance(ev.lifecycle)) {
+    return {
+      complete: false,
+      issue: {
+        kind: "lifecycle_not_accepted",
+        ruleId: rule.id,
+        memberId: member.id,
+        message: `${member.label} is ${ev.lifecycle}; only accepted evidence changes compliance.`,
+      },
+    };
+  }
   if (!ev || !ev.completed) {
+    const reused = input ? reuseForMember(input, staff, rule, member) : null;
+    if (reused?.matched) return { complete: true, issue: null };
+    if (reused && !reused.matched && /cross-tenant/i.test(reused.reason)) {
+      return {
+        complete: false,
+        issue: {
+          kind: "cross_tenant",
+          ruleId: rule.id,
+          memberId: member.id,
+          message: reused.reason,
+        },
+      };
+    }
+    if (reused && !reused.matched) {
+      return {
+        complete: false,
+        issue: {
+          kind: "evidence_mismatch",
+          ruleId: rule.id,
+          memberId: member.id,
+          message: reused.reason,
+        },
+      };
+    }
     return {
       complete: false,
       issue: {
@@ -634,6 +805,7 @@ function evaluateRoute(
       input.orgHasAcreCoverage,
       input.usorOfficialProofOnFile ?? null,
       input.evidence,
+      input,
     );
     return {
       memberId: member.id,
@@ -784,6 +956,7 @@ function evaluateRuleForStaff(
       input.orgHasAcreCoverage,
       input.usorOfficialProofOnFile ?? null,
       input.evidence,
+      input,
     );
     return {
       memberId: member.id,
@@ -879,16 +1052,101 @@ function evaluateRuleForStaff(
  * Pure simulation. Callers must not persist the result. The runner never
  * accepts a Supabase client and never writes assignments or claim holds.
  */
+function simulateNotes(input: SimulationInput): SimulatedNoteResult[] {
+  return (input.notes ?? []).map((note) => {
+    const evaluated = evaluateNoteCompleteness({
+      serviceCode: note.serviceCode,
+      serviceDate: note.serviceDate,
+      fields: note.fields,
+      submittedTemplateId: note.submittedTemplateId,
+    });
+    const issues: SimulationIssue[] = [];
+    if ("missingTemplate" in evaluated) {
+      issues.push({
+        kind: "missing_information",
+        ruleId: "REQ-1.10.7",
+        message: evaluated.message,
+      });
+      return {
+        noteId: note.noteId,
+        serviceCode: note.serviceCode,
+        serviceDate: note.serviceDate,
+        selectedTemplateId: null,
+        templateMatch: false,
+        noteComplete: false,
+        missingFieldIds: [],
+        independent: {
+          evv: independentLaneStatus(note.evvSatisfied),
+          payroll_timesheet: independentLaneStatus(note.timesheetSatisfied),
+          signature: independentLaneStatus(note.signatureSatisfied),
+          reporting: independentLaneStatus(note.reportingSatisfied),
+        },
+        issues,
+      };
+    }
+    if (evaluated.wrongTemplate) {
+      issues.push({
+        kind: "wrong_template",
+        ruleId: "REQ-1.10.7",
+        message: `Submitted template ${note.submittedTemplateId} does not match ${evaluated.templateId} for ${note.serviceCode} on ${note.serviceDate}.`,
+      });
+    }
+    if (evaluated.missingFieldIds.length > 0) {
+      issues.push({
+        kind: "note_incomplete",
+        ruleId: "REQ-1.10.7",
+        message: `Required fields missing: ${evaluated.missingFieldIds.join(", ")}.`,
+      });
+    }
+    return {
+      noteId: note.noteId,
+      serviceCode: note.serviceCode,
+      serviceDate: note.serviceDate,
+      selectedTemplateId: evaluated.templateId,
+      templateMatch: !evaluated.wrongTemplate,
+      noteComplete: evaluated.complete,
+      missingFieldIds: evaluated.missingFieldIds,
+      independent: {
+        evv: independentLaneStatus(note.evvSatisfied),
+        payroll_timesheet: independentLaneStatus(note.timesheetSatisfied),
+        signature: independentLaneStatus(note.signatureSatisfied),
+        reporting: independentLaneStatus(note.reportingSatisfied),
+      },
+      issues,
+    };
+  });
+}
+
 export function simulateDraftRules(input: SimulationInput): SimulationResult {
+  const claims = (input.claims ?? []).map(evaluateClaimRestrictions);
+  const notes = simulateNotes(input);
+  const evidenceReuse: EvidenceMatchResult[] = [];
+  if (input.organizationId && input.evidenceLinks && input.reusableEvidence) {
+    for (const person of input.staff) {
+      evidenceReuse.push(
+        ...applyEvidenceReuse({
+          records: input.reusableEvidence,
+          links: input.evidenceLinks,
+          organizationId: input.organizationId,
+          subjectId: person.staffId,
+          asOf: isoDay(input.now),
+        }),
+      );
+    }
+  }
   return {
     wroteDatabase: false,
     createdLiveAssignments: false,
     createdClaimBlocks: false,
     activatedRules: false,
+    rejectedClaims: false,
     staff: input.staff.map((staff) => ({
       staffId: staff.staffId,
       rules: input.rules.map((rule) => evaluateRuleForStaff(rule, staff, input)),
     })),
+    notes,
+    claims,
+    evidenceReuse,
   };
 }
 
@@ -907,6 +1165,7 @@ export function simulationDutyApplies(
     "REQ-1.8.6": "behavior_intervention_cert",
     "REQ-32.5": "cmp_cms_caregiver_comp",
     "REQ-33.5.b-c": "acre_sjd",
+    "REQ-1.8.5-cpr-current": "cpr_first_aid_renewal",
   };
   const key = catalogByRule[ruleId];
   if (!key) return false;
@@ -929,6 +1188,7 @@ export function simulationDutyVisible(
     "REQ-1.8.6": "behavior_intervention_cert",
     "REQ-32.5": "cmp_cms_caregiver_comp",
     "REQ-33.5.b-c": "acre_sjd",
+    "REQ-1.8.5-cpr-current": "cpr_first_aid_renewal",
   };
   const key = catalogByRule[ruleId];
   if (!key) return false;

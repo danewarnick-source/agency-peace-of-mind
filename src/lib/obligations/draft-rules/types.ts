@@ -1,5 +1,5 @@
 /**
- * In-app draft rule model for DHHS91172 workbook Stages 1–2.
+ * In-app draft rule model for DHHS91172 workbook Stages 1–3.
  * Lifecycle is encoded here. Fixtures stay draft / not_published.
  * No live activation. No invented renewal intervals.
  */
@@ -31,6 +31,11 @@ export const PREDICATE_KINDS = [
   "cmp_cms_assignment",
   "sjd_assignment",
   "periodic_report",
+  "service_documentation",
+  "payroll_timesheet",
+  "evv_mandated",
+  "signature_attestation",
+  "billing_restriction",
 ] as const;
 export type PredicateKind = (typeof PREDICATE_KINDS)[number];
 
@@ -39,8 +44,60 @@ export const MEMBER_CONDITIONS = [
   "sjd_discovery",
   "monthly_summary_codes",
   "quarterly_summary_codes",
+  "quarter_hour_code",
+  "hhs_daily_note",
+  "evv_mandated_code",
 ] as const;
 export type MemberCondition = (typeof MEMBER_CONDITIONS)[number];
+
+/** Evidence / documentation lifecycle. Upload → submitted. Only accepted changes compliance. */
+export const EVIDENCE_LIFECYCLES = [
+  "not_started",
+  "in_progress",
+  "submitted",
+  "needs_correction",
+  "accepted",
+  "expired",
+  "superseded",
+] as const;
+export type EvidenceLifecycle = (typeof EVIDENCE_LIFECYCLES)[number];
+
+export const NOTE_FIELD_REQUIREMENTS = ["ALL", "CONDITIONAL"] as const;
+export type NoteFieldRequirement = (typeof NOTE_FIELD_REQUIREMENTS)[number];
+
+export const INDEPENDENT_DOC_LANES = [
+  "evv",
+  "payroll_timesheet",
+  "signature",
+  "reporting",
+] as const;
+export type IndependentDocLane = (typeof INDEPENDENT_DOC_LANES)[number];
+
+export type NoteFieldSpec = {
+  id: string;
+  label: string;
+  requirement: NoteFieldRequirement;
+  /** CONDITIONAL only — skipped when the source condition is known false. */
+  condition?: MemberCondition;
+};
+
+export type ServiceNoteTemplate = {
+  id: string;
+  label: string;
+  /** Empty = general schema. Non-empty = explicit service-specific override. */
+  serviceCodes: string[];
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  fields: NoteFieldSpec[];
+  sourceClauseId: string;
+};
+
+/** How a reusable evidence record may satisfy a group member. */
+export type EvidenceMatchSpec = {
+  scope: string;
+  requiredCoverage?: string[];
+  issuer?: string;
+};
 
 /** Explicit anchors only. Never invent annual-from-completion. */
 export type TimingAnchor =
@@ -73,6 +130,12 @@ export type GroupMember = {
   condition?: MemberCondition;
   /** Official named program / credential. A generic quiz is not a substitute. */
   requiresOfficialProgram?: boolean;
+  /** Optional reuse match — one accepted record may satisfy several members/rules. */
+  evidenceMatch?: {
+    scope: string;
+    requiredCoverage?: string[];
+    issuer?: string;
+  };
 };
 
 /** ANY-of-routes. The selected route must satisfy ALL of its conditions. */
@@ -152,5 +215,5 @@ export type DraftRule = {
   approval: ApprovalRecord | null;
 };
 
-/** Activation stays locked for every draft fixture (Stage 1 and Stage 2). */
+/** Activation stays locked for every draft fixture (Stage 1, Stage 2, and Stage 3). */
 export const STAGE1_ACTIVATION_LOCKED = true;

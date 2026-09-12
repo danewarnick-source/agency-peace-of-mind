@@ -39,6 +39,9 @@ import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 import { reviewExceptions } from "@/lib/records-review-rules";
 import { RecordsReviewActions } from "@/components/records/records-review-actions";
 import { ThreadsPanel } from "@/components/threads/threads-panel";
+import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { evaluateEntryReadiness, factsFromTimesheet, matchAuthRow } from "@/lib/dspd-entry-readiness";
+import { EntryReadinessPanel } from "@/components/billing/billing-holds";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -395,6 +398,11 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
   const isFlag = row.ai_compliance_status === "Exception";
   const isCleared = row.ai_compliance_status === "Verified";
   const reason = nectarReason(row);
+  const { data: authRows } = useAllClientBillingCodes();
+  const readiness = useMemo(() => {
+    const auth = matchAuthRow(authRows, row.client_id, row.service_type_code);
+    return evaluateEntryReadiness(factsFromTimesheet(row, auth));
+  }, [row, authRows]);
   const accent = isFlag
     ? "border-l-destructive/70"
     : isCleared
@@ -489,6 +497,8 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
               </p>
             )}
           </div>
+
+          <EntryReadinessPanel result={readiness} />
 
           <div>
             <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">

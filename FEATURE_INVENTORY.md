@@ -997,7 +997,7 @@ All server functions use `@tanstack/react-start` `createServerFn`. Auth gate min
 ### nectar-engine.functions.ts
 - **`proposeRequirementMappings`** — POST — gate: `requireOrgMembership(..., "manager")`
 - **`setRequirementMapping`** / **`deleteRequirementMapping`** — POST — gate: `requireOrgMembership(..., "manager")`
-- **`listRequirementMappings`** / **`getApplicableRequirements`** / **`getBillingReadinessForCode`** / **`listEngineGapsAsTasks`** — POST — gate: `requireSupabaseAuth` ⚠️ no org-membership check
+- **`listRequirementMappings`** / **`getApplicableRequirements`** / **`listEngineGapsAsTasks`** — POST — gate: `requireSupabaseAuth` ⚠️ no org-membership check
 - **`prefillRequirementMappings`** / **`confirmRequirementWithScopes`** — POST — gate: `requireOrgMembership(..., "manager")`
 - **`listAuthorizedCodes`** — POST — gate: `requireSupabaseAuth` ⚠️
 - **`upsertAuthorizedCode`** — POST — gate: `requireOrgMembership(..., "manager")`

@@ -309,7 +309,7 @@ export function PunchPad({
   const [correctionOut, setCorrectionOut] = useState<string>(""); // datetime-local
   const [correctionReason, setCorrectionReason] = useState("");
 
-  // ── NECTAR submit completeness (the only documentation gate) ────────────────
+  // ── NECTAR submit completeness (note-complete lane only — not billing) ────
   const [aiBusy, setAiBusy] = useState(false);
   const [completenessErrors, setCompletenessErrors] = useState<CompletenessItem[]>([]);
 

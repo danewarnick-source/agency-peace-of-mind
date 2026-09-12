@@ -507,7 +507,7 @@ export const deleteRequirementMapping = createServerFn({ method: "POST" })
   });
 
 // ---------- Resolver: which CONFIRMED requirements apply in this context? ----------
-// Downstream consumers (audit checklist, billing readiness, staff app, tasks)
+// Downstream consumers (audit checklist, evaluateEntryReadiness, staff app, tasks)
 // call this instead of embedding their own rule tables.
 
 export const getApplicableRequirements = createServerFn({ method: "POST" })
@@ -569,37 +569,9 @@ export const getApplicableRequirements = createServerFn({ method: "POST" })
     return { requirements: reqs ?? [], mappings: matched };
   });
 
-// Convenience: derive billing-readiness rules for a single service code.
-export const getBillingReadinessForCode = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z
-      .object({
-        organizationId: z.string().uuid(),
-        code: z.string().min(1).max(40),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    if (!supabase) return { code: data.code.toUpperCase(), rules: [] };
-    const code = data.code.toUpperCase();
-    const { data: maps } = await supabase
-      .from("nectar_requirement_mappings")
-      .select("requirement_id")
-      .eq("organization_id", data.organizationId)
-      .eq("confirmed", true)
-      .eq("scope_kind", "code")
-      .eq("scope_value", code);
-    const ids = Array.from(new Set((maps ?? []).map((m) => m.requirement_id as string)));
-    if (!ids.length) return { code, rules: [] };
-    const { data: reqs } = await supabase
-      .from("nectar_requirements")
-      .select("id, title, description, category, source_citation")
-      .in("id", ids)
-      .eq("review_status", "confirmed");
-    return { code, rules: reqs ?? [] };
-  });
+// Billing eligibility for a shift/note/claim lives in evaluateEntryReadiness
+// (src/lib/dspd-entry-readiness.ts). Do not add a parallel "ready to bill"
+// helper that lists requirements without evaluating holds.
 
 // Surfaces requirements that need admin attention from the engine's POV:
 // (a) confirmed requirement with NO confirmed mapping yet, or

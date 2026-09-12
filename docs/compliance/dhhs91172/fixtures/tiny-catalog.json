@@ -1,0 +1,72 @@
+{
+  "note": "Tiny fixture for loader tests. Not the finalized 760-parent catalog.",
+  "rows": [
+    {
+      "id": "REQ-1.8.4",
+      "row_kind": "parent",
+      "title": "30-day orientation — ALL topics, one parent assignment",
+      "clause_ids": ["SOW §1.8(4)"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "member_count": 23,
+      "timing_kind": "hire_plus_days",
+      "timing_days": 30,
+      "predicates": [{ "kind": "direct_support_assignment", "catalogKey": "orientation_30_day" }],
+      "tests": [
+        { "kind": "positive", "assert": "Direct-support staff with A–W complete receive one parent orientation task." },
+        { "kind": "negative", "assert": "Office staff with no client assignment do not receive the parent." },
+        { "kind": "boundary", "assert": "ALL group stays incomplete when any one A–W topic is missing." }
+      ]
+    },
+    {
+      "id": "REQ-1.8.5-PCT",
+      "row_kind": "parent",
+      "title": "Person-centered thinking — no invented annual",
+      "clause_ids": ["SOW §1.8(5)(C)"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "timing_kind": "none",
+      "timing_reason": "SOW §1.8(5)(C) is hire+90 with no workbook renewal interval. Do not invent annual-from-completion.",
+      "predicates": [{ "kind": "direct_support_assignment", "catalogKey": "pct_hire_practices" }]
+    },
+    {
+      "id": "REQ-30.6.b",
+      "row_kind": "parent",
+      "title": "SEI 30.6(b) — BOTH agency coverage AND per-staff supervisor",
+      "clause_ids": ["SOW §30.6(b)"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "predicates": [{ "kind": "sei_assignment", "catalogKey": "acre_sei" }]
+    },
+    {
+      "id": "REQ-30.6.c",
+      "row_kind": "parent",
+      "title": "SEI 30.6(c) — ANY named course, independent of 30.6(b)",
+      "clause_ids": ["SOW §30.6(c)"],
+      "group_logic": "ANY",
+      "parent_assignment": "one",
+      "predicates": [{ "kind": "sei_assignment", "catalogKey": "acre_sei" }]
+    },
+    {
+      "id": "REQ-1.12",
+      "row_kind": "parent",
+      "title": "EVV-mandated codes",
+      "clause_ids": ["SOW §1.12"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "publication_gap": "needs EVV mapping review — do not invent UEVV / state integration success",
+      "release_gaps": ["RG-1.12-EVV"],
+      "source_index": "ACTIVE",
+      "rule_status": "published",
+      "execution_status": "published",
+      "predicates": [{ "kind": "evv_mandated", "catalogKey": "evv_visit_verification" }]
+    },
+    {
+      "id": "REQ-1.8.4-A",
+      "row_kind": "element",
+      "parent_id": "REQ-1.8.4",
+      "title": "Orientation topic A",
+      "clause_ids": ["SOW §1.8(4)(A)"]
+    }
+  ]
+}

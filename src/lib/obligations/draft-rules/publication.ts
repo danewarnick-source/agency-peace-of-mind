@@ -19,6 +19,7 @@ export const PUBLICATION_GAP_KEYS = [
   "boundary_test",
   "unresolved_alternatives",
   "unresolved_renewals",
+  "publication_gap",
   "release_gaps",
   "lifecycle_not_reviewed",
   "missing_approval",
@@ -143,6 +144,12 @@ export function structuralPublicationGaps(rule: DraftRule): PublicationGap[] {
     gaps.push({
       key: "unresolved_renewals",
       reason: `Unresolved renewals: ${rule.unresolvedRenewals.join("; ")}`,
+    });
+  }
+  if (rule.publicationGap && rule.publicationGap.trim().length > 0) {
+    gaps.push({
+      key: "publication_gap",
+      reason: `publication_gap is set (do not invent a fix): ${rule.publicationGap}`,
     });
   }
   if (rule.releaseGaps.length > 0) {

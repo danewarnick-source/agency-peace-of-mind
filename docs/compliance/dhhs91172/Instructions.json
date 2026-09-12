@@ -1,0 +1,22 @@
+{
+  "sheet": "Instructions",
+  "design_revision": "2026-09-12",
+  "workbook_sha256": "aba9f6c4debc0b19e207a55f1a2f1fc2b3397d94f8f18a52c6fbc6b0f9d2dbd6",
+  "dane_declared": "completed_and_finalized_sow_mapping_2026-09-11",
+  "summary": [
+    "Requirements is the canonical revised clause mapping.",
+    "Requirement_Catalog rolls parents plus elements. Expected parent count is 760.",
+    "Source_index labels are ARCHIVE METADATA, not publication permission.",
+    "Every operational rule stays draft / not_published. Do not publish or activate.",
+    "Publish only when a rule has reviewed predicates, evidence acceptance, exact timing, source/version, owner, and tests (System_Design Publication).",
+    "Honor Design_Review corrections: orientation topics are ALL; never invent annual-from-completion; SEI 30.6(b) is BOTH coverage and per-staff supervisor; 30.6(c) is ANY named course, independent of (b).",
+    "Leave Release_Gaps open as publication blockers. Do not invent EVV matrix, screening intervals, 1.32 date, USOR email correction, SJB, CHA, RP2/RP3, or other missing legal facts.",
+    "Unknown facts stay question / missing-information. Never automatic compliance."
+  ],
+  "publication": {
+    "rule_status": "draft",
+    "execution_status": "not_published",
+    "canActivate": false,
+    "source_index_is_publication_permission": false
+  }
+}

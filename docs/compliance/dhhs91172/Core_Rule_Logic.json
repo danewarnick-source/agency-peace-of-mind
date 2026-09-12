@@ -1,0 +1,169 @@
+{
+  "sheet": "Core_Rule_Logic",
+  "design_revision": "2026-09-12",
+  "rule_status": "draft",
+  "execution_status": "not_published",
+  "canActivate": false,
+  "source_index": "ARCHIVE METADATA",
+  "note": "Encoded Stage 1–4 draft slice. Every row stays draft / not_published. Design_Review locks hold.",
+  "rows": [
+    {
+      "id": "REQ-1.8.4",
+      "title": "30-day orientation — ALL topics, one parent assignment",
+      "clause_ids": ["SOW §1.8(4)"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "member_count": 23,
+      "timing_kind": "hire_plus_days",
+      "timing_days": 30,
+      "design_review": "orientation topics are ALL; never ANY-one-topic; one parent assignment"
+    },
+    {
+      "id": "REQ-1.8.5",
+      "title": "First aid + CPR + person-centered thinking — ALL three",
+      "clause_ids": ["SOW §1.8(5)", "SOW §1.8(5)(A)", "SOW §1.8(5)(B)", "SOW §1.8(5)(C)"],
+      "group_logic": "ALL",
+      "parent_assignment": "one",
+      "timing_kind": "hire_plus_days",
+      "timing_days": 90,
+      "design_review": "PCT has no invented annual-from-completion expiry"
+    },
+    {
+      "id": "REQ-1.8.7",
+      "title": "12-hour employment-year continuing education",
+      "clause_ids": ["SOW §1.8(7)"],
+      "group_logic": "ALL",
+      "timing_kind": "employment_year",
+      "design_review": "window is hire-anniversary; completion does not invent a new annual"
+    },
+    {
+      "id": "REQ-1.8.8",
+      "title": "ABI training — assignment-gated ALL topics",
+      "clause_ids": ["SOW §1.8(8)"],
+      "group_logic": "ALL",
+      "timing_kind": "none"
+    },
+    {
+      "id": "REQ-30.6.b",
+      "title": "SEI 30.6(b) — agency ACRE coverage AND per-staff supervisor",
+      "clause_ids": ["SOW §30.6(b)"],
+      "group_logic": "ALL",
+      "design_review": "BOTH coverage and supervisor; independent of 30.6(c)"
+    },
+    {
+      "id": "REQ-30.6.c",
+      "title": "SEI 30.6(c) — ANY named course route, independent of 30.6(b)",
+      "clause_ids": ["SOW §30.6(c)"],
+      "group_logic": "ANY",
+      "design_review": "ANY named training route; does not satisfy 30.6(b)"
+    },
+    {
+      "id": "REQ-1.8.6",
+      "title": "Behavior intervention certification — ANY approved complete route",
+      "clause_ids": ["SOW §1.8(6)"],
+      "group_logic": "ALL",
+      "route_logic": "ANY"
+    },
+    {
+      "id": "REQ-30.5",
+      "title": "SEI benefits knowledge — COUNT designated staff >= 1",
+      "clause_ids": ["SOW §30.5"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-30.6.a",
+      "title": "USOR approved vendor — cohort branches",
+      "clause_ids": ["SOW §30.6(a)"],
+      "group_logic": "ALL",
+      "publication_gap": "USOR destination email is published as osrprovider@utah.gov; do not invent a corrected address.",
+      "release_gaps": ["RG-USOR-EMAIL"]
+    },
+    {
+      "id": "REQ-32.5",
+      "title": "DSPD New Caregiver Compensation training — CMP/CMS",
+      "clause_ids": ["SOW §32.5"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-33.5.b-c",
+      "title": "SJD ACRE (60-day, supervised pending) + Customized Employment if Discovery",
+      "clause_ids": ["SOW §33.5(b)", "SOW §33.5(c)"],
+      "group_logic": "ALL",
+      "publication_gap": "Workbook typo SJB is a publication gap; encoded service code is SJD.",
+      "release_gaps": ["RG-SJB-TYPO"]
+    },
+    {
+      "id": "REQ-1.25",
+      "title": "Periodic progress reports — monthly substitutes, never both for one code",
+      "clause_ids": ["SOW §1.25"],
+      "group_logic": "CONDITIONAL"
+    },
+    {
+      "id": "REQ-1.10.7",
+      "title": "Service documentation / notes — general schema unless explicit override",
+      "clause_ids": ["SOW §1.10(7)"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-1.10.7-timesheet",
+      "title": "Payroll / timesheet attendance record — independent of the note",
+      "clause_ids": ["SOW §1.10(7)"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-1.12",
+      "title": "EVV-mandated codes — independent of the service note",
+      "clause_ids": ["SOW §1.12"],
+      "group_logic": "ALL",
+      "publication_gap": "needs EVV mapping review — do not invent UEVV / state integration success (Release_Gaps 1.12).",
+      "release_gaps": ["RG-1.12-EVV"]
+    },
+    {
+      "id": "REQ-1.10-signature",
+      "title": "Staff attestation / signature — independent of the note fields",
+      "clause_ids": ["SOW §1.10(7)"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-ART2",
+      "title": "Article 2 general billing restrictions — evaluate on service date",
+      "clause_ids": ["SOW Article 2"],
+      "group_logic": "ALL",
+      "timing_note": "Do not invent a 1.32 transition date."
+    },
+    {
+      "id": "REQ-1.8.5-cpr-current",
+      "title": "Current CPR on file — reuse target for the same subject",
+      "clause_ids": ["SOW §1.8(5)(B)"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-15.3",
+      "title": "Article 15 PBA funds — three distinct financial reviews",
+      "clause_ids": ["SOW Article 15", "SOW §15.3", "SOW §1.28"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-REMINDERS",
+      "title": "Reminder / escalation offsets — product defaults, not SOW mandates",
+      "clause_ids": ["Workbook System_Design — Reminders (product defaults)"],
+      "group_logic": "ALL",
+      "publication_gap": "Reminder / escalation offsets are product defaults, not SOW mandates.",
+      "release_gaps": ["RG-REMINDERS-PRODUCT"]
+    },
+    {
+      "id": "REQ-OFFBOARD",
+      "title": "Offboarding / change impact — recalculate and preserve evidence",
+      "clause_ids": ["Workbook System_Design — Offboarding / change impact", "SOW §30.6(b)"],
+      "group_logic": "ALL"
+    },
+    {
+      "id": "REQ-AUDIT-EXPORT",
+      "title": "Audit export packet — filtered fields, no invented retention",
+      "clause_ids": ["Workbook System_Design — Audit export"],
+      "group_logic": "ALL",
+      "publication_gap": "Universal retention period is unknown / publication gap.",
+      "release_gaps": ["RG-RETENTION"]
+    }
+  ]
+}

@@ -378,7 +378,7 @@ function SettingsPage() {
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><FlaskConical className="h-5 w-5" /></div>
               <div>
                 <h2 className="text-base font-semibold">Draft rules (simulation)</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Read-only Core_Rule_Logic draft slice (Stages 1–4). Status stays draft. Publish is disabled — simulation does not activate rules or write live assignments.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Read-only Core_Rule_Logic draft slice plus the finalized DHHS91172 catalog count. Status stays draft / not_published. Publish is disabled — simulation does not activate rules.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

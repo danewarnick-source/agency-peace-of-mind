@@ -4,6 +4,7 @@ import { ArrowLeft, FlaskConical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { loadCommittedCatalogSummary } from "@/lib/obligations/draft-rules/catalog-committed";
 import {
   CORE_RULE_LOGIC_SLICE,
   WORKBOOK_DESIGN_REVISION,
@@ -22,6 +23,11 @@ function DraftRulesSimulationPage() {
   const rowsQuery = useQuery({
     queryKey: ["draft-rules-simulation", WORKBOOK_DESIGN_REVISION],
     queryFn: async () => CORE_RULE_LOGIC_SLICE.map(draftRuleAdminRow),
+  });
+
+  const catalogQuery = useQuery({
+    queryKey: ["draft-rules-catalog", WORKBOOK_DESIGN_REVISION],
+    queryFn: async () => loadCommittedCatalogSummary(),
   });
 
   if (!org) {
@@ -49,11 +55,36 @@ function DraftRulesSimulationPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {WORKBOOK_SOURCE_TITLE} design revision {WORKBOOK_DESIGN_REVISION}. Stages 1–4
-          Core_Rule_Logic rows stay draft / not published. Simulation does not create live
-          assignments or claim blocks. Source_index labels are archive metadata, not publication
-          permission. Release_Gaps are listed and are not invented away.
+          Core_Rule_Logic rows and the finalized catalog stay draft / not published. Simulation does
+          not create live assignments or claim blocks. Source_index labels are archive metadata, not
+          publication permission. Release_Gaps are listed and are not invented away.
         </p>
       </div>
+
+      {catalogQuery.data ? (
+        <div className="rounded-2xl border border-border bg-card p-4 text-sm shadow-[var(--shadow-card)]">
+          <p className="font-semibold">Finalized catalog (draft simulation)</p>
+          <ul className="mt-2 space-y-1 text-muted-foreground">
+            <li>Workbook sha256 {catalogQuery.data.workbookSha256}</li>
+            <li>
+              Parents loaded {catalogQuery.data.loadedParentCount} / expected{" "}
+              {catalogQuery.data.expectedParentCount} ({catalogQuery.data.ingestStatus})
+            </li>
+            <li>
+              Requirements rows {catalogQuery.data.loadedRequirementCount} / expected{" "}
+              {catalogQuery.data.expectedRequirementsCount}
+            </li>
+            <li>
+              rule_status={catalogQuery.data.ruleStatus} · execution_status=
+              {catalogQuery.data.executionStatus} · canActivate=false
+            </li>
+            <li>
+              Source_index={catalogQuery.data.sourceIndex} · Release_Gaps open{" "}
+              {catalogQuery.data.releaseGapsOpen}
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
       {rowsQuery.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading draft rules…</p>

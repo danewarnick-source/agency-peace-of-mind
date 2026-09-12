@@ -119,10 +119,31 @@ export {
 } from "./simulation.ts";
 export type { SimulatedNoteResult, SimulationResult, SyntheticServiceNote } from "./simulation.ts";
 export {
+  assembleCatalogRows,
+  buildLoadedCatalog,
+  catalogLoadSummary,
+  isCatalogParentRow,
+  mapCatalogRowsToDraftRules,
+  rowsFromUnknown,
+  CATALOG_BATCH_IDS,
+} from "./catalog-loader.ts";
+export type {
+  CatalogIngestStatus,
+  CatalogLoadSummary,
+  CatalogManifest,
+  CatalogSheetRow,
+  LoadedCatalog,
+  LoadedDraftRule,
+} from "./catalog-loader.ts";
+export {
   fnv1aHex,
   linkWorkbookSource,
   sourceIndexGrantsPublication,
+  WORKBOOK_CATALOG_PARENT_COUNT,
   WORKBOOK_DESIGN_REVISION,
+  WORKBOOK_RELEASE_GAPS_OPEN,
+  WORKBOOK_REQUIREMENTS_ROW_COUNT,
+  WORKBOOK_SHA256,
   WORKBOOK_SOURCE_ID,
   WORKBOOK_SOURCE_INDEX,
   WORKBOOK_SOURCE_TITLE,

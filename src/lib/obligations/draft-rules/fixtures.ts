@@ -53,10 +53,12 @@ function draftBase(
     | "unresolvedAlternatives"
     | "unresolvedRenewals"
     | "releaseGaps"
+    | "publicationGap"
   > & {
     unresolvedAlternatives?: string[];
     unresolvedRenewals?: string[];
     releaseGaps?: string[];
+    publicationGap?: string | null;
   },
 ): DraftRule {
   return {
@@ -68,6 +70,7 @@ function draftBase(
     unresolvedAlternatives: partial.unresolvedAlternatives ?? [],
     unresolvedRenewals: partial.unresolvedRenewals ?? [],
     releaseGaps: partial.releaseGaps ?? [],
+    publicationGap: partial.publicationGap ?? null,
   };
 }
 

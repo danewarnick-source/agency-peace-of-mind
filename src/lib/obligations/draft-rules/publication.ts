@@ -19,6 +19,7 @@ export const PUBLICATION_GAP_KEYS = [
   "boundary_test",
   "unresolved_alternatives",
   "unresolved_renewals",
+  "release_gaps",
   "lifecycle_not_reviewed",
   "missing_approval",
   "not_published_flag",
@@ -43,6 +44,14 @@ function timingPresent(rule: DraftRule): boolean {
   if (rule.timing.kind === "hire_plus_days") return Number.isFinite(rule.timing.days);
   if (rule.timing.kind === "employment_year") return rule.timing.startYear >= 1;
   if (rule.timing.kind === "certificate_expiry") return rule.timing.certKey.trim().length > 0;
+  if (rule.timing.kind === "usor_cohort") {
+    return (
+      /^\d{4}-\d{2}-\d{2}$/.test(rule.timing.cutover) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(rule.timing.existingDeadline) &&
+      Number.isFinite(rule.timing.awardPlusMonths) &&
+      rule.timing.awardPlusMonths >= 1
+    );
+  }
   return false;
 }
 
@@ -65,11 +74,19 @@ function sourcePresent(rule: DraftRule): boolean {
 }
 
 function groupPresent(rule: DraftRule): boolean {
+  const hasMembers = rule.group.members.length > 0;
+  const hasRoutes = (rule.group.routes?.length ?? 0) > 0;
+  const routesOk =
+    !hasRoutes ||
+    rule.group.routes!.every(
+      (route) => route.conditions.length > 0 && route.officialProgram.trim().length > 0,
+    );
   return (
     (rule.group.logic === "ALL" ||
       rule.group.logic === "ANY" ||
       rule.group.logic === "CONDITIONAL") &&
-    rule.group.members.length > 0 &&
+    (hasMembers || hasRoutes) &&
+    routesOk &&
     (rule.group.parentAssignment === "one" || rule.group.parentAssignment === "per_member")
   );
 }
@@ -123,6 +140,12 @@ export function structuralPublicationGaps(rule: DraftRule): PublicationGap[] {
     gaps.push({
       key: "unresolved_renewals",
       reason: `Unresolved renewals: ${rule.unresolvedRenewals.join("; ")}`,
+    });
+  }
+  if (rule.releaseGaps.length > 0) {
+    gaps.push({
+      key: "release_gaps",
+      reason: `Release_Gaps (do not invent a fix): ${rule.releaseGaps.join("; ")}`,
     });
   }
   return gaps;

@@ -1,13 +1,27 @@
 export {
   allDraftRulesAreUnpublished,
+  BEHAVIOR_APPROVED_PROGRAMS,
   CORE_RULE_LOGIC_SLICE,
   draftRuleById,
+  PERIODIC_MONTHLY_CODES,
+  PERIODIC_QUARTERLY_CODES,
   REQ_1_8_4_ORIENTATION,
   REQ_1_8_5_FA_CPR_PCT,
+  REQ_1_8_6_BEHAVIOR,
   REQ_1_8_7_CE12,
   REQ_1_8_8_ABI,
+  REQ_1_25_PERIODIC,
+  REQ_30_5_SEI_BENEFITS,
+  REQ_30_6_A_USOR,
+  REQ_32_5_CAREGIVER,
+  REQ_33_5_SJD,
   REQ_SEI_30_6_B,
   REQ_SEI_30_6_C,
+  STAGE1_RULE_IDS,
+  STAGE2_RULE_IDS,
+  USOR_COHORT_CUTOVER,
+  USOR_EXISTING_PROVIDER_DEADLINE,
+  USOR_PROOF_DESTINATION_AS_PUBLISHED,
 } from "./fixtures.ts";
 export {
   activationBlockReasons,
@@ -18,11 +32,13 @@ export {
   structuralPublicationGaps,
 } from "./publication.ts";
 export {
+  countQualifiedDesignatedBenefits,
   employmentYearDue,
   hirePlusDaysDue,
   simulateDraftRules,
   simulationDutyApplies,
   simulationDutyVisible,
+  usorCohortDue,
 } from "./simulation.ts";
 export {
   fnv1aHex,
@@ -41,6 +57,7 @@ export {
   RULE_LIFECYCLES,
   STAGE1_ACTIVATION_LOCKED,
   type DraftRule,
+  type NestedRoute,
   type PublicationFlag,
   type RuleLifecycle,
 } from "./types.ts";

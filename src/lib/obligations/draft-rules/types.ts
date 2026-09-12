@@ -1,6 +1,6 @@
 /**
- * In-app draft rule model for DHHS91172 workbook Stage 1.
- * Lifecycle is encoded here. Stage 1 fixtures stay draft / not_published.
+ * In-app draft rule model for DHHS91172 workbook Stages 1–2.
+ * Lifecycle is encoded here. Fixtures stay draft / not_published.
  * No live activation. No invented renewal intervals.
  */
 
@@ -25,14 +25,34 @@ export const PREDICATE_KINDS = [
   "sei_assignment",
   "org_acre_coverage",
   "staff_acre_supervisor",
+  "behavior_risk_assignment",
+  "designated_benefits_staff",
+  "usor_sei_vendor",
+  "cmp_cms_assignment",
+  "sjd_assignment",
+  "periodic_report",
 ] as const;
 export type PredicateKind = (typeof PREDICATE_KINDS)[number];
+
+export const MEMBER_CONDITIONS = [
+  "newly_arising_risk",
+  "sjd_discovery",
+  "monthly_summary_codes",
+  "quarterly_summary_codes",
+] as const;
+export type MemberCondition = (typeof MEMBER_CONDITIONS)[number];
 
 /** Explicit anchors only. Never invent annual-from-completion. */
 export type TimingAnchor =
   | { kind: "hire_plus_days"; days: number }
   | { kind: "employment_year"; startYear: number }
   | { kind: "certificate_expiry"; certKey: string }
+  | {
+      kind: "usor_cohort";
+      cutover: string;
+      existingDeadline: string;
+      awardPlusMonths: number;
+    }
   | { kind: "none"; reason: string };
 
 export type DraftPredicate = {
@@ -49,6 +69,21 @@ export type GroupMember = {
   topicCode?: string;
   timing?: TimingAnchor;
   completionRoutes: CompletionRoute[];
+  /** CONDITIONAL member — skipped when the condition is known false. */
+  condition?: MemberCondition;
+  /** Official named program / credential. A generic quiz is not a substitute. */
+  requiresOfficialProgram?: boolean;
+};
+
+/** ANY-of-routes. The selected route must satisfy ALL of its conditions. */
+export type NestedRoute = {
+  id: string;
+  label: string;
+  sourceClauseId: string;
+  officialProgram: string;
+  requiresDspdWrittenApproval?: boolean;
+  completionRoutes: CompletionRoute[];
+  conditions: GroupMember[];
 };
 
 export type CompletionGroup = {
@@ -56,6 +91,9 @@ export type CompletionGroup = {
   /** orientation 1.8(4) = one parent assignment; never one-task-per-topic. */
   parentAssignment: "one" | "per_member";
   members: GroupMember[];
+  /** Nested ANY routes (1.8.6). Selected route must satisfy ALL conditions. */
+  routes?: NestedRoute[];
+  routeLogic?: "ANY";
   conditionNote?: string;
 };
 
@@ -109,7 +147,10 @@ export type DraftRule = {
   tests: DraftRuleTest[];
   unresolvedAlternatives: string[];
   unresolvedRenewals: string[];
+  /** Known workbook publication gaps. Do not invent the missing legal fact. */
+  releaseGaps: string[];
   approval: ApprovalRecord | null;
 };
 
+/** Activation stays locked for every draft fixture (Stage 1 and Stage 2). */
 export const STAGE1_ACTIVATION_LOCKED = true;

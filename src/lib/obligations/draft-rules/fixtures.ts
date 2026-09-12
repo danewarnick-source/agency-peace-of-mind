@@ -1,8 +1,9 @@
 /**
- * Core_Rule_Logic slice — Stage 1 draft fixtures only.
+ * Core_Rule_Logic slice — Stage 1 + Stage 2 draft fixtures.
  * Every imported rule is draft / not_published. Source_index is archive
  * metadata. Clause ids come from the workbook / encoded SOW articles already
- * cited on the live pack. No invented renewal intervals.
+ * cited on the live pack. No invented renewal intervals. Release_Gaps stay
+ * unresolved (USOR email spelling, SJB typo) — do not invent a fix.
  */
 
 import { THIRTY_DAY_SOW_LETTERS, THIRTY_DAY_TOPIC_CITE } from "../../in-hive-training.ts";
@@ -14,6 +15,7 @@ import type {
   DraftRuleTest,
   EvidenceAcceptance,
   GroupMember,
+  NestedRoute,
   TimingAnchor,
 } from "./types.ts";
 
@@ -49,9 +51,11 @@ function draftBase(
     | "sourceIndex"
     | "unresolvedAlternatives"
     | "unresolvedRenewals"
+    | "releaseGaps"
   > & {
     unresolvedAlternatives?: string[];
     unresolvedRenewals?: string[];
+    releaseGaps?: string[];
   },
 ): DraftRule {
   return {
@@ -62,6 +66,7 @@ function draftBase(
     approval: null,
     unresolvedAlternatives: partial.unresolvedAlternatives ?? [],
     unresolvedRenewals: partial.unresolvedRenewals ?? [],
+    releaseGaps: partial.releaseGaps ?? [],
   };
 }
 
@@ -396,6 +401,402 @@ export const REQ_SEI_30_6_C: DraftRule = draftBase({
   ]),
 });
 
+/** Named 1.8.6 programs already cited on the live catalog / audit tool. */
+export const BEHAVIOR_APPROVED_PROGRAMS = ["SOAR", "MANDT", "PART", "CPI", "Safety Care"] as const;
+
+/** Published destination as written. Do not invent a corrected address. */
+export const USOR_PROOF_DESTINATION_AS_PUBLISHED = "osrprovider@utah.gov";
+export const USOR_COHORT_CUTOVER = "2026-07-01";
+export const USOR_EXISTING_PROVIDER_DEADLINE = "2027-01-31";
+
+/** Monthly substitutes under §1.25. Same set as progress-summaries (minus PBA financials). */
+export const PERIODIC_MONTHLY_CODES = ["CMP", "CMS", "PN1", "PN2", "SEI", "SJD"] as const;
+export const PERIODIC_QUARTERLY_CODES = ["HHS", "RHS", "DSI", "SLH", "SLN"] as const;
+
+const BEHAVIOR_PRED: DraftPredicate = {
+  kind: "behavior_risk_assignment",
+  catalogKey: "behavior_intervention_cert",
+};
+
+function behaviorRoute(program: (typeof BEHAVIOR_APPROVED_PROGRAMS)[number]): NestedRoute {
+  const slug = program.toLowerCase().replace(/\s+/g, "-");
+  return {
+    id: `route-${slug}`,
+    label: program,
+    sourceClauseId: "SOW §1.8(6)",
+    officialProgram: program,
+    completionRoutes: ["UPLOAD"],
+    conditions: [
+      {
+        id: `${slug}-official`,
+        label: `Official ${program} program complete and current`,
+        sourceClauseId: "SOW §1.8(6)",
+        catalogKey: "behavior_intervention_cert",
+        completionRoutes: ["UPLOAD"],
+        requiresOfficialProgram: true,
+      },
+    ],
+  };
+}
+
+export const REQ_1_8_6_BEHAVIOR: DraftRule = draftBase({
+  id: "REQ-1.8.6",
+  version: 1,
+  title: "Behavior intervention certification — ANY approved complete route",
+  catalogKeys: ["behavior_intervention_cert"],
+  source: linkWorkbookSource(["SOW §1.8(6)"]),
+  predicates: [BEHAVIOR_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "EXISTS assigned person with aggression / self-injury / destruction risk. ANY approved route; the selected route must satisfy ALL of its conditions. Newly arising risk requires review.",
+    members: [
+      {
+        id: "newly-arising-review",
+        label: "Newly arising risk reviewed",
+        sourceClauseId: "SOW §1.8(6)",
+        catalogKey: "behavior_intervention_cert",
+        completionRoutes: ["SYSTEM"],
+        condition: "newly_arising_risk",
+      },
+    ],
+    routeLogic: "ANY",
+    routes: [
+      ...BEHAVIOR_APPROVED_PROGRAMS.map(behaviorRoute),
+      {
+        id: "route-alternative",
+        label: "Other DSPD-approved intervention program",
+        sourceClauseId: "SOW §1.8(6)",
+        officialProgram: "DSPD-approved alternative",
+        requiresDspdWrittenApproval: true,
+        completionRoutes: ["UPLOAD", "EXTERNAL"],
+        conditions: [
+          {
+            id: "alt-program",
+            label: "Alternative intervention program complete",
+            sourceClauseId: "SOW §1.8(6)",
+            catalogKey: "behavior_intervention_cert",
+            completionRoutes: ["UPLOAD", "EXTERNAL"],
+            requiresOfficialProgram: true,
+          },
+          {
+            id: "alt-dspd-approval",
+            label: "Prior written DSPD approval for the alternative program",
+            sourceClauseId: "SOW §1.8(6)",
+            catalogKey: null,
+            completionRoutes: ["UPLOAD", "EXTERNAL"],
+          },
+        ],
+      },
+    ],
+  },
+  timing: { kind: "hire_plus_days", days: 180 },
+  evidence: evidence(
+    "ANY named approved program (SOAR, MANDT, PART, CPI, Safety Care) or a DSPD-approved alternative with prior written approval. The selected route must satisfy ALL of its conditions. A generic quiz is not a substitute for an official program.",
+    ["UPLOAD", "EXTERNAL", "SYSTEM"],
+    "Upload of a named program certificate is the default handling path; it is not automatic equivalency for a different program or a generic quiz.",
+  ),
+  completionRoutes: ["UPLOAD", "EXTERNAL", "SYSTEM"],
+  tests: tests("REQ-1.8.6", [
+    [
+      "positive",
+      "Staff assigned to a person with aggression/self-injury/destruction risk who complete one official named route (and review if risk newly arose) satisfy the parent.",
+    ],
+    [
+      "negative",
+      "Staff known to have no such assigned person do not receive the behavior-cert parent. An alternative route without prior written DSPD approval is incomplete.",
+    ],
+    [
+      "boundary",
+      "Unknown risk assignment is missing-information. Newly arising risk requires review. Selected route must satisfy ALL of its conditions. Generic quiz is not an official program.",
+    ],
+  ]),
+});
+
+export const REQ_30_5_SEI_BENEFITS: DraftRule = draftBase({
+  id: "REQ-30.5",
+  version: 1,
+  title: "SEI benefits knowledge — COUNT designated staff >= 1",
+  catalogKeys: ["sei_ssi_benefits"],
+  source: linkWorkbookSource(["SOW §30.5"]),
+  predicates: [{ kind: "designated_benefits_staff", catalogKey: "sei_ssi_benefits" }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "COUNT(qualified designated staff) >= 1. Not every SEI staff and not office staff by default.",
+    members: [
+      {
+        id: "qualified-designated",
+        label: "Designated staff is qualified on SSI / Title II / Medicaid earned-income",
+        sourceClauseId: "SOW §30.5",
+        catalogKey: "sei_ssi_benefits",
+        completionRoutes: ["EXTERNAL", "UPLOAD"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Required of the designated qualified person before providing SEI. No invented renewal.",
+  },
+  evidence: evidence(
+    "Agency must have at least one qualified designated staff member. Knowledge is acquired outside HIVE; HIVE records the designated person's qualification. Not assigned to every SEI or office staff member.",
+    ["EXTERNAL", "UPLOAD", "SYSTEM"],
+    "Attestation or upload is a handling path for the designated person, not automatic equivalency for the whole SEI roster.",
+  ),
+  completionRoutes: ["EXTERNAL", "UPLOAD", "SYSTEM"],
+  tests: tests("REQ-30.5", [
+    [
+      "positive",
+      "One designated staff member who is qualified satisfies COUNT>=1. That person receives the duty.",
+    ],
+    [
+      "negative",
+      "SEI staff who are not designated do not receive the duty. Office staff who are not designated do not receive the duty. Zero qualified designated staff fails COUNT>=1.",
+    ],
+    [
+      "boundary",
+      "Unknown designation or unknown qualification is missing-information, never auto compliant or N/A.",
+    ],
+  ]),
+});
+
+export const REQ_30_6_A_USOR: DraftRule = draftBase({
+  id: "REQ-30.6.a",
+  version: 1,
+  title: "USOR approved vendor — cohort branches",
+  catalogKeys: ["usor_job_coaching_sei"],
+  source: linkWorkbookSource(["SOW §30.6(a)"]),
+  predicates: [{ kind: "usor_sei_vendor", catalogKey: "usor_job_coaching_sei" }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    members: [
+      {
+        id: "official-usor-proof",
+        label: "Official USOR approved-vendor proof on file",
+        sourceClauseId: "SOW §30.6(a)",
+        catalogKey: "usor_job_coaching_sei",
+        completionRoutes: ["UPLOAD", "EXTERNAL"],
+      },
+    ],
+  },
+  timing: {
+    kind: "usor_cohort",
+    cutover: USOR_COHORT_CUTOVER,
+    existingDeadline: USOR_EXISTING_PROVIDER_DEADLINE,
+    awardPlusMonths: 6,
+  },
+  evidence: evidence(
+    `Official USOR vendor proof. Published destination is ${USOR_PROOF_DESTINATION_AS_PUBLISHED} (Release_Gaps — do not invent a corrected address). HIVE stores the upload; it does not send the email.`,
+    ["UPLOAD", "EXTERNAL"],
+    "Upload of the official proof is the handling path, not automatic equivalency for a missing vendor letter.",
+  ),
+  completionRoutes: ["UPLOAD", "EXTERNAL"],
+  releaseGaps: [
+    `USOR destination email is published as ${USOR_PROOF_DESTINATION_AS_PUBLISHED}; do not invent a corrected address.`,
+  ],
+  tests: tests("REQ-30.6.a", [
+    [
+      "positive",
+      "SEI awarded before 2026-07-01 with official proof by 2027-01-31 satisfies the existing-provider cohort.",
+    ],
+    [
+      "negative",
+      "SEI awarded on/after 2026-07-01 is incomplete without official proof by award+6 months.",
+    ],
+    [
+      "boundary",
+      "Unknown award date is missing-information (never default the live-UI fallback). Destination spelling stays a Release_Gaps flag.",
+    ],
+  ]),
+});
+
+export const REQ_32_5_CAREGIVER: DraftRule = draftBase({
+  id: "REQ-32.5",
+  version: 1,
+  title: "DSPD New Caregiver Compensation training — CMP/CMS",
+  catalogKeys: ["cmp_cms_caregiver_comp"],
+  source: linkWorkbookSource(["SOW §32.5"]),
+  predicates: [{ kind: "cmp_cms_assignment", catalogKey: "cmp_cms_caregiver_comp" }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    members: [
+      {
+        id: "official-dspd-course",
+        label: "Official DSPD New Caregiver Compensation course (score >= 80%)",
+        sourceClauseId: "SOW §32.5",
+        catalogKey: "cmp_cms_caregiver_comp",
+        completionRoutes: ["EXTERNAL"],
+        requiresOfficialProgram: true,
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason:
+      "Required when assigned CMP or CMS. Course effective 7/1/26. No invented renewal interval.",
+  },
+  evidence: evidence(
+    "Official DSPD New Caregiver Compensation course taken on the DSPD site. SLN alone does not trigger. A generic in-platform quiz is not a substitute.",
+    ["EXTERNAL"],
+    "EXTERNAL official course is the default handling path; it is not equivalency for a generic quiz or an SLN-only assignment.",
+  ),
+  completionRoutes: ["EXTERNAL"],
+  tests: tests("REQ-32.5", [
+    [
+      "positive",
+      "Staff assigned CMP or CMS who complete the official DSPD course satisfy the rule.",
+    ],
+    ["negative", "SLN alone does not trigger. Office staff without CMP/CMS do not receive the duty."],
+    [
+      "boundary",
+      "A generic quiz cannot replace the official DSPD course. Unknown CMP/CMS assignment is missing-information.",
+    ],
+  ]),
+});
+
+export const REQ_33_5_SJD: DraftRule = draftBase({
+  id: "REQ-33.5.b-c",
+  version: 1,
+  title: "SJD ACRE (60-day, supervised pending) + Customized Employment if Discovery",
+  catalogKeys: ["acre_sjd", "customized_employment_usu"],
+  source: linkWorkbookSource(["SOW §33.5(b)", "SOW §33.5(c)"]),
+  predicates: [{ kind: "sjd_assignment", catalogKey: "acre_sjd" }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "SJD ACRE within 60 days of hire with qualified supervision while pending. Customized Employment only if Discovery. Do not copy SEI 30.6(c) alternatives (USU Workplace Supports / Effective Job Coach) onto SJD.",
+    members: [
+      {
+        id: "sjd-acre",
+        label: "ACRE training within 60 days of hire",
+        sourceClauseId: "SOW §33.5(b)",
+        catalogKey: "acre_sjd",
+        timing: { kind: "hire_plus_days", days: 60 },
+        completionRoutes: ["UPLOAD", "EXTERNAL"],
+        requiresOfficialProgram: true,
+      },
+      {
+        id: "sjd-supervision-pending",
+        label: "Qualified ACRE supervision while ACRE is pending",
+        sourceClauseId: "SOW §33.5(b)",
+        catalogKey: "acre_sjd",
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "sjd-customized-employment",
+        label: "USU Customized Employment (Discovery)",
+        sourceClauseId: "SOW §33.5(c)",
+        catalogKey: "customized_employment_usu",
+        completionRoutes: ["UPLOAD", "EXTERNAL"],
+        condition: "sjd_discovery",
+        requiresOfficialProgram: true,
+      },
+    ],
+  },
+  timing: { kind: "hire_plus_days", days: 60 },
+  evidence: evidence(
+    "ACRE for SJD new-hires within 60 days; qualified supervision required while ACRE is pending. Customized Employment if the staff performs Discovery. SEI named-course alternatives are not SJD routes.",
+    ["UPLOAD", "EXTERNAL", "SYSTEM"],
+    "Upload of ACRE / Customized Employment is a handling path, not equivalency for SEI alternative courses.",
+  ),
+  completionRoutes: ["UPLOAD", "EXTERNAL", "SYSTEM"],
+  releaseGaps: [
+    "Workbook typo SJB is a publication gap; encoded service code is SJD. Do not treat SJB as a live code.",
+  ],
+  tests: tests("REQ-33.5.b-c", [
+    [
+      "positive",
+      "SJD staff with ACRE within 60 days (supervised while pending) satisfy 33.5(b). Discovery staff also need Customized Employment.",
+    ],
+    [
+      "negative",
+      "SJD staff past 60 days without ACRE stay incomplete even with supervision. Non-Discovery staff do not receive Customized Employment. SEI alternatives do not satisfy SJD.",
+    ],
+    [
+      "boundary",
+      "Unknown SJD assignment or unknown Discovery fact is missing-information. SJB typo stays a Release_Gaps flag.",
+    ],
+  ]),
+});
+
+export const REQ_1_25_PERIODIC: DraftRule = draftBase({
+  id: "REQ-1.25",
+  version: 1,
+  title: "Periodic progress reports — monthly substitutes, never both for one code",
+  catalogKeys: ["sei_monthly_summary_upi", "cmp_cms_monthly_summaries", "sjd_monthly_summary_upi"],
+  source: linkWorkbookSource(["SOW §1.25"]),
+  predicates: [{ kind: "periodic_report", catalogKey: null }],
+  group: {
+    logic: "CONDITIONAL",
+    parentAssignment: "one",
+    conditionNote:
+      "Default quarterly. Monthly substitutes for CMP, CMS, PN1, PN2, SEI, SJD. One applicable report per code — never duplicate monthly+quarterly on the same code.",
+    members: [
+      {
+        id: "monthly-report",
+        label: "Monthly progress report (CMP/CMS/PN1/PN2/SEI/SJD)",
+        sourceClauseId: "SOW §1.25",
+        catalogKey: null,
+        completionRoutes: ["IN_PLATFORM", "SYSTEM"],
+        condition: "monthly_summary_codes",
+      },
+      {
+        id: "quarterly-report",
+        label: "Quarterly progress report (default cadence)",
+        sourceClauseId: "SOW §1.25",
+        catalogKey: null,
+        completionRoutes: ["IN_PLATFORM", "SYSTEM"],
+        condition: "quarterly_summary_codes",
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason:
+      "Cadence is monthly or quarterly by code. Due 15 days after the period ends. No invented extra interval.",
+  },
+  evidence: evidence(
+    "One applicable narrative report per code. Monthly substitutes for CMP/CMS/PN1/PN2/SEI/SJD; all other narrative codes stay quarterly. Never mint both monthly and quarterly for the same code.",
+    ["IN_PLATFORM", "SYSTEM"],
+    "In-platform summary is the default handling path, not equivalency for a skipped cadence.",
+  ),
+  completionRoutes: ["IN_PLATFORM", "SYSTEM"],
+  tests: tests("REQ-1.25", [
+    [
+      "positive",
+      "HHS/SLN receive quarterly only. SEI/SJD/CMP/CMS/PN1/PN2 receive monthly only.",
+    ],
+    ["negative", "Office staff with no assigned codes do not receive a periodic report clock."],
+    [
+      "boundary",
+      "A code never receives both monthly and quarterly. Mixed caseloads (CMP+SLN) get one monthly and one quarterly for different codes. Unknown codes stay missing-information.",
+    ],
+  ]),
+});
+
+export const STAGE1_RULE_IDS = [
+  "REQ-1.8.4",
+  "REQ-1.8.5",
+  "REQ-1.8.7",
+  "REQ-1.8.8",
+  "REQ-30.6.b",
+  "REQ-30.6.c",
+] as const;
+
+export const STAGE2_RULE_IDS = [
+  "REQ-1.8.6",
+  "REQ-30.5",
+  "REQ-30.6.a",
+  "REQ-32.5",
+  "REQ-33.5.b-c",
+  "REQ-1.25",
+] as const;
+
 export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_1_8_4_ORIENTATION,
   REQ_1_8_5_FA_CPR_PCT,
@@ -403,6 +804,12 @@ export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_1_8_8_ABI,
   REQ_SEI_30_6_B,
   REQ_SEI_30_6_C,
+  REQ_1_8_6_BEHAVIOR,
+  REQ_30_5_SEI_BENEFITS,
+  REQ_30_6_A_USOR,
+  REQ_32_5_CAREGIVER,
+  REQ_33_5_SJD,
+  REQ_1_25_PERIODIC,
 ];
 
 export function draftRuleById(id: string): DraftRule | null {

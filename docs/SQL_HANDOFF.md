@@ -3209,3 +3209,75 @@ these tables through an untyped Supabase client cast (same pattern used
 elsewhere in this codebase for tables ahead of the generated types), so
 the app works correctly either way — it's a type-safety gap, not a
 functional blocker.
+
+---
+
+## ACTION — DSPD compliance engine: new `dspd_*` tables (pilot only, not published) (2026-09-12)
+
+**What this is for:** The new state contract DHHS91172 (effective
+2026-07-01) work — a versioned, clause-linked compliance rule engine for
+8 pilot requirements (orientation, 90-day first aid/CPR/person-centered,
+annual 12-hour training, ABI training, SEI benefits-knowledge staff,
+USOR vendor approval, ACRE certification, SEI job-coaching training
+routes). Full design is in `docs/DSPD_COMPLIANCE_DESIGN.md` — read that
+first, this note only summarizes what's reused vs new.
+
+**Reused, not rebuilt:** the `organization_id` FK +
+`is_org_member`/`is_org_admin_or_manager`/`is_super_admin` RLS pattern,
+GRANT + index + `set_updated_at` convention (copied verbatim from
+`supabase/migrations/20260813233000_company_obligations_and_staff_groups.sql`);
+the existing `organizations.is_demo` column (added in
+`20260603022300_c48efc18-c554-4217-b2e2-b79376d68ee5.sql`) as the flag that
+scopes pilot rule *execution* to a synthetic/test org — no new "is_test"
+column was invented, per instruction to confirm a real one exists first;
+`policy_signatures` is referenced by FK from `dspd_evidence.attestation_id`
+instead of duplicating attestation storage.
+
+**New tables (all `dspd_`-prefixed):**
+- `dspd_requirement_definitions` — one row per requirement *version*;
+  `rule_status` starts and stays `draft` for every row this migration or
+  any following seed script inserts. Catalog table (not org-scoped):
+  readable by any authenticated user, writable only by `service_role`
+  (seeded by script, not end users).
+- `dspd_requirement_elements` — sub-elements (e.g. orientation topics
+  A–W) broken out as independently queryable rows for progress bars,
+  linked to a `requirement_definition_id`.
+- `dspd_fact_definitions` — catalog seeded from `Applicability_Facts.csv`
+  (all 85 rows; only the pilot-relevant ones get `wired_for_pilot = true`
+  in the Phase 2 seed script — this migration only creates the table).
+- `dspd_agency_facts` — org-scoped, effective-dated fact *answers*
+  (`effective_to IS NULL` = current), so a fact change (e.g. a client's
+  ABI need going away) closes the old row instead of overwriting history.
+- `dspd_setup_progress` — one row per org, gates the future setup wizard.
+  **This migration backfills every organization that already has staff
+  (`organization_members`) or clients (`clients`) as `is_complete = true,
+  backfilled = true`** so the Phase 4 gate (not built yet) will never
+  block True North Supports or any other live tenant — verify after
+  running that TNS's org id appears with `is_complete = true`.
+- `dspd_assignments` — the actual per-subject-per-requirement obligation
+  instance, lifecycle `status` (not a boolean), unique on
+  `(requirement_definition_id, subject_type, subject_id,
+  period_or_event_key)` — this is the idempotency guarantee: re-running
+  the same trigger inserts/updates the same row instead of duplicating.
+- `dspd_evidence` / `dspd_evidence_links` — reusable evidence records and
+  a many-to-many link to assignments (optionally to one element), so one
+  accepted CPR card can satisfy multiple matching requirements.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260912020000_dspd_compliance_engine.sql` here and
+run it.
+
+**What you'll see:** seven `CREATE TABLE IF NOT EXISTS` statements, RLS
+enabled + policies on all seven, GRANTs, four `set_updated_at` triggers,
+then one `INSERT ... SELECT ... ON CONFLICT DO NOTHING` backfilling
+`dspd_setup_progress` for every org that already has members or clients.
+No existing table is altered and no existing row is touched — this is
+purely additive.
+
+**After this runs:** regenerate `src/integrations/supabase/types.ts` from
+the live schema — seven new tables will appear. Nothing in the app reads
+or writes these tables yet (Phase 2/3 code lands in a follow-up commit on
+the same branch); until then this migration has zero runtime effect on
+any existing feature.
+
+---

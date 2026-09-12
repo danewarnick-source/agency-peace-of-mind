@@ -1,10 +1,10 @@
 /**
- * Core_Rule_Logic slice — Stage 1 + Stage 2 + Stage 3 draft fixtures.
+ * Core_Rule_Logic slice — Stages 1–4 draft fixtures.
  * Every imported rule is draft / not_published. Source_index is archive
  * metadata. Clause ids come from the workbook / encoded SOW articles already
  * cited on the live pack. No invented renewal intervals. Release_Gaps stay
- * unresolved (USOR email spelling, SJB typo, EVV mapping review) — do not
- * invent a fix.
+ * unresolved (USOR email spelling, SJB typo, EVV mapping review, universal
+ * retention) — do not invent a fix.
  */
 
 import { THIRTY_DAY_SOW_LETTERS, THIRTY_DAY_TOPIC_CITE } from "../../in-hive-training.ts";
@@ -1159,6 +1159,273 @@ export const STAGE3_RULE_IDS = [
   "REQ-1.8.5-cpr-current",
 ] as const;
 
+const PBA_PRED: DraftPredicate = {
+  kind: "pba_assignment",
+  catalogKey: "pba_financial_review",
+};
+
+const MONTHLY_PBA_TIMING: TimingAnchor = { kind: "calendar_period", cadence: "monthly" };
+const QUARTERLY_PBA_TIMING: TimingAnchor = { kind: "calendar_period", cadence: "quarterly" };
+
+export const REQ_ART15_PBA: DraftRule = draftBase({
+  id: "REQ-15.3",
+  version: 1,
+  title: "Article 15 PBA funds — three distinct financial reviews",
+  catalogKeys: ["pba_financial_review"],
+  source: linkWorkbookSource(["SOW Article 15", "SOW §15.3", "SOW §1.28"]),
+  predicates: [PBA_PRED],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Monthly review with the Person, monthly independent administrator review, and quarterly third-person sample. Reviewers must differ. One generic attestation does not satisfy all three. Link itemized statements / bank statements / distribution receipts.",
+    members: [
+      {
+        id: "monthly-person-review",
+        label: "Monthly review with the Person",
+        sourceClauseId: "SOW §15.3",
+        catalogKey: "pba_financial_review",
+        timing: MONTHLY_PBA_TIMING,
+        completionRoutes: ["IN_PLATFORM", "UPLOAD"],
+        evidenceMatch: { scope: "pba_person_review" },
+      },
+      {
+        id: "monthly-administrator-review",
+        label: "Monthly independent administrator review",
+        sourceClauseId: "SOW §15.3",
+        catalogKey: "pba_financial_review",
+        timing: MONTHLY_PBA_TIMING,
+        completionRoutes: ["IN_PLATFORM", "UPLOAD"],
+        evidenceMatch: { scope: "pba_administrator_review" },
+      },
+      {
+        id: "quarterly-third-person-sample",
+        label: "Quarterly third-person sample",
+        sourceClauseId: "SOW Article 15",
+        catalogKey: "pba_financial_review",
+        timing: QUARTERLY_PBA_TIMING,
+        completionRoutes: ["IN_PLATFORM", "UPLOAD"],
+        evidenceMatch: { scope: "pba_third_person_sample" },
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason:
+      "Three source calendars only: monthly person, monthly administrator, quarterly third-person sample. Do not invent a sample percentage or extra interval.",
+  },
+  evidence: evidence(
+    "Each review is a distinct accepted record with its own reviewer role and linked itemized financial evidence (statements, bank statements, distribution receipts). A generic attestation is not equivalency for the set.",
+    ["IN_PLATFORM", "UPLOAD"],
+    "Linked itemized evidence plus the matching reviewer is the handling path, not automatic equivalency across the three reviews.",
+  ),
+  completionRoutes: ["IN_PLATFORM", "UPLOAD"],
+  tests: tests("REQ-15.3", [
+    [
+      "positive",
+      "Distinct person / administrator / third-person reviewers with accepted itemized evidence in the matching monthly vs quarterly periods complete ALL three.",
+    ],
+    [
+      "negative",
+      "A wrong reviewer, a shared reviewer, or one generic attestation leaves the parent incomplete.",
+    ],
+    [
+      "boundary",
+      "Monthly period keys do not satisfy the quarterly sample. Unknown PBA assignment is missing-information.",
+    ],
+  ]),
+});
+
+export const REQ_REMINDERS: DraftRule = draftBase({
+  id: "REQ-REMINDERS",
+  version: 1,
+  title: "Reminder / escalation offsets — product defaults, not SOW mandates",
+  catalogKeys: [],
+  source: linkWorkbookSource(["Workbook System_Design — Reminders (product defaults)"]),
+  predicates: [{ kind: "product_default_reminder", catalogKey: null }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Configurable 30/14/7/1-day style defaults. Dedupe identical pending rows. Resolve on verified acceptance. Pending review reminds the reviewer, not a repeated staff upload.",
+    members: [
+      {
+        id: "product-default-offsets",
+        label: "Product-default reminder offsets (30/14/7/1)",
+        sourceClauseId: "Workbook System_Design — Reminders (product defaults)",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "dedupe-pending",
+        label: "Deduplicate identical pending reminders",
+        sourceClauseId: "Workbook System_Design — Reminders (product defaults)",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "reviewer-not-staff-when-pending",
+        label: "Pending review reminds the reviewer, not the uploading staff",
+        sourceClauseId: "Workbook System_Design — Reminders (product defaults)",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Offsets are product defaults (30/14/7/1), not SOW-mandated intervals.",
+  },
+  evidence: evidence(
+    "Reminder rows are product UX. Verified acceptance resolves them. They are not evidence of a SOW interval.",
+    ["SYSTEM"],
+    "Product-default offsets are a handling path, not equivalency for a legal deadline.",
+  ),
+  completionRoutes: ["SYSTEM"],
+  releaseGaps: [
+    "Reminder / escalation offsets are product defaults, not SOW mandates. Do not publish them as legal intervals.",
+  ],
+  tests: tests("REQ-REMINDERS", [
+    ["positive", "Accepted evidence resolves pending product-default reminders."],
+    [
+      "negative",
+      "Submitted evidence reminds the reviewer, not a second staff-upload nag. Duplicate events collapse.",
+    ],
+    [
+      "boundary",
+      "Offsets stay labeled product_default / isSowMandate false. Publication stays blocked.",
+    ],
+  ]),
+});
+
+export const REQ_OFFBOARD: DraftRule = draftBase({
+  id: "REQ-OFFBOARD",
+  version: 1,
+  title: "Offboarding / change impact — recalculate and preserve evidence",
+  catalogKeys: ["acre_sei"],
+  source: linkWorkbookSource([
+    "Workbook System_Design — Offboarding / change impact",
+    "SOW §30.6(b)",
+  ]),
+  predicates: [{ kind: "change_impact", catalogKey: null }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Recalculate on role, assignment, client needs, credential, or supervisor change. Departing ACRE supervisor triggers reassignment review for SEI staff. Historical evidence is preserved.",
+    members: [
+      {
+        id: "recalculate-on-change",
+        label: "Recalculate applicable duties on encoded change triggers",
+        sourceClauseId: "Workbook System_Design — Offboarding / change impact",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "acre-supervisor-reassignment",
+        label: "Departing ACRE supervisor — SEI reassignment review",
+        sourceClauseId: "SOW §30.6(b)",
+        catalogKey: "acre_sei",
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "preserve-historical-evidence",
+        label: "Preserve historical evidence on the file",
+        sourceClauseId: "Workbook System_Design — Offboarding / change impact",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason: "Recalculate on encoded change triggers. No invented grace interval.",
+  },
+  evidence: evidence(
+    "Change impact lists the duties to recalculate. Prior accepted records stay on the file. A departing ACRE supervisor does not erase SEI supervision history.",
+    ["SYSTEM"],
+    "Impact list is the handling path, not automatic completion of the new assignment.",
+  ),
+  completionRoutes: ["SYSTEM"],
+  tests: tests("REQ-OFFBOARD", [
+    [
+      "positive",
+      "Each encoded change trigger produces a recalculate impact and preserves historical evidence ids.",
+    ],
+    [
+      "negative",
+      "A departing ACRE supervisor on SEI staff adds a reassignment-review item. Non-SEI staff do not.",
+    ],
+    [
+      "boundary",
+      "Unchanged snapshots produce no impact. Simulation never deletes historical evidence.",
+    ],
+  ]),
+});
+
+export const REQ_AUDIT_EXPORT: DraftRule = draftBase({
+  id: "REQ-AUDIT-EXPORT",
+  version: 1,
+  title: "Audit export packet — filtered fields, no invented retention",
+  catalogKeys: [],
+  source: linkWorkbookSource(["Workbook System_Design — Audit export"]),
+  predicates: [{ kind: "audit_export", catalogKey: null }],
+  group: {
+    logic: "ALL",
+    parentAssignment: "one",
+    conditionNote:
+      "Filtered packet: rule version, source clause, assignment, evidence, acceptance, timestamps, exceptions, amendments. Retention is from the applicable authority.",
+    members: [
+      {
+        id: "filtered-packet-fields",
+        label: "Filtered audit packet fields",
+        sourceClauseId: "Workbook System_Design — Audit export",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+      {
+        id: "retention-from-authority",
+        label: "Retention from applicable authority (no invented universal period)",
+        sourceClauseId: "Workbook System_Design — Audit export",
+        catalogKey: null,
+        completionRoutes: ["SYSTEM"],
+      },
+    ],
+  },
+  timing: {
+    kind: "none",
+    reason:
+      "Export is on request. Retention is from the applicable authority — no invented universal period.",
+  },
+  evidence: evidence(
+    "The packet lists encoded fields only. The retention field is 'from applicable authority' when no period is published.",
+    ["SYSTEM"],
+    "Filtered export is the handling path, not a claim that a universal retention interval exists.",
+  ),
+  completionRoutes: ["SYSTEM"],
+  releaseGaps: [
+    "Universal retention period is unknown / publication gap. Field stays 'from applicable authority'. Do not invent a default interval.",
+  ],
+  tests: tests("REQ-AUDIT-EXPORT", [
+    [
+      "positive",
+      "Packet includes rule version, source clause, assignment, evidence, acceptance, timestamps, exceptions, and amendments.",
+    ],
+    ["negative", "Retention is not a fabricated universal period."],
+    [
+      "boundary",
+      "Publication stays blocked while the applicable-authority retention gap is unresolved.",
+    ],
+  ]),
+});
+
+export const STAGE4_RULE_IDS = [
+  "REQ-15.3",
+  "REQ-REMINDERS",
+  "REQ-OFFBOARD",
+  "REQ-AUDIT-EXPORT",
+] as const;
+
 export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_1_8_4_ORIENTATION,
   REQ_1_8_5_FA_CPR_PCT,
@@ -1178,6 +1445,10 @@ export const CORE_RULE_LOGIC_SLICE: readonly DraftRule[] = [
   REQ_1_10_SIGNATURE,
   REQ_ART2_BILLING,
   REQ_1_8_5_CPR_CURRENT,
+  REQ_ART15_PBA,
+  REQ_REMINDERS,
+  REQ_OFFBOARD,
+  REQ_AUDIT_EXPORT,
 ];
 
 export function draftRuleById(id: string): DraftRule | null {

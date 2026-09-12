@@ -2,7 +2,7 @@
  * Workbook publication gate (System_Design §Publication).
  * Schema/simulation first. A published rule needs predicates, groups, timing,
  * evidence, source, and positive/negative/boundary tests. Unresolved
- * renewal/alternative blocks activation. Stage 1 never activates.
+ * renewal/alternative blocks activation. Stage 1 lock never activates.
  */
 
 import { STAGE1_ACTIVATION_LOCKED, type DraftRule, type RuleTestKind } from "./types.ts";
@@ -51,6 +51,9 @@ function timingPresent(rule: DraftRule): boolean {
       Number.isFinite(rule.timing.awardPlusMonths) &&
       rule.timing.awardPlusMonths >= 1
     );
+  }
+  if (rule.timing.kind === "calendar_period") {
+    return rule.timing.cadence === "monthly" || rule.timing.cadence === "quarterly";
   }
   return false;
 }

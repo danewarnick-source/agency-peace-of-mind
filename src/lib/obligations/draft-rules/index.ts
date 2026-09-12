@@ -46,15 +46,51 @@ export {
   REQ_32_5_CAREGIVER,
   REQ_33_5_SJD,
   REQ_ART2_BILLING,
+  REQ_ART15_PBA,
+  REQ_AUDIT_EXPORT,
+  REQ_OFFBOARD,
+  REQ_REMINDERS,
   REQ_SEI_30_6_B,
   REQ_SEI_30_6_C,
   STAGE1_RULE_IDS,
   STAGE2_RULE_IDS,
   STAGE3_RULE_IDS,
+  STAGE4_RULE_IDS,
   USOR_COHORT_CUTOVER,
   USOR_EXISTING_PROVIDER_DEADLINE,
   USOR_PROOF_DESTINATION_AS_PUBLISHED,
 } from "./fixtures.ts";
+export {
+  AUDIT_PACKET_FIELDS,
+  AUDIT_RETENTION,
+  auditPacketHasOnlyFilteredFields,
+  buildAuditExportPacket,
+} from "./audit-export.ts";
+export type { AuditExportRowInput, SimulatedAuditPacket } from "./audit-export.ts";
+export {
+  CHANGE_TRIGGERS,
+  departingAcreSupervisor,
+  seiStaffNeedsAcreReassignmentReview,
+  simulateChangeImpact,
+} from "./offboarding.ts";
+export type { ChangeImpactItem, SyntheticChangeEvent } from "./offboarding.ts";
+export {
+  PBA_EVIDENCE_KINDS,
+  PBA_REVIEW_SPECS,
+  evaluatePbaReviews,
+  periodKeyForCadence,
+  reviewsAreScheduleSeparated,
+} from "./pba-reviews.ts";
+export type { SimulatedPbaAccountResult, SyntheticPbaReview } from "./pba-reviews.ts";
+export {
+  DEFAULT_REMINDER_CONFIG,
+  PRODUCT_REMINDER_AUTHORITY,
+  PRODUCT_REMINDER_OFFSETS_DAYS,
+  reminderDedupeKey,
+  reminderTargetForLifecycle,
+  simulateReminders,
+} from "./reminders.ts";
+export type { SimulatedReminderResult, SyntheticReminderSubject } from "./reminders.ts";
 export {
   evaluateNoteCompleteness,
   GENERAL_NOTE_TEMPLATE,

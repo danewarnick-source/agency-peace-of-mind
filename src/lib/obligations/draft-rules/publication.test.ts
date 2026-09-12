@@ -5,6 +5,7 @@ import {
   STAGE1_RULE_IDS,
   STAGE2_RULE_IDS,
   STAGE3_RULE_IDS,
+  STAGE4_RULE_IDS,
   USOR_PROOF_DESTINATION_AS_PUBLISHED,
   allDraftRulesAreUnpublished,
   REQ_1_8_4_ORIENTATION,
@@ -28,7 +29,7 @@ function clone(rule: DraftRule): DraftRule {
 
 describe("Stage 1 draft fixtures stay unpublished", () => {
   it("marks every Core_Rule_Logic rule draft / not_published with no approval", () => {
-    assert.equal(CORE_RULE_LOGIC_SLICE.length, 18);
+    assert.equal(CORE_RULE_LOGIC_SLICE.length, 22);
     assert.equal(allDraftRulesAreUnpublished(), true);
     for (const rule of CORE_RULE_LOGIC_SLICE) {
       assert.equal(rule.lifecycle, "draft");
@@ -45,7 +46,12 @@ describe("Stage 1 draft fixtures stay unpublished", () => {
 
   it("encodes the required slice ids and group shapes", () => {
     const ids = CORE_RULE_LOGIC_SLICE.map((r) => r.id);
-    assert.deepEqual(ids, [...STAGE1_RULE_IDS, ...STAGE2_RULE_IDS, ...STAGE3_RULE_IDS]);
+    assert.deepEqual(ids, [
+      ...STAGE1_RULE_IDS,
+      ...STAGE2_RULE_IDS,
+      ...STAGE3_RULE_IDS,
+      ...STAGE4_RULE_IDS,
+    ]);
     const o = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.8.4");
     assert.equal(o?.group.logic, "ALL");
     assert.equal(o?.group.parentAssignment, "one");
@@ -84,6 +90,13 @@ describe("Stage 1 draft fixtures stay unpublished", () => {
     assert.equal(art2?.group.members.length, 5);
     const cprReuse = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-1.8.5-cpr-current");
     assert.equal(cprReuse?.group.members[0]?.evidenceMatch?.scope, "cpr");
+    const pba = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-15.3");
+    assert.equal(pba?.group.logic, "ALL");
+    assert.equal(pba?.group.members.length, 3);
+    const reminders = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-REMINDERS");
+    assert.ok(reminders?.releaseGaps.some((g) => /product defaults, not SOW/i.test(g)));
+    const audit = CORE_RULE_LOGIC_SLICE.find((r) => r.id === "REQ-AUDIT-EXPORT");
+    assert.ok(audit?.releaseGaps.some((g) => /from applicable authority/i.test(g)));
   });
 });
 

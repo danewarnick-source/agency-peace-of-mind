@@ -3,7 +3,9 @@
  * subjects without minting live assignments or claim blocks.
  * Reuses duty applicability + My tasks. Unknown facts → missing-information.
  * Stage 3 adds note templates, Article 2 review holds, evidence reuse, and
- * evidence lifecycle — still this runner, never a second engine.
+ * evidence lifecycle. Stage 4 adds PBA reviews, product-default reminders,
+ * change-impact, and audit-export shape — still this runner, never a second
+ * engine.
  */
 
 import { addDaysUTC, addMonthsUTC, addYearsUTC, utcDay } from "../../obligation-due-dates.ts";
@@ -34,7 +36,29 @@ import {
   type EvidenceRequirementLink,
   type ReusableEvidenceRecord,
 } from "./evidence-reuse.ts";
+import {
+  buildAuditExportPacket,
+  type AuditExportRowInput,
+  type SimulatedAuditPacket,
+} from "./audit-export.ts";
 import { PERIODIC_MONTHLY_CODES, PERIODIC_QUARTERLY_CODES } from "./fixtures.ts";
+import {
+  simulateChangeImpact,
+  type SimulatedOffboardingResult,
+  type SyntheticChangeEvent,
+} from "./offboarding.ts";
+import {
+  evaluatePbaReviews,
+  specForMember,
+  type SimulatedPbaAccountResult,
+  type SyntheticPbaReview,
+} from "./pba-reviews.ts";
+import {
+  simulateReminders,
+  type SimulatedReminderResult,
+  type SyntheticReminderEvent,
+  type SyntheticReminderSubject,
+} from "./reminders.ts";
 import {
   evaluateNoteCompleteness,
   independentLaneStatus,
@@ -127,7 +151,10 @@ export type SimulationIssueKind =
   | "review_hold"
   | "cross_tenant"
   | "evidence_mismatch"
-  | "lifecycle_not_accepted";
+  | "lifecycle_not_accepted"
+  | "wrong_reviewer"
+  | "schedule_mismatch"
+  | "generic_attestation";
 
 export type SimulationIssue = {
   kind: SimulationIssueKind;
@@ -173,6 +200,10 @@ export type SimulationResult = {
   notes: SimulatedNoteResult[];
   claims: SimulatedClaimResult[];
   evidenceReuse: EvidenceMatchResult[];
+  pbaReviews: SimulatedPbaAccountResult[];
+  reminders: SimulatedReminderResult;
+  offboarding: SimulatedOffboardingResult;
+  auditExport: SimulatedAuditPacket | null;
 };
 
 export type SimulationInput = {
@@ -190,6 +221,11 @@ export type SimulationInput = {
   claims?: SyntheticClaim[];
   reusableEvidence?: ReusableEvidenceRecord[];
   evidenceLinks?: EvidenceRequirementLink[];
+  pbaReviews?: SyntheticPbaReview[];
+  reminderSubjects?: SyntheticReminderSubject[];
+  reminderEvents?: SyntheticReminderEvent[];
+  changeEvents?: SyntheticChangeEvent[];
+  auditExportRows?: AuditExportRowInput[];
 };
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -334,6 +370,10 @@ function dueFromAnchor(
       awardPlusMonths: anchor.awardPlusMonths,
     }).dueAt;
   }
+  if (anchor.kind === "calendar_period") {
+    // Period key is evaluated by the PBA reviewer — do not invent a due day.
+    return null;
+  }
   return null;
 }
 
@@ -403,6 +443,21 @@ function predicateStatus(
       return staffDutyFootprint(staff) === "office" ? "does_not_apply" : "unanswered";
     }
     return codes.some((c) => isEvvLockedCode(c)) ? "applies" : "does_not_apply";
+  }
+  if (predicate.kind === "pba_assignment") {
+    if (!staff.assignmentsKnown) return "unanswered";
+    const codes = staff.assignedServiceCodes;
+    if (codes.length === 0) {
+      return staffDutyFootprint(staff) === "office" ? "does_not_apply" : "unanswered";
+    }
+    return codesOverlapSet(codes, ["PBA"]) ? "applies" : "does_not_apply";
+  }
+  if (
+    predicate.kind === "product_default_reminder" ||
+    predicate.kind === "change_impact" ||
+    predicate.kind === "audit_export"
+  ) {
+    return "applies";
   }
   const catalogKey = predicate.catalogKey;
   if (!catalogKey) return "unanswered";
@@ -587,6 +642,47 @@ function memberComplete(
         ruleId: rule.id,
         memberId: member.id,
         message: `${member.label} is not on file.`,
+      },
+    };
+  }
+  const pbaSpec = specForMember(member.id);
+  if (pbaSpec && input) {
+    const orgId = input.organizationId ?? input.pbaReviews?.[0]?.organizationId ?? "";
+    const accounts = evaluatePbaReviews({
+      organizationId: orgId,
+      reviews: input.pbaReviews ?? [],
+      asOf: now,
+    });
+    const memberRows = accounts
+      .flatMap((account) => account.reviews)
+      .filter((row) => row.memberId === member.id);
+    if (memberRows.length === 0) {
+      return {
+        complete: false,
+        issue: {
+          kind: "member_incomplete",
+          ruleId: rule.id,
+          memberId: member.id,
+          message: `${member.label} is not complete.`,
+        },
+      };
+    }
+    if (memberRows.every((row) => row.complete)) return { complete: true, issue: null };
+    const first = memberRows.find((row) => !row.complete)?.issues[0];
+    const kind: SimulationIssueKind =
+      first?.kind === "wrong_reviewer" ||
+      first?.kind === "schedule_mismatch" ||
+      first?.kind === "generic_attestation" ||
+      first?.kind === "lifecycle_not_accepted"
+        ? first.kind
+        : "member_incomplete";
+    return {
+      complete: false,
+      issue: {
+        kind,
+        ruleId: rule.id,
+        memberId: member.id,
+        message: first?.message ?? `${member.label} is not complete.`,
       },
     };
   }
@@ -1134,6 +1230,26 @@ export function simulateDraftRules(input: SimulationInput): SimulationResult {
       );
     }
   }
+  const pbaReviews = input.organizationId
+    ? evaluatePbaReviews({
+        organizationId: input.organizationId,
+        reviews: input.pbaReviews ?? [],
+        asOf: input.now,
+      })
+    : [];
+  const reminders = simulateReminders({
+    subjects: input.reminderSubjects ?? [],
+    events: input.reminderEvents,
+    asOf: input.now,
+  });
+  const offboarding = simulateChangeImpact(input.changeEvents ?? []);
+  const auditExport =
+    input.auditExportRows && input.auditExportRows.length > 0
+      ? buildAuditExportPacket({
+          rows: input.auditExportRows,
+          exportedAt: input.now.toISOString(),
+        })
+      : null;
   return {
     wroteDatabase: false,
     createdLiveAssignments: false,
@@ -1147,6 +1263,10 @@ export function simulateDraftRules(input: SimulationInput): SimulationResult {
     notes,
     claims,
     evidenceReuse,
+    pbaReviews,
+    reminders,
+    offboarding,
+    auditExport,
   };
 }
 

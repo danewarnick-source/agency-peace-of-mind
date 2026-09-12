@@ -1,5 +1,5 @@
 /**
- * In-app draft rule model for DHHS91172 workbook Stages 1–3.
+ * In-app draft rule model for DHHS91172 workbook Stages 1–4.
  * Lifecycle is encoded here. Fixtures stay draft / not_published.
  * No live activation. No invented renewal intervals.
  */
@@ -36,6 +36,10 @@ export const PREDICATE_KINDS = [
   "evv_mandated",
   "signature_attestation",
   "billing_restriction",
+  "pba_assignment",
+  "product_default_reminder",
+  "change_impact",
+  "audit_export",
 ] as const;
 export type PredicateKind = (typeof PREDICATE_KINDS)[number];
 
@@ -110,6 +114,7 @@ export type TimingAnchor =
       existingDeadline: string;
       awardPlusMonths: number;
     }
+  | { kind: "calendar_period"; cadence: "monthly" | "quarterly" }
   | { kind: "none"; reason: string };
 
 export type DraftPredicate = {
@@ -215,5 +220,5 @@ export type DraftRule = {
   approval: ApprovalRecord | null;
 };
 
-/** Activation stays locked for every draft fixture (Stage 1, Stage 2, and Stage 3). */
+/** Activation stays locked for every draft fixture (Stages 1–4). */
 export const STAGE1_ACTIVATION_LOCKED = true;

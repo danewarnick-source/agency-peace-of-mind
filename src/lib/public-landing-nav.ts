@@ -1,5 +1,5 @@
 /**
- * Public marketing hamburger (landing + SiteHeader).
+ * Public marketing hamburger (PiPublicHeader / PiPublicPage).
  *
  * Root cause (Dane, iPhone Safari, 2026-08-31): the three-bars control was
  * 40×40 (`h-10`) in the top-right of a sticky, backdrop-blurred, 92% opaque

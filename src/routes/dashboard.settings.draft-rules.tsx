@@ -48,9 +48,10 @@ function DraftRulesSimulationPage() {
           <FlaskConical className="h-5 w-5" /> Draft rules (simulation)
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {WORKBOOK_SOURCE_TITLE} design revision {WORKBOOK_DESIGN_REVISION}. These rows are draft /
-          not published. Simulation does not create live assignments or claim blocks. Source_index
-          labels are archive metadata, not publication permission.
+          {WORKBOOK_SOURCE_TITLE} design revision {WORKBOOK_DESIGN_REVISION}. Stage 1 and Stage 2
+          Core_Rule_Logic rows stay draft / not published. Simulation does not create live
+          assignments or claim blocks. Source_index labels are archive metadata, not publication
+          permission. Release_Gaps are listed and are not invented away.
         </p>
       </div>
 

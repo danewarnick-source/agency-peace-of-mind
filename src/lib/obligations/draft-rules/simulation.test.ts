@@ -6,17 +6,29 @@ import { EMPTY_ORG_FACTS, type OrgFacts } from "../applicability.ts";
 import { UNKNOWN_STAFF_DUTY_FACTS, type StaffDutyFacts } from "../duty-applicability.ts";
 import {
   CORE_RULE_LOGIC_SLICE,
+  PERIODIC_MONTHLY_CODES,
   REQ_1_8_4_ORIENTATION,
   REQ_1_8_5_FA_CPR_PCT,
+  REQ_1_8_6_BEHAVIOR,
   REQ_1_8_7_CE12,
   REQ_1_8_8_ABI,
+  REQ_1_25_PERIODIC,
+  REQ_30_5_SEI_BENEFITS,
+  REQ_30_6_A_USOR,
+  REQ_32_5_CAREGIVER,
+  REQ_33_5_SJD,
   REQ_SEI_30_6_B,
   REQ_SEI_30_6_C,
+  STAGE2_RULE_IDS,
+  USOR_EXISTING_PROVIDER_DEADLINE,
+  USOR_PROOF_DESTINATION_AS_PUBLISHED,
 } from "./fixtures.ts";
-import { canActivate } from "./publication.ts";
+import { canActivate, canPublish } from "./publication.ts";
 import {
+  countQualifiedDesignatedBenefits,
   employmentYearDue,
   simulateDraftRules,
+  usorCohortDue,
   type SimulationInput,
   type SyntheticEvidence,
   type SyntheticStaff,
@@ -51,6 +63,10 @@ function staff(partial: Partial<SyntheticStaff> & Pick<SyntheticStaff, "staffId"
     hireDate: "2024-07-01",
     acreCertified: false,
     supervisorAcreCertified: true,
+    isBenefitsDesignated: false,
+    benefitsQualified: false,
+    behaviorRiskNewlyArisen: false,
+    sjdPerformsDiscovery: false,
     ...partial,
   };
 }
@@ -153,6 +169,7 @@ describe("unknown facts stay missing-information", () => {
       "REQ-1.8.8",
       "REQ-30.6.b",
       "REQ-30.6.c",
+      ...STAGE2_RULE_IDS,
     ]) {
       const row = ruleFor(result, "unknown-1", id);
       assert.equal(row.applicability, "unanswered", id);
@@ -395,5 +412,399 @@ describe("SEI 30.6(b) BOTH vs 30.6(c) ANY", () => {
     const unknown = ruleFor(unknownCoverage, "sei-1", "REQ-30.6.b");
     assert.equal(unknown.parentComplete, false);
     assert.ok(unknown.issues.some((i) => i.kind === "missing_information"));
+  });
+});
+
+describe("REQ-1.8.6 behavior certification nested ANY routes", () => {
+  it("applies on risk assignment; official named route completes; alternative needs written DSPD approval", () => {
+    const assigned = staff({
+      staffId: "beh-1",
+      hasBehaviorCaseload: true,
+      requiresDeescalation: true,
+      behaviorRiskNewlyArisen: false,
+    });
+    const none = staff({
+      staffId: "safe-1",
+      hasBehaviorCaseload: false,
+      requiresDeescalation: false,
+    });
+    const official = run({
+      staff: [assigned, none],
+      rules: [REQ_1_8_6_BEHAVIOR],
+      evidence: [
+        {
+          staffId: "beh-1",
+          ruleId: "REQ-1.8.6",
+          memberId: "route-soar",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "SOAR",
+          selectedRouteId: "route-soar",
+        },
+      ],
+    });
+    const ok = ruleFor(official, "beh-1", "REQ-1.8.6");
+    assert.equal(ok.applicability, "applies");
+    assert.equal(ok.parentComplete, true);
+    assert.equal(ok.dueAt?.slice(0, 10), "2024-12-28");
+    assert.equal(ruleFor(official, "safe-1", "REQ-1.8.6").applicability, "does_not_apply");
+
+    const altMissingApproval = run({
+      staff: [assigned],
+      rules: [REQ_1_8_6_BEHAVIOR],
+      evidence: [
+        {
+          staffId: "beh-1",
+          ruleId: "REQ-1.8.6",
+          memberId: "route-alternative",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "Other program",
+          selectedRouteId: "route-alternative",
+          writtenDspdApproval: false,
+        },
+      ],
+    });
+    const alt = ruleFor(altMissingApproval, "beh-1", "REQ-1.8.6");
+    assert.equal(alt.parentComplete, false);
+    assert.ok(alt.issues.some((i) => /written DSPD approval/i.test(i.message)));
+
+    const newRisk = run({
+      staff: [{ ...assigned, behaviorRiskNewlyArisen: true }],
+      rules: [REQ_1_8_6_BEHAVIOR],
+      evidence: [
+        {
+          staffId: "beh-1",
+          ruleId: "REQ-1.8.6",
+          memberId: "route-soar",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "SOAR",
+          selectedRouteId: "route-soar",
+        },
+      ],
+    });
+    const review = ruleFor(newRisk, "beh-1", "REQ-1.8.6");
+    assert.equal(review.parentComplete, false);
+    assert.ok(review.issues.some((i) => /newly arising risk requires review/i.test(i.message)));
+  });
+});
+
+describe("REQ-30.5 designated benefits COUNT>=1", () => {
+  it("does not apply to every SEI or office staff; COUNT needs one qualified designated person", () => {
+    const designated = staff({
+      staffId: "des-1",
+      assignedServiceCodes: ["SEI"],
+      assignedClientIds: ["client-sei"],
+      isBenefitsDesignated: true,
+      benefitsQualified: true,
+    });
+    const seiOther = staff({
+      staffId: "sei-other",
+      assignedServiceCodes: ["SEI"],
+      assignedClientIds: ["client-sei"],
+      isBenefitsDesignated: false,
+    });
+    const office = staff({
+      staffId: "office-1",
+      role: "admin",
+      assignedClientIds: [],
+      assignedServiceCodes: [],
+      isBenefitsDesignated: false,
+    });
+    const result = run({
+      staff: [designated, seiOther, office],
+      rules: [REQ_30_5_SEI_BENEFITS],
+    });
+    assert.equal(ruleFor(result, "des-1", "REQ-30.5").applicability, "applies");
+    assert.equal(ruleFor(result, "des-1", "REQ-30.5").parentComplete, true);
+    assert.equal(ruleFor(result, "sei-other", "REQ-30.5").applicability, "does_not_apply");
+    assert.equal(ruleFor(result, "office-1", "REQ-30.5").applicability, "does_not_apply");
+    assert.equal(countQualifiedDesignatedBenefits([designated, seiOther, office]).satisfies, true);
+
+    const none = countQualifiedDesignatedBenefits([seiOther, office]);
+    assert.equal(none.satisfies, false);
+    assert.equal(none.qualified, 0);
+  });
+});
+
+describe("REQ-30.6.a USOR cohort branches", () => {
+  it("uses 2027-01-31 before cutover and award+6 months on/after; unknown award is missing-information", () => {
+    const existing = usorCohortDue({
+      awardDate: "2026-06-30",
+      cutover: "2026-07-01",
+      existingDeadline: USOR_EXISTING_PROVIDER_DEADLINE,
+      awardPlusMonths: 6,
+    });
+    assert.equal(existing.cohort, "existing");
+    assert.equal(existing.dueAt?.slice(0, 10), "2027-01-31");
+
+    const next = usorCohortDue({
+      awardDate: "2026-07-01",
+      cutover: "2026-07-01",
+      existingDeadline: USOR_EXISTING_PROVIDER_DEADLINE,
+      awardPlusMonths: 6,
+    });
+    assert.equal(next.cohort, "new_award");
+    assert.equal(next.dueAt?.slice(0, 10), "2027-01-01");
+
+    assert.equal(
+      usorCohortDue({
+        awardDate: null,
+        cutover: "2026-07-01",
+        existingDeadline: USOR_EXISTING_PROVIDER_DEADLINE,
+        awardPlusMonths: 6,
+      }).cohort,
+      null,
+    );
+
+    const admin = staff({ staffId: "admin-1", role: "admin" });
+    const unknownAward = run({
+      staff: [admin],
+      rules: [REQ_30_6_A_USOR],
+      seiAwardDate: null,
+    });
+    const unanswered = ruleFor(unknownAward, "admin-1", "REQ-30.6.a");
+    assert.equal(unanswered.applicability, "unanswered");
+    assert.ok(unanswered.issues.some((i) => i.kind === "missing_information"));
+
+    const proof = run({
+      staff: [admin],
+      rules: [REQ_30_6_A_USOR],
+      seiAwardDate: "2025-01-01",
+      usorOfficialProofOnFile: true,
+    });
+    const ok = ruleFor(proof, "admin-1", "REQ-30.6.a");
+    assert.equal(ok.applicability, "applies");
+    assert.equal(ok.parentComplete, true);
+    assert.equal(ok.dueAt?.slice(0, 10), "2027-01-31");
+    assert.equal(canPublish(REQ_30_6_A_USOR), false);
+    assert.match(USOR_PROOF_DESTINATION_AS_PUBLISHED, /osrprovider@utah\.gov/);
+  });
+});
+
+describe("REQ-32.5 caregiver training CMP/CMS only", () => {
+  it("SLN alone does not trigger; official EXTERNAL course required", () => {
+    const cmp = staff({
+      staffId: "cmp-1",
+      assignedServiceCodes: ["CMP"],
+      assignedClientIds: ["client-cmp"],
+    });
+    const sln = staff({
+      staffId: "sln-1",
+      assignedServiceCodes: ["SLN"],
+      assignedClientIds: ["client-sln"],
+    });
+    const result = run({
+      staff: [cmp, sln],
+      rules: [REQ_32_5_CAREGIVER],
+      evidence: [
+        {
+          staffId: "cmp-1",
+          ruleId: "REQ-32.5",
+          memberId: "official-dspd-course",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "DSPD New Caregiver Compensation",
+          route: "EXTERNAL",
+        },
+      ],
+    });
+    assert.equal(ruleFor(result, "cmp-1", "REQ-32.5").applicability, "applies");
+    assert.equal(ruleFor(result, "cmp-1", "REQ-32.5").parentComplete, true);
+    assert.equal(ruleFor(result, "sln-1", "REQ-32.5").applicability, "does_not_apply");
+    assert.deepEqual(REQ_32_5_CAREGIVER.completionRoutes, ["EXTERNAL"]);
+  });
+});
+
+describe("REQ-33.5.b-c SJD ACRE + Discovery CE", () => {
+  it("ACRE hire+60 with supervision pending; CE only if Discovery; no SEI alternatives", () => {
+    const sjd = staff({
+      staffId: "sjd-1",
+      hireDate: "2026-08-01",
+      assignedServiceCodes: ["SJD"],
+      assignedClientIds: ["client-sjd"],
+      supervisorAcreCertified: true,
+      acreCertified: false,
+      sjdPerformsDiscovery: false,
+    });
+    const pending = run({
+      staff: [sjd],
+      rules: [REQ_33_5_SJD],
+    });
+    const row = ruleFor(pending, "sjd-1", "REQ-33.5.b-c");
+    assert.equal(row.applicability, "applies");
+    assert.equal(row.parentComplete, false);
+    assert.equal(row.members.find((m) => m.memberId === "sjd-supervision-pending")?.complete, true);
+    assert.equal(
+      row.members.find((m) => m.memberId === "sjd-customized-employment")?.applicable,
+      false,
+    );
+
+    const discovery = run({
+      staff: [{ ...sjd, sjdPerformsDiscovery: true, acreCertified: true }],
+      rules: [REQ_33_5_SJD],
+      evidence: [
+        {
+          staffId: "sjd-1",
+          ruleId: "REQ-33.5.b-c",
+          memberId: "sjd-acre",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "ACRE",
+        },
+        {
+          staffId: "sjd-1",
+          ruleId: "REQ-33.5.b-c",
+          memberId: "sjd-customized-employment",
+          completed: true,
+          isOfficialProgram: true,
+          courseName: "USU Customized Employment",
+        },
+      ],
+    });
+    assert.equal(ruleFor(discovery, "sjd-1", "REQ-33.5.b-c").parentComplete, true);
+
+    const labels = REQ_33_5_SJD.group.members.map((m) => m.label).join(" ");
+    assert.doesNotMatch(labels, /Workplace Supports|Effective Job Coach/);
+    assert.equal(canPublish(REQ_33_5_SJD), false);
+    assert.ok(REQ_33_5_SJD.releaseGaps.some((g) => /SJB/.test(g)));
+  });
+});
+
+describe("REQ-1.25 periodic reports monthly substitutes", () => {
+  it("one applicable report per code — never monthly+quarterly on the same code", () => {
+    const hhs = staff({
+      staffId: "hhs-1",
+      assignedServiceCodes: ["HHS"],
+    });
+    const sei = staff({
+      staffId: "sei-1",
+      assignedServiceCodes: ["SEI"],
+    });
+    const mixed = staff({
+      staffId: "mix-1",
+      assignedServiceCodes: ["CMP", "SLN"],
+    });
+    const office = staff({
+      staffId: "office-1",
+      role: "admin",
+      assignedClientIds: [],
+      assignedServiceCodes: [],
+    });
+    const evidence: SyntheticEvidence[] = [
+      {
+        staffId: "hhs-1",
+        ruleId: "REQ-1.25",
+        memberId: "quarterly-report",
+        completed: true,
+      },
+      {
+        staffId: "sei-1",
+        ruleId: "REQ-1.25",
+        memberId: "monthly-report",
+        completed: true,
+      },
+      {
+        staffId: "mix-1",
+        ruleId: "REQ-1.25",
+        memberId: "monthly-report",
+        completed: true,
+      },
+      {
+        staffId: "mix-1",
+        ruleId: "REQ-1.25",
+        memberId: "quarterly-report",
+        completed: true,
+      },
+    ];
+    const result = run({
+      staff: [hhs, sei, mixed, office],
+      rules: [REQ_1_25_PERIODIC],
+      evidence,
+    });
+    const h = ruleFor(result, "hhs-1", "REQ-1.25");
+    assert.equal(h.members.find((m) => m.memberId === "quarterly-report")?.applicable, true);
+    assert.equal(h.members.find((m) => m.memberId === "monthly-report")?.applicable, false);
+    assert.equal(h.parentComplete, true);
+
+    const s = ruleFor(result, "sei-1", "REQ-1.25");
+    assert.equal(s.members.find((m) => m.memberId === "monthly-report")?.applicable, true);
+    assert.equal(s.members.find((m) => m.memberId === "quarterly-report")?.applicable, false);
+    assert.equal(s.parentComplete, true);
+
+    const mix = ruleFor(result, "mix-1", "REQ-1.25");
+    assert.equal(mix.members.find((m) => m.memberId === "monthly-report")?.applicable, true);
+    assert.equal(mix.members.find((m) => m.memberId === "quarterly-report")?.applicable, true);
+    assert.equal(mix.parentComplete, true);
+
+    assert.equal(ruleFor(result, "office-1", "REQ-1.25").applicability, "does_not_apply");
+    assert.ok(PERIODIC_MONTHLY_CODES.includes("PN1"));
+  });
+});
+
+describe("completion routes vs equivalency", () => {
+  it("generic quiz cannot replace official DSPD course or CPR credential", () => {
+    for (const rule of CORE_RULE_LOGIC_SLICE) {
+      assert.ok(rule.completionRoutes.length > 0, rule.id);
+      assert.equal(rule.evidence.automaticEquivalency, false, rule.id);
+      assert.ok(rule.evidence.defaultHandlingLabel.length > 0, rule.id);
+    }
+
+    const dsp = staff({ staffId: "dsp-1" });
+    const quizCpr = run({
+      staff: [dsp],
+      rules: [REQ_1_8_5_FA_CPR_PCT],
+      evidence: [
+        {
+          staffId: "dsp-1",
+          ruleId: "REQ-1.8.5",
+          memberId: "first_aid",
+          completed: true,
+          certExpiresOn: "2027-01-15",
+        },
+        {
+          staffId: "dsp-1",
+          ruleId: "REQ-1.8.5",
+          memberId: "cpr",
+          completed: true,
+          isGenericQuiz: true,
+          courseName: "Generic quiz",
+          certExpiresOn: "2027-06-01",
+        },
+        {
+          staffId: "dsp-1",
+          ruleId: "REQ-1.8.5",
+          memberId: "person_centered",
+          completed: true,
+        },
+      ],
+    });
+    const cpr = ruleFor(quizCpr, "dsp-1", "REQ-1.8.5");
+    assert.equal(cpr.parentComplete, false);
+    assert.ok(cpr.issues.some((i) => /generic quiz cannot replace/i.test(i.message)));
+
+    const cmp = staff({
+      staffId: "cmp-1",
+      assignedServiceCodes: ["CMP"],
+      assignedClientIds: ["client-cmp"],
+    });
+    const quizCourse = run({
+      staff: [cmp],
+      rules: [REQ_32_5_CAREGIVER],
+      evidence: [
+        {
+          staffId: "cmp-1",
+          ruleId: "REQ-32.5",
+          memberId: "official-dspd-course",
+          completed: true,
+          isGenericQuiz: true,
+          courseName: "Generic quiz",
+        },
+      ],
+    });
+    const course = ruleFor(quizCourse, "cmp-1", "REQ-32.5");
+    assert.equal(course.parentComplete, false);
+    assert.ok(course.issues.some((i) => /generic quiz cannot replace/i.test(i.message)));
   });
 });

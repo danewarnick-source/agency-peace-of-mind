@@ -55,7 +55,7 @@ function main(): void {
   );
   const c = report.counts;
   process.stdout.write(
-    `DHHS91172 coverage: parents=${c.importedParents} elements=${c.importedElements} executable=${c.executable} verified=${c.verified} published=${c.published} blocked=${c.blocked} unwired=${c.draftUnwired}\n`,
+    `DHHS91172 coverage: parents=${c.importedParents} elements=${c.importedElements} executable=${c.executable} wired=${c.wired} verified=${c.verified} published=${c.published} blocked=${c.blocked} unwired=${c.draftUnwired}\n`,
   );
 }
 

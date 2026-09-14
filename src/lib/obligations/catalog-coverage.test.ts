@@ -11,6 +11,8 @@ describe("DHHS91172 catalog coverage", () => {
     assert.equal(report.counts.importedRows, 1367);
     assert.ok(report.counts.executable >= 41);
     assert.equal(report.counts.published, 0);
+    assert.equal(report.counts.verified, 0);
+    assert.equal(report.counts.wired, 5);
     assert.equal(report.counts.elementOfParent, 607);
 
     const orientation = report.rows.find((r) => r.requirementKey === "REQ-1.8.4");
@@ -19,6 +21,9 @@ describe("DHHS91172 catalog coverage", () => {
     assert.equal(orientation.liveKey, "orientation_30_day");
     assert.equal(orientation.implementationStatus, "live_mapped");
     assert.equal(orientation.mintsStaffTask, false);
+    assert.equal(orientation.canPublish, true);
+    assert.equal(orientation.canActivate, false);
+    assert.equal(orientation.publication, "not_published");
 
     const elements = report.rows.filter((r) => r.role === "element");
     assert.equal(elements.length, 607);

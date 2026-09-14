@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { EMPTY_ORG_FACTS } from "./applicability.ts";
-import {
-  catalogFactPrompts,
-  evaluateCatalogFact,
-} from "./catalog-fact-questions.ts";
+import { catalogFactPrompts, evaluateCatalogFact } from "./catalog-fact-questions.ts";
 import type { CatalogFact } from "./draft-rules/catalog-loader.ts";
 
 const SEI: CatalogFact = {
@@ -29,7 +26,10 @@ describe("catalog applicability facts", () => {
   });
 
   it("resolves awarded-code facts from the live company-profile list", () => {
-    const applies = evaluateCatalogFact(SEI, { ...EMPTY_ORG_FACTS, servicesOffered: ["HHS", "SEI"] });
+    const applies = evaluateCatalogFact(SEI, {
+      ...EMPTY_ORG_FACTS,
+      servicesOffered: ["HHS", "SEI"],
+    });
     const skip = evaluateCatalogFact(SEI, { ...EMPTY_ORG_FACTS, servicesOffered: ["HHS"] });
     assert.equal(applies.status, "applies");
     assert.equal(skip.status, "does_not_apply");
@@ -41,5 +41,26 @@ describe("catalog applicability facts", () => {
     assert.ok(prompts.some((p) => /transportation/i.test(p)));
     assert.ok(prompts.some((p) => /Client age/.test(p)));
     assert.equal(evaluateCatalogFact(UNKNOWN, EMPTY_ORG_FACTS).status, "unanswered");
+  });
+
+  it("maps first-batch live assignment facts without coercing N/A", () => {
+    const hire = evaluateCatalogFact(
+      {
+        fact_id: "LIVE-direct_support_assignment",
+        question: "Which staff have a direct-support assignment?",
+      },
+      EMPTY_ORG_FACTS,
+    );
+    assert.equal(hire.source, "staff_assignment");
+    assert.equal(hire.status, "unanswered");
+    const abi = evaluateCatalogFact(
+      {
+        fact_id: "LIVE-abi_caseload",
+        question: "Which persons have acquired brain injury, and which staff serve them?",
+      },
+      EMPTY_ORG_FACTS,
+    );
+    assert.equal(abi.source, "abi_caseload");
+    assert.equal(abi.status, "unanswered");
   });
 });

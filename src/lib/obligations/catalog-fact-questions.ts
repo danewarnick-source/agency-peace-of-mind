@@ -75,8 +75,14 @@ const ORG_FACT_IDS: Record<string, CatalogFactLiveSource> = {
 };
 
 const TRANSPORT_FACT_IDS = new Set(["FACT-003", "FACT-080", "FACT-081"]);
-const ABI_FACT_IDS = new Set(["FACT-056", "FACT-067"]);
-const STAFF_ASSIGNMENT_FACT_IDS = new Set(["FACT-009", "FACT-041", "FACT-085"]);
+const ABI_FACT_IDS = new Set(["FACT-056", "FACT-067", "LIVE-abi_caseload"]);
+const STAFF_ASSIGNMENT_FACT_IDS = new Set([
+  "FACT-009",
+  "FACT-041",
+  "FACT-085",
+  "LIVE-direct_support_assignment",
+  "LIVE-behavior_risk_assignment",
+]);
 
 function awardedCodesFromQuestion(question: string): string[] {
   const match = question.match(/agency awarded\s+([a-z0-9,\s/]+)\s*\??/i);
@@ -88,6 +94,13 @@ function awardedCodesFromQuestion(question: string): string[] {
 }
 
 export function liveSourceForCatalogFact(fact: CatalogFact): CatalogFactLiveSource {
+  if (fact.fact_id === "LIVE-abi_caseload") return "abi_caseload";
+  if (
+    fact.fact_id === "LIVE-direct_support_assignment" ||
+    fact.fact_id === "LIVE-behavior_risk_assignment"
+  ) {
+    return "staff_assignment";
+  }
   if (AWARDED_FACT_CODES[fact.fact_id] || awardedCodesFromQuestion(fact.question).length > 0) {
     return "awarded_service_codes";
   }

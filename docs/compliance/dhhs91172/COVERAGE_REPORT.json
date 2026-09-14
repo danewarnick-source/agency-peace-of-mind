@@ -11,7 +11,8 @@
     "liveMapped": 19,
     "systemBehavior": 427,
     "draftUnwired": 292,
-    "elementOfParent": 607
+    "elementOfParent": 607,
+    "wired": 5
   },
   "parents": [
     {
@@ -611,23 +612,22 @@
       "title": "Complete 30-day staff orientation",
       "owner": "Staff (verified by Administrator/HR)",
       "completionMethod": "In-platform validated course OR accepted external training mapped to every required topic",
-      "timing": "Earlier of hire date + 30 calendar days and first solo support / hire_date; first_solo_service_at / Initial orientation; applicable client-specific instruction on assignment or change",
+      "timing": "hire + 30 days",
       "renewal": "No automatic annual orientation renewal stated",
       "liveKey": "orientation_30_day",
       "implementationStatus": "live_mapped",
       "publication": "not_published",
-      "canPublish": false,
+      "canPublish": true,
       "canActivate": false,
       "mintsStaffTask": false,
-      "applicabilityFactIds": [],
-      "unansweredFacts": [],
+      "applicabilityFactIds": [
+        "LIVE-direct_support_assignment"
+      ],
+      "unansweredFacts": [
+        "Which staff have a direct-support assignment?"
+      ],
       "blockers": [
-        "Rule has no applicability predicates.",
-        "Rule is missing a positive test.",
-        "Rule is missing a negative test.",
-        "Rule is missing a boundary test.",
-        "Unresolved alternatives: ALL applicable topics A–W; client-specific subtopics use actual client needs. Never ANY-one-topic.",
-        "Unresolved renewals: No automatic annual orientation renewal stated"
+        "Unanswered applicability fact: Which staff have a direct-support assignment?"
       ]
     },
     {
@@ -637,23 +637,22 @@
       "title": "Complete first aid, CPR and person-centered training",
       "owner": "Staff (verified by Administrator/HR)",
       "completionMethod": "First aid/CPR: accepted credential evidence. Person-centered training: approved in-platform course or accepted external record",
-      "timing": "hire_date + 90 calendar days / hire_date / First aid/CPR: renew at certificate expiry",
+      "timing": "hire + 90 days",
       "renewal": "First aid and CPR: actual credential expiry. Person-centered training: no automatic expiry stated",
       "liveKey": "cpr_first_aid_initial",
       "implementationStatus": "live_mapped",
       "publication": "not_published",
-      "canPublish": false,
+      "canPublish": true,
       "canActivate": false,
       "mintsStaffTask": false,
-      "applicabilityFactIds": [],
-      "unansweredFacts": [],
+      "applicabilityFactIds": [
+        "LIVE-direct_support_assignment"
+      ],
+      "unansweredFacts": [
+        "Which staff have a direct-support assignment?"
+      ],
       "blockers": [
-        "Rule has no applicability predicates.",
-        "Rule is missing a positive test.",
-        "Rule is missing a negative test.",
-        "Rule is missing a boundary test.",
-        "Unresolved alternatives: ALL three areas required; first aid and CPR each retain independent certificate expiry",
-        "Unresolved renewals: First aid and CPR: actual credential expiry. Person-centered training: no automatic expiry stated"
+        "Unanswered applicability fact: Which staff have a direct-support assignment?"
       ]
     },
     {
@@ -663,23 +662,22 @@
       "title": "Staff successfully complete training and maintain certification in one of the following…",
       "owner": "Staff (verified by Administrator/HR)",
       "completionMethod": "External approved certification + verified upload or authorized issuer import",
-      "timing": "180 calendar days / hire_date; reassess when assigned client behavior risk changes / maintain certification (renew at expiry)",
+      "timing": "hire + 180 days",
       "renewal": "Renew before the expiry date on the credential/license; status becomes non-compliant at expiry",
       "liveKey": "behavior_intervention_cert",
       "implementationStatus": "live_mapped",
       "publication": "not_published",
-      "canPublish": false,
+      "canPublish": true,
       "canActivate": false,
       "mintsStaffTask": false,
-      "applicabilityFactIds": [],
-      "unansweredFacts": [],
+      "applicabilityFactIds": [
+        "LIVE-behavior_risk_assignment"
+      ],
+      "unansweredFacts": [
+        "Which persons are likely to engage in aggressive, self-injurious, or destructive behavior, and which staff serve them?"
+      ],
       "blockers": [
-        "Rule has no applicability predicates.",
-        "Rule is missing a positive test.",
-        "Rule is missing a negative test.",
-        "Rule is missing a boundary test.",
-        "Unresolved alternatives: ANY one approved certification route; each selected route must satisfy ALL its conditions. Prior written DSPD approval for an alternative program.",
-        "Unresolved renewals: Renew before the expiry date on the credential/license; status becomes non-compliant at expiry"
+        "Unanswered applicability fact: Which persons are likely to engage in aggressive, self-injurious, or destructive behavior, and which staff serve them?"
       ]
     },
     {
@@ -689,24 +687,22 @@
       "title": "Staff complete a minimum of 12 hours of training each year in…",
       "owner": "Staff (verified by Administrator/HR)",
       "completionMethod": "Upload credential/training record to staff profile",
-      "timing": "hire_date anniversary / Each employment year starting with year 2",
+      "timing": "employment year 2",
       "renewal": "12 documented hours per employment-year window; completion does not reset the anniversary",
       "liveKey": "ce_12h_annual",
       "implementationStatus": "live_mapped",
       "publication": "not_published",
-      "canPublish": false,
+      "canPublish": true,
       "canActivate": false,
       "mintsStaffTask": false,
-      "applicabilityFactIds": [],
-      "unansweredFacts": [],
+      "applicabilityFactIds": [
+        "LIVE-direct_support_assignment"
+      ],
+      "unansweredFacts": [
+        "Which staff have a direct-support assignment?"
+      ],
       "blockers": [
-        "Rule has no applicability predicates.",
-        "Rule is missing ALL/ANY/conditional group members.",
-        "Rule is missing a positive test.",
-        "Rule is missing a negative test.",
-        "Rule is missing a boundary test.",
-        "Unresolved alternatives: See exceptions_alternatives; unresolved groups require review",
-        "Unresolved renewals: 12 documented hours per employment-year window; completion does not reset the anniversary"
+        "Unanswered applicability fact: Which staff have a direct-support assignment?"
       ]
     },
     {
@@ -721,7 +717,7 @@
       "liveKey": "abi_training",
       "implementationStatus": "live_mapped",
       "publication": "not_published",
-      "canPublish": false,
+      "canPublish": true,
       "canActivate": false,
       "mintsStaffTask": false,
       "applicabilityFactIds": [
@@ -733,12 +729,6 @@
         "Does the client have an ABI? (client flag)"
       ],
       "blockers": [
-        "Rule has no applicability predicates.",
-        "Rule is missing a positive test.",
-        "Rule is missing a negative test.",
-        "Rule is missing a boundary test.",
-        "Unresolved alternatives: ALL listed ABI topics; applies to staff serving people with ABI",
-        "Unresolved renewals: No annual ABI renewal stated; reassess evidence when content or applicable needs change",
         "Unanswered applicability fact: Does the client have an ABI?",
         "Unanswered applicability fact: Does the client have an ABI? (client flag)"
       ]

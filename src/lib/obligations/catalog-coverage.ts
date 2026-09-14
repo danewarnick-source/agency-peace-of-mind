@@ -23,6 +23,11 @@ import type {
 } from "./draft-rules/catalog-loader.ts";
 import { canActivate, canPublish, structuralPublicationGaps } from "./draft-rules/publication.ts";
 import { applyVerifiedPublicationOverlay } from "./draft-rules/verified-publication.ts";
+import {
+  applyFirstExecutableBatchOverlay,
+  applyFirstExecutableBatchOverlayAll,
+  firstBatchParentIsWired,
+} from "./first-executable-batch.ts";
 
 export type CatalogCoverageRow = {
   requirementKey: string;
@@ -57,6 +62,8 @@ export type CatalogCoverageCounts = {
   systemBehavior: number;
   draftUnwired: number;
   elementOfParent: number;
+  /** First shared-behavior batch: live key + fixture overlay, still unpublished. */
+  wired: number;
 };
 
 export type CatalogCoverageReport = {
@@ -115,7 +122,8 @@ function elementRow(el: CatalogSheetRow, parent: LoadedDraftRule | undefined): C
 }
 
 function parentRow(rule: LoadedDraftRule, orgFacts: OrgFacts): CatalogCoverageRow {
-  const published = applyVerifiedPublicationOverlay([rule])[0] ?? rule;
+  const executable = applyFirstExecutableBatchOverlay(rule);
+  const published = applyVerifiedPublicationOverlay([executable])[0] ?? executable;
   const gaps = structuralPublicationGaps(published);
   const policy = staffTaskPolicyForRule(published);
   const liveKey = liveObligationKeyForRule(published);
@@ -168,7 +176,9 @@ export function buildCatalogCoverageReport(
   loaded: LoadedCatalog,
   orgFacts: OrgFacts = EMPTY_ORG_FACTS,
 ): CatalogCoverageReport {
-  const parents = applyVerifiedPublicationOverlay(loaded.parents);
+  const parents = applyVerifiedPublicationOverlay(
+    applyFirstExecutableBatchOverlayAll(loaded.parents),
+  );
   const byId = new Map(parents.map((p) => [p.id, p]));
   const parentRows = parents.map((rule) => parentRow(rule, orgFacts));
   const elementRows = loaded.elements.map((el) =>
@@ -188,6 +198,7 @@ export function buildCatalogCoverageReport(
     systemBehavior: parentOnly.filter((r) => r.implementationStatus === "system_behavior").length,
     draftUnwired: parentOnly.filter((r) => r.implementationStatus === "draft_unwired").length,
     elementOfParent: elementRows.length,
+    wired: parents.filter((rule) => firstBatchParentIsWired(rule)).length,
   };
   return {
     workbookSha256: loaded.manifest.sha256,
@@ -220,6 +231,7 @@ export function formatCatalogCoverageMarkdown(report: CatalogCoverageReport): st
     `| System / standing behavior | ${c.systemBehavior} |`,
     `| Draft unwired | ${c.draftUnwired} |`,
     `| Element of parent | ${c.elementOfParent} |`,
+    `| Wired first batch (unpublished) | ${c.wired} |`,
     "",
     "## Parents",
     "",

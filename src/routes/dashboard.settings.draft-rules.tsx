@@ -8,9 +8,11 @@ import { buildCatalogCoverageReport } from "@/lib/obligations/catalog-coverage";
 import { loadCommittedCatalog } from "@/lib/obligations/draft-rules/catalog-committed";
 import {
   CORE_RULE_LOGIC_SLICE,
+  FIRST_EXECUTABLE_BATCH_RULE_IDS,
   WORKBOOK_DESIGN_REVISION,
   WORKBOOK_SOURCE_TITLE,
   draftRuleAdminRow,
+  firstExecutableBatchParents,
 } from "@/lib/obligations/draft-rules";
 
 export const Route = createFileRoute("/dashboard/settings/draft-rules")({
@@ -21,9 +23,23 @@ export const Route = createFileRoute("/dashboard/settings/draft-rules")({
 function DraftRulesSimulationPage() {
   const { data: org } = useCurrentOrg();
 
+  const firstBatchQuery = useQuery({
+    queryKey: ["draft-rules-first-batch", WORKBOOK_DESIGN_REVISION],
+    queryFn: async () => {
+      const loaded = loadCommittedCatalog();
+      return firstExecutableBatchParents(loaded.parents).map((rule) => ({
+        ...draftRuleAdminRow(rule),
+        liveKey: rule.catalogKeys[0] ?? null,
+      }));
+    },
+  });
+
   const rowsQuery = useQuery({
     queryKey: ["draft-rules-simulation", WORKBOOK_DESIGN_REVISION],
-    queryFn: async () => CORE_RULE_LOGIC_SLICE.map(draftRuleAdminRow),
+    queryFn: async () =>
+      CORE_RULE_LOGIC_SLICE.filter(
+        (rule) => !(FIRST_EXECUTABLE_BATCH_RULE_IDS as readonly string[]).includes(rule.id),
+      ).map(draftRuleAdminRow),
   });
 
   const catalogQuery = useQuery({
@@ -48,6 +64,7 @@ function DraftRulesSimulationPage() {
     );
   }
 
+  const firstBatch = firstBatchQuery.data ?? [];
   const rows = rowsQuery.data ?? [];
   const counts = catalogQuery.data?.counts;
 
@@ -83,8 +100,9 @@ function DraftRulesSimulationPage() {
               {catalogQuery.data.ingestStatus})
             </li>
             <li>
-              Executable (live key) {counts.executable} · verified {counts.verified} · published{" "}
-              {counts.published} · blocked {counts.blocked} · unwired {counts.draftUnwired}
+              Executable (live key) {counts.executable} · wired first batch {counts.wired} ·
+              verified {counts.verified} · published {counts.published} · blocked {counts.blocked} ·
+              unwired {counts.draftUnwired}
             </li>
             <li>
               Source_index={catalogQuery.data.sourceIndex} · canActivateAny=
@@ -94,10 +112,87 @@ function DraftRulesSimulationPage() {
         </div>
       ) : null}
 
+      {firstBatchQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading first executable batch…</p>
+      ) : firstBatch.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold">First executable batch — hire training clocks</h2>
+          <p className="text-sm text-muted-foreground">
+            Orientation, CPR / First Aid, person-centered thinking, behavior certification, annual
+            12-hour CE, and ABI reuse the live obligation engine. One parent assignment. Child
+            elements stay on the parent. Missing assignment facts stay questions. Not published.
+          </p>
+          <ul className="space-y-4">
+            {firstBatch.map((row) => {
+              const ready = row.canPublish && !row.canActivate;
+              return (
+                <li
+                  key={row.id}
+                  className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{row.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {row.id}
+                        {row.liveKey ? ` · live ${row.liveKey}` : ""} · {row.clauseIds.join(", ")}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline">status={row.lifecycle}</Badge>
+                      <Badge variant="outline">{row.publication}</Badge>
+                      {row.canActivate ? (
+                        <Badge>activatable</Badge>
+                      ) : ready ? (
+                        <Badge variant="outline">wired — ready for per-rule publish</Badge>
+                      ) : (
+                        <Badge variant="outline">draft</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                    {row.gaps.length === 0 ? (
+                      <li>
+                        Wired to the live engine. Unrelated workbook Release_Gaps do not block this
+                        rule. Record an explicit approval to publish this rule only.
+                      </li>
+                    ) : (
+                      row.gaps.map((gap) => <li key={gap.key}>{gap.reason}</li>)
+                    )}
+                  </ul>
+                  <Button
+                    className="mt-3"
+                    variant="outline"
+                    disabled
+                    title={
+                      row.canActivate
+                        ? "This rule is individually verified."
+                        : ready
+                          ? "Record approval in the verified-publication overlay. This screen does not flip tenants."
+                          : row.gaps.map((g) => g.reason).join(" ")
+                    }
+                  >
+                    {row.canActivate ? "Published (this rule)" : "Publish this rule"}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       {rowsQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading draft rules…</p>
+        <p className="text-sm text-muted-foreground">Loading remaining draft rules…</p>
       ) : (
         <ul className="space-y-4">
+          {rows.length > 0 ? (
+            <li className="list-none">
+              <h2 className="text-sm font-semibold">Remaining Core_Rule_Logic fixtures</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Later shared-behavior batches. Still draft. Not this PR.
+              </p>
+            </li>
+          ) : null}
           {rows.map((row) => {
             const ready = row.canPublish && !row.canActivate;
             return (

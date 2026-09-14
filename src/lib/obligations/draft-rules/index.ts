@@ -119,6 +119,14 @@ export {
   VERIFIED_PUBLICATIONS,
 } from "./verified-publication.ts";
 export {
+  applyFirstExecutableBatchOverlay,
+  applyFirstExecutableBatchOverlayAll,
+  FIRST_EXECUTABLE_BATCH_ID,
+  FIRST_EXECUTABLE_BATCH_LIVE_KEYS,
+  FIRST_EXECUTABLE_BATCH_RULE_IDS,
+  firstExecutableBatchParents,
+} from "../first-executable-batch.ts";
+export {
   countQualifiedDesignatedBenefits,
   employmentYearDue,
   hirePlusDaysDue,

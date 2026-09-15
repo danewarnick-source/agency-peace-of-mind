@@ -23,6 +23,9 @@ test.use({
 });
 
 async function openAdminScheduler(page: Page, mockRole: "admin" | "employee" = "admin"): Promise<HiveMock> {
+  // goToSep1 walks forward from "today" via the Next button, so today must be
+  // fixed before Sep 1 2026 regardless of the host machine's real clock.
+  await page.clock.setFixedTime(new Date("2026-08-25T09:00:00-06:00"));
   const mock = await installHiveMocks(page, mockRole);
   const consoleErrors: string[] = [];
   page.on("pageerror", (err) => consoleErrors.push(err.message));

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { isRouteUuid, redirectUnlessUuidParam } from "@/lib/route-uuid";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ComplianceFactsPanel } from "@/components/compliance/compliance-facts-panel";
+import { onStaffDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 import { RequirePermission } from "@/components/rbac-guard";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
@@ -85,6 +88,7 @@ function StaffProfilePage() {
   const activeTab = resolveTab(tab);
 
   const orgId = org?.organization_id;
+  const staffDutyFactsChangedFn = useServerFn(onStaffDutyFactsChanged);
 
   const memberQ = useQuery({
     enabled: !!orgId && isRouteUuid(staffId),
@@ -216,6 +220,18 @@ function StaffProfilePage() {
 
         <TabsContent value="personnel" className="mt-4 space-y-6">
           <StaffObligationsFilesTab organizationId={orgId} staffId={staffId} staffName={name} />
+          <ComplianceFactsPanel
+            scope="staff"
+            entityId={staffId}
+            organizationId={orgId ?? ""}
+            canEdit={!!orgId}
+            title="Staff compliance facts"
+            reevaluate={
+              orgId
+                ? () => staffDutyFactsChangedFn({ data: { organizationId: orgId, staffId } })
+                : undefined
+            }
+          />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4 space-y-6">

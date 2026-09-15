@@ -1,4 +1,3 @@
-import { PI_THEME } from "@/lib/pi-theme";
 import type { Decision, DecisionActionKind } from "@/lib/obligations/this-week";
 import { decorateDecision } from "@/lib/obligations/this-week";
 import { OVERRIDE_STATE_LABEL, OVERRIDE_STILL_REQUIRED } from "@/lib/obligations/overrides";
@@ -6,17 +5,17 @@ import { cn } from "@/lib/utils";
 import "./decision-card.css";
 
 function urgencyBar(urgency: Decision["urgency"]): string {
-  if (urgency === "critical") return PI_THEME.red;
-  if (urgency === "high") return PI_THEME.amber;
-  return PI_THEME.ok;
+  if (urgency === "critical") return "var(--hive-danger)";
+  if (urgency === "high") return "var(--hive-gold-hover)";
+  return "var(--hive-ok)";
 }
 
 function pillTone(dueText: string): { bg: string; fg: string } {
-  if (dueText === "Done") return { bg: "rgba(95, 174, 127, 0.16)", fg: PI_THEME.ok };
+  if (dueText === "Done") return { bg: "var(--hive-ok-soft)", fg: "var(--hive-ok-fg)" };
   if (dueText === "Today" || /overdue/i.test(dueText) || dueText === "Yesterday") {
-    return { bg: "rgba(224, 138, 128, 0.16)", fg: PI_THEME.red };
+    return { bg: "var(--hive-danger-soft)", fg: "var(--hive-danger-fg)" };
   }
-  return { bg: PI_THEME.goldSoft, fg: PI_THEME.amber };
+  return { bg: "var(--hive-gold-soft)", fg: "var(--hive-on-gold)" };
 }
 
 export function DecisionCard({
@@ -48,17 +47,17 @@ export function DecisionCard({
       data-testid="decision-card"
       className={cn("act", done && "act-done")}
       style={{
-        background: PI_THEME.heroTileBg,
-        borderColor: PI_THEME.hairlines.faint,
+        background: "var(--hive-surface)",
+        borderColor: "var(--hive-border)",
         borderLeftColor: urgencyBar(decorated.urgency),
-        color: PI_THEME.cream,
+        color: "var(--hive-text)",
       }}
     >
       <div className="act-head">
         <div
           data-testid="decision-headline"
           className="act-headline"
-          style={{ color: PI_THEME.cream }}
+          style={{ color: "var(--hive-text)" }}
         >
           {headline}
         </div>
@@ -70,16 +69,20 @@ export function DecisionCard({
           {dueText}
         </span>
       </div>
-      <p data-testid="decision-why" className="act-why" style={{ color: PI_THEME.c70 }}>
+      <p data-testid="decision-why" className="act-why" style={{ color: "var(--hive-text-muted)" }}>
         {why}
       </p>
       {item.overridden ? (
-        <p data-testid="override-state" className="act-why" style={{ color: PI_THEME.amber }}>
+        <p
+          data-testid="override-state"
+          className="act-why"
+          style={{ color: "var(--hive-gold-hover)" }}
+        >
           {OVERRIDE_STATE_LABEL}
           {item.overrideUntil ? ` until ${item.overrideUntil}` : ""}. {OVERRIDE_STILL_REQUIRED}
         </p>
       ) : null}
-      <div className="act-meta" style={{ color: PI_THEME.c50 }}>
+      <div className="act-meta" style={{ color: "var(--hive-text-muted)" }}>
         <span data-testid="decision-owner">Owner: {ownerText}</span>
         <span data-testid="decision-if-missed">If missed: {ifMissed}</span>
       </div>
@@ -87,26 +90,16 @@ export function DecisionCard({
         <div data-testid="decision-action" className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="act-btn"
+            className="act-btn hive-gold-btn"
             disabled={reviewing}
-            style={{
-              background: PI_THEME.buttons.primaryBg,
-              color: PI_THEME.buttons.primaryFg,
-              boxShadow: PI_THEME.buttons.primaryShadow,
-            }}
             onClick={() => onAction("approve_plan", "approved")}
           >
             Approve
           </button>
           <button
             type="button"
-            className="act-btn"
+            className="act-btn hive-ghost-btn"
             disabled={reviewing}
-            style={{
-              background: PI_THEME.buttons.secondaryBg,
-              color: PI_THEME.buttons.secondaryFg,
-              border: `1px solid ${PI_THEME.buttons.secondaryBorder}`,
-            }}
             onClick={() => onAction("approve_plan", "rejected")}
           >
             Reject
@@ -116,27 +109,13 @@ export function DecisionCard({
         <div data-testid="decision-action" className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="act-btn"
-            style={{
-              background: PI_THEME.buttons.primaryBg,
-              color: PI_THEME.buttons.primaryFg,
-              boxShadow: PI_THEME.buttons.primaryShadow,
-            }}
+            className="act-btn hive-gold-btn"
             onClick={() => onAction(action.kind, "open")}
           >
             {action.label}
           </button>
           {onRecordOverride ? (
-            <button
-              type="button"
-              className="act-btn"
-              style={{
-                background: PI_THEME.buttons.secondaryBg,
-                color: PI_THEME.buttons.secondaryFg,
-                border: `1px solid ${PI_THEME.buttons.secondaryBorder}`,
-              }}
-              onClick={onRecordOverride}
-            >
+            <button type="button" className="act-btn hive-ghost-btn" onClick={onRecordOverride}>
               Record override
             </button>
           ) : null}

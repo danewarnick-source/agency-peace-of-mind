@@ -7,7 +7,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -1007,15 +1007,11 @@ function DashboardLayout() {
               )}
 
               <DashboardMain
-                immersive={immersiveAdminHome}
                 className={
-                  immersiveAdminHome
-                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-0"
-                    : isMobilePreview
+                  isMobilePreview
                     ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)]"
                     : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--hive-canvas)] px-4 py-6 md:px-8"
                 }
-                style={immersiveAdminHome ? { background: PI_THEME.navy } : undefined}
               >
                 {isStatePreview && !stateCode ? (
                   <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
@@ -1095,18 +1091,17 @@ function CompanyClientsBridge({
 
 /**
  * Admin / desktop nested scroller. Staff phones use StaffMobileShell instead.
- * Resets to top on route change. iOS safe-area is applied via styles.css
- * on [data-dashboard-scroller].
+ * data-scroll-restoration-id is what tells the router (scrollToTopSelectors
+ * in src/router.tsx) to snap this container to top on every navigation
+ * instead of carrying over the previous page's scroll offset. The manual
+ * reset below is a defensive belt-and-suspenders for the same behavior.
+ * iOS safe-area is applied via styles.css on [data-dashboard-scroller].
  */
 function DashboardMain({
-  immersive,
   className,
-  style,
   children,
 }: {
-  immersive: boolean;
   className: string;
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -1118,9 +1113,8 @@ function DashboardMain({
     <main
       ref={mainRef}
       data-dashboard-scroller=""
-      data-immersive={immersive ? "" : undefined}
+      data-scroll-restoration-id="dashboard-main"
       className={className}
-      style={style}
     >
       {children}
     </main>

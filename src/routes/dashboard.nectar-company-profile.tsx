@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, Building2 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { agencySetupQueryKey } from "@/hooks/use-agency-setup";
+import { persistAgencySetupFacts } from "@/lib/agency-setup-gate.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +16,7 @@ import { RequireRole } from "@/components/rbac-guard";
 import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
 import { cn } from "@/lib/utils";
+import { awardableServiceCodeChoices } from "@/lib/service-code-registry";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/nectar-company-profile")({
@@ -31,12 +34,11 @@ export const Route = createFileRoute("/dashboard/nectar-company-profile")({
   ),
 });
 
-const SERVICE_OPTIONS = ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS"] as const;
-type Service = (typeof SERVICE_OPTIONS)[number];
+const SERVICE_OPTIONS = awardableServiceCodeChoices();
 
 type ProfileDraft = {
   providerEmail: string;
-  services: Service[];
+  services: string[];
   clientCount: string;
   staffCount: string;
   serviceArea: string;
@@ -57,6 +59,7 @@ function NectarCompanyProfilePage() {
   const orgId = org?.organization_id;
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const persistCompliance = useServerFn(persistAgencySetupFacts);
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY);
 
   const { data: orgRow } = useQuery({
@@ -78,13 +81,12 @@ function NectarCompanyProfilePage() {
   useEffect(() => {
     if (!orgRow) return;
     const offered = Array.isArray(orgRow.services_offered) ? orgRow.services_offered : [];
+    // Preserve every already-saved code, including one this registry doesn't
+    // recognize yet — never silently drop an existing selection.
     setDraft({
       providerEmail: "",
-      services: offered.filter((code): code is Service =>
-        (SERVICE_OPTIONS as readonly string[]).includes(code),
-      ),
-      clientCount:
-        orgRow.approx_client_count == null ? "" : String(orgRow.approx_client_count),
+      services: offered.map((c) => String(c).trim().toUpperCase()).filter(Boolean),
+      clientCount: orgRow.approx_client_count == null ? "" : String(orgRow.approx_client_count),
       staffCount: "",
       serviceArea: orgRow.service_area ?? "",
       specializations: orgRow.specializations ?? "",
@@ -93,24 +95,34 @@ function NectarCompanyProfilePage() {
 
   const saved = !!orgRow?.nectar_profile_saved_at;
 
-  const toggleService = (s: Service) => {
+  const toggleService = (s: string) => {
     setDraft((d) => ({
       ...d,
       services: d.services.includes(s) ? d.services.filter((x) => x !== s) : [...d.services, s],
     }));
   };
 
-  // Writes org columns only. This page does not calculate setup completion
-  // or create unlock — that is useAgencySetup + the six operating facts.
+  // Compliance-relevant fields (services / count / area) go through the
+  // shared agency-setup persist path so obligation_applicability stays in
+  // sync — this page must not compute setup completion itself, but it also
+  // must not let those fields drift out of sync with it. NECTAR-only fields
+  // (specializations, provider_approver_email, nectar_profile_saved_at)
+  // update directly since they are outside the compliance registry.
   const save = async (): Promise<boolean> => {
     if (!orgId) return false;
     try {
+      await persistCompliance({
+        data: {
+          organizationId: orgId,
+          servicesOffered: draft.services ?? [],
+          approxClientCount: Number(draft.clientCount) || null,
+          serviceArea: draft.serviceArea?.trim() || null,
+        },
+      });
+
       const { error } = await supabase
         .from("organizations")
         .update({
-          services_offered: draft.services ?? [],
-          approx_client_count: Number(draft.clientCount) || null,
-          service_area: draft.serviceArea?.trim() || null,
           specializations: draft.specializations?.trim() || null,
           nectar_profile_saved_at: new Date().toISOString(),
           // Live-only column used by 520 billing; not a setup-completion fact.
@@ -174,9 +186,8 @@ function NectarCompanyProfilePage() {
             NECTAR — Company profile
           </h1>
           <p className="text-sm text-muted-foreground">
-            A few details so NECTAR can calibrate its guidance. Saving this
-            page does not unlock hire or add-client — that is the six
-            operating facts on Home / compliance setup.
+            A few details so NECTAR can calibrate its guidance. Saving this page does not unlock
+            hire or add-client — that is the six operating facts on Home / compliance setup.
           </p>
         </div>
       </header>
@@ -185,21 +196,27 @@ function NectarCompanyProfilePage() {
         <div>
           <Label className="text-xs">Services you provide</Label>
           <div className="mt-2 flex flex-wrap gap-2">
-            {SERVICE_OPTIONS.map((s) => {
+            {Array.from(new Set([...SERVICE_OPTIONS, ...draft.services])).map((s) => {
               const active = draft.services.includes(s);
+              const recognized = (SERVICE_OPTIONS as readonly string[]).includes(s);
               return (
                 <button
                   key={s}
                   type="button"
                   onClick={() => toggleService(s)}
+                  title={
+                    recognized ? undefined : "Not in the current code registry — verify this code"
+                  }
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
                     active
                       ? "border-[color:var(--amber-500,var(--hive-gold))] bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733]"
                       : "border-border bg-background hover:border-[color:var(--amber-500,var(--hive-gold))]/40",
+                    !recognized && "border-dashed",
                   )}
                 >
                   {s}
+                  {!recognized ? " ⚠" : ""}
                 </button>
               );
             })}

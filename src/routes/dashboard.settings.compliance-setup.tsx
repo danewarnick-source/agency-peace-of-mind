@@ -1,28 +1,30 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, ClipboardList } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, CheckCircle2, ChevronDown, ClipboardList, Info } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { UnansweredFactsCard } from "@/components/obligations/unanswered-facts-card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { resolveCatalogExceptions } from "@/lib/obligations/catalog-exceptions";
+import { listUnansweredFacts, type OrgFacts } from "@/lib/obligations/applicability";
 import {
-  ORG_FACT_DEFINITIONS,
-  computeObligationApplicability,
-  listUnansweredFacts,
-  type FactAnswer,
-  type OrgFacts,
-} from "@/lib/obligations/applicability";
-import {
-  AWARDED_CODE_CHOICES,
-  LIVE_PATH_SETUP_QUESTIONS,
-} from "@/lib/obligations/setup-facts";
+  AGENCY_SETUP_QUESTIONS,
+  activeSectionCodeCallouts,
+  agencyAnswerContext,
+  agencySetupFactValue,
+  agencySetupQuestionsBySection,
+  isQuestionRequired,
+  type AgencyAnswerContext,
+  type AgencySetupQuestionDefinition,
+} from "@/lib/agency-setup-gate";
 import { persistAgencySetupFacts } from "@/lib/agency-setup-gate.functions";
-import { REQUIRED_SETUP_QUESTIONS } from "@/lib/agency-setup-gate";
 import { agencySetupQueryKey, useAgencySetup } from "@/hooks/use-agency-setup";
-import { Input } from "@/components/ui/input";
+import {
+  ComplianceAnswerField,
+  type ComplianceAnswerValue,
+} from "@/components/compliance/compliance-answer-field";
+import { DEFERRED_FACTS } from "@/lib/obligations/deferred-setup-facts";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/settings/compliance-setup")({
@@ -33,77 +35,62 @@ export const Route = createFileRoute("/dashboard/settings/compliance-setup")({
   component: ComplianceSetupPage,
 });
 
-const FACT_CHOICES: Array<{ value: FactAnswer; label: string }> = [
-  { value: true, label: "Yes" },
-  { value: false, label: "No" },
-  { value: null, label: "Not yet answered" },
-];
+type Draft = Record<string, ComplianceAnswerValue>;
 
-type SetupDraft = {
-  operates_ol_site: FactAnswer;
-  uses_volunteers: FactAnswer;
-  has_governing_board: FactAnswer;
-  servicesOffered: string[];
-  approxClientCount: string;
-  serviceArea: string;
-};
+function draftFromFacts(): Draft {
+  const draft: Draft = {};
+  for (const q of AGENCY_SETUP_QUESTIONS) {
+    draft[q.factKey] = null;
+  }
+  return draft;
+}
+
+function hydrateDraft(facts: Parameters<typeof agencySetupFactValue>[1]): Draft {
+  const draft = draftFromFacts();
+  for (const q of AGENCY_SETUP_QUESTIONS) {
+    const value = agencySetupFactValue(q.factKey, facts);
+    draft[q.factKey] = (value ?? null) as ComplianceAnswerValue;
+  }
+  return draft;
+}
+
+function answerToPersistPayload(draft: Draft) {
+  const get = (key: string) => draft[key] ?? null;
+  const awarded = get("awarded_service_codes");
+  return {
+    operates_ol_site: get("operates_ol_site") as boolean | null,
+    uses_volunteers: get("uses_volunteers") as boolean | null,
+    has_governing_board: get("has_governing_board") as boolean | null,
+    servicesOffered: Array.isArray(awarded) ? (awarded as string[]) : [],
+    approxClientCount: get("approx_client_count") as number | null,
+    serviceArea: get("service_area") as string | null,
+    dhhsProviderId: get("dhhs_provider_id") as string | null,
+    seiAwardDate: get("sei_award_date") as string | null,
+    providesRespiteOvernight: get("fact_provides_respite_overnight") as boolean | null,
+    isUsorVendor: get("fact_is_usor_vendor") as boolean | null,
+    supportsSelfAdministeredMedication: get("fact_supports_self_administered_medication") as
+      | boolean
+      | null,
+    actsAsRepresentativePayee: get("fact_acts_as_representative_payee") as boolean | null,
+    providesTransportation: get("fact_provides_transportation") as boolean | null,
+    communityProgramTotalPersonsServed: get("community_program_total_persons_served") as
+      | number
+      | null,
+  };
+}
+
+function isAnswered(q: AgencySetupQuestionDefinition, value: ComplianceAnswerValue): boolean {
+  if (q.answerType === "multi_select") return Array.isArray(value) && value.length > 0;
+  if (q.answerType === "text" || q.answerType === "date") {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+  if (q.answerType === "number") return typeof value === "number" && Number.isFinite(value);
+  if (q.answerType === "boolean") return value === true || value === false;
+  return value !== null && value !== undefined;
+}
 
 function ComplianceSetupPage() {
-  const { user } = useAuth();
   const { data: org } = useCurrentOrg();
-  const qc = useQueryClient();
-  const search = useSearch({ strict: false }) as { reason?: string };
-  const persistFacts = useServerFn(persistAgencySetupFacts);
-  const { facts, status, isLoading } = useAgencySetup();
-  const orgId = org?.organization_id ?? null;
-  const canEdit =
-    org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
-
-  const [draft, setDraft] = useState<SetupDraft>({
-    operates_ol_site: null,
-    uses_volunteers: null,
-    has_governing_board: null,
-    servicesOffered: [],
-    approxClientCount: "",
-    serviceArea: "",
-  });
-
-  useEffect(() => {
-    setDraft({
-      operates_ol_site: facts.operates_ol_site,
-      uses_volunteers: facts.uses_volunteers,
-      has_governing_board: facts.has_governing_board,
-      servicesOffered: facts.servicesOffered,
-      approxClientCount: facts.approxClientCount == null ? "" : String(facts.approxClientCount),
-      serviceArea: facts.serviceArea ?? "",
-    });
-  }, [facts]);
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!orgId || !user?.id) throw new Error("No organization selected.");
-      const count = draft.approxClientCount.trim() === "" ? null : Number(draft.approxClientCount);
-      return persistFacts({
-        data: {
-          organizationId: orgId,
-          operates_ol_site: draft.operates_ol_site,
-          uses_volunteers: draft.uses_volunteers,
-          has_governing_board: draft.has_governing_board,
-          servicesOffered: draft.servicesOffered,
-          approxClientCount: Number.isFinite(count as number) ? (count as number) : null,
-          serviceArea: draft.serviceArea.trim() || null,
-        },
-      });
-    },
-    onSuccess: async () => {
-      toast.success("Agency setup saved");
-      await qc.invalidateQueries({ queryKey: agencySetupQueryKey(orgId) });
-    },
-    onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : "Could not save agency setup");
-    },
-  });
-
   if (!org) {
     return (
       <div className="max-w-3xl space-y-4">
@@ -111,21 +98,97 @@ function ComplianceSetupPage() {
       </div>
     );
   }
+  // Remount the whole form on org switch so no draft state carries between organizations.
+  return (
+    <ComplianceSetupForOrg
+      key={org.organization_id}
+      organizationId={org.organization_id}
+      role={org.role}
+    />
+  );
+}
 
-  const merged: OrgFacts = {
-    ...facts,
-    operates_ol_site: draft.operates_ol_site,
-    uses_volunteers: draft.uses_volunteers,
-    has_governing_board: draft.has_governing_board,
-    servicesOffered: draft.servicesOffered ?? [],
+function ComplianceSetupForOrg({
+  organizationId,
+  role,
+}: {
+  organizationId: string;
+  role: string | null;
+}) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const search = useSearch({ strict: false }) as { reason?: string };
+  const navigate = useNavigate();
+  const persistFacts = useServerFn(persistAgencySetupFacts);
+  const { facts, status, isLoading } = useAgencySetup();
+  const canEdit = role === "admin" || role === "program_manager" || role === "manager";
+
+  const [draft, setDraft] = useState<Draft>(() => draftFromFacts());
+  const [hydrated, setHydrated] = useState(false);
+  const [showMissing, setShowMissing] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (isLoading || hydrated) return;
+    setDraft(hydrateDraft(facts));
+    setHydrated(true);
+  }, [isLoading, hydrated, facts]);
+
+  const ctx: AgencyAnswerContext = useMemo(
+    () => agencyAnswerContext({ servicesOffered: (draft.awarded_service_codes as string[]) ?? [] }),
+    [draft.awarded_service_codes],
+  );
+
+  const sections = useMemo(() => agencySetupQuestionsBySection(ctx), [ctx]);
+  const callouts = useMemo(() => activeSectionCodeCallouts(ctx), [ctx]);
+
+  const requiredVisible = useMemo(
+    () => AGENCY_SETUP_QUESTIONS.filter((q) => isQuestionRequired(q, ctx)),
+    [ctx],
+  );
+  const missing = useMemo(
+    () => requiredVisible.filter((q) => !isAnswered(q, draft[q.factKey] ?? null)),
+    [requiredVisible, draft],
+  );
+  const answeredCount = requiredVisible.length - missing.length;
+  const readyToFinish = missing.length === 0;
+
+  const save = useMutation({
+    mutationFn: async (finish: boolean) => {
+      if (!user?.id) throw new Error("Not signed in.");
+      const result = await persistFacts({
+        data: { organizationId, ...answerToPersistPayload(draft) },
+      });
+      return { result, finish };
+    },
+    onSuccess: async ({ finish }) => {
+      await qc.invalidateQueries({ queryKey: agencySetupQueryKey(organizationId) });
+      if (finish) {
+        toast.success("Agency setup complete. Staff and client records are unlocked.");
+        void navigate({ to: "/dashboard" });
+      } else {
+        toast.success("Draft saved. Come back any time — nothing is lost.");
+      }
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Could not save agency setup");
+    },
+  });
+
+  if (!hydrated || isLoading) {
+    return <p className="max-w-3xl text-sm text-muted-foreground">Loading setup facts…</p>;
+  }
+
+  const orgFactsForCard: OrgFacts = {
+    operates_ol_site: draft.operates_ol_site as boolean | null,
+    uses_volunteers: draft.uses_volunteers as boolean | null,
+    has_governing_board: draft.has_governing_board as boolean | null,
+    servicesOffered: (draft.awarded_service_codes as string[]) ?? [],
   };
-  const unanswered = listUnansweredFacts(merged);
-  const preview = computeObligationApplicability(merged);
-  const visible = preview.filter((row) => row.applies);
-  const hidden = preview.filter((row) => !row.applies);
+  const unanswered = listUnansweredFacts(orgFactsForCard);
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6 pb-16">
       <Link
         to="/dashboard/settings"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
@@ -138,9 +201,9 @@ function ComplianceSetupPage() {
           <ClipboardList className="h-5 w-5" /> Agency setup
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Record awarded service codes and operational facts. Questions are concrete — never whether
-          a SOW article applies. Staff and client creation stay closed until all required facts are
-          saved ({status.progressLabel}).
+          Answer the operating questions below once, right after signup — before adding your first
+          staff member or client. Your answers automatically configure which compliance requirements
+          apply to your agency. Save draft any time; nothing is lost between visits or logins.
         </p>
       </div>
 
@@ -150,214 +213,233 @@ function ComplianceSetupPage() {
           className="rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-950"
         >
           Staff and client screens stay closed until required operating questions are answered.
-          Skip is disabled at {status.progressLabel}.
+          Finish setup is disabled at {answeredCount} of {requiredVisible.length}.
         </div>
       ) : null}
 
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Setup progress</span>
+          <span>
+            {answeredCount} of {requiredVisible.length} required questions answered
+          </span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{
+              width: `${requiredVisible.length === 0 ? 100 : Math.round((answeredCount / requiredVisible.length) * 100)}%`,
+            }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Progress counts only questions that currently apply to you — answering the services
+          question can add or remove questions below.
+        </p>
+      </div>
+
       <UnansweredFactsCard unanswered={unanswered} showSetupLink={false} />
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading setup facts…</p>
-      ) : (
-        <form
-          className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canEdit) return;
-            save.mutate();
-          }}
-        >
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">
-              Which DSPD service codes is this contractor awarded?
-            </legend>
-            <p className="text-xs text-muted-foreground">
-              Same codes as the company profile. Leave empty until known — empty is unanswered, not
-              N/A. Extra codes already stored stay listed.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(
-                new Set([
-                  ...AWARDED_CODE_CHOICES,
-                  ...(draft.servicesOffered ?? []).map((c) => c.toUpperCase()),
-                ]),
-              ).map((code) => {
-                const selected = (draft.servicesOffered ?? []).includes(code);
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    disabled={!canEdit}
-                    aria-pressed={selected}
-                    className={`rounded-md border px-3 py-1.5 text-sm ${
-                      selected
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground"
-                    }`}
-                    onClick={() =>
-                      setDraft((prev) => {
-                        const current = prev.servicesOffered ?? [];
-                        return {
-                          ...prev,
-                          servicesOffered: selected
-                            ? current.filter((c) => c !== code)
-                            : [...current, code],
-                        };
-                      })
-                    }
-                  >
-                    {code}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+      {!canEdit ? (
+        <p className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Only owners, program managers, and supervisors can change these answers.
+        </p>
+      ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">{REQUIRED_SETUP_QUESTIONS[4]?.question}</label>
-              <Input
-                inputMode="numeric"
-                disabled={!canEdit}
-                value={draft.approxClientCount}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, approxClientCount: e.target.value }))
-                }
-                placeholder="e.g. 24"
+      <form
+        className="space-y-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+        }}
+      >
+        {sections.map(({ section, label, questions }) => (
+          <section
+            key={section}
+            className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          >
+            <button
+              type="button"
+              onClick={() => setCollapsed((prev) => ({ ...prev, [section]: !prev[section] }))}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <h2 className="text-base font-semibold">{label}</h2>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed[section] ? "-rotate-90" : ""}`}
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">{REQUIRED_SETUP_QUESTIONS[5]?.question}</label>
-              <Input
-                disabled={!canEdit}
-                value={draft.serviceArea}
-                onChange={(e) => setDraft((prev) => ({ ...prev, serviceArea: e.target.value }))}
-                placeholder="e.g. Salt Lake, Davis"
-              />
-            </div>
-          </div>
+            </button>
 
-          {ORG_FACT_DEFINITIONS.map((def) => (
-            <fieldset key={def.key} className="space-y-2">
-              <legend className="text-sm font-medium">{def.question}</legend>
-              <p className="text-xs text-muted-foreground">{def.help}</p>
-              <div className="flex flex-wrap gap-2">
-                {FACT_CHOICES.map((choice) => {
-                  const selected = draft[def.key] === choice.value;
-                  return (
-                    <button
-                      key={String(choice.value)}
-                      type="button"
-                      disabled={!canEdit}
-                      aria-pressed={selected}
-                      className={`rounded-md border px-3 py-1.5 text-sm ${
-                        selected
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border bg-background text-muted-foreground"
-                      }`}
-                      onClick={() =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          [def.key]: choice.value,
-                        }))
-                      }
+            {!collapsed[section] ? (
+              <div className="space-y-5">
+                {callouts
+                  .filter((c) => c.section === section)
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex gap-3 rounded-xl border border-sky-300/50 bg-sky-50 p-3 text-sm text-sky-950"
                     >
-                      {choice.label}
-                    </button>
+                      <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="font-medium">{c.title}</p>
+                        <p className="mt-1 text-sky-900">{c.body}</p>
+                        {c.linkTo ? (
+                          <Link
+                            to={c.linkTo}
+                            className="mt-1 inline-block text-sm font-medium underline"
+                          >
+                            {c.linkLabel ?? "Open"}
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+
+                {questions.map((q) => {
+                  const required = isQuestionRequired(q, ctx);
+                  const answered = isAnswered(q, draft[q.factKey] ?? null);
+                  return (
+                    <fieldset key={q.id} className="space-y-2">
+                      <legend className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                        {q.question}
+                        {required ? (
+                          <span className="text-xs font-normal text-muted-foreground">
+                            (required)
+                          </span>
+                        ) : null}
+                        {answered ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : null}
+                      </legend>
+                      {q.help ? <p className="text-xs text-muted-foreground">{q.help}</p> : null}
+                      {q.whyItMatters ? (
+                        <p className="text-xs italic text-muted-foreground">
+                          Why it matters: {q.whyItMatters}
+                        </p>
+                      ) : null}
+                      <ComplianceAnswerField
+                        question={q}
+                        value={draft[q.factKey] ?? null}
+                        disabled={!canEdit}
+                        onChange={(next) => setDraft((prev) => ({ ...prev, [q.factKey]: next }))}
+                      />
+                      {showMissing && required && !answered ? (
+                        <p className="text-xs font-medium text-destructive">
+                          This is required to finish setup.
+                        </p>
+                      ) : null}
+                    </fieldset>
                   );
                 })}
               </div>
-            </fieldset>
-          ))}
+            ) : null}
+          </section>
+        ))}
 
-          {canEdit ? (
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save setup facts"}
+        {canEdit ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={save.isPending}
+              onClick={() => save.mutate(false)}
+            >
+              {save.isPending ? "Saving…" : "Save draft"}
             </Button>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Only owners, program managers, and supervisors can change these facts.
+            <Button
+              type="button"
+              disabled={save.isPending}
+              onClick={() => {
+                if (!readyToFinish) {
+                  setShowMissing(true);
+                  toast.error(
+                    `${missing.length} required question${missing.length === 1 ? "" : "s"} still need an answer.`,
+                  );
+                  return;
+                }
+                save.mutate(true);
+              }}
+            >
+              {save.isPending ? "Saving…" : "Finish setup"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Save draft keeps your progress without requiring everything to be answered. Finish
+              setup unlocks staff and client records.
             </p>
-          )}
-        </form>
-      )}
-
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-sm font-semibold">What this means for the register</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Awarded codes{" "}
-          {merged.servicesOffered.length
-            ? merged.servicesOffered.join(", ")
-            : "are unanswered"}.
-          Empty codes keep code-gated rows visible until recorded.
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Stay visible
-            </h3>
-            <ul className="mt-2 space-y-1 text-sm">
-              {visible.map((row) => (
-                <li key={row.obligationKey}>
-                  {row.title}
-                  {row.unanswered ? " (until answered)" : ""}
-                </li>
-              ))}
-            </ul>
           </div>
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Do not apply
-            </h3>
-            {hidden.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">None yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-1 text-sm">
-                {hidden.map((row) => (
-                  <li key={row.obligationKey}>{row.title}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
+        ) : null}
+      </form>
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-sm font-semibold">Live paths on the current catalog</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Each path uses a concrete fact the engine already reads. Exceptions are on the catalog
-          record. SOW CSV import is still deferred.
-        </p>
-        <ul className="mt-4 space-y-3">
-          {LIVE_PATH_SETUP_QUESTIONS.map((path) => {
-            const flags = path.dutyKeys.map((key) => ({
-              key,
-              ...resolveCatalogExceptions(key),
-            }));
-            const labels = [
-              flags.some((f) => f.nonwaivable) ? "Nonwaivable" : null,
-              flags.some((f) => f.sei_only) ? "SEI-only" : null,
-              flags.some((f) => f.assignment_gated) ? "Assignment-gated" : null,
-            ].filter(Boolean);
-            return (
-              <li key={path.path} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                <p className="text-sm font-medium">{path.question}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{path.help}</p>
-                {labels.length > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{labels.join(" · ")}</p>
-                ) : null}
-                {path.ownerAnswers ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Recorded on this page.</p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Read from live assignments, person records, or 1056 authorizations.
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <SetupSummary ctx={ctx} draft={draft} />
     </div>
+  );
+}
+
+function SetupSummary({ ctx, draft }: { ctx: AgencyAnswerContext; draft: Draft }) {
+  const deferredByRecord = useMemo(() => {
+    const counts = { location_record: 0, staff_record: 0, client_record: 0, assignment_record: 0 };
+    for (const f of DEFERRED_FACTS) counts[f.deferredTo] += 1;
+    return counts;
+  }, []);
+
+  return (
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <h2 className="text-sm font-semibold">Summary</h2>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Awarded services
+        </h3>
+        <p className="mt-1 text-sm">
+          {ctx.awardedCodes.length ? ctx.awardedCodes.join(", ") : "Not yet recorded."}
+        </p>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Locations & licensing
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {draft.operates_ol_site === true
+            ? "You operate at least one OL-licensed or certified site. Add each home or site under Homes & Teams to record its license, capacity, and zoning details."
+            : draft.operates_ol_site === false
+              ? "No OL-licensed or certified site recorded."
+              : "Not yet answered."}
+        </p>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Responsibilities this unlocks
+        </h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>
+            {deferredByRecord.client_record} questions become available on each client's record as
+            you add clients.
+          </li>
+          <li>
+            {deferredByRecord.staff_record} questions become available on each staff record as you
+            hire.
+          </li>
+          <li>
+            {deferredByRecord.location_record} questions become available on each home/site as you
+            add locations.
+          </li>
+          <li>
+            {deferredByRecord.assignment_record} question becomes available when you assign a staff
+            member to a client.
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Unresolved information
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Every unanswered required question above stays visible until it is recorded — HIVE never
+          assumes "no" or "not applicable" for you. Once you award a new service code, configure its
+          billing and scheduling details under Settings → Service codes.
+        </p>
+      </div>
+    </section>
   );
 }

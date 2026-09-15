@@ -306,3 +306,27 @@ export const onClientDutyFactsChanged = createServerFn({ method: "POST" })
     await reevaluateStaffAssignedToClientInternal(supabase, data.organizationId, data.clientId);
     return { ok: true };
   });
+
+/**
+ * Staff-scope counterpart to onClientDutyFactsChanged — same shape, for a
+ * ComplianceFactsPanel mounted with scope="staff" (e.g. a staff record's
+ * compliance facts changing after hire). Reevaluates only this staff
+ * member's duties; does not touch any client or assignment.
+ */
+export const onStaffDutyFactsChanged = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    await reevaluateStaffDutiesInternal(supabase, data.organizationId, data.staffId);
+    return { ok: true };
+  });

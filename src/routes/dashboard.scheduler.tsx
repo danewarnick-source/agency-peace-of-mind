@@ -48,19 +48,13 @@ import { listSoloLapsesForStaff } from "@/lib/obligations/remediation.functions"
 import type { SoloLapse } from "@/lib/obligations/solo-lapse";
 import { denverYmd } from "@/lib/denver-date";
 import { layoutShiftBars } from "@/lib/scheduler/recurrence";
-import { HiveMark } from "@/components/brand/hive-mark";
+import { PageShell } from "@/components/page-shell";
 
 export const Route = createFileRoute("/dashboard/scheduler")({
   head: () => ({
     meta: [
       { title: "Scheduler — Provider Interface" },
       { name: "description", content: "Schedule, Day Program, and Staff view" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
-      },
     ],
   }),
   validateSearch: (s: Record<string, unknown>): { focus?: string } =>
@@ -170,62 +164,55 @@ function SchedulerPage() {
   }
 
   return (
-    <div
-      className="min-h-0 min-w-0 max-w-full overflow-x-hidden rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)]"
-      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-    >
-      <div className="px-4 pt-4"><NectarFocusBanner /></div>
-      {/* Brand bar with tabs — light work area, gold jewelry only */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--hive-border)] bg-[var(--hive-surface)] px-4 py-3 text-[var(--hive-text)]">
-        <div className="flex items-center gap-2">
-          <HiveMark className="h-8 w-8 text-[var(--hive-text)]" />
-          <div>
-            <div className="text-sm font-bold tracking-[0.14em] text-[var(--hive-text)]">SCHEDULER</div>
-          </div>
-        </div>
-        <div className="ml-2 flex items-center gap-1">
-          <TabBtn label="Schedule" active={tab === "schedule"} onClick={() => setTab("schedule")} />
-          <TabBtn label="Day Program" active={tab === "day-program"} onClick={() => setTab("day-program")} />
-          <TabBtn label="Staff view" active={tab === "staff-view"} onClick={() => setTab("staff-view")} />
-        </div>
-        <div className="flex-1" />
-        {tab === "schedule" && (
-          <button
-            onClick={() => publishMut.mutate()}
-            disabled={publishMut.isPending || !orgId}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--hive-gold)] bg-transparent px-3.5 py-2 text-[13px] font-semibold text-[var(--hive-text)] hover:bg-[var(--hive-gold-soft)]"
-          >
-            <Send className="h-4 w-4" /> {publishMut.isPending ? "Publishing…" : "Publish"}
-          </button>
-        )}
-      </div>
-
-      {/* Sub-toolbar — date nav + view */}
-      {tab !== "staff-view" && (
-        <div className="px-4 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: `1px solid ${LINE}`, background: "#fff" }}>
-          <div className="flex items-center gap-1 border rounded-md" style={{ borderColor: LINE }}>
-            <button onClick={() => shift(-1)} className="px-2 py-1 hover:bg-muted" aria-label="Previous"><ChevronLeft className="h-4 w-4" /></button>
-            <button onClick={() => setAnchor(startOfDay(new Date()))} className="px-3 py-1 text-sm font-medium hover:bg-muted">Today</button>
-            <span className="px-3 py-1 text-sm font-medium tabular-nums min-w-[180px] text-center">{dateLabel}</span>
-            <button onClick={() => shift(1)} className="px-2 py-1 hover:bg-muted" aria-label="Next"><ChevronRight className="h-4 w-4" /></button>
+    <PageShell title="Scheduler">
+      <div className="min-h-0 min-w-0 max-w-full overflow-x-hidden rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)]">
+        <div className="px-4 pt-4"><NectarFocusBanner /></div>
+        {/* Tab bar — light work area, gold jewelry only */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--hive-border)] bg-[var(--hive-surface)] px-4 py-3 text-[var(--hive-text)]">
+          <div className="flex items-center gap-1">
+            <TabBtn label="Schedule" active={tab === "schedule"} onClick={() => setTab("schedule")} />
+            <TabBtn label="Day Program" active={tab === "day-program"} onClick={() => setTab("day-program")} />
+            <TabBtn label="Staff view" active={tab === "staff-view"} onClick={() => setTab("staff-view")} />
           </div>
           <div className="flex-1" />
-          <ViewBtn label="Day" icon={<CalendarDays className="h-4 w-4" />} active={view === "day"} onClick={() => setView("day")} />
-          <ViewBtn label="Week" active={view === "week"} onClick={() => setView("week")} />
-          <ViewBtn label="Month" active={view === "month"} onClick={() => setView("month")} />
+          {tab === "schedule" && (
+            <button
+              onClick={() => publishMut.mutate()}
+              disabled={publishMut.isPending || !orgId}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--hive-gold)] bg-transparent px-3.5 py-2 text-[13px] font-semibold text-[var(--hive-text)] hover:bg-[var(--hive-gold-soft)]"
+            >
+              <Send className="h-4 w-4" /> {publishMut.isPending ? "Publishing…" : "Publish"}
+            </button>
+          )}
         </div>
-      )}
 
-      <SchedulerBody
-        tab={tab}
-        view={view}
-        anchor={anchor}
-        setAnchor={setAnchor}
-        setView={setView}
-        data={data}
-        isLoading={isLoading}
-      />
-    </div>
+        {/* Sub-toolbar — date nav + view */}
+        {tab !== "staff-view" && (
+          <div className="px-4 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: `1px solid ${LINE}`, background: "#fff" }}>
+            <div className="flex items-center gap-1 border rounded-md" style={{ borderColor: LINE }}>
+              <button onClick={() => shift(-1)} className="px-2 py-1 hover:bg-muted" aria-label="Previous"><ChevronLeft className="h-4 w-4" /></button>
+              <button onClick={() => setAnchor(startOfDay(new Date()))} className="px-3 py-1 text-sm font-medium hover:bg-muted">Today</button>
+              <span className="px-3 py-1 text-sm font-medium tabular-nums min-w-[180px] text-center">{dateLabel}</span>
+              <button onClick={() => shift(1)} className="px-2 py-1 hover:bg-muted" aria-label="Next"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <div className="flex-1" />
+            <ViewBtn label="Day" icon={<CalendarDays className="h-4 w-4" />} active={view === "day"} onClick={() => setView("day")} />
+            <ViewBtn label="Week" active={view === "week"} onClick={() => setView("week")} />
+            <ViewBtn label="Month" active={view === "month"} onClick={() => setView("month")} />
+          </div>
+        )}
+
+        <SchedulerBody
+          tab={tab}
+          view={view}
+          anchor={anchor}
+          setAnchor={setAnchor}
+          setView={setView}
+          data={data}
+          isLoading={isLoading}
+        />
+      </div>
+    </PageShell>
   );
 
   // Late state — declared after JSX so it's defined before use via hoisting? No — must declare above. Fix:
@@ -293,7 +280,13 @@ function SchedulerBody({
   }
 
   if (!data && isLoading) {
-    return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+    return (
+      <div className="space-y-2 p-4">
+        <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+        <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+        <div className="h-10 w-3/4 animate-pulse rounded-md bg-muted" />
+      </div>
+    );
   }
   if (!data) return <div className="p-8 text-sm text-muted-foreground">No data available.</div>;
 

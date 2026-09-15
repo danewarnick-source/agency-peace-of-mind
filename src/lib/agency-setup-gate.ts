@@ -1,12 +1,13 @@
 /**
  * Agency setup gate — server-authoritative completion from saved facts.
- * Staff and client creation stay closed until every required operating
- * question has a recorded answer. Banner math is display-only.
+ * Staff and client creation stay closed until every applicable required
+ * operating question has a recorded answer. Which questions are required is
+ * registry-driven (src/lib/obligations/agency-setup-questions.ts) and reacts
+ * to awarded codes (e.g. the SEI award-date question is only required once
+ * SEI is awarded). Banner math is display-only.
  */
 
-import { AWARDED_SERVICE_CODES_FACT_KEY } from "./obligations/setup-facts.ts";
 import {
-  ORG_FACT_DEFINITIONS,
   computeObligationApplicability,
   type ObligationApplicability,
   type OrgFacts,
@@ -19,7 +20,13 @@ import {
   type SyntheticStaff,
 } from "./obligations/draft-rules/index.ts";
 import {
+  AGENCY_SETUP_QUESTIONS,
+  requiredAgencySetupQuestions,
+  type AgencyAnswerContext,
+} from "./obligations/agency-setup-questions.ts";
+import {
   AGENCY_SETUP_COMPLETION_SPEC,
+  agencyAnswerContext,
   factsAreComplete,
   isRequiredSetupFactAnswered,
   type AgencySetupFacts,
@@ -28,76 +35,63 @@ import {
 export {
   AGENCY_SETUP_COMPLETION_SPEC,
   EMPTY_AGENCY_SETUP_FACTS,
+  agencyAnswerContext,
+  agencySetupFactValue,
   factAnswerOrNull,
+  isRequiredSetupFactAnswered,
   parseApproxCount,
+  parseNullableTrimmedString,
   parseServiceAreaColumn,
   setupFactsFromOrgRow,
   type AgencySetupFacts,
 } from "./agency-setup-completion.ts";
+export {
+  AGENCY_SETUP_QUESTIONS,
+  AGENCY_SETUP_QUESTIONS_VERSION,
+  AGENCY_SETUP_SECTIONS,
+  AGENCY_SETUP_SECTION_LABELS,
+  NON_QUESTION_FACT_DISPOSITIONS,
+  SECTION_CODE_CALLOUTS,
+  activeSectionCodeCallouts,
+  agencySetupQuestionByFactKey,
+  agencySetupQuestionsBySection,
+  isQuestionRequired,
+  isQuestionVisible,
+  isSectionVisible,
+  requiredAgencySetupQuestions,
+  visibleAgencySetupQuestions,
+  type AgencyAnswerContext,
+  type AgencySetupQuestionDefinition,
+  type AgencySetupSection,
+} from "./obligations/agency-setup-questions.ts";
+export { DEFERRED_FACTS } from "./obligations/deferred-setup-facts.ts";
 
 export const AGENCY_SETUP_PATH = "/dashboard/settings/compliance-setup" as const;
 
 export const AGENCY_SETUP_INCOMPLETE_MESSAGE =
   "Agency setup is incomplete. Answer the required operating questions before creating staff or clients.";
 
-export const REQUIRED_SETUP_FACT_KEYS = AGENCY_SETUP_COMPLETION_SPEC.requiredFacts.map(
-  (fact) => fact.key,
-) as unknown as readonly [
-  typeof AWARDED_SERVICE_CODES_FACT_KEY,
-  "operates_ol_site",
-  "uses_volunteers",
-  "has_governing_board",
-  "approx_client_count",
-  "service_area",
-];
-
-export type RequiredSetupFactKey = (typeof REQUIRED_SETUP_FACT_KEYS)[number];
-
 export type RequiredSetupQuestion = {
-  key: RequiredSetupFactKey;
+  key: string;
   question: string;
   help: string;
 };
 
-export const REQUIRED_SETUP_QUESTIONS: RequiredSetupQuestion[] = [
-  {
-    key: AWARDED_SERVICE_CODES_FACT_KEY,
-    question: "Which DSPD service codes is this contractor awarded?",
-    help: "Record at least one awarded code. Empty is unanswered — not known-none.",
-  },
-  {
-    key: "operates_ol_site",
-    question: "Does this contractor operate an OL-licensed or OL-certified site?",
-    help: ORG_FACT_DEFINITIONS.find((d) => d.key === "operates_ol_site")?.help ?? "",
-  },
-  {
-    key: "uses_volunteers",
-    question: "Does this contractor use regularly scheduled volunteers?",
-    help: ORG_FACT_DEFINITIONS.find((d) => d.key === "uses_volunteers")?.help ?? "",
-  },
-  {
-    key: "has_governing_board",
-    question: "Does this contractor have a governing or policy-making board?",
-    help: ORG_FACT_DEFINITIONS.find((d) => d.key === "has_governing_board")?.help ?? "",
-  },
-  {
-    key: "approx_client_count",
-    question: "Approximately how many clients does this contractor serve?",
-    help: "A recorded count, including zero. Blank is unanswered.",
-  },
-  {
-    key: "service_area",
-    question: "Which counties or service area does this contractor cover?",
-    help: "A recorded service area. Blank is unanswered.",
-  },
-];
+/** Every agency question that exists, independent of current conditional visibility. */
+export const REQUIRED_SETUP_QUESTIONS: RequiredSetupQuestion[] = AGENCY_SETUP_QUESTIONS.map(
+  (q) => ({
+    key: q.factKey,
+    question: q.question,
+    help: q.help ?? "",
+  }),
+);
 
 export type AgencySetupStatus = {
   complete: boolean;
   answeredCount: number;
   requiredCount: number;
   unanswered: RequiredSetupQuestion[];
-  answeredKeys: RequiredSetupFactKey[];
+  answeredKeys: string[];
   progressLabel: string;
   message: string | null;
   /** One-time SQL snapshot: org already had staff/clients when the gate landed. */
@@ -137,14 +131,16 @@ export function computeAgencySetupStatus(
   facts: AgencySetupFacts,
   options: ComputeAgencySetupStatusOptions = {},
 ): AgencySetupStatus {
-  const unanswered = REQUIRED_SETUP_QUESTIONS.filter(
-    (q) => !isRequiredSetupFactAnswered(q.key, facts),
-  );
-  const answeredKeys = REQUIRED_SETUP_QUESTIONS.filter((q) =>
-    isRequiredSetupFactAnswered(q.key, facts),
-  ).map((q) => q.key);
+  const ctx: AgencyAnswerContext = agencyAnswerContext(facts);
+  const required = requiredAgencySetupQuestions(ctx);
+  const unanswered = required
+    .filter((q) => !isRequiredSetupFactAnswered(q.factKey, facts))
+    .map((q) => ({ key: q.factKey, question: q.question, help: q.help ?? "" }));
+  const answeredKeys = required
+    .filter((q) => isRequiredSetupFactAnswered(q.factKey, facts))
+    .map((q) => q.factKey);
   const answeredCount = answeredKeys.length;
-  const requiredCount = REQUIRED_SETUP_QUESTIONS.length;
+  const requiredCount = required.length;
   const complete = unanswered.length === 0 && factsAreComplete(facts);
   const createGateExempt = options.createGateExempt === true;
   return {

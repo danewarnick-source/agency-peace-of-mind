@@ -43,6 +43,23 @@ CREATE TABLE public.organizations (
   services_offered text[],
   approx_client_count integer,
   specializations text,
+  service_area text,
+  fact_operates_ol_site boolean,
+  fact_uses_volunteers boolean,
+  fact_has_governing_board boolean,
+  fact_provides_respite_overnight boolean,
+  fact_is_usor_vendor boolean,
+  fact_supports_self_administered_medication boolean,
+  fact_acts_as_representative_payee boolean,
+  fact_provides_transportation boolean,
+  dhhs_provider_id text,
+  sei_award_date date,
+  fact_community_program_total_persons_served integer,
+  fact_answers_updated_at timestamptz,
+  fact_answers_updated_by uuid,
+  setup_completed_at timestamptz,
+  setup_completed_by uuid,
+  setup_questionnaire_version integer,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -87,6 +104,42 @@ AS $$
     WHERE om.organization_id = p_org
       AND om.user_id = auth.uid()
       AND om.active
+  );
+$$;
+
+-- 2-arg overloads matching the production signature (is_org_member(_org,
+-- _user), is_org_admin_or_manager(_org, _user)) — needed by the
+-- compliance_fact_answers RLS policies added in the questionnaire migration.
+CREATE OR REPLACE FUNCTION public.is_org_member(p_org uuid, p_user uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.organization_members om
+    WHERE om.organization_id = p_org
+      AND om.user_id = p_user
+      AND om.active
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_org_admin_or_manager(p_org uuid, p_user uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.organization_members om
+    WHERE om.organization_id = p_org
+      AND om.user_id = p_user
+      AND om.active
+      AND om.role IN ('admin', 'program_manager', 'manager')
   );
 $$;
 
@@ -174,3 +227,14 @@ CREATE POLICY organizations_untrusted_update_for_lock_it
 GRANT USAGE ON SCHEMA public TO authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+
+-- Real Supabase projects configure this once at the project level, so
+-- individual migrations never GRANT on their own new tables (see e.g.
+-- 20260524055323, which creates pba_accounts with no GRANT at all). This
+-- isolated schema does not have that project-level configuration, so any
+-- migration applied after this file that CREATEs a new table (e.g. this
+-- gate's own compliance_fact_answers) needs it replicated here.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO authenticated, service_role;

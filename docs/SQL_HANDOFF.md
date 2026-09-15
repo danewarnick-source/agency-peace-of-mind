@@ -1,5 +1,133 @@
 # SQL Handoff — run these in Lovable's SQL editor
 
+## ACTION — Comprehensive agency setup questionnaire (2026-09-15) — Core flag
+
+**Do not Soft-apply / execute against Hive-Platform production from this PR.**
+Core pastes this after Dane go, clearing the editor first. Additive only —
+no DROP TABLE / DROP COLUMN. Does not publish or activate any DHHS91172
+catalog rule; the `compliance_fact_answers` table added here is never read
+by `org_setup_is_complete` / `org_setup_allows_create` and never gates
+staff/client/invitation creation.
+
+Matches `supabase/migrations/20260915080000_agency_setup_questionnaire.sql`,
+applied **after** `20260914120000_agency_setup_gate.sql` (do not paste out
+of order — this one calls `CREATE OR REPLACE` on the same two functions and
+widens the required-fact list they check).
+
+### What changes for an owner
+
+The six-fact compliance-setup page is now a sectioned, conditional
+questionnaire (`src/lib/obligations/agency-setup-questions.ts`, currently 11
+agency-level questions, one of them — the SEI award date — only required
+once SEI is an awarded code). The six previously-required facts
+(`services_offered`, `fact_operates_ol_site`, `fact_uses_volunteers`,
+`fact_has_governing_board`, `approx_client_count`, `service_area`) are
+unchanged in meaning and column name — an org that already completed the
+old six-fact gate keeps every one of those answers. It will show as
+**incomplete** again only until the five newly-required facts below are
+also answered (never erased, never guessed on the org's behalf):
+
+- `fact_provides_respite_overnight` (does the agency provide respite,
+  including overnight)
+- `fact_is_usor_vendor` (USOR-approved vendor)
+- `fact_supports_self_administered_medication`
+- `fact_acts_as_representative_payee` (agency-level screening question;
+  reclassified from workbook FACT-078's "...for any client?" phrasing — see
+  `docs/compliance/dhhs91172/AGENCY_SETUP_COVERAGE.md`)
+- `fact_provides_transportation`
+- `dhhs_provider_id` — reuses the **existing** column (already used by Utah
+  EVV export); newly enforced by the gate, not a new column
+- `sei_award_date` — new column, required only when `SEI` is awarded (fixes
+  a pre-existing gap: `setup-facts.ts`'s `usor_sei` live path already
+  claimed `ownerAnswers: true` for this fact with no real input anywhere)
+
+`setup_create_gate_exempt` (the TNS-style grandfather snapshot) is
+**unchanged** — an exempt org is never blocked by any of this, old or new.
+
+### New table: `compliance_fact_answers`
+
+Staff/client/location/assignment-scoped facts that cannot be asked at
+agency-setup time (the record doesn't exist yet) — e.g. "does this staff
+member hold UPI access", "is this location site-based". Answer `status`
+(`unanswered` / `answered` / `unknown` / `not_applicable`) is stored
+separately from `value` on purpose — "no" and "0" are answers. RLS: any org
+member can read their org's rows, only admin/program_manager/manager can
+write. Never gates anything; a missing answer here shows as a visible
+follow-up on that staff/client/home's own page
+(`src/components/compliance/compliance-facts-panel.tsx`), not a blocker.
+
+### Setup-completion audit columns
+
+`setup_completed_at` / `setup_completed_by` / `setup_questionnaire_version`
+record the last time (and under which registry version) this org's
+questionnaire actually reached 100% — locked the same fail-closed way
+`setup_create_gate_exempt` already is (only `service_role` / `postgres` /
+`supabase_admin`; an authenticated admin editing their own row is rejected).
+Purely an audit trail — completeness itself is always computed live against
+the current registry, so a future version adding a required question can
+correctly show an already-completed org as needing that one new answer,
+without touching (or requiring you to re-answer) anything already saved.
+
+### Probe before paste (read-only)
+
+```sql
+SELECT string_agg(x, E'\n' ORDER BY x) AS checks
+FROM (
+  SELECT 'organizations.dhhs_provider_id populated=' ||
+    (SELECT count(*)::text FROM public.organizations WHERE dhhs_provider_id IS NOT NULL AND length(trim(dhhs_provider_id)) > 0)
+  UNION ALL
+  SELECT 'organizations total=' || (SELECT count(*)::text FROM public.organizations)
+  UNION ALL
+  SELECT 'orgs currently org_setup_is_complete()=true (six-fact era)=' ||
+    (SELECT count(*)::text FROM public.organizations o WHERE public.org_setup_is_complete(o.id))
+) s;
+```
+
+**What you'll see:** how many orgs already have a Medicaid provider ID on
+file (should be most/all real operating orgs, since `dhhs_provider_id` is
+already used by Utah EVV export), and how many currently pass the six-fact
+gate — expect that second number to **drop** immediately after paste for
+any non-exempt org missing the five new facts, until they're answered in
+the new questionnaire UI.
+
+### Confirm after paste
+
+```sql
+SELECT string_agg(x, E'\n' ORDER BY x) AS checks
+FROM (
+  SELECT 'organizations.sei_award_date=' ||
+    (SELECT count(*)::text FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='organizations' AND column_name='sei_award_date')
+  UNION ALL
+  SELECT 'organizations.fact_provides_transportation=' ||
+    (SELECT count(*)::text FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='organizations' AND column_name='fact_provides_transportation')
+  UNION ALL
+  SELECT 'compliance_fact_answers table=' ||
+    (SELECT count(*)::text FROM information_schema.tables
+      WHERE table_schema='public' AND table_name='compliance_fact_answers')
+) s;
+```
+
+You should see all three `=1`. Then re-run the probe above — TNS and any
+other `setup_create_gate_exempt = true` org must still show
+`org_setup_allows_create() = true` regardless of the six-fact number.
+
+### Tested
+
+`npm run test:agency-setup-integration` — 14/14 passing against an isolated
+local Postgres (not Hive-Platform), covering: registry-driven completion
+(including the SEI-conditional requirement), `compliance_fact_answers`
+org-isolation and permission-denied-for-non-admin-write, the
+setup-completion audit columns being locked the same way
+`setup_create_gate_exempt` is, and the existing grandfather/rollback/
+service-role-still-hits-the-trigger coverage from 2026-09-14 (all still
+green — this migration only widens the required-fact list, not the trigger/
+policy shape). See `scripts/agency-setup-gate-preview.md` for how to spin up
+that isolated database yourself.
+
+---
+
 ## ACTION — Agency setup gate before staff/client create (2026-09-14) — Core flag
 
 **Do not Soft-apply / execute against Hive-Platform production from this PR.**

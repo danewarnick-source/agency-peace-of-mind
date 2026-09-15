@@ -2,10 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import {
-  computeAgencySetupStatus,
-  EMPTY_AGENCY_SETUP_FACTS,
-} from "@/lib/agency-setup-gate";
+import { computeAgencySetupStatus, EMPTY_AGENCY_SETUP_FACTS } from "@/lib/agency-setup-gate";
 import {
   assertAgencySetupCompleteForOrg,
   loadAgencySetupFacts,
@@ -25,12 +22,23 @@ const OrgId = z.object({ organizationId: z.string().uuid() });
 
 const PersistInput = z.object({
   organizationId: z.string().uuid(),
-  operates_ol_site: z.union([z.boolean(), z.null()]),
-  uses_volunteers: z.union([z.boolean(), z.null()]),
-  has_governing_board: z.union([z.boolean(), z.null()]),
+  // Nullable AND optional: null means "answer is (still) unrecorded", missing
+  // means "leave this fact untouched" — lets a partial save (e.g. the
+  // service-codes-only NECTAR company profile save) update just the fields
+  // it owns without clobbering the others back to null.
+  operates_ol_site: z.union([z.boolean(), z.null()]).optional(),
+  uses_volunteers: z.union([z.boolean(), z.null()]).optional(),
+  has_governing_board: z.union([z.boolean(), z.null()]).optional(),
   servicesOffered: z.array(z.string()).optional(),
   approxClientCount: z.number().int().min(0).nullable().optional(),
   serviceArea: z.string().max(200).nullable().optional(),
+  dhhsProviderId: z.string().max(200).nullable().optional(),
+  seiAwardDate: z.string().max(40).nullable().optional(),
+  providesRespiteOvernight: z.boolean().nullable().optional(),
+  isUsorVendor: z.boolean().nullable().optional(),
+  supportsSelfAdministeredMedication: z.boolean().nullable().optional(),
+  actsAsRepresentativePayee: z.boolean().nullable().optional(),
+  providesTransportation: z.boolean().nullable().optional(),
 });
 
 export const getAgencySetupStatus = createServerFn({ method: "GET" })

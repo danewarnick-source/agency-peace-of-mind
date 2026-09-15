@@ -5,9 +5,8 @@ import { fileURLToPath } from "node:url";
 import {
   AGENCY_SETUP_INCOMPLETE_MESSAGE,
   AGENCY_SETUP_PATH,
+  AGENCY_SETUP_QUESTIONS,
   EMPTY_AGENCY_SETUP_FACTS,
-  REQUIRED_SETUP_FACT_KEYS,
-  REQUIRED_SETUP_QUESTIONS,
   SETUP_CREATE_APIS,
   SETUP_GATED_PATHS,
   assertAgencySetupComplete,
@@ -18,9 +17,11 @@ import {
   computeAgencySetupStatus,
   isolateOrgRecords,
   isDashboardHomePath,
+  isQuestionRequired,
   isSetupGatedPath,
-  parseServiceAreaColumn,
+  parseNullableTrimmedString,
   reevaluateAgencyRequirements,
+  requiredAgencySetupQuestions,
   setupFactsFromOrgRow,
   setupRedirectForPath,
   shouldBlockStaffClientCreate,
@@ -34,6 +35,16 @@ function read(rel: string) {
   return readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 }
 
+const BASE_NEW_FACTS = {
+  dhhsProviderId: "12345",
+  seiAwardDate: null,
+  providesRespiteOvernight: false,
+  isUsorVendor: false,
+  supportsSelfAdministeredMedication: false,
+  actsAsRepresentativePayee: false,
+  providesTransportation: false,
+};
+
 const RESIDENTIAL: AgencySetupFacts = {
   operates_ol_site: true,
   uses_volunteers: false,
@@ -41,6 +52,7 @@ const RESIDENTIAL: AgencySetupFacts = {
   servicesOffered: ["HHS", "RHS"],
   approxClientCount: 12,
   serviceArea: "Salt Lake, Davis",
+  ...BASE_NEW_FACTS,
 };
 
 const EMPLOYMENT: AgencySetupFacts = {
@@ -50,6 +62,8 @@ const EMPLOYMENT: AgencySetupFacts = {
   servicesOffered: ["SEI", "DSI"],
   approxClientCount: 8,
   serviceArea: "Utah County",
+  ...BASE_NEW_FACTS,
+  seiAwardDate: "2026-01-15",
 };
 
 const AGENCY_A = {
@@ -120,33 +134,69 @@ const AGENCY_B = {
   clients: [{ organizationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2", id: "client-b-1" }],
 };
 
-describe("unit: agency setup gate — required operating facts", () => {
-  it("defines six concrete operating questions — never whether a section applies", () => {
-    assert.equal(REQUIRED_SETUP_QUESTIONS.length, 6);
+describe("unit: agency setup gate — registry-driven operating questions", () => {
+  it("defines concrete operating questions for every agency fact — never whether a section applies", () => {
+    assert.equal(AGENCY_SETUP_QUESTIONS.length, 12);
+    const keys = AGENCY_SETUP_QUESTIONS.map((q) => q.factKey)
+      .slice()
+      .sort();
     assert.deepEqual(
-      REQUIRED_SETUP_FACT_KEYS.slice().sort(),
+      keys,
       [
-        "approx_client_count",
         "awarded_service_codes",
+        "community_program_total_persons_served",
+        "dhhs_provider_id",
+        "fact_acts_as_representative_payee",
+        "fact_is_usor_vendor",
+        "fact_provides_respite_overnight",
+        "fact_provides_transportation",
+        "fact_supports_self_administered_medication",
         "has_governing_board",
         "operates_ol_site",
-        "service_area",
+        "sei_award_date",
         "uses_volunteers",
-      ],
+      ].sort(),
     );
-    for (const q of REQUIRED_SETUP_QUESTIONS) {
+    for (const q of AGENCY_SETUP_QUESTIONS) {
       assert.doesNotMatch(q.question, /does this (duty|obligation|section|clause|article) apply/i);
       assert.doesNotMatch(q.question, /does\s*§/);
+      assert.doesNotMatch(
+        q.question,
+        /\bFACT-\d{3}\b/,
+        `${q.factKey} leaks a workbook fact id into the question text`,
+      );
+      assert.doesNotMatch(
+        q.question,
+        /\bREQ-/,
+        `${q.factKey} leaks a requirement key into the question text`,
+      );
     }
   });
 
-  it("treats empty facts as 0 of 6 and incomplete", () => {
+  it("requires the SEI award date only once SEI is an awarded code", () => {
+    const withoutSei = requiredAgencySetupQuestions({ awardedCodes: [] });
+    const withSei = requiredAgencySetupQuestions({ awardedCodes: ["SEI"] });
+    assert.equal(
+      withoutSei.some((q) => q.factKey === "sei_award_date"),
+      false,
+    );
+    assert.equal(
+      withSei.some((q) => q.factKey === "sei_award_date"),
+      true,
+    );
+    assert.equal(withSei.length, withoutSei.length + 1);
+
+    const seiQuestion = AGENCY_SETUP_QUESTIONS.find((q) => q.factKey === "sei_award_date")!;
+    assert.equal(isQuestionRequired(seiQuestion, { awardedCodes: [] }), false);
+    assert.equal(isQuestionRequired(seiQuestion, { awardedCodes: ["SEI"] }), true);
+  });
+
+  it("treats empty facts as 0 of 10 (SEI not awarded) and incomplete", () => {
     const status = computeAgencySetupStatus(EMPTY_AGENCY_SETUP_FACTS);
     assert.equal(status.complete, false);
     assert.equal(status.answeredCount, 0);
-    assert.equal(status.requiredCount, 6);
-    assert.equal(status.progressLabel, "1 of 6".replace("1", "0"));
-    assert.equal(status.progressLabel, "0 of 6");
+    assert.equal(status.requiredCount, 10);
+    assert.equal(status.progressLabel, "0 of 10");
     assert.equal(canSkipAgencySetup(status), false);
     assert.equal(shouldBlockStaffClientCreate(status), true);
     assert.equal(status.createAllowed, false);
@@ -154,26 +204,37 @@ describe("unit: agency setup gate — required operating facts", () => {
     assert.equal(status.message, AGENCY_SETUP_INCOMPLETE_MESSAGE);
   });
 
-  it("treats a single saved fact as 1 of 6 — banner math is not completion", () => {
+  it("treats a single saved fact as 1 of 10 — banner math is not completion", () => {
     const status = computeAgencySetupStatus({
       ...EMPTY_AGENCY_SETUP_FACTS,
       servicesOffered: ["HHS"],
     });
-    assert.equal(status.progressLabel, "1 of 6");
+    assert.equal(status.progressLabel, "1 of 10");
     assert.equal(status.complete, false);
     assert.equal(canSkipAgencySetup(status), false);
     assert.equal(shouldBlockStaffClientCreate(status), true);
   });
 
-  it("is complete only when every required fact is saved", () => {
+  it("is complete only when every currently-applicable required fact is saved", () => {
     const status = computeAgencySetupStatus(RESIDENTIAL);
     assert.equal(status.complete, true);
-    assert.equal(status.answeredCount, 6);
-    assert.equal(status.progressLabel, "6 of 6");
+    assert.equal(status.answeredCount, 10);
+    assert.equal(status.progressLabel, "10 of 10");
     assert.equal(canSkipAgencySetup(status), true);
     assert.equal(shouldBlockStaffClientCreate(status), false);
     assert.equal(status.createAllowed, true);
     assert.equal(status.message, null);
+  });
+
+  it("is complete for an SEI agency only once the SEI award date is also saved", () => {
+    const missingDate = computeAgencySetupStatus({ ...EMPLOYMENT, seiAwardDate: null });
+    assert.equal(missingDate.complete, false);
+    assert.equal(missingDate.requiredCount, 11);
+    assert.ok(missingDate.unanswered.some((q) => q.key === "sei_award_date"));
+
+    const status = computeAgencySetupStatus(EMPLOYMENT);
+    assert.equal(status.complete, true);
+    assert.equal(status.requiredCount, 11);
   });
 
   it("does not treat false answers as unanswered", () => {
@@ -181,12 +242,13 @@ describe("unit: agency setup gate — required operating facts", () => {
     assert.equal(status.complete, true);
     assert.ok(status.answeredKeys.includes("operates_ol_site"));
     assert.ok(status.answeredKeys.includes("uses_volunteers"));
+    assert.ok(status.answeredKeys.includes("fact_provides_respite_overnight"));
   });
 
   it("reads service_area from the dedicated column — never specializations", () => {
-    assert.equal(parseServiceAreaColumn(null), null);
-    assert.equal(parseServiceAreaColumn("   "), null);
-    assert.equal(parseServiceAreaColumn("Utah County"), "Utah County");
+    assert.equal(parseNullableTrimmedString(null), null);
+    assert.equal(parseNullableTrimmedString("   "), null);
+    assert.equal(parseNullableTrimmedString("Utah County"), "Utah County");
     const ignored = setupFactsFromOrgRow({
       services_offered: ["HHS"],
       fact_operates_ol_site: true,
@@ -209,15 +271,22 @@ describe("unit: agency setup gate — required operating facts", () => {
       approx_client_count: null,
       service_area: null,
     });
-    assert.equal(computeAgencySetupStatus(incomplete).progressLabel, "1 of 6");
+    assert.equal(computeAgencySetupStatus(incomplete).progressLabel, "1 of 10");
 
     const complete = setupFactsFromOrgRow({
       services_offered: ["SEI", "DSI"],
       fact_operates_ol_site: false,
       fact_uses_volunteers: true,
       fact_has_governing_board: false,
+      fact_provides_respite_overnight: false,
+      fact_is_usor_vendor: false,
+      fact_supports_self_administered_medication: false,
+      fact_acts_as_representative_payee: false,
+      fact_provides_transportation: false,
       approx_client_count: 8,
       service_area: "Utah County",
+      dhhs_provider_id: "12345",
+      sei_award_date: "2026-01-15",
     });
     assert.equal(computeAgencySetupStatus(complete).complete, true);
   });
@@ -234,6 +303,21 @@ describe("unit: agency setup gate — required operating facts", () => {
     assert.equal(shouldBlockStaffClientCreate(incomplete), false);
     assert.equal(setupRedirectForPath("/dashboard/employees", incomplete), null);
   });
+
+  it("changing awarded services changes which questions are required (never erases other answers)", () => {
+    const before = computeAgencySetupStatus({ ...RESIDENTIAL, servicesOffered: ["HHS", "RHS"] });
+    assert.equal(before.requiredCount, 10);
+    const afterAwardingSei = computeAgencySetupStatus({
+      ...RESIDENTIAL,
+      servicesOffered: ["HHS", "RHS", "SEI"],
+    });
+    assert.equal(afterAwardingSei.requiredCount, 11);
+    assert.equal(afterAwardingSei.complete, false);
+    assert.ok(afterAwardingSei.unanswered.some((q) => q.key === "sei_award_date"));
+    // Every other already-saved answer is untouched.
+    assert.equal(afterAwardingSei.answeredKeys.includes("operates_ol_site"), true);
+    assert.equal(afterAwardingSei.answeredKeys.includes("dhhs_provider_id"), true);
+  });
 });
 
 describe("unit: agency setup gate — skip, create, redirect", () => {
@@ -245,7 +329,6 @@ describe("unit: agency setup gate — skip, create, redirect", () => {
     assert.equal(canSkipAgencySetup(incomplete), false);
     const panel = read("../components/onboarding/nectar-onboarding-panel.tsx");
     assert.match(panel, /canSkipAgencySetup/);
-    assert.match(panel, /disabled=\{!canSkip\}/);
     assert.doesNotMatch(panel, /Skip — take me to my dashboard/);
   });
 
@@ -288,10 +371,10 @@ describe("unit: agency setup gate — skip, create, redirect", () => {
     assert.equal(isSetupGatedPath("/dashboard/settings/compliance-setup"), false);
   });
 
-  it("setup page previews applicability from useAgencySetup facts, not a leftover factsQuery", () => {
+  it("setup page derives its conditional sections from live draft state, not a stale query", () => {
     const setupPage = read("../routes/dashboard.settings.compliance-setup.tsx");
     assert.match(setupPage, /const \{ facts, status, isLoading \} = useAgencySetup\(\)/);
-    assert.match(setupPage, /\.\.\.facts,/);
+    assert.match(setupPage, /agencyAnswerContext\(/);
     assert.doesNotMatch(setupPage, /factsQuery/);
   });
 
@@ -329,13 +412,21 @@ describe("unit: agency setup helpers on in-memory arrays (not database isolation
     assert.equal(aZoning?.applies, true);
     assert.equal(bZoning?.applies, false);
 
-    const aHousemate = a.applicability.find((row) => row.obligationKey === "housemate_informed_choice");
-    const bHousemate = b.applicability.find((row) => row.obligationKey === "housemate_informed_choice");
+    const aHousemate = a.applicability.find(
+      (row) => row.obligationKey === "housemate_informed_choice",
+    );
+    const bHousemate = b.applicability.find(
+      (row) => row.obligationKey === "housemate_informed_choice",
+    );
     assert.equal(aHousemate?.applies, true);
     assert.equal(bHousemate?.applies, false);
 
-    const aKeys = new Set(a.applicability.filter((row) => row.applies).map((row) => row.obligationKey));
-    const bKeys = new Set(b.applicability.filter((row) => row.applies).map((row) => row.obligationKey));
+    const aKeys = new Set(
+      a.applicability.filter((row) => row.applies).map((row) => row.obligationKey),
+    );
+    const bKeys = new Set(
+      b.applicability.filter((row) => row.applies).map((row) => row.obligationKey),
+    );
     assert.notDeepEqual([...aKeys].sort(), [...bKeys].sort());
     assert.ok(CORE_RULE_LOGIC_SLICE.every((rule) => canActivate(rule) === false));
   });
@@ -396,28 +487,16 @@ describe("unit: agency setup helpers on in-memory arrays (not database isolation
 });
 
 describe("unit: SQL source review (not a live database)", () => {
-  it("correlates first-owner EXISTS to the inserted organization_members row", () => {
+  it("correlates first-owner EXISTS to the inserted organization_members row (original gate migration, unchanged)", () => {
     const sql = read("../../supabase/migrations/20260914120000_agency_setup_gate.sql");
     assert.match(sql, /om\.organization_id = NEW\.organization_id/);
-    assert.match(
-      sql,
-      /existing_member\.organization_id = organization_members\.organization_id/,
-    );
-    assert.doesNotMatch(
-      sql,
-      /WHERE om\.organization_id = organization_id\s*\n/,
-    );
-    assert.match(sql, /service_area IS NOT NULL/);
-    assert.match(sql, /length\(trim\(o\.service_area\)\) > 0/);
-    assert.doesNotMatch(sql, /o\.specializations ~\*/);
+    assert.match(sql, /existing_member\.organization_id = organization_members\.organization_id/);
+    assert.doesNotMatch(sql, /WHERE om\.organization_id = organization_id\s*\n/);
     assert.match(sql, /FOR INSERT/);
     assert.doesNotMatch(sql, /FOR SELECT[\s\S]*requires_setup/);
     assert.match(sql, /REVOKE UPDATE \(setup_create_gate_exempt\)/);
     assert.match(sql, /trg_protect_setup_create_gate_exempt/);
-    assert.match(
-      sql,
-      /current_user IN \('service_role', 'postgres', 'supabase_admin'\)/,
-    );
+    assert.match(sql, /current_user IN \('service_role', 'postgres', 'supabase_admin'\)/);
     assert.doesNotMatch(sql, /current_user = 'authenticated'/);
     assert.match(
       sql,
@@ -429,6 +508,56 @@ describe("unit: SQL source review (not a live database)", () => {
     );
   });
 
+  it("the questionnaire migration matches the TypeScript completion spec exactly", () => {
+    const sql = read("../../supabase/migrations/20260915080000_agency_setup_questionnaire.sql");
+    assert.match(sql, /service_area IS NOT NULL/);
+    assert.match(sql, /length\(trim\(o\.service_area\)\) > 0/);
+    assert.doesNotMatch(sql, /o\.specializations ~\*/);
+    for (const column of [
+      "fact_operates_ol_site",
+      "fact_uses_volunteers",
+      "fact_has_governing_board",
+      "fact_provides_respite_overnight",
+      "fact_is_usor_vendor",
+      "fact_supports_self_administered_medication",
+      "fact_acts_as_representative_payee",
+      "fact_provides_transportation",
+      "dhhs_provider_id",
+    ]) {
+      assert.match(
+        sql,
+        new RegExp(`o\\.${column} IS NOT NULL`),
+        `missing completeness check for ${column}`,
+      );
+    }
+    assert.match(sql, /'SEI' = ANY/);
+    assert.match(sql, /sei_award_date IS NOT NULL/);
+    // Completion audit columns are locked the same way setup_create_gate_exempt is.
+    assert.match(
+      sql,
+      /REVOKE UPDATE \(setup_completed_at, setup_completed_by, setup_questionnaire_version\)/,
+    );
+    assert.match(sql, /trg_protect_agency_setup_completion_columns/);
+    // Real DDL only — the file's own header prose says "No DROP TABLE / DROP
+    // COLUMN", which would otherwise false-positive a naive substring check.
+    assert.doesNotMatch(sql, /^\s*DROP TABLE\b/m);
+    assert.doesNotMatch(sql, /^\s*DROP COLUMN\b/m);
+    assert.doesNotMatch(sql, /^\s*ALTER TABLE[^;]*DROP COLUMN/m);
+    // The generic deferred-fact table never gates agency setup.
+    const gateFnBody = sql.slice(
+      sql.indexOf("CREATE OR REPLACE FUNCTION public.org_setup_is_complete"),
+      sql.indexOf("CREATE OR REPLACE FUNCTION public.org_setup_allows_create"),
+    );
+    assert.doesNotMatch(gateFnBody, /compliance_fact_answers/);
+  });
+
+  it("locks compliance_fact_answers to org members, writes to admins/managers", () => {
+    const sql = read("../../supabase/migrations/20260915080000_agency_setup_questionnaire.sql");
+    assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
+    assert.match(sql, /is_org_member\(organization_id, auth\.uid\(\)\)/);
+    assert.match(sql, /is_org_admin_or_manager\(organization_id, auth\.uid\(\)\)/);
+  });
+
   it("does not write service area into specializations", () => {
     const fns = read("./agency-setup-persist.ts");
     const profile = read("../routes/dashboard.nectar-company-profile.tsx");
@@ -437,7 +566,6 @@ describe("unit: SQL source review (not a live database)", () => {
     assert.match(fns, /service_area: nextArea/);
     assert.doesNotMatch(fns, /setup_create_gate_exempt:/);
     assert.doesNotMatch(profile, /Service area: \$\{/);
-    assert.match(profile, /service_area: draft\.serviceArea/);
     assert.doesNotMatch(profile, /localStorage|onboardingLSKey|notifyOnboardingChanged/);
   });
 });
@@ -450,12 +578,22 @@ describe("unit: persist rollback when a later step fails", () => {
       fact_operates_ol_site: null,
       fact_uses_volunteers: null,
       fact_has_governing_board: null,
+      fact_provides_respite_overnight: null,
+      fact_is_usor_vendor: null,
+      fact_supports_self_administered_medication: null,
+      fact_acts_as_representative_payee: null,
+      fact_provides_transportation: null,
       services_offered: ["HHS"],
       approx_client_count: null,
       service_area: null,
+      dhhs_provider_id: null,
+      sei_award_date: null,
       setup_create_gate_exempt: false,
       fact_answers_updated_at: null,
       fact_answers_updated_by: null,
+      setup_completed_at: null,
+      setup_completed_by: null,
+      setup_questionnaire_version: null,
     };
     const updates: unknown[] = [];
     const supabase = {
@@ -508,4 +646,3 @@ describe("unit: persist rollback when a later step fails", () => {
     assert.deepEqual(restore.payload.services_offered, ["HHS"]);
   });
 });
-

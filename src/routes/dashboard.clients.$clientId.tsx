@@ -54,6 +54,8 @@ import { displayMedicaidId } from "@/lib/medicaid-id";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
+import { ComplianceFactsPanel } from "@/components/compliance/compliance-facts-panel";
+import { onClientDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import {
@@ -249,6 +251,7 @@ function ClientProfileHub() {
   const router = useRouter();
   const orgId = org?.organization_id;
   const recordAccessFn = useServerFn(recordPhiAccess);
+  const clientDutyFactsChangedFn = useServerFn(onClientDutyFactsChanged);
   const chartAuditLogged = useRef(false);
 
   useEffect(() => {
@@ -539,6 +542,18 @@ function ClientProfileHub() {
               <RightsRestrictionsPanel clientId={clientId} />
             </SectionPanel>
           </SectionGroup>
+          <ComplianceFactsPanel
+            scope="client"
+            entityId={clientId}
+            organizationId={orgId ?? ""}
+            canEdit={!!orgId}
+            title="Client compliance facts"
+            reevaluate={
+              orgId
+                ? () => clientDutyFactsChangedFn({ data: { organizationId: orgId, clientId } })
+                : undefined
+            }
+          />
           <CustomFieldsForSection clientId={clientId} section="compliance" />
         </TabsContent>
       </Tabs>

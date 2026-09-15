@@ -56,15 +56,24 @@ describe("live-path setup questions", () => {
     assert.ok(AWARDED_CODE_CHOICES.includes("SEI"));
   });
 
-  it("reuses the company-profile code set instead of a second questionnaire", () => {
+  it("reuses the one shared service-code registry instead of a second questionnaire", () => {
     const src = readFileSync(
       fileURLToPath(new URL("../../routes/dashboard.nectar-company-profile.tsx", import.meta.url)),
       "utf8",
     );
-    for (const code of AWARDED_CODE_CHOICES) {
-      assert.match(src, new RegExp(`"${code}"`));
-    }
+    // The company-profile page must import its code choices from the same
+    // registry AWARDED_CODE_CHOICES is built from — not hand-roll its own
+    // list (that drift is exactly what caused the original six-code gap).
+    assert.match(src, /awardableServiceCodeChoices/);
+    assert.match(src, /@\/lib\/service-code-registry/);
     assert.doesNotMatch(src, /does this (duty|obligation|section) apply/i);
+  });
+
+  it("AWARDED_CODE_CHOICES is the full service-code registry, not a hand-picked subset", () => {
+    assert.ok(AWARDED_CODE_CHOICES.length >= 40, "expected the full registry, not a shortlist");
+    for (const code of ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS", "PPS", "PBA"]) {
+      assert.ok(AWARDED_CODE_CHOICES.includes(code), `missing ${code}`);
+    }
   });
 
   it("does not invent an SEI org fact_key for agency code rows", () => {

@@ -43,10 +43,12 @@ function consoleErrorsOf(page: Page): string[] {
 
 async function waitForSchedulerChrome(page: Page) {
   try {
-    // "Publish" is unique to the admin scheduler brand bar. getByText("SCHEDULER")
-    // is case-insensitive and also matches the sidebar "Scheduler" link / h1.
+    // "Publish" is unique to the admin scheduler tab bar. The page title
+    // "Scheduler" also appears in the persistent dark header and the sidebar
+    // link, so scope the heading lookup to the <main> content landmark
+    // (PageShell's own <h1>) to avoid a strict-mode multi-match.
     await expect(page.getByRole("button", { name: /^Publish$/ })).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByText("HIVE SCHEDULER")).toBeVisible();
+    await expect(page.getByRole("main").getByRole("heading", { name: "Scheduler" })).toBeVisible();
   } catch (err) {
     const dump = await page.evaluate(() => ({
       href: location.href,

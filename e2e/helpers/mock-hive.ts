@@ -9,6 +9,11 @@
 import { expect, type Page, type Route } from "@playwright/test";
 import { toCrossJSONAsync } from "seroval";
 import {
+  EMPTY_AGENCY_SETUP_FACTS,
+  computeAgencySetupStatus,
+  type AgencySetupFacts,
+} from "../../src/lib/agency-setup-gate";
+import {
   ALL_PERMISSIONS,
   DEFAULT_MATRIX,
   PROVIDER_ROLES,
@@ -771,8 +776,93 @@ function inferServerFn(url: string, body: string): string {
   return "";
 }
 
+// Mutable so a persistAgencySetupFacts POST in a test is reflected by the
+// next getAgencySetupStatus GET — screenshots/interactions stay consistent
+// end-to-end instead of resetting on every call.
+let mockAgencySetupFacts: AgencySetupFacts = {
+  ...EMPTY_AGENCY_SETUP_FACTS,
+  servicesOffered: ["HHS", "RHS", "SEI", "PBA"],
+  operates_ol_site: true,
+  uses_volunteers: false,
+  has_governing_board: true,
+  approxClientCount: 12,
+  serviceArea: "Salt Lake, Davis",
+  dhhsProviderId: "1234567890",
+};
+
 function serverFnPayload(url: string, body: string): unknown {
   const fn = inferServerFn(url, body);
+  if (/getAgencySetupStatus/i.test(fn)) {
+    const status = computeAgencySetupStatus(mockAgencySetupFacts);
+    return { ...status, organizationId: ORG_ID, facts: mockAgencySetupFacts };
+  }
+  if (/persistAgencySetupFacts/i.test(fn)) {
+    try {
+      const parsed = JSON.parse(body) as {
+        data?: Partial<AgencySetupFacts> & Record<string, unknown>;
+      };
+      const data = parsed.data ?? {};
+      mockAgencySetupFacts = {
+        ...mockAgencySetupFacts,
+        ...(data.operates_ol_site !== undefined
+          ? { operates_ol_site: data.operates_ol_site as never }
+          : {}),
+        ...(data.uses_volunteers !== undefined
+          ? { uses_volunteers: data.uses_volunteers as never }
+          : {}),
+        ...(data.has_governing_board !== undefined
+          ? { has_governing_board: data.has_governing_board as never }
+          : {}),
+        ...("servicesOffered" in data
+          ? { servicesOffered: (data as { servicesOffered: string[] }).servicesOffered }
+          : {}),
+        ...("approxClientCount" in data
+          ? { approxClientCount: (data as { approxClientCount: number | null }).approxClientCount }
+          : {}),
+        ...("serviceArea" in data
+          ? { serviceArea: (data as { serviceArea: string | null }).serviceArea }
+          : {}),
+        ...("dhhsProviderId" in data
+          ? { dhhsProviderId: (data as { dhhsProviderId: string | null }).dhhsProviderId }
+          : {}),
+        ...("seiAwardDate" in data
+          ? { seiAwardDate: (data as { seiAwardDate: string | null }).seiAwardDate }
+          : {}),
+        ...("providesRespiteOvernight" in data
+          ? {
+              providesRespiteOvernight: (data as { providesRespiteOvernight: boolean | null })
+                .providesRespiteOvernight,
+            }
+          : {}),
+        ...("isUsorVendor" in data
+          ? { isUsorVendor: (data as { isUsorVendor: boolean | null }).isUsorVendor }
+          : {}),
+        ...("supportsSelfAdministeredMedication" in data
+          ? {
+              supportsSelfAdministeredMedication: (
+                data as { supportsSelfAdministeredMedication: boolean | null }
+              ).supportsSelfAdministeredMedication,
+            }
+          : {}),
+        ...("actsAsRepresentativePayee" in data
+          ? {
+              actsAsRepresentativePayee: (data as { actsAsRepresentativePayee: boolean | null })
+                .actsAsRepresentativePayee,
+            }
+          : {}),
+        ...("providesTransportation" in data
+          ? {
+              providesTransportation: (data as { providesTransportation: boolean | null })
+                .providesTransportation,
+            }
+          : {}),
+      };
+    } catch {
+      /* leave mock state untouched on unparseable body */
+    }
+    const status = computeAgencySetupStatus(mockAgencySetupFacts);
+    return { facts: mockAgencySetupFacts, status, activatedRules: false, canActivateAny: false };
+  }
   if (/createEmployeeManually/i.test(fn)) {
     return { userId: "00000000-0000-4000-a000-000000000499", email: "sep1.tester@example.test" };
   }

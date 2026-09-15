@@ -5,11 +5,17 @@
 
 import { allSowCatalogEntries } from "../sow-obligation-catalog.ts";
 import { resolveCatalogExceptions, type CatalogExceptions } from "./catalog-exceptions.ts";
+import { awardableServiceCodeChoices } from "../service-code-registry.ts";
 
 export const AWARDED_SERVICE_CODES_FACT_KEY = "awarded_service_codes" as const;
 
-/** Same live codes the company profile already records. Not a second catalog. */
-export const AWARDED_CODE_CHOICES = ["HHS", "SLN", "SLH", "SEI", "DSI", "RHS"] as const;
+/**
+ * Every SOW service code an agency can be awarded — sourced from
+ * src/lib/service-code-registry.ts, the one authoritative code list. Do not
+ * hand-roll a narrower list anywhere else; every surface that lets an owner
+ * pick awarded codes (compliance setup, company profile) must import this.
+ */
+export const AWARDED_CODE_CHOICES: readonly string[] = awardableServiceCodeChoices();
 
 export type SetupFactSource =
   | "org_profile"

@@ -434,8 +434,10 @@ export function EmployeesPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {membersLoading ? (
-          <div className="flex items-center justify-center gap-2 p-12 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading employees…
+          <div className="space-y-2 p-4">
+            <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+            <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+            <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
           </div>
         ) : !visibleMembers.length ? (
           <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">

@@ -7,12 +7,13 @@ import {
   type PersistOrgFactsInput,
 } from "./obligations/applicability.ts";
 import { canActivate } from "./obligations/draft-rules/publication.ts";
+import { AGENCY_SETUP_QUESTIONS_VERSION } from "./obligations/agency-setup-questions.ts";
 import {
   AGENCY_SETUP_INCOMPLETE_MESSAGE,
   computeAgencySetupStatus,
   EMPTY_AGENCY_SETUP_FACTS,
   parseApproxCount,
-  parseServiceAreaColumn,
+  parseNullableTrimmedString,
   reevaluateAgencyRequirements,
   setupFactsFromOrgRow,
   type AgencySetupFacts,
@@ -22,19 +23,53 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
-const SETUP_ORG_COLUMNS =
-  "fact_operates_ol_site, fact_uses_volunteers, fact_has_governing_board, services_offered, approx_client_count, service_area, setup_create_gate_exempt";
+const SETUP_ORG_COLUMNS = [
+  "fact_operates_ol_site",
+  "fact_uses_volunteers",
+  "fact_has_governing_board",
+  "fact_provides_respite_overnight",
+  "fact_is_usor_vendor",
+  "fact_supports_self_administered_medication",
+  "fact_acts_as_representative_payee",
+  "fact_provides_transportation",
+  "services_offered",
+  "approx_client_count",
+  "service_area",
+  "dhhs_provider_id",
+  "sei_award_date",
+  "fact_community_program_total_persons_served",
+  "setup_create_gate_exempt",
+].join(", ");
+
+const AUDIT_ONLY_COLUMNS = [
+  "fact_answers_updated_at",
+  "fact_answers_updated_by",
+  "setup_completed_at",
+  "setup_completed_by",
+  "setup_questionnaire_version",
+].join(", ");
 
 type OrgSetupSnapshot = {
   fact_operates_ol_site: unknown;
   fact_uses_volunteers: unknown;
   fact_has_governing_board: unknown;
+  fact_provides_respite_overnight: unknown;
+  fact_is_usor_vendor: unknown;
+  fact_supports_self_administered_medication: unknown;
+  fact_acts_as_representative_payee: unknown;
+  fact_provides_transportation: unknown;
   services_offered: unknown;
   approx_client_count: unknown;
   service_area: unknown;
+  dhhs_provider_id: unknown;
+  sei_award_date: unknown;
+  fact_community_program_total_persons_served: unknown;
   setup_create_gate_exempt?: unknown;
   fact_answers_updated_at?: unknown;
   fact_answers_updated_by?: unknown;
+  setup_completed_at?: unknown;
+  setup_completed_by?: unknown;
+  setup_questionnaire_version?: unknown;
 };
 
 export function columnsMissing(message: string | undefined): boolean {
@@ -97,6 +132,14 @@ export async function assertAgencySetupCompleteForOrg(
 export type PersistAgencySetupInput = PersistOrgFactsInput & {
   approxClientCount?: number | null;
   serviceArea?: string | null;
+  dhhsProviderId?: string | null;
+  seiAwardDate?: string | null;
+  providesRespiteOvernight?: boolean | null;
+  isUsorVendor?: boolean | null;
+  supportsSelfAdministeredMedication?: boolean | null;
+  actsAsRepresentativePayee?: boolean | null;
+  providesTransportation?: boolean | null;
+  communityProgramTotalPersonsServed?: number | null;
 };
 
 async function readOrgSetupSnapshot(
@@ -105,7 +148,7 @@ async function readOrgSetupSnapshot(
 ): Promise<OrgSetupSnapshot | null> {
   const { data, error } = await supabase
     .from("organizations")
-    .select(`${SETUP_ORG_COLUMNS}, fact_answers_updated_at, fact_answers_updated_by`)
+    .select(`${SETUP_ORG_COLUMNS}, ${AUDIT_ONLY_COLUMNS}`)
     .eq("id", organizationId)
     .maybeSingle();
   if (error && !columnsMissing(error.message)) throw new Error(error.message);
@@ -113,8 +156,11 @@ async function readOrgSetupSnapshot(
 }
 
 /**
- * One organizations UPDATE for all six facts. If a later step fails,
- * restore the snapshot so a partial save does not stick.
+ * One organizations UPDATE for every answered fact. If a later step (the
+ * applicability recompute) fails, restore the pre-update snapshot so a
+ * partial save never sticks — the closest thing to a transaction the
+ * Supabase client here supports, and the same compensating-rollback shape
+ * already covered by agency-setup-gate.integration.test.ts.
  */
 export async function persistAgencySetupFactsInternal(
   supabase: AnySupabase,
@@ -140,19 +186,90 @@ export async function persistAgencySetupFactsInternal(
       : existingFacts.approxClientCount;
   const nextArea =
     answers.serviceArea !== undefined
-      ? parseServiceAreaColumn(answers.serviceArea)
+      ? parseNullableTrimmedString(answers.serviceArea)
       : existingFacts.serviceArea;
+  const nextProviderId =
+    answers.dhhsProviderId !== undefined
+      ? parseNullableTrimmedString(answers.dhhsProviderId)
+      : existingFacts.dhhsProviderId;
+  const nextSeiAwardDate =
+    answers.seiAwardDate !== undefined
+      ? parseNullableTrimmedString(answers.seiAwardDate)
+      : existingFacts.seiAwardDate;
+  const nextCommunityProgramTotal =
+    answers.communityProgramTotalPersonsServed !== undefined
+      ? parseApproxCount(answers.communityProgramTotalPersonsServed)
+      : existingFacts.communityProgramTotalPersonsServed;
 
-  const orgUpdate = {
-    fact_operates_ol_site: answers.operates_ol_site,
-    fact_uses_volunteers: answers.uses_volunteers,
-    fact_has_governing_board: answers.has_governing_board,
+  const factsForApplicability: AgencySetupFacts = {
+    operates_ol_site:
+      answers.operates_ol_site !== undefined
+        ? answers.operates_ol_site
+        : existingFacts.operates_ol_site,
+    uses_volunteers:
+      answers.uses_volunteers !== undefined
+        ? answers.uses_volunteers
+        : existingFacts.uses_volunteers,
+    has_governing_board:
+      answers.has_governing_board !== undefined
+        ? answers.has_governing_board
+        : existingFacts.has_governing_board,
+    servicesOffered: nextServices,
+    approxClientCount: nextCount,
+    serviceArea: nextArea,
+    dhhsProviderId: nextProviderId,
+    seiAwardDate: nextSeiAwardDate,
+    providesRespiteOvernight:
+      answers.providesRespiteOvernight !== undefined
+        ? answers.providesRespiteOvernight
+        : existingFacts.providesRespiteOvernight,
+    isUsorVendor:
+      answers.isUsorVendor !== undefined ? answers.isUsorVendor : existingFacts.isUsorVendor,
+    supportsSelfAdministeredMedication:
+      answers.supportsSelfAdministeredMedication !== undefined
+        ? answers.supportsSelfAdministeredMedication
+        : existingFacts.supportsSelfAdministeredMedication,
+    actsAsRepresentativePayee:
+      answers.actsAsRepresentativePayee !== undefined
+        ? answers.actsAsRepresentativePayee
+        : existingFacts.actsAsRepresentativePayee,
+    providesTransportation:
+      answers.providesTransportation !== undefined
+        ? answers.providesTransportation
+        : existingFacts.providesTransportation,
+    communityProgramTotalPersonsServed: nextCommunityProgramTotal,
+  };
+
+  const willBeComplete = computeAgencySetupStatus(factsForApplicability, {
+    createGateExempt: createGateExemptFromRow(existing),
+  }).complete;
+
+  const orgUpdate: Record<string, unknown> = {
+    fact_operates_ol_site: factsForApplicability.operates_ol_site,
+    fact_uses_volunteers: factsForApplicability.uses_volunteers,
+    fact_has_governing_board: factsForApplicability.has_governing_board,
+    fact_provides_respite_overnight: factsForApplicability.providesRespiteOvernight,
+    fact_is_usor_vendor: factsForApplicability.isUsorVendor,
+    fact_supports_self_administered_medication:
+      factsForApplicability.supportsSelfAdministeredMedication,
+    fact_acts_as_representative_payee: factsForApplicability.actsAsRepresentativePayee,
+    fact_provides_transportation: factsForApplicability.providesTransportation,
     ...(answers.servicesOffered !== undefined ? { services_offered: nextServices } : {}),
     ...(answers.approxClientCount !== undefined ? { approx_client_count: nextCount } : {}),
     ...(answers.serviceArea !== undefined ? { service_area: nextArea } : {}),
+    ...(answers.dhhsProviderId !== undefined ? { dhhs_provider_id: nextProviderId } : {}),
+    ...(answers.seiAwardDate !== undefined ? { sei_award_date: nextSeiAwardDate } : {}),
+    ...(answers.communityProgramTotalPersonsServed !== undefined
+      ? { fact_community_program_total_persons_served: nextCommunityProgramTotal }
+      : {}),
     fact_answers_updated_at: new Date().toISOString(),
     fact_answers_updated_by: userId,
   };
+  if (willBeComplete) {
+    orgUpdate.setup_completed_at = new Date().toISOString();
+    orgUpdate.setup_completed_by = userId;
+    orgUpdate.setup_questionnaire_version = AGENCY_SETUP_QUESTIONS_VERSION;
+  }
 
   const { error: updateErr } = await supabase
     .from("organizations")
@@ -161,20 +278,11 @@ export async function persistAgencySetupFactsInternal(
   if (updateErr) {
     if (columnsMissing(updateErr.message)) {
       throw new Error(
-        "Agency setup columns are not live yet. Soft Core must apply the setup-gate SQL first.",
+        "Agency setup columns are not live yet. Soft Core must apply the setup-questionnaire SQL first.",
       );
     }
     throw new Error(updateErr.message);
   }
-
-  const factsForApplicability: AgencySetupFacts = {
-    operates_ol_site: answers.operates_ol_site,
-    uses_volunteers: answers.uses_volunteers,
-    has_governing_board: answers.has_governing_board,
-    servicesOffered: nextServices,
-    approxClientCount: nextCount,
-    serviceArea: nextArea,
-  };
 
   try {
     const applicability = computeObligationApplicability(factsForApplicability);
@@ -187,11 +295,24 @@ export async function persistAgencySetupFactsInternal(
           fact_operates_ol_site: existing.fact_operates_ol_site ?? null,
           fact_uses_volunteers: existing.fact_uses_volunteers ?? null,
           fact_has_governing_board: existing.fact_has_governing_board ?? null,
+          fact_provides_respite_overnight: existing.fact_provides_respite_overnight ?? null,
+          fact_is_usor_vendor: existing.fact_is_usor_vendor ?? null,
+          fact_supports_self_administered_medication:
+            existing.fact_supports_self_administered_medication ?? null,
+          fact_acts_as_representative_payee: existing.fact_acts_as_representative_payee ?? null,
+          fact_provides_transportation: existing.fact_provides_transportation ?? null,
           services_offered: existing.services_offered,
           approx_client_count: existing.approx_client_count,
           service_area: existing.service_area,
+          dhhs_provider_id: existing.dhhs_provider_id,
+          sei_award_date: existing.sei_award_date,
+          fact_community_program_total_persons_served:
+            existing.fact_community_program_total_persons_served,
           fact_answers_updated_at: existing.fact_answers_updated_at ?? null,
           fact_answers_updated_by: existing.fact_answers_updated_by ?? null,
+          setup_completed_at: existing.setup_completed_at ?? null,
+          setup_completed_by: existing.setup_completed_by ?? null,
+          setup_questionnaire_version: existing.setup_questionnaire_version ?? null,
         })
         .eq("id", organizationId);
       if (restoreErr && !columnsMissing(restoreErr.message)) {

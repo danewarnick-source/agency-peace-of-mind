@@ -1,114 +1,27 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight, ClipboardList, Hexagon, Sparkles, X } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { dismissAdminWelcome } from "@/lib/admin-home-welcome.functions";
-import { persistAgencySetupFacts } from "@/lib/agency-setup-gate.functions";
-import {
-  AGENCY_SETUP_PATH,
-  REQUIRED_SETUP_QUESTIONS,
-  canSkipAgencySetup,
-  type AgencySetupFacts,
-} from "@/lib/agency-setup-gate";
-import { AWARDED_CODE_CHOICES } from "@/lib/obligations/setup-facts";
+import { AGENCY_SETUP_PATH, canSkipAgencySetup } from "@/lib/agency-setup-gate";
 import { agencySetupQueryKey, useAgencySetup } from "@/hooks/use-agency-setup";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
-type FactAnswer = boolean | null;
-
-type Draft = {
-  services: string[];
-  operates_ol_site: FactAnswer;
-  uses_volunteers: FactAnswer;
-  has_governing_board: FactAnswer;
-  clientCount: string;
-  serviceArea: string;
-};
-
-const EMPTY_DRAFT: Draft = {
-  services: [],
-  operates_ol_site: null,
-  uses_volunteers: null,
-  has_governing_board: null,
-  clientCount: "",
-  serviceArea: "",
-};
-
-const FACT_CHOICES: Array<{ value: FactAnswer; label: string }> = [
-  { value: true, label: "Yes" },
-  { value: false, label: "No" },
-];
-
-function factsToDraft(facts: AgencySetupFacts): Draft {
-  return {
-    services: facts.servicesOffered,
-    operates_ol_site: facts.operates_ol_site,
-    uses_volunteers: facts.uses_volunteers,
-    has_governing_board: facts.has_governing_board,
-    clientCount: facts.approxClientCount == null ? "" : String(facts.approxClientCount),
-    serviceArea: facts.serviceArea ?? "",
-  };
-}
-
-export function NectarOnboardingPanel({
-  welcomeFlag = false,
-}: {
-  welcomeFlag?: boolean;
-}) {
+export function NectarOnboardingPanel({ welcomeFlag = false }: { welcomeFlag?: boolean }) {
   const { data: org } = useCurrentOrg();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const dismissWelcome = useServerFn(dismissAdminWelcome);
-  const persistFacts = useServerFn(persistAgencySetupFacts);
   const orgId = org?.organization_id;
   const orgName = org?.organization_name ?? "your agency";
-  const { status, facts, isLoading } = useAgencySetup();
+  const { status } = useAgencySetup();
 
   const [dismissedNow, setDismissedNow] = useState(false);
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    if (!orgId || isLoading || hydrated) return;
-    setDraft(factsToDraft(facts));
-    setHydrated(true);
-  }, [orgId, isLoading, hydrated, facts]);
 
   const canSkip = canSkipAgencySetup(status);
   const shouldShow = !!orgId && !dismissedNow && (welcomeFlag || !status.complete);
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!orgId || !user?.id) throw new Error("No organization selected.");
-      const count = draft.clientCount.trim() === "" ? null : Number(draft.clientCount);
-      return persistFacts({
-        data: {
-          organizationId: orgId,
-          operates_ol_site: draft.operates_ol_site,
-          uses_volunteers: draft.uses_volunteers,
-          has_governing_board: draft.has_governing_board,
-          servicesOffered: draft.services,
-          approxClientCount: Number.isFinite(count as number) ? (count as number) : null,
-          serviceArea: draft.serviceArea.trim() || null,
-        },
-      });
-    },
-    onSuccess: async () => {
-      toast.success("Operating facts saved");
-      await queryClient.invalidateQueries({ queryKey: agencySetupQueryKey(orgId) });
-    },
-    onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : "Could not save setup facts");
-    },
-  });
 
   if (!shouldShow || !orgId) return null;
 
@@ -129,7 +42,10 @@ export function NectarOnboardingPanel({
       data-testid="agency-setup-panel"
     >
       <div className="pointer-events-none absolute -right-12 -top-12 opacity-20">
-        <Hexagon className="h-56 w-56 text-[color:var(--amber-400,var(--hive-gold))]" strokeWidth={1} />
+        <Hexagon
+          className="h-56 w-56 text-[color:var(--amber-400,var(--hive-gold))]"
+          strokeWidth={1}
+        />
       </div>
 
       <div className="relative flex flex-col gap-4 border-b border-amber-300/15 px-5 py-5 sm:px-7">
@@ -176,145 +92,32 @@ export function NectarOnboardingPanel({
           />
         </div>
 
-        {!canSkip ? (
-          <p className="text-xs text-amber-100/80">
-            Skip is disabled until all required operating questions are answered.
-          </p>
-        ) : (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={dismiss}
-            className="self-start bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]"
+            asChild
+            className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]"
           >
-            Dismiss and go to dashboard
-            <ArrowRight className="ml-1 h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      {!status.complete && (
-        <form
-          className="relative space-y-4 px-5 py-5 sm:px-7"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-        >
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">
-              {REQUIRED_SETUP_QUESTIONS[0]?.question}
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {AWARDED_CODE_CHOICES.map((code) => {
-                const selected = draft.services.includes(code);
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        services: selected
-                          ? prev.services.filter((c) => c !== code)
-                          : [...prev.services, code],
-                      }))
-                    }
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium",
-                      selected
-                        ? "border-[color:var(--amber-400,var(--hive-gold))] bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733]"
-                        : "border-white/15 bg-white/[0.04] text-amber-100/80",
-                    )}
-                  >
-                    {code}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          {(
-            [
-              ["operates_ol_site", REQUIRED_SETUP_QUESTIONS[1]],
-              ["uses_volunteers", REQUIRED_SETUP_QUESTIONS[2]],
-              ["has_governing_board", REQUIRED_SETUP_QUESTIONS[3]],
-            ] as const
-          ).map(([key, q]) => (
-            <fieldset key={key} className="space-y-2">
-              <legend className="text-sm font-medium">{q?.question}</legend>
-              <div className="flex flex-wrap gap-2">
-                {FACT_CHOICES.map((choice) => {
-                  const selected = draft[key] === choice.value;
-                  return (
-                    <button
-                      key={String(choice.value)}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => setDraft((prev) => ({ ...prev, [key]: choice.value }))}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-sm",
-                        selected
-                          ? "border-[color:var(--amber-400,var(--hive-gold))] bg-amber-400/15"
-                          : "border-white/15 bg-white/[0.04] text-amber-100/80",
-                      )}
-                    >
-                      {choice.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-          ))}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs text-amber-100/90">
-                {REQUIRED_SETUP_QUESTIONS[4]?.question}
-              </Label>
-              <Input
-                inputMode="numeric"
-                value={draft.clientCount}
-                onChange={(e) => setDraft((prev) => ({ ...prev, clientCount: e.target.value }))}
-                className="mt-1 border-white/15 bg-white/5 text-amber-50"
-                placeholder="e.g. 24"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-amber-100/90">
-                {REQUIRED_SETUP_QUESTIONS[5]?.question}
-              </Label>
-              <Input
-                value={draft.serviceArea}
-                onChange={(e) => setDraft((prev) => ({ ...prev, serviceArea: e.target.value }))}
-                className="mt-1 border-white/15 bg-white/5 text-amber-50"
-                placeholder="e.g. Salt Lake, Davis"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button
-              type="submit"
-              disabled={save.isPending}
-              className="bg-[color:var(--amber-500,var(--hive-gold))] text-[#0b1733] hover:bg-[color:var(--amber-400,var(--hive-gold))]"
-            >
-              {save.isPending ? "Saving…" : "Save operating facts"}
+            <Link to={AGENCY_SETUP_PATH}>
+              <ClipboardList className="mr-1 h-4 w-4" />
+              {status.complete ? "Review agency setup" : "Continue agency setup"}
               <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
+            </Link>
+          </Button>
+          {!canSkip ? (
+            <p className="text-xs text-amber-100/80">
+              Skip is disabled until all required operating questions are answered.
+            </p>
+          ) : (
             <Button
-              type="button"
-              variant="outline"
-              asChild
-              className="border-amber-300/40 bg-transparent text-amber-50 hover:bg-white/10"
+              variant="ghost"
+              onClick={dismiss}
+              className="text-amber-100 hover:bg-white/10 hover:text-amber-50"
             >
-              <Link to={AGENCY_SETUP_PATH}>
-                <ClipboardList className="mr-1 h-4 w-4" />
-                Open full setup
-              </Link>
+              Dismiss and go to dashboard
             </Button>
-          </div>
-        </form>
-      )}
+          )}
+        </div>
+      </div>
     </section>
   );
 }

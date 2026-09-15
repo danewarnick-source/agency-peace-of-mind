@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChoreChartForTeam } from "@/components/chores/chore-chart-mount";
+import { ComplianceFactsPanel } from "@/components/compliance/compliance-facts-panel";
 
 export const Route = createFileRoute("/dashboard/homes/$teamId")({
   head: () => ({ meta: [{ title: "Home details — Provider Interface" }] }),
@@ -426,6 +427,14 @@ function HomeDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ComplianceFactsPanel
+        scope="location"
+        entityId={team.id}
+        organizationId={orgId ?? ""}
+        canEdit={!!orgId}
+        title="Location compliance facts"
+      />
 
       {/* Residents + ratios */}
       <Card>

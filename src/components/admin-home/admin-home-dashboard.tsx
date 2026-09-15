@@ -5,7 +5,6 @@
 import { Suspense, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { PI_GRAIN_SVG, PI_THEME } from "@/lib/pi-theme";
 import { cn } from "@/lib/utils";
 import { greetingWord, useAdminHomeData } from "@/components/admin-home/use-admin-home-data";
 import { AdminHomeWelcome } from "@/components/admin-home/admin-home-welcome";
@@ -24,42 +23,10 @@ import { isAdminLevelRole } from "@/lib/obligations/escalation";
 import "@/components/compliance/decision-card.css";
 import "./admin-home-decisions.css";
 
-const SERIF = { fontFamily: PI_THEME.serif } as const;
-const SANS = { fontFamily: PI_THEME.sans } as const;
-
 type HomeTab = "this-week" | "review-day" | "what-changed";
 
-function Grain() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0"
-      style={{
-        opacity: PI_THEME.grainOpacity,
-        mixBlendMode: "overlay",
-        backgroundImage: `url("${PI_GRAIN_SVG}")`,
-      }}
-    />
-  );
-}
-
-function PageGlow() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0"
-      style={{ background: PI_THEME.pageGlow }}
-    />
-  );
-}
-
 function Skeleton({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn("animate-pulse rounded-md", className)}
-      style={{ background: PI_THEME.c08 }}
-    />
-  );
+  return <div className={cn("animate-pulse rounded-md bg-muted", className)} />;
 }
 
 function ReviewDayPanel({ orgId }: { orgId: string }) {
@@ -84,44 +51,26 @@ function ReviewDayPanel({ orgId }: { orgId: string }) {
 
   return (
     <section data-testid="review-day" className="space-y-4">
-      <h2 className="text-[22px] font-semibold leading-tight" style={{ color: PI_THEME.cream }}>
-        Review day
-      </h2>
-      <p className="text-sm" style={{ color: PI_THEME.c50 }}>
+      <h2 className="text-[22px] font-semibold leading-tight text-foreground">Review day</h2>
+      <p className="text-sm text-muted-foreground">
         Draft a DSPD review from this week. A human must attest. Nothing publishes itself.
       </p>
       {metaLine ? (
-        <p data-testid="review-day-meta" className="text-sm" style={{ color: PI_THEME.c50 }}>
+        <p data-testid="review-day-meta" className="text-sm text-muted-foreground">
           {metaLine}
         </p>
       ) : null}
-      <button
-        type="button"
-        className="act-btn"
-        style={{
-          background: PI_THEME.buttons.primaryBg,
-          color: PI_THEME.buttons.primaryFg,
-          boxShadow: PI_THEME.buttons.primaryShadow,
-        }}
-        onClick={() => mut.mutate()}
-      >
+      <button type="button" className="act-btn hive-gold-btn" onClick={() => mut.mutate()}>
         Generate my DSPD review
       </button>
-      {mut.isPending ? (
-        <p className="text-sm" style={{ color: PI_THEME.c50 }}>
-          Generating draft.
-        </p>
-      ) : null}
+      {mut.isPending ? <p className="text-sm text-muted-foreground">Generating draft.</p> : null}
       {mut.isError ? (
-        <p className="text-sm" style={{ color: PI_THEME.c50 }}>
-          Could not generate the review.
-        </p>
+        <p className="text-sm text-muted-foreground">Could not generate the review.</p>
       ) : null}
       {reviewText ? (
         <pre
           data-testid="review-pack-text"
-          className="whitespace-pre-wrap text-sm"
-          style={{ color: PI_THEME.c70 }}
+          className="whitespace-pre-wrap text-sm text-muted-foreground"
         >
           {reviewText}
         </pre>
@@ -138,12 +87,12 @@ function WhatChangedPanel({
   const notes = changes.filter((c) => isHumanPackNote(c.note));
   return (
     <section data-testid="what-changed" className="space-y-3">
-      <h2 className="text-[22px] font-semibold leading-tight" style={{ color: PI_THEME.cream }}>
+      <h2 className="text-[22px] font-semibold leading-tight text-foreground">
         {whatChangedTitle(PACK_VERSION)}
       </h2>
       <ul className="space-y-2">
         {notes.map((c) => (
-          <li key={`${c.change_kind}:${c.obligation_key}`} className="text-sm" style={{ color: PI_THEME.c70 }}>
+          <li key={`${c.change_kind}:${c.obligation_key}`} className="text-sm text-muted-foreground">
             {c.note!.trim()}
           </li>
         ))}
@@ -187,23 +136,17 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
   const activeTab: HomeTab = tab === "what-changed" && !showWhatChanged ? "this-week" : tab;
 
   return (
-    <section
-      data-testid="admin-home-dashboard"
-      className="relative isolate min-h-full"
-      style={{ background: PI_THEME.navy, color: PI_THEME.cream, ...SANS }}
-    >
-      <PageGlow />
-      <Grain />
+    <section data-testid="admin-home-dashboard" className="relative isolate min-h-full">
       <div data-testid="home-column" className="home-column relative z-10 space-y-6">
         <Suspense fallback={null}>
           <AdminHomeWelcome welcomeFlag={welcomeFlag} />
         </Suspense>
         {orgId ? <NectarOnboardingPanel welcomeFlag={welcomeFlag} /> : null}
         <div>
-          <div className="text-lg font-semibold" style={{ ...SERIF, color: PI_THEME.cream }}>
+          <div className="text-lg font-semibold text-foreground">
             Good {greetingWord(now)}, {firstName}. Here's what needs your attention.
           </div>
-          <div className="text-sm" style={{ color: PI_THEME.c50 }}>
+          <div className="text-sm text-muted-foreground">
             {org ? `${orgName} · ${dateLine}` : dateLine}
           </div>
         </div>
@@ -216,9 +159,11 @@ function AdminHomeDashboardInner({ welcomeFlag = false }: { welcomeFlag?: boolea
                 key={t.id}
                 type="button"
                 role="tab"
-                className="home-tab"
+                className={cn(
+                  "home-tab",
+                  activeTab === t.id ? "text-foreground" : "text-muted-foreground",
+                )}
                 aria-selected={activeTab === t.id}
-                style={{ color: activeTab === t.id ? PI_THEME.cream : PI_THEME.c50 }}
                 onClick={() => setTab(t.id)}
               >
                 {t.label}
@@ -238,19 +183,11 @@ export function AdminHomeDashboard({ welcomeFlag = false }: { welcomeFlag?: bool
   return (
     <Suspense
       fallback={
-        <section
-          data-testid="admin-home-dashboard"
-          className="relative isolate min-h-full"
-          style={{ background: PI_THEME.navy, color: PI_THEME.cream }}
-        >
-          <PageGlow />
-          <Grain />
+        <section data-testid="admin-home-dashboard" className="relative isolate min-h-full">
           <div data-testid="home-column" className="home-column relative z-10 space-y-4">
             <div>
-              <div className="text-lg font-semibold">Good day</div>
-              <div className="text-sm" style={{ color: PI_THEME.c50 }}>
-                Loading workspace…
-              </div>
+              <div className="text-lg font-semibold text-foreground">Good day</div>
+              <div className="text-sm text-muted-foreground">Loading workspace…</div>
             </div>
             <Skeleton className="h-[220px] rounded-xl" />
           </div>

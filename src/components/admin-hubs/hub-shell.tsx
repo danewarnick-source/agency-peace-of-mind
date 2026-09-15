@@ -3,6 +3,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { Lock } from "lucide-react";
 import { UpgradeGate, FeatureLockedRoute } from "@/components/upgrade-gate";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
+import { PageShell } from "@/components/page-shell";
 
 export type HubTab = {
   key: string;
@@ -20,8 +21,9 @@ type Props = {
 };
 
 /**
- * Thin shell: a horizontal tab bar (URL-driven via ?tab=) above the active tab's
- * existing page component. Does not modify any wrapped page's behavior.
+ * Thin shell: PageShell's title/subtitle chrome plus a horizontal tab bar
+ * (URL-driven via ?tab=) above the active tab's existing page component.
+ * Does not modify any wrapped page's behavior.
  */
 export function HubShell({ title, subtitle, tabs, basePath }: Props) {
   const search = useSearch({ strict: false }) as { tab?: string };
@@ -32,12 +34,7 @@ export function HubShell({ title, subtitle, tabs, basePath }: Props) {
   const activeLocked = active.feature ? !isEnabled(active.feature) : false;
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-      </div>
-
+    <PageShell title={title} subtitle={subtitle}>
       {tabs.length > 1 && (
         <div className="mb-4 border-b border-border">
           <nav className="-mb-px flex flex-wrap gap-1" aria-label="Tabs">
@@ -91,6 +88,6 @@ export function HubShell({ title, subtitle, tabs, basePath }: Props) {
           onOpenChange={(o) => { if (!o) setUpgradeFeatureKey(null); }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

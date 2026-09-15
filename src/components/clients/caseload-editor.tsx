@@ -23,8 +23,10 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Search, Save, X, Tag } from "lucide-react";
+import { Search, Save, X, Tag, ShieldQuestion } from "lucide-react";
 import { setClientCaseload } from "@/lib/scheduler/setup.functions";
+import { ComplianceFactsPanel } from "@/components/compliance/compliance-facts-panel";
+import { onClientDutyFactsChanged } from "@/lib/staff-assignment-hooks.functions";
 
 type StaffOption = { id: string; name: string };
 
@@ -45,8 +47,10 @@ export function CaseloadEditor(props: CaseloadEditorProps) {
   const { clientId, draftMode = false, authorizedCodes, value, onChange } = props;
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const canEditCompliance = org?.role === "admin" || org?.role === "manager" || org?.role === "program_manager";
   const qc = useQueryClient();
   const saveFn = useServerFn(setClientCaseload);
+  const clientDutyFactsChangedFn = useServerFn(onClientDutyFactsChanged);
 
   // Staff pool (same in both modes).
   const staffQ = useQuery({
@@ -89,13 +93,13 @@ export function CaseloadEditor(props: CaseloadEditorProps) {
     enabled: !draftMode && !!orgId && !!clientId,
     queryKey: ["caseload-editor-current-v2", orgId, clientId],
     queryFn: async (): Promise<{
-      assignments: Array<{ staff_id: string; service_codes: string[] | null }>;
+      assignments: Array<{ id: string; staff_id: string; service_codes: string[] | null }>;
       codes: string[];
     }> => {
       const [a, c] = await Promise.all([
         supabase
           .from("staff_assignments")
-          .select("staff_id, service_codes")
+          .select("id, staff_id, service_codes")
           .eq("organization_id", orgId!)
           .eq("client_id", clientId!),
         supabase
@@ -112,11 +116,25 @@ export function CaseloadEditor(props: CaseloadEditorProps) {
         ...(((c.data as { job_code?: string[] } | null)?.job_code) ?? []),
       ].filter(Boolean)));
       return {
-        assignments: ((a.data ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>),
+        assignments: ((a.data ?? []) as Array<{
+          id: string; staff_id: string; service_codes: string[] | null;
+        }>),
         codes,
       };
     },
   });
+
+  // Real staff_assignments.id per staff, live mode only — a compliance fact
+  // keyed on "assignment" scope needs the actual row id, not just staff_id,
+  // so it stays specific to this one staff-client relationship and never
+  // silently doubles as a staff-wide flag. Only assignments that already
+  // exist in the database have one; a row just checked in this session but
+  // not yet saved does not.
+  const assignmentIdByStaff = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of currentQ.data?.assignments ?? []) m.set(r.staff_id, r.id);
+    return m;
+  }, [currentQ.data]);
 
   // Local state for live mode; draft mode is controlled via value/onChange.
   const [liveState, setLiveState] = useState<CaseloadDraftValue>(new Map());
@@ -319,6 +337,16 @@ export function CaseloadEditor(props: CaseloadEditorProps) {
                       summary={scopeSummary(scope)}
                     />
                   )}
+                  {checked && !draftMode && wasOriginal && assignmentIdByStaff.has(s.id) && orgId && clientId && (
+                    <AssignmentCompliancePopover
+                      assignmentId={assignmentIdByStaff.get(s.id)!}
+                      organizationId={orgId}
+                      canEdit={canEditCompliance}
+                      onAnswered={() =>
+                        clientDutyFactsChangedFn({ data: { organizationId: orgId, clientId } })
+                      }
+                    />
+                  )}
                   {checked && !wasOriginal && (
                     <Badge variant="default" className="text-[10px]">new</Badge>
                   )}
@@ -332,6 +360,51 @@ export function CaseloadEditor(props: CaseloadEditorProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Relationship-specific compliance facts for one staff-client assignment
+ * (e.g. FACT-060: is the assigned staff a legal guardian, Immediate
+ * Relative, or grandparent of this client — distinct from any staff-wide or
+ * client-wide flag). Keyed on the real staff_assignments.id, so an answer
+ * here can never leak onto a different pairing of the same staff or client.
+ */
+function AssignmentCompliancePopover({
+  assignmentId,
+  organizationId,
+  canEdit,
+  onAnswered,
+}: {
+  assignmentId: string;
+  organizationId: string;
+  canEdit: boolean;
+  onAnswered: () => Promise<unknown>;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] gap-1"
+          title="Compliance facts for this staff-client assignment"
+        >
+          <ShieldQuestion className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <ComplianceFactsPanel
+          scope="assignment"
+          entityId={assignmentId}
+          organizationId={organizationId}
+          canEdit={canEdit}
+          title="Assignment compliance facts"
+          reevaluate={onAnswered}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 

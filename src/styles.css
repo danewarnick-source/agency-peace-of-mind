@@ -398,9 +398,6 @@
   [data-dashboard-scroller] {
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   }
-  [data-dashboard-scroller][data-immersive] {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
 }
 
 /*
